@@ -1,60 +1,306 @@
 <!doctype html>
 <html lang="es">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>ViTAH — Tecnología para vivir mejor</title>
-    <meta
-      name="description"
-      content="ViTAH — PropTech para hogares saludables, eficientes e inteligentes. Estamos construyendo algo grande."
-    />
-    <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg" />
-    <link rel="stylesheet" href="/assets/style.css" />
-  </head>
-  <body>
-    <header class="site-header">
-      <a class="brand" href="/" aria-label="ViTAH">
-        <span class="brand-mark">ViTAH</span>
-        <span class="brand-descriptor">Tecnología para vivir mejor</span>
-      </a>
-    </header>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>ViTAH — Tecnología para vivir mejor</title>
+  <meta name="description" content="ViTAH — PropTech para hogares saludables, eficientes e inteligentes."/>
+  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg"/>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --g:#6B7A4A;--gd:#4A5E2C;--gl:#8A9B62;
+      --dark:#1E1E1E;--warm:#E8E7E2;--cream:#F5F4F0;
+      --sb:#12120E;--border:#E0DED8;
+      --sb-w:240px;--sb-w-collapsed:52px
+    }
+    html,body{height:100%}
+    body{
+      font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
+      background:var(--cream);color:var(--dark);
+      display:flex;height:100vh;overflow:hidden;font-size:13px;
+      -webkit-font-smoothing:antialiased
+    }
+    button{cursor:pointer;font-family:inherit}
+    ::-webkit-scrollbar{width:4px}
+    ::-webkit-scrollbar-thumb{background:#D4D3CE;border-radius:2px}
 
-    <main class="hero">
-      <div class="hero-content">
-        <p class="eyebrow">En construcción</p>
-        <h1>
-          Estamos construyendo
-          <span class="accent">algo grande</span>.
-        </h1>
-        <p class="lede">
-          ViTAH está dando forma al futuro de los hogares saludables, eficientes
-          e inteligentes. Vuelve pronto.
-        </p>
+    /* ── Sidebar ── */
+    #sidebar{
+      width:var(--sb-w);
+      background:var(--sb);
+      display:flex;flex-direction:column;flex-shrink:0;
+      border-right:1px solid rgba(255,255,255,.04);
+      overflow:hidden;
+      transition:width .28s cubic-bezier(.4,0,.2,1)
+    }
+    #sidebar.collapsed{ width:var(--sb-w-collapsed) }
 
-        <div class="cta-row">
-          <a class="btn-primary" href="https://portal.vitah.es"
-            >Acceder al portal</a
-          >
-          <a class="btn-ghost" href="mailto:hola@vitah.es">Contáctanos</a>
-        </div>
-      </div>
+    /* Logo */
+    #logo{
+      padding:30px 28px 26px;
+      border-bottom:1px solid rgba(255,255,255,.06);
+      flex-shrink:0;white-space:nowrap
+    }
+    #logo .wordmark{
+      color:var(--warm);font-size:20px;font-weight:600;
+      letter-spacing:.3em;line-height:1;
+      transition:opacity .18s
+    }
+    #logo .tagline{
+      color:rgba(107,122,74,.8);font-size:7.5px;letter-spacing:.28em;
+      text-transform:uppercase;margin-top:8px;font-weight:400;
+      transition:opacity .18s
+    }
+    #sidebar.collapsed #logo .wordmark,
+    #sidebar.collapsed #logo .tagline{ opacity:0 }
 
-      <figure class="hero-illustration" aria-hidden="true">
-        <img
-          src="/assets/under-construction.svg"
-          alt="Ilustración de una casa en construcción"
-        />
-      </figure>
-    </main>
+    /* Nav */
+    nav{flex:1;padding:20px 0 8px;overflow-y:auto;overflow-x:hidden;white-space:nowrap}
+    .nav-label{
+      padding:0 28px 10px;font-size:9px;letter-spacing:.22em;
+      text-transform:uppercase;color:rgba(232,231,226,.2);font-weight:500;
+      transition:opacity .18s
+    }
+    #sidebar.collapsed .nav-label{ opacity:0 }
 
-    <footer class="site-footer">
-      <span>© <span id="year"></span> ViTAH</span>
-      <span class="dot">·</span>
-      <span>Tecnología para vivir mejor</span>
-    </footer>
+    nav button{
+      width:100%;display:flex;align-items:center;
+      padding:12px 28px;border:none;background:transparent;
+      text-align:left;transition:background .15s,border-color .15s;
+      border-left:1px solid transparent;overflow:hidden
+    }
+    nav button .num{
+      font-size:10px;color:rgba(107,122,74,.45);
+      letter-spacing:.05em;flex-shrink:0;font-weight:500;
+      transition:color .15s,margin .28s cubic-bezier(.4,0,.2,1);
+      margin-right:14px;width:16px;text-align:center
+    }
+    nav button .label{
+      font-size:11px;letter-spacing:.18em;text-transform:uppercase;
+      color:rgba(232,231,226,.35);font-weight:500;
+      transition:color .15s,opacity .18s;
+      white-space:nowrap
+    }
+    nav button.active .num{ color:var(--g) }
+    nav button.active .label{ color:var(--warm) }
+    nav button.active{ background:rgba(255,255,255,.03);border-left-color:var(--g) }
+    nav button:hover:not(.active) .num{ color:rgba(107,122,74,.7) }
+    nav button:hover:not(.active) .label{ color:rgba(232,231,226,.62) }
+    nav button:hover:not(.active){ background:rgba(255,255,255,.025) }
 
-    <script>
-      document.getElementById("year").textContent = new Date().getFullYear();
-    </script>
-  </body>
+    nav hr{
+      border:none;border-top:1px solid rgba(255,255,255,.05);
+      margin:6px 28px;transition:opacity .18s
+    }
+
+    /* Collapsed nav */
+    #sidebar.collapsed nav button{
+      padding:12px 0;justify-content:center
+    }
+    #sidebar.collapsed nav button .num{
+      margin-right:0;width:auto
+    }
+    #sidebar.collapsed nav button .label{ opacity:0;width:0;overflow:hidden }
+    #sidebar.collapsed nav hr{ opacity:0 }
+
+    /* Collapse toggle */
+    #collapse-btn{
+      width:100%;display:flex;align-items:center;gap:10px;
+      padding:12px 28px;border:none;border-top:1px solid rgba(255,255,255,.05);
+      background:transparent;color:rgba(232,231,226,.2);
+      font-size:10px;letter-spacing:.12em;text-transform:uppercase;
+      transition:color .15s;overflow:hidden;white-space:nowrap;flex-shrink:0
+    }
+    #collapse-btn:hover{ color:rgba(232,231,226,.5) }
+    #collapse-btn .arrow{
+      font-size:14px;flex-shrink:0;line-height:1;
+      transition:transform .28s cubic-bezier(.4,0,.2,1)
+    }
+    #sidebar.collapsed #collapse-btn{ padding:12px 0;justify-content:center }
+    #sidebar.collapsed #collapse-btn .arrow{ transform:rotate(180deg) }
+    #sidebar.collapsed #collapse-btn .collapse-label{ opacity:0;width:0 }
+
+    /* Footer */
+    #sidebar-footer{
+      padding:16px 28px;border-top:1px solid rgba(255,255,255,.05);
+      flex-shrink:0;white-space:nowrap
+    }
+    #sidebar-footer .footer-brand{
+      color:rgba(232,231,226,.2);font-size:9.5px;letter-spacing:.12em;font-weight:500;
+      transition:opacity .18s
+    }
+    #sidebar-footer .footer-copy{
+      color:rgba(232,231,226,.12);font-size:9px;letter-spacing:.06em;margin-top:3px;
+      transition:opacity .18s
+    }
+    #sidebar.collapsed #sidebar-footer .footer-brand,
+    #sidebar.collapsed #sidebar-footer .footer-copy{ opacity:0 }
+
+    /* ── Main ── */
+    #main{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
+    #topbar{
+      height:52px;background:white;border-bottom:1px solid var(--border);
+      display:flex;align-items:center;padding:0 24px;gap:12px;flex-shrink:0
+    }
+    .view-title{
+      flex:1;font-size:13px;font-weight:600;color:var(--dark);letter-spacing:.01em
+    }
+    .topbar-actions{display:flex;align-items:center;gap:8px}
+    .btn-primary{
+      display:flex;align-items:center;gap:6px;
+      padding:7px 14px;background:var(--g);color:white;
+      border:none;border-radius:7px;font-size:12px;font-weight:500;
+      text-decoration:none;transition:background .15s
+    }
+    .btn-primary:hover{background:var(--gd)}
+    .btn-ghost{
+      padding:7px 14px;background:transparent;color:var(--dark);
+      border:1px solid var(--border);border-radius:7px;font-size:12px;
+      text-decoration:none;transition:border-color .15s
+    }
+    .btn-ghost:hover{border-color:rgba(30,30,30,.5)}
+    #content{flex:1;overflow-y:auto;padding:32px 28px}
+
+    /* ── WIP placeholder ── */
+    .wip{
+      display:flex;flex-direction:column;align-items:center;justify-content:center;
+      min-height:440px;text-align:center;gap:16px
+    }
+    .wip-badge{
+      display:inline-block;padding:4px 14px;border-radius:999px;
+      border:1px solid var(--g);color:var(--g);
+      font-size:9.5px;letter-spacing:.22em;text-transform:uppercase;font-weight:500
+    }
+    .wip h2{
+      font-size:26px;font-weight:600;color:var(--dark);
+      letter-spacing:-.01em;line-height:1.2
+    }
+    .wip p{font-size:14px;color:#6B6B6B;line-height:1.65;max-width:360px}
+    .wip-mark{
+      width:56px;height:56px;border-radius:14px;background:var(--g);
+      display:flex;align-items:center;justify-content:center;
+      color:white;font-size:11px;font-weight:600;letter-spacing:.22em;
+      margin-bottom:4px
+    }
+
+    /* ── Mobile ── */
+    #menu-toggle{
+      display:none;width:34px;height:34px;border:1px solid var(--border);
+      background:white;border-radius:7px;align-items:center;justify-content:center;
+      font-size:16px
+    }
+    @media(max-width:680px){
+      #sidebar{
+        position:fixed;top:0;left:0;height:100%;z-index:100;
+        width:var(--sb-w) !important;
+        transform:translateX(-100%);
+        transition:transform .24s cubic-bezier(.4,0,.2,1)
+      }
+      #sidebar.open{ transform:translateX(0) }
+      #collapse-btn{ display:none }
+      #menu-toggle{ display:flex }
+      #overlay{
+        display:none;position:fixed;inset:0;
+        background:rgba(0,0,0,.45);z-index:99
+      }
+      #overlay.show{ display:block }
+    }
+  </style>
+</head>
+<body>
+
+<div id="overlay" onclick="closeMobile()"></div>
+
+<div id="sidebar">
+  <div id="logo">
+    <div class="wordmark">ViTAH</div>
+    <div class="tagline">Tecnología para vivir mejor</div>
+  </div>
+
+  <nav id="nav">
+    <div class="nav-label">Menú</div>
+    <button class="active" onclick="setView('portada',this)">
+      <span class="num">01</span><span class="label">Portada</span>
+    </button>
+    <button onclick="setView('acabados',this)">
+      <span class="num">02</span><span class="label">Acabados</span>
+    </button>
+    <button onclick="setView('proyectos',this)">
+      <span class="num">03</span><span class="label">Proyectos</span>
+    </button>
+    <hr>
+    <button onclick="setView('franquicia',this)">
+      <span class="num">04</span><span class="label">Franquicia</span>
+    </button>
+    <button onclick="setView('nosotros',this)">
+      <span class="num">05</span><span class="label">Nosotros</span>
+    </button>
+  </nav>
+
+  <button id="collapse-btn" onclick="toggleCollapse()" title="Plegar menú">
+    <span class="arrow">‹</span>
+    <span class="collapse-label">Plegar</span>
+  </button>
+
+  <div id="sidebar-footer">
+    <div class="footer-brand">ViTAH Platform</div>
+    <div class="footer-copy">© 2026 · Santander</div>
+  </div>
+</div>
+
+<div id="main">
+  <div id="topbar">
+    <button id="menu-toggle" onclick="openMobile()" aria-label="Menú">☰</button>
+    <div class="view-title" id="view-title">Portada</div>
+    <div class="topbar-actions">
+      <a class="btn-ghost" href="mailto:hola@vitah.es">Contáctanos</a>
+      <a class="btn-primary" href="https://portal.vitah.es">Portal →</a>
+    </div>
+  </div>
+  <div id="content"></div>
+</div>
+
+<script>
+const VIEWS = {
+  portada:    { title: 'Portada',    label: 'Portada',    desc: 'La página de inicio está en construcción. Aquí encontrarás la presentación de ViTAH y nuestra propuesta de valor.' },
+  acabados:   { title: 'Acabados',   label: 'Acabados',   desc: 'El catálogo de acabados y materiales está en construcción. Pronto podrás explorar todas las opciones disponibles.' },
+  proyectos:  { title: 'Proyectos',  label: 'Proyectos',  desc: 'La galería de proyectos realizados está en construcción. Próximamente mostraremos nuestras viviendas más destacadas.' },
+  franquicia: { title: 'Franquicia', label: 'Franquicia', desc: 'La sección de modelo de franquicia está en construcción. Descubre cómo asociarte con ViTAH.' },
+  nosotros:   { title: 'Nosotros',   label: 'Nosotros',   desc: 'La sección sobre el equipo y la empresa está en construcción. Conocerás la historia y valores de ViTAH.' },
+};
+
+function setView(key, btn) {
+  const v = VIEWS[key];
+  if (!btn) btn = document.querySelector(`nav button[onclick*="'${key}'"]`);
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  document.getElementById('view-title').textContent = v.title;
+  document.getElementById('content').innerHTML = `
+    <div class="wip">
+      <div class="wip-mark">ViTAH</div>
+      <span class="wip-badge">Próximamente</span>
+      <h2>${v.label}</h2>
+      <p>${v.desc}</p>
+    </div>`;
+  closeMobile();
+}
+
+function toggleCollapse() {
+  const sb = document.getElementById('sidebar');
+  sb.classList.toggle('collapsed');
+}
+
+function openMobile() {
+  document.getElementById('sidebar').classList.add('open');
+  document.getElementById('overlay').classList.add('show');
+}
+function closeMobile() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('overlay').classList.remove('show');
+}
+
+setView('portada');
+</script>
+</body>
 </html>
