@@ -2,6 +2,7 @@ import bcrypt from "bcryptjs";
 const { hash } = bcrypt;
 import postgres from "postgres";
 import { drizzle } from "drizzle-orm/postgres-js";
+import { eq } from "drizzle-orm";
 import * as schema from "./schema";
 
 async function seed() {
@@ -20,28 +21,29 @@ async function seed() {
   const name = process.env.SEED_ADMIN_NAME ?? "ViTAH Admin";
 
   // Create or find tenant
-  let [tenant] = await db
+  const [insertedTenant] = await db
     .insert(schema.tenants)
     .values({ name: tenantName, slug: tenantSlug })
     .onConflictDoNothing({ target: schema.tenants.slug })
     .returning({ id: schema.tenants.id });
 
-  if (!tenant) {
-    // Tenant already exists — look it up
-    const existing = await db.query.tenants.findFirst({
+  const tenant =
+    insertedTenant ??
+    (await db.query.tenants.findFirst({
       where: (t, { eq }) => eq(t.slug, tenantSlug),
       columns: { id: true },
-    });
-    if (!existing) {
-      console.error("Could not find existing tenant");
-      await client.end();
-      process.exit(1);
-    }
-    tenant = existing;
-    console.log(`Tenant "${tenantName}" already exists, continuing with project seed...`);
-  } else {
-    console.log(`Created tenant "${tenantName}"`);
+    }));
+
+  if (!tenant) {
+    console.error("Could not find existing tenant");
+    await client.end();
+    process.exit(1);
   }
+  console.log(
+    insertedTenant
+      ? `Created tenant "${tenantName}"`
+      : `Tenant "${tenantName}" already exists, continuing with project seed...`,
+  );
 
   // Create or find admin user
   const passwordHash = await hash(password, 12);
@@ -520,6 +522,23 @@ async function seed() {
     })),
   );
   console.log(`Seeded ${ACTIVITIES.length} activity log entries`);
+
+  // --- Seed a mobile app client for VTH-26-001 (same password as the admin) ---
+
+  const clientEmail = "cliente@vitah.es";
+  const [demoClient] = await db
+    .insert(schema.users)
+    .values({ tenantId: tenant.id, email: clientEmail, name: "Cliente Demo", passwordHash, role: "client" })
+    .onConflictDoNothing()
+    .returning({ id: schema.users.id });
+
+  if (demoClient) {
+    await db
+      .update(schema.projects)
+      .set({ clientUserId: demoClient.id })
+      .where(eq(schema.projects.id, projectMap.get("VTH-26-001")!));
+    console.log(`Mobile app client: ${clientEmail} (project VTH-26-001)`);
+  }
 
   console.log("Seed completed successfully!");
   await client.end();

@@ -2,6 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import type { ProjectWithRelations } from "../../../../actions/projects";
+import ClientAccessCard from "./ClientAccessCard";
 import shared from "../../../shared.module.css";
 import styles from "../page.module.css";
 
@@ -18,8 +19,10 @@ const PHASES = [
 
 export default function OverviewTab({
   project,
+  canManageClient,
 }: {
   project: ProjectWithRelations;
+  canManageClient: boolean;
 }) {
   const t = useTranslations("projectDetailPage");
 
@@ -88,6 +91,12 @@ export default function OverviewTab({
           })}
         </div>
       </div>
+
+      {canManageClient && (
+        <div className={shared.mb16}>
+          <ClientAccessCard projectId={project.id} client={project.client} />
+        </div>
+      )}
 
       <div className={shared.grid2}>
         {/* Key Dates */}

@@ -1,4 +1,4 @@
-import { relations } from "drizzle-orm";
+import { eq, ne, relations, sql } from "drizzle-orm";
 import {
   boolean,
   integer,
@@ -8,6 +8,7 @@ import {
   text,
   timestamp,
   unique,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 
 // --- Enums ---
@@ -16,7 +17,15 @@ export const userRoleEnum = pgEnum("user_role", [
   "admin",
   "manager",
   "viewer",
+  // Homeowner using the mobile app. Cannot sign in to the portal.
+  "client",
 ]);
+
+export type UserRole = (typeof userRoleEnum.enumValues)[number];
+export type StaffRole = Exclude<UserRole, "client">;
+export const STAFF_ROLES = userRoleEnum.enumValues.filter(
+  (role): role is StaffRole => role !== "client",
+);
 
 export const projectPhaseEnum = pgEnum("project_phase", [
   "showroom",
@@ -124,8 +133,17 @@ export const users = pgTable(
   },
   (table) => ({
     tenantEmailUnique: unique("users_tenant_email_unique").on(table.tenantId, table.email),
+    // Mobile login looks clients up by email alone, so client emails must be
+    // unique across tenants.
+    clientEmailUnique: uniqueIndex("users_client_email_unique")
+      .on(table.email)
+      .where(sql`${table.role} = 'client'`),
   }),
 );
+
+/** SQL filters splitting portal staff from mobile-app clients. */
+export const isClientUser = eq(users.role, "client");
+export const isStaffUser = ne(users.role, "client");
 
 // --- NextAuth adapter tables (for future OAuth / DB sessions) ---
 
@@ -186,12 +204,17 @@ export const projects = pgTable(
     advisorId: text("advisor_id").references(() => users.id, {
       onDelete: "set null",
     }),
+    // Full address of the home; shown as "address" in the mobile app.
     location: text("location").notNull(),
     qualityLevel: text("quality_level").default("standard").notNull(),
     constructionWeekCurrent: integer("construction_week_current"),
     constructionWeekTotal: integer("construction_week_total"),
     startDate: timestamp("start_date", { mode: "date" }),
     expectedDeliveryDate: timestamp("expected_delivery_date", { mode: "date" }),
+    // Homeowner with mobile app access. At most one project per client.
+    clientUserId: text("client_user_id")
+      .unique("projects_client_user_unique")
+      .references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
   },
@@ -384,6 +407,10 @@ export const projectsRelations = relations(projects, ({ one, many }) => ({
   }),
   advisor: one(users, {
     fields: [projects.advisorId],
+    references: [users.id],
+  }),
+  client: one(users, {
+    fields: [projects.clientUserId],
     references: [users.id],
   }),
   milestones: many(projectMilestones),

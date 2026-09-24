@@ -35,6 +35,10 @@
     "check-types": {
       "dependsOn": ["^check-types"]
     },
+    "test": {
+      "cache": false,
+      "env": ["TEST_POSTGRES_URL", "POSTGRES_URL", "NEXTAUTH_SECRET", "BCRYPT_COST"]
+    },
     "dev": {
       "cache": false,
       "persistent": true

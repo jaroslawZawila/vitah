@@ -18,11 +18,12 @@ Turborepo monorepo with pnpm@9.0.0 workspaces.
 | Package | Name | Purpose |
 |---------|------|---------|
 | `packages/auth` | `@repo/auth` | NextAuth.js v5 config (Credentials provider, JWT sessions) |
-| `packages/db` | `@repo/db` | Drizzle ORM schema, database client, seed script (postgres.js driver) |
+| `packages/db` | `@repo/db` | Drizzle ORM schema, database client, seed script (postgres.js driver), test helpers (`./testing`, `./vitest`) |
+| `packages/core` | `@repo/core` | Shared business logic (project client access, mobile project data). `./contract` holds DB-free types/constants safe for mobile and browser code |
 | `packages/shared` | `@repo/ui` | React UI components (exports `./src/*.tsx`) |
 | `packages/tailwind-config` | `@repo/tailwind-config` | Shared Tailwind v4 theme with ViTAH brand tokens |
 | `packages/eslint-config` | `@repo/eslint-config` | ESLint configs (`./base`, `./next-js`, `./react-internal`) |
-| `packages/typescript-config` | `@repo/typescript-config` | Shared tsconfig (`base.json`, `nextjs.json`, `react-library.json`) |
+| `packages/typescript-config` | `@repo/typescript-config` | Shared tsconfig (`base.json`, `nextjs.json`, `react-library.json`, `internal-package.json` for source-only packages) |
 
 ## Commands
 
@@ -33,6 +34,7 @@ pnpm exec turbo build                # Build all
 pnpm exec turbo build --filter=web   # Build web only
 pnpm exec turbo lint                 # Lint all
 pnpm exec turbo check-types          # Type check all
+pnpm test                            # Run all tests (needs `pnpm db:up`)
 pnpm run format                      # Prettier format all
 pnpm db:up                           # Start local PostgreSQL (Docker)
 pnpm db:down                         # Stop local PostgreSQL
@@ -117,14 +119,16 @@ When adding any API route, server action, or backend logic:
 - JWT sessions include `role` and `tenantId` fields
 - `NEXTAUTH_SECRET` + `POSTGRES_URL` required in each app's `.env.local`
 - Login page is `/`, authenticated users redirect to `/dashboard`
-- Middleware protects all routes except `/`, `/api/auth/*`, and static assets
-- User roles: `admin`, `manager`, `viewer` (Postgres enum)
+- Middleware protects all routes except `/`, `/api/auth/*`, `/api/mobile/*`, and static assets
+- User roles: `admin`, `manager`, `viewer` (staff, portal only) and `client` (homeowner, mobile app only) — Postgres enum. Use `isStaffUser` / `isClientUser` / `STAFF_ROLES` from `@repo/db`
+- Clients are created from the project page ("Client app access" card), one project per client; client emails are unique across tenants
+- Mobile API: `POST /api/mobile/auth` (clients only, returns a 30d JWT) and `GET /api/mobile/project` (`Authorization: Bearer`). Each request re-checks the client is still active
 - Admin-only server actions guarded by `requireAdmin()` check
 
 ### Database
 
 - **Driver:** `postgres` (postgres.js) — works with any PostgreSQL (local Docker, Vercel Postgres, AWS RDS, etc.)
-- Schema in `packages/db/src/schema.ts` — tables: `tenants`, `users`, `accounts`, `sessions`, `verification_tokens`
+- Schema in `packages/db/src/schema.ts` — tables: `tenants`, `users`, `accounts`, `sessions`, `verification_tokens`, `projects` (+ milestones, quality checks, tasks, material orders, invoices, documents, activity log). `projects.client_user_id` links a project to its mobile app client
 - Drizzle Kit for migrations: `pnpm db:generate`, `pnpm db:migrate`, `pnpm db:push`
 - Seed script: `pnpm db:seed` creates initial tenant + admin user
 - Local dev: Docker Compose with PostgreSQL 16 (`docker-compose.yml` at root)
@@ -175,6 +179,13 @@ apps/web/
     api/auth/[...nextauth]/route.ts
 ```
 
+### Testing
+
+- Vitest in `packages/core`, `packages/auth`, `apps/web`; jest-expo in `apps/mobile` (`__tests__/`)
+- DB tests run against a real, disposable Postgres database per package (`vitah_<pkg>_test`, recreated each run via `testDatabase()` from `@repo/db/vitest`). Override the server with `TEST_POSTGRES_URL`
+- Seed data with `createTestTenant` / `createTestUser` / `createTestProject` from `@repo/db/testing`
+- Web server actions: mock the session with `vi.mock("<path>/auth", ...)` and `signInAs()` from `apps/web/test/session.ts`
+
 ## Local Development Setup
 
 Prerequisites: Docker Desktop
@@ -185,7 +196,7 @@ pnpm db:setup                        # Start Postgres + push schema + seed data
 pnpm exec turbo dev --filter=web     # Start web app on localhost:3000
 ```
 
-Login with `admin@vitah.es` / `vitah2026`.
+Login with `admin@vitah.es` / `vitah2026`. The mobile app logs in as `cliente@vitah.es` / `vitah2026` (client of project VTH-26-001).
 
 To reset the database: `docker compose down -v && pnpm db:setup`
 

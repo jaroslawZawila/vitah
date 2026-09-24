@@ -1,7 +1,7 @@
 import { Redirect, Stack } from "expo-router";
 import { View, ActivityIndicator, StyleSheet } from "react-native";
 import { useAuth } from "../../lib/auth";
-import { colors } from "../../constants/colors";
+import { colors } from "../../constants/theme";
 
 export default function AppLayout() {
   const { token, isLoading } = useAuth();
@@ -21,7 +21,10 @@ export default function AppLayout() {
   return (
     <Stack
       screenOptions={{
-        headerShown: false,
+        headerStyle: { backgroundColor: colors.grafito },
+        headerTintColor: colors.blancoCalido,
+        headerTitleStyle: { fontWeight: "300" },
+        headerShadowVisible: false,
         contentStyle: { backgroundColor: colors.grafito },
       }}
     />
