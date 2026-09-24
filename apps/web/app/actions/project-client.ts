@@ -1,36 +1,27 @@
 "use server";
 
+// Thin portal adapters over @repo/core (packages/core/src/project-client.ts),
+// behind the "Client app access" card on the project page.
+
+import { CoreError, projectClientService as svc, type Ctx } from "@repo/core";
+import { getSessionContext } from "@repo/auth/context";
 import { revalidatePath } from "next/cache";
-import {
-  createProjectClient,
-  normalizeEmail,
-  resetProjectClientPassword,
-  revokeProjectClient,
-  type ProjectClientError,
-  type Result,
-} from "@repo/core";
-import { logActivity } from "../../lib/activity";
-import { requireAdmin } from "../../lib/session";
 
-// Server actions behind the "Client app access" card on the project page.
+export type ClientAccessState = { error?: string; success?: boolean } | null;
 
-export type ClientAccessState = { error?: ProjectClientError; success?: boolean } | null;
-
-function field(formData: FormData, name: string): string {
-  const value = formData.get(name);
-  return typeof value === "string" ? value : "";
-}
-
-/** Logs and revalidates on success; maps the result to form state. */
-async function finish(
-  result: Result,
+/** Runs a core mutation; returns `{ error: code }` for expected failures. */
+async function mutate(
   projectId: string,
-  activity: { tenantId: string; userId: string; action: string; detail: string },
+  fn: (ctx: Ctx) => Promise<unknown>,
 ): Promise<ClientAccessState> {
-  if (!result.ok) return { error: result.error };
-
-  const { tenantId, userId, action, detail } = activity;
-  await logActivity(tenantId, projectId, userId, action, detail);
+  const ctx = await getSessionContext();
+  if (!ctx) throw new Error("Unauthorized");
+  try {
+    await fn(ctx);
+  } catch (err) {
+    if (err instanceof CoreError) return { error: err.code };
+    throw err;
+  }
   revalidatePath(`/dashboard/projects/${projectId}`);
   return { success: true };
 }
@@ -40,21 +31,9 @@ export async function createProjectClientAction(
   _prevState: ClientAccessState,
   formData: FormData,
 ): Promise<ClientAccessState> {
-  const { tenantId, userId } = await requireAdmin();
-  const email = field(formData, "email");
-
-  const result = await createProjectClient(tenantId, projectId, {
-    name: field(formData, "name"),
-    email,
-    password: field(formData, "password"),
-  });
-
-  return finish(result, projectId, {
-    tenantId,
-    userId,
-    action: "client_access_granted",
-    detail: `Acceso a la app concedido a ${normalizeEmail(email)}`,
-  });
+  return mutate(projectId, (ctx) =>
+    svc.createProjectClient(ctx, projectId, Object.fromEntries(formData)),
+  );
 }
 
 export async function resetProjectClientPasswordAction(
@@ -62,27 +41,11 @@ export async function resetProjectClientPasswordAction(
   _prevState: ClientAccessState,
   formData: FormData,
 ): Promise<ClientAccessState> {
-  const { tenantId, userId } = await requireAdmin();
-
-  const result = await resetProjectClientPassword(tenantId, projectId, field(formData, "password"));
-
-  return finish(result, projectId, {
-    tenantId,
-    userId,
-    action: "client_password_reset",
-    detail: "Contraseña de la app restablecida",
-  });
+  return mutate(projectId, (ctx) =>
+    svc.resetProjectClientPassword(ctx, projectId, Object.fromEntries(formData)),
+  );
 }
 
 export async function revokeProjectClientAction(projectId: string): Promise<ClientAccessState> {
-  const { tenantId, userId } = await requireAdmin();
-
-  const result = await revokeProjectClient(tenantId, projectId);
-
-  return finish(result, projectId, {
-    tenantId,
-    userId,
-    action: "client_access_revoked",
-    detail: "Acceso a la app revocado",
-  });
+  return mutate(projectId, (ctx) => svc.revokeProjectClient(ctx, projectId));
 }

@@ -6,6 +6,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./mobile": "./src/mobile.ts",
+    "./context": "./src/context.ts",
     "./credentials": "./src/credentials.ts"
   },
   "scripts": {

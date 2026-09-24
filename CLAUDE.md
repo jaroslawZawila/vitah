@@ -10,17 +10,16 @@ Turborepo monorepo with pnpm@9.0.0 workspaces.
 
 | App | Package name | Port | Purpose |
 |-----|-------------|------|---------|
-| `apps/web` | `web` | 3000 | Admin portal — login, dashboard, client-facing |
-| `apps/app` | `docs` | 3001 | Internal app |
+| `apps/web` | `web` | 3000 | Portal (login, dashboard) **and** the API (`/api/v1/*`, `/api/mobile/*`) |
+| `apps/mobile` | `mobile` | — | Expo / React Native app; calls the `apps/web` API with a Bearer token |
 
 ### Shared Packages
 
 | Package | Name | Purpose |
 |---------|------|---------|
-| `packages/auth` | `@repo/auth` | NextAuth.js v5 config (Credentials provider, JWT sessions) |
+| `packages/core` | `@repo/core` | Business logic / service layer (tenant-scoped, takes `ctx`) — the single API. `./contract` holds DB-free types/constants safe for mobile and browser code |
+| `packages/auth` | `@repo/auth` | NextAuth.js v5 config, credential checks (`./credentials`), mobile JWT (`./mobile`), request context (`./context`) |
 | `packages/db` | `@repo/db` | Drizzle ORM schema, database client, seed script (postgres.js driver), test helpers (`./testing`, `./vitest`) |
-| `packages/core` | `@repo/core` | Shared business logic (project client access, mobile project data). `./contract` holds DB-free types/constants safe for mobile and browser code |
-| `packages/shared` | `@repo/ui` | React UI components (exports `./src/*.tsx`) |
 | `packages/tailwind-config` | `@repo/tailwind-config` | Shared Tailwind v4 theme with ViTAH brand tokens |
 | `packages/eslint-config` | `@repo/eslint-config` | ESLint configs (`./base`, `./next-js`, `./react-internal`) |
 | `packages/typescript-config` | `@repo/typescript-config` | Shared tsconfig (`base.json`, `nextjs.json`, `react-library.json`, `internal-package.json` for source-only packages) |
@@ -59,13 +58,21 @@ pnpm db:studio                       # Open Drizzle Studio (DB browser)
 
 ## Key Conventions
 
-### API-first: every backend feature must be shared
+### API-first: one service layer, two thin adapters
 
-When adding any API route, server action, or backend logic:
-- Put shared auth/business logic in `packages/` (e.g., `@repo/auth`)
-- Both `apps/web` and `apps/app` must be able to consume it
-- Each app has its own `auth.ts` that re-exports from `@repo/auth`
-- Each app has its own `app/api/auth/[...nextauth]/route.ts`
+The portal and the mobile app share one backend. Layers:
+
+1. **`packages/core`** — all business logic. Functions take `ctx: Ctx` (`{ tenantId, userId, role }`)
+   first and scope every query to `ctx.tenantId`. Throw `CoreError(code, status)` for expected failures.
+   Never import Next.js APIs here.
+2. **Portal adapter** — `apps/web/app/actions/*.ts` server actions: `getSessionContext()` →
+   call core → `revalidatePath`. No business logic.
+3. **Mobile/API adapter** — `apps/web/app/api/v1/**/route.ts`: `withContext(request, ctx => core…)`
+   from `apps/web/lib/api.ts`. Accepts `Authorization: Bearer <mobile JWT>` or the session cookie.
+   Errors are JSON `{ error: code }`.
+
+When adding a feature: write it in `packages/core`, then add the server action and the `/api/v1`
+route. Keep `/api/v1` backwards compatible — installed mobile builds lag behind.
 
 ### Mobile-first responsive design (apps/web)
 
@@ -119,10 +126,10 @@ When adding any API route, server action, or backend logic:
 - JWT sessions include `role` and `tenantId` fields
 - `NEXTAUTH_SECRET` + `POSTGRES_URL` required in each app's `.env.local`
 - Login page is `/`, authenticated users redirect to `/dashboard`
-- Middleware protects all routes except `/`, `/api/auth/*`, `/api/mobile/*`, and static assets
-- User roles: `admin`, `manager`, `viewer` (staff, portal only) and `client` (homeowner, mobile app only) — Postgres enum. Use `isStaffUser` / `isClientUser` / `STAFF_ROLES` from `@repo/db`
+- `proxy.ts` protects all routes except `/`, `/api/auth/*`, `/api/mobile/*`, `/api/v1/*` (these authenticate per request), and static assets
+- User roles: `admin`, `manager`, `viewer` (staff, portal only) and `client` (homeowner, mobile app only) — Postgres enum. Use `isStaffUser` / `isClientUser` / `STAFF_ROLES` from `@repo/db`. `Ctx` is staff-only: client tokens are rejected by `/api/v1`
 - Clients are created from the project page ("Client app access" card), one project per client; client emails are unique across tenants
-- Mobile API: `POST /api/mobile/auth` (clients only, returns a 30d JWT) and `GET /api/mobile/project` (`Authorization: Bearer`). Each request re-checks the client is still active
+- Mobile client API: `POST /api/mobile/auth` (clients only, returns a 30d JWT) and `GET /api/mobile/project` (`Authorization: Bearer`). Each request re-checks the client is still active
 - Admin-only server actions guarded by `requireAdmin()` check
 
 ### Database
@@ -161,7 +168,7 @@ When adding any API route, server action, or backend logic:
 ```
 apps/web/
   auth.ts                          # Re-exports from @repo/auth
-  middleware.ts                    # Route protection
+  proxy.ts                         # Route protection (Next 16 "proxy", formerly middleware)
   postcss.config.mjs               # @tailwindcss/postcss plugin
   i18n/request.ts                  # next-intl config
   messages/{locale}.json           # Translation strings

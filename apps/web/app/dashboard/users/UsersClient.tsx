@@ -4,7 +4,11 @@ import { useState, useActionState } from "react";
 import { useTranslations } from "next-intl";
 import shared from "../shared.module.css";
 import styles from "./page.module.css";
-import { createUser, updateUserRole, toggleUserActive } from "../../actions/users";
+import {
+  createUser,
+  updateUserRole,
+  toggleUserActive,
+} from "../../actions/users";
 
 type UserRow = {
   id: string;
@@ -21,10 +25,22 @@ const ROLE_STYLE: Record<string, string> = {
   viewer: styles.roleViewer!,
 };
 
-export function UsersClient({ users }: { users: UserRow[] }) {
+export function UsersClient({
+  users,
+  currentUserId,
+}: {
+  users: UserRow[];
+  currentUserId: string | null;
+}) {
   const t = useTranslations("usersPage");
   const [showForm, setShowForm] = useState(false);
   const [formState, formAction, isPending] = useActionState(createUser, null);
+  const [rowError, setRowError] = useState<string | null>(null);
+
+  async function runRowAction(action: Promise<{ error?: string }>) {
+    const result = await action;
+    setRowError(result.error ?? null);
+  }
 
   return (
     <>
@@ -42,6 +58,12 @@ export function UsersClient({ users }: { users: UserRow[] }) {
         </button>
       </div>
 
+      {rowError && (
+        <div className={styles.formError} role="alert">
+          {t(`errors.${rowError}`)}
+        </div>
+      )}
+
       {showForm && (
         <div className={styles.formOverlay}>
           <div className={styles.formCard}>
@@ -53,9 +75,7 @@ export function UsersClient({ users }: { users: UserRow[] }) {
               </div>
             )}
             {formState?.success && (
-              <div className={styles.formSuccess}>
-                {t("success.created")}
-              </div>
+              <div className={styles.formSuccess}>{t("success.created")}</div>
             )}
 
             <form action={formAction}>
@@ -81,7 +101,9 @@ export function UsersClient({ users }: { users: UserRow[] }) {
                   />
                 </div>
                 <div className={styles.formField}>
-                  <label htmlFor="password">{t("inviteForm.passwordLabel")}</label>
+                  <label htmlFor="password">
+                    {t("inviteForm.passwordLabel")}
+                  </label>
                   <input
                     id="password"
                     name="password"
@@ -106,7 +128,9 @@ export function UsersClient({ users }: { users: UserRow[] }) {
                   className={styles.submitBtn}
                   disabled={isPending}
                 >
-                  {isPending ? t("inviteForm.submitting") : t("inviteForm.submit")}
+                  {isPending
+                    ? t("inviteForm.submitting")
+                    : t("inviteForm.submit")}
                 </button>
                 <button
                   type="button"
@@ -139,7 +163,9 @@ export function UsersClient({ users }: { users: UserRow[] }) {
                 <td style={{ fontWeight: 500 }}>{user.name ?? "—"}</td>
                 <td style={{ color: "#6b6b6b" }}>{user.email}</td>
                 <td>
-                  <span className={`${shared.chip} ${ROLE_STYLE[user.role] ?? ""}`}>
+                  <span
+                    className={`${shared.chip} ${ROLE_STYLE[user.role] ?? ""}`}
+                  >
                     {t(`roles.${user.role}`)}
                   </span>
                 </td>
@@ -163,10 +189,18 @@ export function UsersClient({ users }: { users: UserRow[] }) {
                     <select
                       className={styles.roleSelect}
                       value={user.role}
+                      disabled={user.id === currentUserId}
+                      title={
+                        user.id === currentUserId
+                          ? t("errors.cannot_modify_self")
+                          : undefined
+                      }
                       onChange={(e) =>
-                        updateUserRole(
-                          user.id,
-                          e.target.value as "admin" | "manager" | "viewer",
+                        runRowAction(
+                          updateUserRole(
+                            user.id,
+                            e.target.value as "admin" | "manager" | "viewer",
+                          ),
                         )
                       }
                     >
@@ -178,7 +212,15 @@ export function UsersClient({ users }: { users: UserRow[] }) {
                       <button
                         type="button"
                         className={styles.deactivateBtn}
-                        onClick={() => toggleUserActive(user.id, false)}
+                        disabled={user.id === currentUserId}
+                        title={
+                          user.id === currentUserId
+                            ? t("errors.cannot_modify_self")
+                            : undefined
+                        }
+                        onClick={() =>
+                          runRowAction(toggleUserActive(user.id, false))
+                        }
                       >
                         {t("actions.deactivate")}
                       </button>
@@ -186,7 +228,9 @@ export function UsersClient({ users }: { users: UserRow[] }) {
                       <button
                         type="button"
                         className={styles.activateBtn}
-                        onClick={() => toggleUserActive(user.id, true)}
+                        onClick={() =>
+                          runRowAction(toggleUserActive(user.id, true))
+                        }
                       >
                         {t("actions.activate")}
                       </button>

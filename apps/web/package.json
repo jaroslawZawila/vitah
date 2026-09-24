@@ -17,7 +17,6 @@
     "@repo/core": "workspace:*",
     "@repo/db": "workspace:*",
     "@repo/tailwind-config": "workspace:*",
-    "@repo/ui": "workspace:*",
     "@tailwindcss/postcss": "^4.3.0",
     "bcryptjs": "^2.4.3",
     "class-variance-authority": "^0.7.1",

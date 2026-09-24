@@ -1,12 +1,13 @@
 import { vi } from "vitest";
-import type { UserRole } from "@repo/db";
+import type { Ctx } from "@repo/core";
 
-// Server code reads the session through `auth()` from apps/web/auth.ts.
-// Tests mock that module with `vi.mock("<path>/auth", () => authMock)`.
+// Server actions resolve the caller with `getSessionContext()` from
+// @repo/auth/context. Tests mock that module with
+// `vi.mock("@repo/auth/context", () => sessionMock)`.
 
-export const auth = vi.fn();
-export const authMock = { auth };
+export const getSessionContext = vi.fn();
+export const sessionMock = { getSessionContext };
 
-export function signInAs(user: { id: string; tenantId: string; role: UserRole } | null) {
-  auth.mockResolvedValue(user ? { user } : null);
+export function signInAs(ctx: Ctx | null) {
+  getSessionContext.mockResolvedValue(ctx);
 }

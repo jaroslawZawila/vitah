@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { authenticateMobileRequest } from "@repo/auth/mobile";
-import { getClientProject } from "@repo/core";
+import { projectClientService } from "@repo/core";
 
 // ─── GET /api/mobile/project ──────────────────────────────────────────────────
 // The project attached to the signed-in client, or { project: null } when no
@@ -13,6 +13,6 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  const project = await getClientProject(client.tenantId, client.sub);
+  const project = await projectClientService.getClientProject(client.tenantId, client.sub);
   return NextResponse.json({ project });
 }

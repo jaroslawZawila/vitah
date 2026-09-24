@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { createTestProject, createTestTenant, createTestUser, resetDatabase } from "@repo/db/testing";
 import { createMobileToken } from "@repo/auth/mobile";
-import { createProjectClient, revokeProjectClient } from "@repo/core";
+import { projectClientService as svc, type Ctx } from "@repo/core";
 import { db, eq, users } from "@repo/db";
 import { GET } from "./route";
 
@@ -24,6 +24,11 @@ async function tokenFor(email: string) {
   });
 }
 
+async function adminCtx(tenantId: string): Promise<Ctx> {
+  const admin = await createTestUser(tenantId, { role: "admin" });
+  return { tenantId, userId: admin.id, role: "admin" };
+}
+
 beforeEach(async () => {
   await resetDatabase();
 });
@@ -37,7 +42,7 @@ describe("GET /api/mobile/project", () => {
       startDate: new Date("2026-03-01T00:00:00Z"),
       expectedDeliveryDate: new Date("2026-11-15T00:00:00Z"),
     });
-    await createProjectClient(tenant.id, project.id, {
+    await svc.createProjectClient(await adminCtx(tenant.id), project.id, {
       name: "Ana",
       email: "ana@example.com",
       password: "client-pass",
@@ -81,14 +86,14 @@ describe("GET /api/mobile/project", () => {
   it("returns 401 once the client's access is revoked", async () => {
     const tenant = await createTestTenant();
     const project = await createTestProject(tenant.id);
-    await createProjectClient(tenant.id, project.id, {
+    await svc.createProjectClient(await adminCtx(tenant.id), project.id, {
       name: "Ana",
       email: "ana@example.com",
       password: "client-pass",
     });
     const token = await tokenFor("ana@example.com");
 
-    await revokeProjectClient(tenant.id, project.id);
+    await svc.revokeProjectClient(await adminCtx(tenant.id), project.id);
 
     expect((await get(token)).status).toBe(401);
   });

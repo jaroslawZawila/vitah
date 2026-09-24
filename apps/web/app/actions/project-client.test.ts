@@ -1,6 +1,5 @@
-import bcrypt from "bcryptjs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { db, eq, projectActivityLog, projects, users } from "@repo/db";
+import { db, eq, projects, users } from "@repo/db";
 import { createTestProject, createTestTenant, createTestUser, resetDatabase } from "@repo/db/testing";
 import { signInAs } from "../../test/session";
 import {
@@ -9,7 +8,10 @@ import {
   revokeProjectClientAction,
 } from "./project-client";
 
-vi.mock("../../auth", async () => (await import("../../test/session")).authMock);
+// The service itself is covered in packages/core; these tests cover the
+// adapter: session → core → `{ error }` / revalidation.
+
+vi.mock("@repo/auth/context", async () => (await import("../../test/session")).sessionMock);
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 const { revalidatePath } = await import("next/cache");
 
@@ -20,20 +22,14 @@ function form(fields: Record<string, string>) {
 }
 
 const clientForm = () =>
-  form({ name: "Ana García", email: "Ana@Example.com", password: "client-pass" });
+  form({ name: "Ana García", email: "ana@example.com", password: "client-pass" });
 
 async function setup() {
   const tenant = await createTestTenant();
   const admin = await createTestUser(tenant.id, { role: "admin" });
   const project = await createTestProject(tenant.id);
-  signInAs({ id: admin.id, tenantId: tenant.id, role: "admin" });
+  signInAs({ tenantId: tenant.id, userId: admin.id, role: "admin" });
   return { tenant, admin, project };
-}
-
-async function activityFor(projectId: string) {
-  return db.query.projectActivityLog.findMany({
-    where: eq(projectActivityLog.projectId, projectId),
-  });
 }
 
 beforeEach(async () => {
@@ -41,66 +37,40 @@ beforeEach(async () => {
   vi.mocked(revalidatePath).mockClear();
 });
 
-describe("createProjectClientAction", () => {
-  it("creates and attaches the client, logs activity and revalidates", async () => {
-    const { admin, project } = await setup();
+describe("client access actions", () => {
+  it("grants access and revalidates the project page", async () => {
+    const { project } = await setup();
 
-    const state = await createProjectClientAction(project.id, null, clientForm());
+    expect(await createProjectClientAction(project.id, null, clientForm())).toEqual({
+      success: true,
+    });
 
-    expect(state).toEqual({ success: true });
     const client = await db.query.users.findFirst({ where: eq(users.email, "ana@example.com") });
-    expect(client?.role).toBe("client");
     const updated = await db.query.projects.findFirst({ where: eq(projects.id, project.id) });
     expect(updated?.clientUserId).toBe(client!.id);
-    expect(await activityFor(project.id)).toEqual([
-      expect.objectContaining({
-        userId: admin.id,
-        action: "client_access_granted",
-        detail: "Acceso a la app concedido a ana@example.com",
-      }),
-    ]);
     expect(revalidatePath).toHaveBeenCalledWith(`/dashboard/projects/${project.id}`);
   });
 
-  it("returns validation errors without side effects", async () => {
+  it("returns core errors as form state without revalidating", async () => {
     const { project } = await setup();
 
-    const state = await createProjectClientAction(
-      project.id,
-      null,
-      form({ name: "Ana", email: "ana@example.com", password: "short" }),
-    );
-
-    expect(state).toEqual({ error: "password_too_short" });
-    expect(await activityFor(project.id)).toHaveLength(0);
+    expect(
+      await createProjectClientAction(
+        project.id,
+        null,
+        form({ name: "Ana", email: "ana@example.com", password: "short" }),
+      ),
+    ).toEqual({ error: "password_too_short" });
     expect(revalidatePath).not.toHaveBeenCalled();
   });
 
-  it("treats missing form fields as empty", async () => {
-    const { project } = await setup();
+  it("returns forbidden for non-admins", async () => {
+    const { tenant, admin, project } = await setup();
+    signInAs({ tenantId: tenant.id, userId: admin.id, role: "manager" });
 
-    expect(await createProjectClientAction(project.id, null, new FormData())).toEqual({
-      error: "missing_fields",
+    expect(await createProjectClientAction(project.id, null, clientForm())).toEqual({
+      error: "forbidden",
     });
-  });
-
-  it("cannot reach a project in another tenant", async () => {
-    await setup();
-    const other = await createTestTenant();
-    const foreignProject = await createTestProject(other.id);
-
-    expect(await createProjectClientAction(foreignProject.id, null, clientForm())).toEqual({
-      error: "project_not_found",
-    });
-  });
-
-  it.each(["manager", "viewer", "client"] as const)("rejects %s users", async (role) => {
-    const { tenant, project } = await setup();
-    signInAs({ id: "someone", tenantId: tenant.id, role });
-
-    await expect(createProjectClientAction(project.id, null, clientForm())).rejects.toThrow(
-      "Unauthorized",
-    );
   });
 
   it("rejects anonymous requests", async () => {
@@ -111,64 +81,21 @@ describe("createProjectClientAction", () => {
       "Unauthorized",
     );
   });
-});
 
-describe("resetProjectClientPasswordAction", () => {
-  it("updates the password and logs activity", async () => {
+  it("resets the password", async () => {
     const { project } = await setup();
     await createProjectClientAction(project.id, null, clientForm());
 
-    const state = await resetProjectClientPasswordAction(
-      project.id,
-      null,
-      form({ password: "brand-new-pass" }),
-    );
-
-    expect(state).toEqual({ success: true });
-    const client = await db.query.users.findFirst({ where: eq(users.email, "ana@example.com") });
-    expect(await bcrypt.compare("brand-new-pass", client!.passwordHash!)).toBe(true);
-    expect((await activityFor(project.id)).map((a) => a.action)).toContain("client_password_reset");
-  });
-
-  it("reports a project without a client", async () => {
-    const { project } = await setup();
-
     expect(
       await resetProjectClientPasswordAction(project.id, null, form({ password: "brand-new-pass" })),
-    ).toEqual({ error: "no_client" });
+    ).toEqual({ success: true });
   });
 
-  it("rejects non-admins", async () => {
-    const { tenant, project } = await setup();
-    signInAs({ id: "someone", tenantId: tenant.id, role: "manager" });
-
-    await expect(
-      resetProjectClientPasswordAction(project.id, null, form({ password: "brand-new-pass" })),
-    ).rejects.toThrow("Unauthorized");
-  });
-});
-
-describe("revokeProjectClientAction", () => {
-  it("deletes the client and logs activity", async () => {
+  it("revokes access", async () => {
     const { project } = await setup();
     await createProjectClientAction(project.id, null, clientForm());
 
     expect(await revokeProjectClientAction(project.id)).toEqual({ success: true });
-
-    expect(await db.query.users.findFirst({ where: eq(users.email, "ana@example.com") })).toBeUndefined();
-    expect((await activityFor(project.id)).map((a) => a.action)).toContain("client_access_revoked");
-  });
-
-  it("reports a project without a client", async () => {
-    const { project } = await setup();
-
     expect(await revokeProjectClientAction(project.id)).toEqual({ error: "no_client" });
-  });
-
-  it("rejects non-admins", async () => {
-    const { tenant, project } = await setup();
-    signInAs({ id: "someone", tenantId: tenant.id, role: "viewer" });
-
-    await expect(revokeProjectClientAction(project.id)).rejects.toThrow("Unauthorized");
   });
 });

@@ -1,25 +1,34 @@
-import bcrypt from "bcryptjs";
 import { and, db, eq, inArray, isClientUser, projects, users } from "@repo/db";
+import { hashPassword, normalizeEmail } from "./accounts";
+import { logActivity } from "./activity";
+import { requireAdmin, type Ctx } from "./context";
 import { MIN_PASSWORD_LENGTH, type MobileProject, type ProjectClientError } from "./contract";
+import { CoreError } from "./errors";
 
 // ─── Project client access ────────────────────────────────────────────────────
 // A "client" is the homeowner of a project. They sign in to the mobile app
-// only, and each client is attached to at most one project.
+// only, and each client is attached to at most one project. Managing clients
+// is admin only.
 // ─────────────────────────────────────────────────────────────────────────────
-
-export type Result = { ok: true } | { ok: false; error: ProjectClientError };
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-// Tests lower the cost (see @repo/db/vitest); production always uses 12.
-const BCRYPT_COST = Number(process.env.BCRYPT_COST ?? 12);
+const STATUS: Record<ProjectClientError, number> = {
+  missing_fields: 400,
+  invalid_email: 400,
+  password_too_short: 400,
+  email_exists: 409,
+  client_already_attached: 409,
+  project_not_found: 404,
+  no_client: 404,
+};
 
-export function normalizeEmail(email: string): string {
-  return email.trim().toLowerCase();
+function fail(code: ProjectClientError): never {
+  throw new CoreError(code, STATUS[code]);
 }
 
-export function hashPassword(password: string): Promise<string> {
-  return bcrypt.hash(password, BCRYPT_COST);
+function text(value: unknown): string {
+  return typeof value === "string" ? value : "";
 }
 
 function toCalendarDate(date: Date | null): string | null {
@@ -47,6 +56,10 @@ async function findProjectClientId(tenantId: string, projectId: string) {
   return project && project.clientUserId;
 }
 
+/**
+ * The project attached to a client, in the mobile app's shape. Called with the
+ * client's own identity (from their mobile token), not a staff `Ctx`.
+ */
 export async function getClientProject(
   tenantId: string,
   clientUserId: string,
@@ -66,80 +79,93 @@ export async function getClientProject(
   };
 }
 
-/** Creates a client user and attaches them to the project, atomically. */
+/**
+ * Creates a client user and attaches them to the project, atomically.
+ * Body: { name, email, password }
+ */
 export async function createProjectClient(
-  tenantId: string,
+  ctx: Ctx,
   projectId: string,
-  input: { name: string; email: string; password: string },
-): Promise<Result> {
-  const name = input.name.trim();
-  const email = normalizeEmail(input.email);
-  const { password } = input;
+  input: Record<string, unknown>,
+) {
+  requireAdmin(ctx);
 
-  if (!name || !email || !password) return { ok: false, error: "missing_fields" };
-  if (!EMAIL_PATTERN.test(email)) return { ok: false, error: "invalid_email" };
-  if (password.length < MIN_PASSWORD_LENGTH) return { ok: false, error: "password_too_short" };
+  const name = text(input.name).trim();
+  const email = normalizeEmail(text(input.email));
+  const password = text(input.password);
+
+  if (!name || !email || !password) fail("missing_fields");
+  if (!EMAIL_PATTERN.test(email)) fail("invalid_email");
+  if (password.length < MIN_PASSWORD_LENGTH) fail("password_too_short");
 
   // Cheap checks before the slow hash; the locked re-check below is authoritative.
-  const existing = await findProjectClientId(tenantId, projectId);
-  if (existing === undefined) return { ok: false, error: "project_not_found" };
-  if (existing) return { ok: false, error: "client_already_attached" };
+  const existing = await findProjectClientId(ctx.tenantId, projectId);
+  if (existing === undefined) fail("project_not_found");
+  if (existing) fail("client_already_attached");
 
   const passwordHash = await hashPassword(password);
 
   try {
-    return await db.transaction(async (tx): Promise<Result> => {
+    await db.transaction(async (tx) => {
       const [project] = await tx
         .select({ clientUserId: projects.clientUserId })
         .from(projects)
-        .where(projectInTenant(tenantId, projectId))
+        .where(projectInTenant(ctx.tenantId, projectId))
         .for("update");
 
-      if (!project) return { ok: false, error: "project_not_found" };
-      if (project.clientUserId) return { ok: false, error: "client_already_attached" };
+      if (!project) fail("project_not_found");
+      if (project.clientUserId) fail("client_already_attached");
 
       const [client] = await tx
         .insert(users)
-        .values({ tenantId, name, email, passwordHash, role: "client" })
+        .values({ tenantId: ctx.tenantId, name, email, passwordHash, role: "client" })
         .returning({ id: users.id });
 
       await tx
         .update(projects)
         .set({ clientUserId: client!.id, updatedAt: new Date() })
         .where(eq(projects.id, projectId));
-
-      return { ok: true };
     });
   } catch (error) {
     // Email taken by a client in any tenant, or by anyone in this tenant.
-    if (isUniqueViolation(error)) return { ok: false, error: "email_exists" };
+    if (isUniqueViolation(error)) fail("email_exists");
     throw error;
   }
+
+  await logActivity(ctx, projectId, "client_access_granted", `Acceso a la app concedido a ${email}`);
+  return { projectId };
 }
 
+/** Body: { password } */
 export async function resetProjectClientPassword(
-  tenantId: string,
+  ctx: Ctx,
   projectId: string,
-  password: string,
-): Promise<Result> {
-  if (password.length < MIN_PASSWORD_LENGTH) return { ok: false, error: "password_too_short" };
+  input: Record<string, unknown>,
+) {
+  requireAdmin(ctx);
 
-  const clientUserId = await findProjectClientId(tenantId, projectId);
-  if (!clientUserId) return { ok: false, error: "no_client" };
+  const password = text(input.password);
+  if (password.length < MIN_PASSWORD_LENGTH) fail("password_too_short");
+
+  const clientUserId = await findProjectClientId(ctx.tenantId, projectId);
+  if (!clientUserId) fail("no_client");
 
   await db
     .update(users)
     .set({ passwordHash: await hashPassword(password), updatedAt: new Date() })
-    .where(and(eq(users.id, clientUserId), eq(users.tenantId, tenantId)));
+    .where(and(eq(users.id, clientUserId), eq(users.tenantId, ctx.tenantId)));
 
-  return { ok: true };
+  await logActivity(ctx, projectId, "client_password_reset", "Contraseña de la app restablecida");
+  return { projectId };
 }
 
 /**
  * Deletes the project's client account. Their app session stops working on
  * the next request, and the project can get a new client afterwards.
  */
-export async function revokeProjectClient(tenantId: string, projectId: string): Promise<Result> {
+export async function revokeProjectClient(ctx: Ctx, projectId: string) {
+  requireAdmin(ctx);
+
   const deleted = await db
     .delete(users)
     .where(
@@ -149,13 +175,15 @@ export async function revokeProjectClient(tenantId: string, projectId: string): 
           db
             .select({ id: projects.clientUserId })
             .from(projects)
-            .where(projectInTenant(tenantId, projectId)),
+            .where(projectInTenant(ctx.tenantId, projectId)),
         ),
-        eq(users.tenantId, tenantId),
+        eq(users.tenantId, ctx.tenantId),
         isClientUser,
       ),
     )
     .returning({ id: users.id });
+  if (deleted.length === 0) fail("no_client");
 
-  return deleted.length ? { ok: true } : { ok: false, error: "no_client" };
+  await logActivity(ctx, projectId, "client_access_revoked", "Acceso a la app revocado");
+  return { projectId };
 }

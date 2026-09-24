@@ -5,7 +5,9 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./contract": "./src/contract.ts"
+    "./contract": "./src/contract.ts",
+    "./projects": "./src/projects.ts",
+    "./users": "./src/users.ts"
   },
   "scripts": {
     "check-types": "tsc --noEmit",
