@@ -1,6 +1,6 @@
 import React, {
   createContext,
-  useContext,
+  use,
   useState,
   useEffect,
   useCallback,
@@ -75,14 +75,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ ...state, signIn, signOut }}>
+    <AuthContext value={{ ...state, signIn, signOut }}>
       {children}
-    </AuthContext.Provider>
+    </AuthContext>
   );
 }
 
 export function useAuth(): AuthContextValue {
-  const ctx = useContext(AuthContext);
+  const ctx = use(AuthContext);
   if (!ctx) throw new Error("useAuth must be used within AuthProvider");
   return ctx;
 }
