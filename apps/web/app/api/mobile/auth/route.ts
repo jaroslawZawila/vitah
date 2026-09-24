@@ -1,14 +1,15 @@
-import { type NextRequest, NextResponse } from "next/server";
-import { db, users, tenants, eq } from "@repo/db";
-import { compare } from "bcryptjs";
+import { NextResponse } from "next/server";
+import { verifyCredentials } from "@repo/auth/credentials";
 import { createMobileToken } from "@repo/auth/mobile";
+import type { MobileSession } from "@repo/core/contract";
 
 // ─── POST /api/mobile/auth ────────────────────────────────────────────────────
-// Credentials auth for the mobile app. Returns a signed JWT (30d) + user data.
+// Credentials auth for the mobile app (client users only). Returns a signed
+// JWT (30d) + user data.
 // For social login, add POST /api/mobile/auth/social — same response shape.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export async function POST(request: NextRequest) {
+export async function POST(request: Request) {
   let email: string | undefined;
   let password: string | undefined;
 
@@ -27,43 +28,18 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const user = await db.query.users.findFirst({
-    where: eq(users.email, email),
-  });
-
-  if (!user || !user.passwordHash || !user.active) {
-    return NextResponse.json({ error: "invalid_credentials" }, { status: 401 });
-  }
-
-  const tenant = await db.query.tenants.findFirst({
-    where: eq(tenants.id, user.tenantId),
-  });
-
-  if (!tenant?.active) {
-    return NextResponse.json({ error: "invalid_credentials" }, { status: 401 });
-  }
-
-  const valid = await compare(password, user.passwordHash);
-  if (!valid) {
+  const user = await verifyCredentials(email, password, "mobile");
+  if (!user) {
     return NextResponse.json({ error: "invalid_credentials" }, { status: 401 });
   }
 
   const token = await createMobileToken({
     sub: user.id,
     email: user.email,
-    name: user.name ?? null,
+    name: user.name,
     role: user.role,
     tenantId: user.tenantId,
   });
 
-  return NextResponse.json({
-    token,
-    user: {
-      id: user.id,
-      email: user.email,
-      name: user.name ?? null,
-      role: user.role,
-      tenantId: user.tenantId,
-    },
-  });
+  return NextResponse.json({ token, user } satisfies MobileSession);
 }

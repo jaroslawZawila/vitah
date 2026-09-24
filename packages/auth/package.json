@@ -6,10 +6,12 @@
   "exports": {
     ".": "./src/index.ts",
     "./mobile": "./src/mobile.ts",
-    "./context": "./src/context.ts"
+    "./context": "./src/context.ts",
+    "./credentials": "./src/credentials.ts"
   },
   "scripts": {
-    "check-types": "tsc --noEmit"
+    "check-types": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "@repo/core": "workspace:*",
@@ -22,7 +24,9 @@
     "@repo/typescript-config": "workspace:*",
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^22.15.3",
-    "typescript": "5.9.2"
+    "@vitest/coverage-v8": "^5.0.1",
+    "typescript": "5.9.2",
+    "vitest": "^5.0.1"
   },
   "peerDependencies": {
     "next": ">=16.0.0"

@@ -1,6 +1,9 @@
-export type { Ctx, UserRole } from "./context";
+export { requireAdmin, type Ctx, type UserRole } from "./context";
 export { CoreError, notFound, forbidden, invalid } from "./errors";
+export { hashPassword, normalizeEmail } from "./accounts";
+export * from "./contract";
 export * as projectsService from "./projects";
 export type { ProjectListItem, ProjectWithRelations } from "./projects";
+export * as projectClientService from "./project-client";
 export * as usersService from "./users";
 export type { UserListItem } from "./users";

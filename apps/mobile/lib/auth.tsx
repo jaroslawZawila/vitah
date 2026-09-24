@@ -1,6 +1,6 @@
 import React, {
   createContext,
-  useContext,
+  use,
   useState,
   useEffect,
   useCallback,
@@ -53,13 +53,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signIn = useCallback(
     async (email: string, password: string): Promise<{ error?: string }> => {
       const result = await api.signIn(email, password);
-      if ("error" in result) return { error: result.error };
+      if (!result.ok) return { error: result.error };
 
+      const { token, user } = result.data;
       await Promise.all([
-        SecureStore.setItemAsync(TOKEN_KEY, result.token),
-        SecureStore.setItemAsync(USER_KEY, JSON.stringify(result.user)),
+        SecureStore.setItemAsync(TOKEN_KEY, token),
+        SecureStore.setItemAsync(USER_KEY, JSON.stringify(user)),
       ]);
-      setState({ token: result.token, user: result.user, isLoading: false });
+      setState({ token, user, isLoading: false });
       return {};
     },
     []
@@ -74,14 +75,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ ...state, signIn, signOut }}>
+    <AuthContext value={{ ...state, signIn, signOut }}>
       {children}
-    </AuthContext.Provider>
+    </AuthContext>
   );
 }
 
 export function useAuth(): AuthContextValue {
-  const ctx = useContext(AuthContext);
+  const ctx = use(AuthContext);
   if (!ctx) throw new Error("useAuth must be used within AuthProvider");
   return ctx;
 }

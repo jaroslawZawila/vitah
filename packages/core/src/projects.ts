@@ -13,6 +13,7 @@ import {
   desc,
   asc,
 } from "@repo/db";
+import { logActivity } from "./activity";
 import type { Ctx } from "./context";
 import { invalid, notFound } from "./errors";
 
@@ -48,21 +49,6 @@ const MILESTONES = [
 ];
 
 // --- Helpers ---
-
-async function logActivity(
-  ctx: Ctx,
-  projectId: string,
-  action: string,
-  detail: string,
-) {
-  await db.insert(projectActivityLog).values({
-    tenantId: ctx.tenantId,
-    projectId,
-    userId: ctx.userId,
-    action,
-    detail,
-  });
-}
 
 /** Throws not_found unless the project exists in the caller's tenant. */
 async function assertProject(ctx: Ctx, projectId: string) {
@@ -117,6 +103,7 @@ export async function getProject(ctx: Ctx, id: string) {
     where: and(eq(projects.id, id), eq(projects.tenantId, ctx.tenantId)),
     with: {
       advisor: { columns: { id: true, name: true } },
+      client: { columns: { id: true, name: true, email: true } },
       milestones: { orderBy: [asc(projectMilestones.sortOrder)] },
       qualityChecks: { orderBy: [asc(projectQualityChecks.createdAt)] },
       tasks: { orderBy: [desc(projectTasks.createdAt)] },

@@ -1,8 +1,14 @@
 import { config } from "@repo/eslint-config/react-internal";
+import globals from "globals";
 
 /** @type {import("eslint").Linter.Config[]} */
 export default [
-  // CommonJS tooling config and generated Expo files
-  { ignores: [".expo/**", "*.config.js"] },
   ...config,
+  {
+    ignores: [".expo/**", "dist/**", "web-build/**", "*.config.js"],
+  },
+  {
+    files: ["__tests__/**"],
+    languageOptions: { globals: globals.jest },
+  },
 ];

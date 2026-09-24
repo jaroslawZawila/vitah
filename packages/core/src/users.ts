@@ -1,15 +1,11 @@
-import { hash } from "bcryptjs";
-import { db, users, eq, and } from "@repo/db";
-import type { Ctx, UserRole } from "./context";
-import { forbidden, invalid, notFound } from "./errors";
+import { db, users, eq, and, isStaffUser, STAFF_ROLES } from "@repo/db";
+import { hashPassword } from "./accounts";
+import { requireAdmin, type Ctx, type UserRole } from "./context";
+import { MIN_PASSWORD_LENGTH } from "./contract";
+import { invalid, notFound } from "./errors";
 
-// User management within the caller's tenant. Admin only.
-
-const ROLES: readonly UserRole[] = ["admin", "manager", "viewer"];
-
-function requireAdmin(ctx: Ctx) {
-  if (ctx.role !== "admin") throw forbidden();
-}
+// Staff management within the caller's tenant. Admin only. Clients (mobile
+// app users) are managed from their project (./project-client.ts).
 
 function str(value: unknown): string | undefined {
   if (typeof value !== "string") return undefined;
@@ -18,13 +14,13 @@ function str(value: unknown): string | undefined {
 }
 
 function role(value: unknown): UserRole | undefined {
-  return ROLES.includes(value as UserRole) ? (value as UserRole) : undefined;
+  return STAFF_ROLES.includes(value as UserRole) ? (value as UserRole) : undefined;
 }
 
 export async function listUsers(ctx: Ctx) {
   requireAdmin(ctx);
-  return db.query.users.findMany({
-    where: eq(users.tenantId, ctx.tenantId),
+  const staff = await db.query.users.findMany({
+    where: and(eq(users.tenantId, ctx.tenantId), isStaffUser),
     columns: {
       id: true,
       name: true,
@@ -35,6 +31,8 @@ export async function listUsers(ctx: Ctx) {
     },
     orderBy: (users, { asc }) => [asc(users.createdAt)],
   });
+  // Narrows the role type; the query already excludes clients.
+  return staff.filter((u): u is typeof u & { role: UserRole } => u.role !== "client");
 }
 
 export type UserListItem = Awaited<ReturnType<typeof listUsers>>[number];
@@ -52,7 +50,7 @@ export async function createUser(ctx: Ctx, input: Record<string, unknown>) {
 
   if (!email || !name || !password || !userRole)
     throw invalid("missing_fields");
-  if (password.length < 8) throw invalid("password_too_short");
+  if (password.length < MIN_PASSWORD_LENGTH) throw invalid("password_too_short");
 
   const existing = await db.query.users.findFirst({
     where: and(eq(users.tenantId, ctx.tenantId), eq(users.email, email)),
@@ -66,7 +64,7 @@ export async function createUser(ctx: Ctx, input: Record<string, unknown>) {
       tenantId: ctx.tenantId,
       email,
       name,
-      passwordHash: await hash(password, 12),
+      passwordHash: await hashPassword(password),
       role: userRole,
     })
     .returning({ id: users.id });
@@ -130,7 +128,7 @@ export async function updateUser(
     const updated = await tx
       .update(users)
       .set(set)
-      .where(and(eq(users.id, userId), eq(users.tenantId, ctx.tenantId)))
+      .where(and(eq(users.id, userId), eq(users.tenantId, ctx.tenantId), isStaffUser))
       .returning({ id: users.id });
     if (updated.length === 0) throw notFound();
 

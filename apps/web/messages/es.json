@@ -438,7 +438,8 @@
       "startDate": "Inicio",
       "delivery": "Entrega est.",
       "advisor": "Asesor",
-      "qualityLevel": "Calidad"
+      "qualityLevel": "Calidad",
+      "address": "Dirección"
     },
     "tabs": {
       "overview": "Resumen",
@@ -608,7 +609,38 @@
       "invoice_paid": "Factura pagada",
       "document_uploaded": "Documento subido",
       "project_certified": "Proyecto certificado",
-      "order_delivered": "Pedido entregado"
+      "order_delivered": "Pedido entregado",
+      "client_access_granted": "Acceso a la app concedido",
+      "client_password_reset": "Contraseña de la app restablecida",
+      "client_access_revoked": "Acceso a la app revocado"
+    },
+    "clientAccess": {
+      "title": "Acceso del cliente a la app",
+      "intro": "Crea la cuenta con la que el cliente verá su proyecto en la app móvil de ViTAH.",
+      "name": "Nombre",
+      "email": "Email",
+      "password": "Contraseña",
+      "newPassword": "Nueva contraseña",
+      "passwordHint": "Mínimo 8 caracteres. Compártela con el cliente de forma segura.",
+      "grant": "Dar acceso",
+      "granting": "Creando…",
+      "active": "Acceso activo",
+      "resetPassword": "Restablecer contraseña",
+      "savePassword": "Guardar contraseña",
+      "passwordUpdated": "Contraseña actualizada.",
+      "cancel": "Cancelar",
+      "revoke": "Revocar acceso",
+      "confirmRevoke": "¿Revocar el acceso de {email}? Se eliminará su cuenta de la app.",
+      "errors": {
+        "missing_fields": "Completa todos los campos.",
+        "invalid_email": "Introduce un email válido.",
+        "password_too_short": "La contraseña debe tener al menos 8 caracteres.",
+        "email_exists": "Este email ya está en uso.",
+        "project_not_found": "Proyecto no encontrado.",
+        "client_already_attached": "Este proyecto ya tiene un cliente con acceso.",
+        "no_client": "Este proyecto no tiene ningún cliente con acceso.",
+        "forbidden": "Solo los administradores pueden gestionar el acceso."
+      }
     }
   },
   "usersPage": {

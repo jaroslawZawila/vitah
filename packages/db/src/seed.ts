@@ -2,6 +2,7 @@ import bcrypt from "bcryptjs";
 const { hash } = bcrypt;
 import postgres from "postgres";
 import { drizzle } from "drizzle-orm/postgres-js";
+import { eq } from "drizzle-orm";
 import * as schema from "./schema";
 
 async function seed() {
@@ -522,6 +523,23 @@ async function seed() {
     })),
   );
   console.log(`Seeded ${ACTIVITIES.length} activity log entries`);
+
+  // --- Seed a mobile app client for VTH-26-001 (same password as the admin) ---
+
+  const clientEmail = "cliente@vitah.es";
+  const [demoClient] = await db
+    .insert(schema.users)
+    .values({ tenantId, email: clientEmail, name: "Cliente Demo", passwordHash, role: "client" })
+    .onConflictDoNothing()
+    .returning({ id: schema.users.id });
+
+  if (demoClient) {
+    await db
+      .update(schema.projects)
+      .set({ clientUserId: demoClient.id })
+      .where(eq(schema.projects.id, projectMap.get("VTH-26-001")!));
+    console.log(`Mobile app client: ${clientEmail} (project VTH-26-001)`);
+  }
 
   console.log("Seed completed successfully!");
   await client.end();

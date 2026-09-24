@@ -1,11 +1,5 @@
 {
-  "extends": "@repo/typescript-config/base.json",
-  "compilerOptions": {
-    "module": "ESNext",
-    "moduleResolution": "Bundler",
-    "declaration": false,
-    "noEmit": true
-  },
-  "include": ["src/**/*.ts"],
+  "extends": "@repo/typescript-config/internal-package.json",
+  "include": ["src/**/*.ts", "test/**/*.ts", "vitest.config.ts"],
   "exclude": ["node_modules"]
 }

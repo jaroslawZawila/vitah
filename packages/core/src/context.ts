@@ -1,4 +1,8 @@
-export type UserRole = "admin" | "manager" | "viewer";
+import type { StaffRole } from "@repo/db";
+import { forbidden } from "./errors";
+
+/** Roles that can act through `Ctx`. Clients (mobile app users) never do. */
+export type UserRole = StaffRole;
 
 /**
  * Who is making the call. Every core function takes this as its first
@@ -12,3 +16,7 @@ export type Ctx = {
   userId: string;
   role: UserRole;
 };
+
+export function requireAdmin(ctx: Ctx) {
+  if (ctx.role !== "admin") throw forbidden();
+}

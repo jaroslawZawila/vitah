@@ -1,170 +1,137 @@
-import { useEffect, useState } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  SafeAreaView,
-  FlatList,
-  ActivityIndicator,
-} from "react-native";
+import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } from "react-native";
+import { Stack } from "expo-router";
+import { Button } from "../../components/button";
+import { colors, spacing, type } from "../../constants/theme";
+import type { Project } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
-import { api, type Project } from "../../lib/api";
-import { useRouter } from "expo-router";
-import { colors } from "../../constants/colors";
+import { formatDate } from "../../lib/format";
+import { useProject } from "../../lib/use-project";
 
-const ROLE_LABELS: Record<string, string> = {
-  admin: "Administrador",
-  manager: "Gestor",
-  viewer: "Visor",
-};
-
-export default function HomeScreen() {
-  const { user, token, signOut } = useAuth();
-  const router = useRouter();
-  const [projects, setProjects] = useState<Project[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!token) return;
-    void api.getProjects(token).then((result) => {
-      if ("data" in result) {
-        setProjects(result.data);
-      } else if (result.error === "unauthorized") {
-        void handleSignOut();
-      } else {
-        setError(result.error);
-      }
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
-
-  async function handleSignOut() {
-    await signOut();
-    router.replace("/sign-in");
-  }
+export default function ProjectScreen() {
+  const { user, signOut } = useAuth();
+  const { project, error, refreshing, refresh, retry } = useProject();
+  const loaded = project !== undefined;
+  const firstName = user?.name?.split(" ")[0];
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerLogo}>ViTAH</Text>
-        <TouchableOpacity onPress={handleSignOut} activeOpacity={0.7}>
-          <Text style={styles.signOutText}>Salir</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Content */}
-      <View style={styles.content}>
-        <Text style={styles.welcomeLabel}>BIENVENIDO</Text>
-        <Text style={styles.userName}>{user?.name ?? user?.email}</Text>
-        <Text style={styles.userRole}>
-          {user?.role ? (ROLE_LABELS[user.role] ?? user.role) : ""}
-        </Text>
-
-        <Text style={styles.sectionLabel}>PROYECTOS</Text>
-        {error ? (
-          <Text style={styles.cardSubtitle}>No se pudieron cargar los proyectos</Text>
-        ) : projects === null ? (
-          <ActivityIndicator color={colors.verdeOliva} />
-        ) : (
-          <FlatList
-            data={projects}
-            keyExtractor={(p) => p.id}
-            ItemSeparatorComponent={() => <View style={styles.separator} />}
-            ListEmptyComponent={
-              <Text style={styles.cardSubtitle}>Sin proyectos</Text>
-            }
-            renderItem={({ item }) => (
-              <View style={styles.card}>
-                <Text style={styles.cardTitle}>
-                  {item.ref} · {item.clientName}
-                </Text>
-                <Text style={styles.cardSubtitle}>
-                  {item.location} · {item.progressPct}%
-                </Text>
-              </View>
-            )}
-          />
+    <>
+      <Stack.Screen
+        options={{
+          title: "Mi proyecto",
+          headerRight: () => (
+            <Pressable
+              onPress={signOut}
+              accessibilityRole="button"
+              hitSlop={12}
+              style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
+            >
+              <Text style={type.subhead}>Salir</Text>
+            </Pressable>
+          ),
+        }}
+      />
+      <ScrollView
+        contentInsetAdjustmentBehavior="automatic"
+        style={{ flex: 1, backgroundColor: colors.grafito }}
+        contentContainerStyle={{ flexGrow: 1, padding: spacing.lg, gap: spacing.xl }}
+        refreshControl={
+          loaded ? (
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={refresh}
+              tintColor={colors.verdeOliva}
+              colors={[colors.verdeOliva]}
+            />
+          ) : undefined
+        }
+      >
+        {!loaded && !error && (
+          <View style={{ flex: 1, justifyContent: "center" }}>
+            <ActivityIndicator
+              color={colors.verdeOliva}
+              size="large"
+              accessibilityLabel="Cargando tu proyecto"
+            />
+          </View>
         )}
-      </View>
-    </SafeAreaView>
+
+        {!loaded && error && (
+          <View style={{ flex: 1, justifyContent: "center", gap: spacing.lg }}>
+            <Text selectable style={[type.body, { textAlign: "center" }]}>
+              No hemos podido cargar tu proyecto. Comprueba tu conexión.
+            </Text>
+            <Button title="Reintentar" variant="secondary" onPress={retry} />
+          </View>
+        )}
+
+        {loaded && (
+          <View style={{ gap: spacing.sm }}>
+            <Text style={type.label}>{firstName ? `Hola, ${firstName}` : "Hola"}</Text>
+            {project === null && (
+              <Text style={type.subhead}>
+                Todavía no tienes un proyecto asignado. Tu asesor de ViTAH lo activará en cuanto
+                esté listo.
+              </Text>
+            )}
+          </View>
+        )}
+
+        {loaded && error && (
+          <Text selectable accessibilityRole="alert" style={[type.subhead, { color: colors.error }]}>
+            No se ha podido actualizar. Desliza hacia abajo para reintentarlo.
+          </Text>
+        )}
+
+        {project && <ProjectDetails project={project} />}
+      </ScrollView>
+    </>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.grafito,
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 24,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.inputBorder,
-  },
-  headerLogo: {
-    color: colors.blancoCalido,
-    fontSize: 22,
-    fontWeight: "300",
-    letterSpacing: 6,
-  },
-  signOutText: {
-    color: colors.muted,
-    fontSize: 14,
-    letterSpacing: 0.5,
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: 24,
-    paddingTop: 40,
-  },
-  welcomeLabel: {
-    color: colors.muted,
-    fontSize: 10,
-    letterSpacing: 3,
-    marginBottom: 8,
-  },
-  userName: {
-    color: colors.blancoCalido,
-    fontSize: 30,
-    fontWeight: "300",
-    marginBottom: 4,
-  },
-  userRole: {
-    color: colors.verdeOliva,
-    fontSize: 13,
-    letterSpacing: 2,
-    textTransform: "uppercase",
-    marginBottom: 40,
-  },
-  sectionLabel: {
-    color: colors.muted,
-    fontSize: 10,
-    letterSpacing: 3,
-    marginBottom: 12,
-  },
-  separator: {
-    height: 12,
-  },
-  card: {
-    backgroundColor: colors.inputBg,
-    borderRadius: 10,
-    padding: 24,
-    borderWidth: 1,
-    borderColor: colors.inputBorder,
-  },
-  cardTitle: {
-    color: colors.blancoCalido,
-    fontSize: 18,
-    fontWeight: "400",
-    marginBottom: 6,
-  },
-  cardSubtitle: {
-    color: colors.muted,
-    fontSize: 14,
-  },
-});
+function ProjectDetails({ project }: { project: Project }) {
+  return (
+    <View style={{ gap: spacing.xl }}>
+      <View style={{ gap: spacing.sm }}>
+        <Text style={type.label}>Proyecto</Text>
+        <Text selectable style={[type.display, { fontVariant: ["tabular-nums"] }]}>
+          {project.ref}
+        </Text>
+      </View>
+
+      <View style={{ gap: spacing.sm }}>
+        <Text style={type.label}>Dirección</Text>
+        <Text selectable style={type.title}>
+          {project.address}
+        </Text>
+      </View>
+
+      <View style={{ borderTopWidth: 1, borderColor: colors.inputBorder }}>
+        <DateRow label="Inicio de obra" date={project.startDate} />
+        <DateRow label="Finalización prevista" date={project.completionDate} />
+      </View>
+    </View>
+  );
+}
+
+function DateRow({ label, date }: { label: string; date: string | null }) {
+  return (
+    <View
+      style={{
+        flexDirection: "row",
+        flexWrap: "wrap",
+        justifyContent: "space-between",
+        alignItems: "center",
+        gap: spacing.sm,
+        minHeight: 56,
+        paddingVertical: spacing.md,
+        borderBottomWidth: 1,
+        borderColor: colors.inputBorder,
+      }}
+    >
+      <Text style={type.subhead}>{label}</Text>
+      <Text selectable style={[type.body, !date && { color: colors.muted }]}>
+        {date ? formatDate(date) : "Por confirmar"}
+      </Text>
+    </View>
+  );
+}

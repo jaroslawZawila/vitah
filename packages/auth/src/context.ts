@@ -1,6 +1,15 @@
 import type { Ctx } from "@repo/core";
+import type { UserRole as AnyUserRole } from "@repo/db";
 import { auth } from "./index";
 import { verifyMobileToken } from "./mobile";
+
+/**
+ * Builds a staff `Ctx`. Clients (mobile app homeowners) never get one: they
+ * may only use their own /api/mobile/* endpoints, never tenant-wide APIs.
+ */
+function staffContext(tenantId: string, userId: string, role: AnyUserRole): Ctx | null {
+  return role === "client" ? null : { tenantId, userId, role };
+}
 
 /**
  * Resolves the caller for an API request.
@@ -13,7 +22,7 @@ export async function getRequestContext(request: Request): Promise<Ctx | null> {
   if (header?.toLowerCase().startsWith("bearer ")) {
     try {
       const payload = await verifyMobileToken(header.slice(7).trim());
-      return { tenantId: payload.tenantId, userId: payload.sub, role: payload.role };
+      return staffContext(payload.tenantId, payload.sub, payload.role);
     } catch {
       return null;
     }
@@ -26,5 +35,5 @@ export async function getSessionContext(): Promise<Ctx | null> {
   const session = await auth();
   const user = session?.user;
   if (!user?.id || !user.tenantId || !user.role) return null;
-  return { tenantId: user.tenantId, userId: user.id, role: user.role };
+  return staffContext(user.tenantId, user.id, user.role);
 }

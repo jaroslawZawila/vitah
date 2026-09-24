@@ -1,8 +1,7 @@
 import "./types";
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
-import { compare } from "bcryptjs";
-import { db, users, tenants, eq } from "@repo/db";
+import { verifyCredentials } from "./credentials";
 
 export { AuthError } from "next-auth";
 
@@ -16,34 +15,9 @@ const result = NextAuth({
       async authorize(credentials) {
         const email = credentials?.email as string | undefined;
         const password = credentials?.password as string | undefined;
-
         if (!email || !password) return null;
 
-        // Find user by email
-        const user = await db.query.users.findFirst({
-          where: eq(users.email, email),
-        });
-
-        if (!user || !user.passwordHash || !user.active) return null;
-
-        // Verify tenant is active
-        const tenant = await db.query.tenants.findFirst({
-          where: eq(tenants.id, user.tenantId),
-        });
-
-        if (!tenant || !tenant.active) return null;
-
-        // Verify password
-        const valid = await compare(password, user.passwordHash);
-        if (!valid) return null;
-
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          role: user.role,
-          tenantId: user.tenantId,
-        };
+        return verifyCredentials(email, password, "portal");
       },
     }),
   ],
