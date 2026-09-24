@@ -125,7 +125,7 @@ route. Keep `/api/v1` backwards compatible — installed mobile builds lag behin
 - JWT sessions include `role` and `tenantId` fields
 - `NEXTAUTH_SECRET` + `POSTGRES_URL` required in each app's `.env.local`
 - Login page is `/`, authenticated users redirect to `/dashboard`
-- Middleware protects all routes except `/`, `/api/auth/*`, and static assets
+- `proxy.ts` protects all routes except `/`, `/api/auth/*`, `/api/mobile/*`, `/api/v1/*` (these authenticate per request), and static assets
 - User roles: `admin`, `manager`, `viewer` (Postgres enum)
 - Admin-only server actions guarded by `requireAdmin()` check
 
@@ -165,7 +165,7 @@ route. Keep `/api/v1` backwards compatible — installed mobile builds lag behin
 ```
 apps/web/
   auth.ts                          # Re-exports from @repo/auth
-  middleware.ts                    # Route protection
+  proxy.ts                         # Route protection (Next 16 "proxy", formerly middleware)
   postcss.config.mjs               # @tailwindcss/postcss plugin
   i18n/request.ts                  # next-intl config
   messages/{locale}.json           # Translation strings

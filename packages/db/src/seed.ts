@@ -20,13 +20,17 @@ async function seed() {
   const name = process.env.SEED_ADMIN_NAME ?? "ViTAH Admin";
 
   // Create or find tenant
-  let [tenant] = await db
+  const [insertedTenant] = await db
     .insert(schema.tenants)
     .values({ name: tenantName, slug: tenantSlug })
     .onConflictDoNothing({ target: schema.tenants.slug })
     .returning({ id: schema.tenants.id });
 
-  if (!tenant) {
+  let tenantId: string;
+  if (insertedTenant) {
+    tenantId = insertedTenant.id;
+    console.log(`Created tenant "${tenantName}"`);
+  } else {
     // Tenant already exists — look it up
     const existing = await db.query.tenants.findFirst({
       where: (t, { eq }) => eq(t.slug, tenantSlug),
@@ -37,10 +41,8 @@ async function seed() {
       await client.end();
       process.exit(1);
     }
-    tenant = existing;
+    tenantId = existing.id;
     console.log(`Tenant "${tenantName}" already exists, continuing with project seed...`);
-  } else {
-    console.log(`Created tenant "${tenantName}"`);
   }
 
   // Create or find admin user
@@ -49,7 +51,7 @@ async function seed() {
   let [adminUser] = await db
     .insert(schema.users)
     .values({
-      tenantId: tenant.id,
+      tenantId: tenantId,
       email,
       name,
       passwordHash,
@@ -61,7 +63,7 @@ async function seed() {
 
   if (!adminUser) {
     const existingUser = await db.query.users.findFirst({
-      where: (u, { eq, and }) => and(eq(u.tenantId, tenant.id), eq(u.email, email)),
+      where: (u, { eq, and }) => and(eq(u.tenantId, tenantId), eq(u.email, email)),
       columns: { id: true },
     });
     adminUser = existingUser ?? undefined;
@@ -159,7 +161,7 @@ async function seed() {
     .values(
       PROJECTS_DATA.map((p) => ({
         ...p,
-        tenantId: tenant.id,
+        tenantId: tenantId,
         advisorId: adminUser?.id,
       })),
     )
@@ -188,7 +190,7 @@ async function seed() {
   const constructionProjectId = projectMap.get("VTH-26-003");
   if (constructionProjectId) {
     const milestoneValues = MILESTONES.map((m) => ({
-      tenantId: tenant.id,
+      tenantId: tenantId,
       projectId: constructionProjectId,
       code: m.code,
       name: m.name,
@@ -214,7 +216,7 @@ async function seed() {
 
     await db.insert(schema.projectQualityChecks).values([
       {
-        tenantId: tenant.id,
+        tenantId: tenantId,
         projectId: constructionProjectId,
         name: "Tolerancia replanteo",
         detail: "Desviación máxima ±5mm",
@@ -223,7 +225,7 @@ async function seed() {
         checkedAt: new Date("2026-02-20"),
       },
       {
-        tenantId: tenant.id,
+        tenantId: tenantId,
         projectId: constructionProjectId,
         name: "Aplomado estructura",
         detail: "Desviación máx. 0.2%",
@@ -232,7 +234,7 @@ async function seed() {
         checkedAt: new Date("2026-03-10"),
       },
       {
-        tenantId: tenant.id,
+        tenantId: tenantId,
         projectId: constructionProjectId,
         name: "Blower Door test",
         detail: "Objetivo < 0.6 ACH@50Pa",
@@ -240,7 +242,7 @@ async function seed() {
         result: "pending" as const,
       },
       {
-        tenantId: tenant.id,
+        tenantId: tenantId,
         projectId: constructionProjectId,
         name: "Validación sellado Thermochip",
         detail: "Continuidad de la envolvente",
@@ -249,7 +251,7 @@ async function seed() {
         checkedAt: new Date("2026-04-05"),
       },
       {
-        tenantId: tenant.id,
+        tenantId: tenantId,
         projectId: constructionProjectId,
         name: "Verificación pre-instalaciones MEP",
         detail: "Pasos y registros conforme a proyecto",
@@ -323,7 +325,7 @@ async function seed() {
   ];
 
   const taskValues = TASKS.map((t) => ({
-    tenantId: tenant.id,
+    tenantId: tenantId,
     projectId: projectMap.get(t.projectRef)!,
     title: t.title,
     department: t.department,
@@ -401,7 +403,7 @@ async function seed() {
 
   await db.insert(schema.projectMaterialOrders).values(
     ORDERS.map((o) => ({
-      tenantId: tenant.id,
+      tenantId: tenantId,
       projectId: projectMap.get(o.projectRef)!,
       materialDescription: o.materialDescription,
       supplier: o.supplier,
@@ -458,7 +460,7 @@ async function seed() {
 
   await db.insert(schema.projectInvoices).values(
     INVOICES.map((inv) => ({
-      tenantId: tenant.id,
+      tenantId: tenantId,
       projectId: projectMap.get(inv.projectRef)!,
       amount: inv.amount,
       description: inv.description,
@@ -486,7 +488,7 @@ async function seed() {
 
   await db.insert(schema.projectDocuments).values(
     DOCUMENTS.map((d) => ({
-      tenantId: tenant.id,
+      tenantId: tenantId,
       projectId: projectMap.get(d.projectRef)!,
       category: d.category,
       fileName: d.fileName,
@@ -511,7 +513,7 @@ async function seed() {
 
   await db.insert(schema.projectActivityLog).values(
     ACTIVITIES.map((a) => ({
-      tenantId: tenant.id,
+      tenantId: tenantId,
       projectId: projectMap.get(a.projectRef)!,
       userId: adminUser?.id,
       action: a.action,

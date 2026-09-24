@@ -28,12 +28,12 @@ export default function HomeScreen() {
   useEffect(() => {
     if (!token) return;
     void api.getProjects(token).then((result) => {
-      if (result.data) {
+      if ("data" in result) {
         setProjects(result.data);
       } else if (result.error === "unauthorized") {
         void handleSignOut();
       } else {
-        setError(result.error ?? "request_failed");
+        setError(result.error);
       }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps

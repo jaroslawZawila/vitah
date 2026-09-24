@@ -10,8 +10,8 @@ export type AuthUser = {
   tenantId: string;
 };
 
-type SignInSuccess = { token: string; user: AuthUser; error?: never };
-type SignInFailure = { error: string; token?: never; user?: never };
+type SignInSuccess = { token: string; user: AuthUser };
+type SignInFailure = { error: string };
 type SignInResult = SignInSuccess | SignInFailure;
 
 // ─── Social login (future) ────────────────────────────────────────────────────
@@ -37,7 +37,7 @@ export type Project = {
   advisor: { id: string; name: string | null } | null;
 };
 
-type ApiResult<T> = { data: T; error?: never } | { error: string; data?: never };
+type ApiResult<T> = { data: T } | { error: string };
 
 async function authedGet<T>(path: string, token: string): Promise<ApiResult<T>> {
   try {
