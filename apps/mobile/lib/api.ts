@@ -1,44 +1,57 @@
+import type { MobileProject, MobileSession } from "@repo/core/contract";
+
 const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
 
-export type UserRole = "admin" | "manager" | "viewer";
+export type AuthUser = MobileSession["user"];
+export type Project = MobileProject;
 
-export type AuthUser = {
-  id: string;
-  email: string;
-  name: string | null;
-  role: UserRole;
-  tenantId: string;
-};
+type ApiError = "invalid_credentials" | "unauthorized" | "network_error" | "server_error";
 
-type SignInSuccess = { token: string; user: AuthUser; error?: never };
-type SignInFailure = { error: string; token?: never; user?: never };
-type SignInResult = SignInSuccess | SignInFailure;
+type Result<T> = { ok: true; data: T } | { ok: false; error: ApiError };
+
+async function request<T>(path: string, init: RequestInit = {}): Promise<Result<T>> {
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}${path}`, init);
+  } catch {
+    return { ok: false, error: "network_error" };
+  }
+
+  if (res.status === 401) {
+    const body = (await res.json().catch(() => null)) as { error?: string } | null;
+    return {
+      ok: false,
+      error: body?.error === "invalid_credentials" ? "invalid_credentials" : "unauthorized",
+    };
+  }
+  if (!res.ok) return { ok: false, error: "server_error" };
+
+  try {
+    return { ok: true, data: (await res.json()) as T };
+  } catch {
+    return { ok: false, error: "server_error" };
+  }
+}
 
 // ─── Social login (future) ────────────────────────────────────────────────────
 // Add signInWithProvider(provider: 'google' | 'apple', idToken: string) here.
 // Call POST /api/mobile/auth/social with { provider, idToken }.
-// The server validates the idToken, looks up the user by (tenantId, email),
+// The server validates the idToken, looks up the client by email,
 // and returns the same { token, user } shape — no changes needed in auth.tsx.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const api = {
-  async signIn(email: string, password: string): Promise<SignInResult> {
-    try {
-      const res = await fetch(`${API_BASE}/api/mobile/auth`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
+  signIn(email: string, password: string) {
+    return request<MobileSession>("/api/mobile/auth", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
+  },
 
-      const data = await res.json();
-
-      if (!res.ok) {
-        return { error: (data.error as string) ?? "invalid_credentials" };
-      }
-
-      return data as SignInSuccess;
-    } catch {
-      return { error: "network_error" };
-    }
+  getProject(token: string) {
+    return request<{ project: Project | null }>("/api/mobile/project", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
   },
 };

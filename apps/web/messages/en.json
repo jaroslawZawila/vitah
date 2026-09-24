@@ -438,7 +438,8 @@
       "startDate": "Start",
       "delivery": "Est. delivery",
       "advisor": "Advisor",
-      "qualityLevel": "Quality"
+      "qualityLevel": "Quality",
+      "address": "Address"
     },
     "tabs": {
       "overview": "Overview",
@@ -608,7 +609,37 @@
       "invoice_paid": "Invoice paid",
       "document_uploaded": "Document uploaded",
       "project_certified": "Project certified",
-      "order_delivered": "Order delivered"
+      "order_delivered": "Order delivered",
+      "client_access_granted": "App access granted",
+      "client_password_reset": "App password reset",
+      "client_access_revoked": "App access revoked"
+    },
+    "clientAccess": {
+      "title": "Client app access",
+      "intro": "Create the account the client will use to see their project in the ViTAH mobile app.",
+      "name": "Name",
+      "email": "Email",
+      "password": "Password",
+      "newPassword": "New password",
+      "passwordHint": "At least 8 characters. Share it with the client securely.",
+      "grant": "Grant access",
+      "granting": "Creating…",
+      "active": "Access active",
+      "resetPassword": "Reset password",
+      "savePassword": "Save password",
+      "passwordUpdated": "Password updated.",
+      "cancel": "Cancel",
+      "revoke": "Revoke access",
+      "confirmRevoke": "Revoke access for {email}? Their app account will be deleted.",
+      "errors": {
+        "missing_fields": "Fill in all fields.",
+        "invalid_email": "Enter a valid email.",
+        "password_too_short": "The password must be at least 8 characters.",
+        "email_exists": "This email is already in use.",
+        "project_not_found": "Project not found.",
+        "client_already_attached": "This project already has a client with access.",
+        "no_client": "This project has no client with access."
+      }
     }
   },
   "usersPage": {

@@ -53,13 +53,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signIn = useCallback(
     async (email: string, password: string): Promise<{ error?: string }> => {
       const result = await api.signIn(email, password);
-      if (result.error) return { error: result.error };
+      if (!result.ok) return { error: result.error };
 
+      const { token, user } = result.data;
       await Promise.all([
-        SecureStore.setItemAsync(TOKEN_KEY, result.token),
-        SecureStore.setItemAsync(USER_KEY, JSON.stringify(result.user)),
+        SecureStore.setItemAsync(TOKEN_KEY, token),
+        SecureStore.setItemAsync(USER_KEY, JSON.stringify(user)),
       ]);
-      setState({ token: result.token, user: result.user, isLoading: false });
+      setState({ token, user, isLoading: false });
       return {};
     },
     []

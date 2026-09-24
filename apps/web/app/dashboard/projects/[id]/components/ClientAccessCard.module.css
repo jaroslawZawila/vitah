@@ -1,0 +1,128 @@
+/* Mobile first: stacked fields and full-width buttons with 44px touch targets. */
+
+.intro {
+  margin: 0;
+  font-size: 12px;
+  color: var(--admin-muted);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.field label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--admin-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.field input {
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--admin-card-border);
+  border-radius: 6px;
+  background: #ffffff;
+  color: var(--admin-foreground);
+  font-size: 16px; /* prevents iOS zoom on focus */
+}
+
+.field input:focus-visible {
+  outline: 2px solid var(--verde-oliva);
+  outline-offset: 1px;
+}
+
+.hint {
+  font-size: 11px;
+  color: var(--admin-muted);
+}
+
+.error,
+.success {
+  margin: 0;
+  font-size: 12px;
+}
+
+.error {
+  color: var(--error);
+}
+
+.success {
+  color: var(--verde-oliva);
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.primary {
+  composes: btnPrimary from "../page.module.css";
+  min-height: 44px;
+}
+
+.secondary {
+  composes: btnSmall from "../page.module.css";
+  min-height: 44px;
+}
+
+.danger {
+  composes: btnDanger from "../page.module.css";
+  min-height: 44px;
+}
+
+.primary:disabled,
+.secondary:disabled,
+.danger:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.attached {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.identity {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+}
+
+.status {
+  composes: badgeGreen from "../../../shared.module.css";
+  margin-bottom: 6px;
+}
+
+.clientName {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--admin-foreground);
+  overflow-wrap: anywhere;
+}
+
+.clientEmail {
+  font-size: 12px;
+  color: var(--admin-muted);
+  overflow-wrap: anywhere;
+}
+
+@media (min-width: 768px) {
+  .actions {
+    flex-direction: row;
+    justify-content: flex-end;
+  }
+}

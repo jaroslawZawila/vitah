@@ -76,6 +76,14 @@ export default function ProjectHeader({
           />
         </div>
         <div className={styles.editField}>
+          <label htmlFor="project-location">{t("header.address")}</label>
+          <input
+            id="project-location"
+            value={formData.location}
+            onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+          />
+        </div>
+        <div className={styles.editField}>
           <label>m²</label>
           <input
             type="number"

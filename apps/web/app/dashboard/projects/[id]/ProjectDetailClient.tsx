@@ -18,8 +18,10 @@ type TabKey = (typeof TABS)[number];
 
 export default function ProjectDetailClient({
   project,
+  canManageClient,
 }: {
   project: ProjectWithRelations;
+  canManageClient: boolean;
 }) {
   const t = useTranslations("projectDetailPage");
   const searchParams = useSearchParams();
@@ -60,7 +62,7 @@ export default function ProjectDetailClient({
 
       {/* Tab content */}
       <div className={styles.tabContent}>
-        {activeTab === "overview" && <OverviewTab project={project} />}
+        {activeTab === "overview" && <OverviewTab project={project} canManageClient={canManageClient} />}
         {activeTab === "construction" && <ConstructionTab project={project} />}
         {activeTab === "technical" && <TechnicalTab project={project} />}
         {activeTab === "logistics" && <LogisticsTab project={project} />}

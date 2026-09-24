@@ -2,7 +2,6 @@ import {
   View,
   Text,
   TextInput,
-  TouchableOpacity,
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
@@ -12,7 +11,8 @@ import {
 import { useState } from "react";
 import { Redirect } from "expo-router";
 import { useAuth } from "../lib/auth";
-import { colors } from "../constants/colors";
+import { colors } from "../constants/theme";
+import { Button } from "../components/button";
 
 export default function SignInScreen() {
   const { signIn, token, isLoading: authLoading } = useAuth();
@@ -88,18 +88,12 @@ export default function SignInScreen() {
 
             {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
-            <TouchableOpacity
-              style={[styles.button, loading && styles.buttonDisabled]}
+            <Button
+              title="Iniciar sesión"
               onPress={handleSignIn}
-              disabled={loading}
-              activeOpacity={0.8}
-            >
-              {loading ? (
-                <ActivityIndicator color={colors.blancoCalido} />
-              ) : (
-                <Text style={styles.buttonText}>Iniciar sesión</Text>
-              )}
-            </TouchableOpacity>
+              loading={loading}
+              style={{ marginTop: 4 }}
+            />
           </View>
         </View>
       </KeyboardAvoidingView>
@@ -160,23 +154,5 @@ const styles = StyleSheet.create({
     color: colors.error,
     fontSize: 13,
     textAlign: "center",
-  },
-  button: {
-    backgroundColor: colors.verdeOliva,
-    borderRadius: 8,
-    paddingVertical: 15,
-    alignItems: "center",
-    marginTop: 4,
-    minHeight: 50,
-    justifyContent: "center",
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  buttonText: {
-    color: colors.blancoCalido,
-    fontSize: 16,
-    fontWeight: "500",
-    letterSpacing: 0.5,
   },
 });

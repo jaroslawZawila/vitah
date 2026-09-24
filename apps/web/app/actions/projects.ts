@@ -17,6 +17,7 @@ import {
   asc,
 } from "@repo/db";
 import { revalidatePath } from "next/cache";
+import { logActivity } from "../../lib/activity";
 
 // --- Auth helpers ---
 
@@ -27,22 +28,6 @@ async function requireAuth() {
     throw new Error("Unauthorized");
   }
   return { tenantId: user.tenantId, userId: user.id!, user };
-}
-
-async function logActivity(
-  tenantId: string,
-  projectId: string,
-  userId: string,
-  action: string,
-  detail: string,
-) {
-  await db.insert(projectActivityLog).values({
-    tenantId,
-    projectId,
-    userId,
-    action,
-    detail,
-  });
 }
 
 // --- Projects ---
@@ -68,6 +53,7 @@ export async function getProject(id: string) {
     where: and(eq(projects.id, id), eq(projects.tenantId, user.tenantId)),
     with: {
       advisor: { columns: { id: true, name: true } },
+      client: { columns: { id: true, name: true, email: true } },
       milestones: { orderBy: [asc(projectMilestones.sortOrder)] },
       qualityChecks: { orderBy: [asc(projectQualityChecks.createdAt)] },
       tasks: { orderBy: [desc(projectTasks.createdAt)] },

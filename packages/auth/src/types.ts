@@ -1,16 +1,17 @@
 import "next-auth";
 import "next-auth/jwt";
+import type { UserRole } from "@repo/db";
 
 declare module "next-auth" {
   interface User {
-    role?: "admin" | "manager" | "viewer";
+    role?: UserRole;
     tenantId?: string;
   }
 }
 
 declare module "next-auth/jwt" {
   interface JWT {
-    role?: "admin" | "manager" | "viewer";
+    role?: UserRole;
     tenantId?: string;
   }
 }
