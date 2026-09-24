@@ -653,6 +653,8 @@
       "missing_fields": "All fields are required.",
       "email_exists": "A user with this email already exists.",
       "password_too_short": "Password must be at least 8 characters.",
+      "cannot_modify_self": "You can't change your own role or deactivate your own account.",
+      "last_admin": "The organisation must keep at least one active administrator.",
       "generic": "Error processing the request."
     },
     "success": {

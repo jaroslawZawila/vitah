@@ -1,41 +1,27 @@
 "use server";
 
-import { auth } from "../../auth";
-import { db, users, eq, and } from "@repo/db";
-import { hash } from "bcryptjs";
+// Thin portal adapters over @repo/core (packages/core/src/users.ts).
+
+import {
+  CoreError,
+  usersService as svc,
+  type Ctx,
+  type UserRole,
+} from "@repo/core";
+import { getSessionContext } from "@repo/auth/context";
 import { revalidatePath } from "next/cache";
 
-type UserRole = "admin" | "manager" | "viewer";
-
-async function requireAdmin() {
-  const session = await auth();
-  const user = session?.user;
-  if (!user?.tenantId || user.role !== "admin") {
-    throw new Error("Unauthorized");
-  }
-  return { tenantId: user.tenantId, user };
+async function requireAuth(): Promise<Ctx> {
+  const ctx = await getSessionContext();
+  if (!ctx) throw new Error("Unauthorized");
+  return ctx;
 }
 
 export async function getUsers() {
-  const session = await auth();
-  const user = session?.user;
-  if (!user?.tenantId || user.role !== "admin") {
-    return [];
-  }
-
+  const ctx = await getSessionContext();
+  if (!ctx || ctx.role !== "admin") return [];
   try {
-    return await db.query.users.findMany({
-      where: eq(users.tenantId, user.tenantId),
-      columns: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
-        active: true,
-        createdAt: true,
-      },
-      orderBy: (users, { asc }) => [asc(users.createdAt)],
-    });
+    return await svc.listUsers(ctx);
   } catch {
     return [];
   }
@@ -45,61 +31,33 @@ export async function createUser(
   _prevState: { error?: string; success?: boolean } | null,
   formData: FormData,
 ) {
-  const { tenantId } = await requireAdmin();
-
-  const email = formData.get("email") as string;
-  const name = formData.get("name") as string;
-  const password = formData.get("password") as string;
-  const role = formData.get("role") as UserRole;
-
-  if (!email || !name || !password || !role) {
-    return { error: "missing_fields" };
+  const ctx = await requireAuth();
+  try {
+    await svc.createUser(ctx, Object.fromEntries(formData));
+  } catch (err) {
+    if (err instanceof CoreError) return { error: err.code };
+    throw err;
   }
-
-  if (password.length < 8) {
-    return { error: "password_too_short" };
-  }
-
-  const existing = await db.query.users.findFirst({
-    where: and(eq(users.tenantId, tenantId), eq(users.email, email)),
-  });
-
-  if (existing) {
-    return { error: "email_exists" };
-  }
-
-  const passwordHash = await hash(password, 12);
-
-  await db.insert(users).values({
-    tenantId,
-    email,
-    name,
-    passwordHash,
-    role,
-  });
-
   revalidatePath("/dashboard/users");
   return { success: true };
 }
 
-export async function updateUserRole(userId: string, role: UserRole) {
-  const { tenantId } = await requireAdmin();
-
-  await db
-    .update(users)
-    .set({ role, updatedAt: new Date() })
-    .where(and(eq(users.id, userId), eq(users.tenantId, tenantId)));
-
+/** Runs a core mutation; returns `{ error: code }` for expected failures. */
+async function mutate(fn: (ctx: Ctx) => Promise<unknown>) {
+  try {
+    await fn(await requireAuth());
+  } catch (err) {
+    if (err instanceof CoreError) return { error: err.code };
+    throw err;
+  }
   revalidatePath("/dashboard/users");
+  return {};
+}
+
+export async function updateUserRole(userId: string, role: UserRole) {
+  return mutate((ctx) => svc.updateUser(ctx, userId, { role }));
 }
 
 export async function toggleUserActive(userId: string, active: boolean) {
-  const { tenantId } = await requireAdmin();
-
-  await db
-    .update(users)
-    .set({ active, updatedAt: new Date() })
-    .where(and(eq(users.id, userId), eq(users.tenantId, tenantId)));
-
-  revalidatePath("/dashboard/users");
+  return mutate((ctx) => svc.updateUser(ctx, userId, { active }));
 }

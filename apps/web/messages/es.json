@@ -653,6 +653,8 @@
       "missing_fields": "Todos los campos son obligatorios.",
       "email_exists": "Ya existe un usuario con este correo.",
       "password_too_short": "La contraseña debe tener al menos 8 caracteres.",
+      "cannot_modify_self": "No puedes cambiar tu propio rol ni desactivar tu cuenta.",
+      "last_admin": "La organización debe tener al menos un administrador activo.",
       "generic": "Error al procesar la solicitud."
     },
     "success": {

@@ -71,8 +71,13 @@ const result = NextAuth({
       const isAuthenticated = !!session?.user;
       const isLoginPage = nextUrl.pathname === "/";
       const isAuthApi = nextUrl.pathname.startsWith("/api/auth");
+      // Mobile and v1 API routes authenticate per request (Bearer token or
+      // session) and must answer 401 JSON rather than redirect to the login page.
+      const isPublicApi =
+        nextUrl.pathname.startsWith("/api/mobile") ||
+        nextUrl.pathname.startsWith("/api/v1");
 
-      if (isAuthApi) return true;
+      if (isAuthApi || isPublicApi) return true;
 
       if (isLoginPage) {
         if (isAuthenticated) {

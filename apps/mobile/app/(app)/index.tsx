@@ -1,11 +1,15 @@
+import { useEffect, useState } from "react";
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   SafeAreaView,
+  FlatList,
+  ActivityIndicator,
 } from "react-native";
 import { useAuth } from "../../lib/auth";
+import { api, type Project } from "../../lib/api";
 import { useRouter } from "expo-router";
 import { colors } from "../../constants/colors";
 
@@ -16,8 +20,24 @@ const ROLE_LABELS: Record<string, string> = {
 };
 
 export default function HomeScreen() {
-  const { user, signOut } = useAuth();
+  const { user, token, signOut } = useAuth();
   const router = useRouter();
+  const [projects, setProjects] = useState<Project[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!token) return;
+    void api.getProjects(token).then((result) => {
+      if (result.data) {
+        setProjects(result.data);
+      } else if (result.error === "unauthorized") {
+        void handleSignOut();
+      } else {
+        setError(result.error ?? "request_failed");
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
 
   async function handleSignOut() {
     await signOut();
@@ -42,11 +62,31 @@ export default function HomeScreen() {
           {user?.role ? (ROLE_LABELS[user.role] ?? user.role) : ""}
         </Text>
 
-        {/* Placeholder card */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Panel de control</Text>
-          <Text style={styles.cardSubtitle}>Próximamente</Text>
-        </View>
+        <Text style={styles.sectionLabel}>PROYECTOS</Text>
+        {error ? (
+          <Text style={styles.cardSubtitle}>No se pudieron cargar los proyectos</Text>
+        ) : projects === null ? (
+          <ActivityIndicator color={colors.verdeOliva} />
+        ) : (
+          <FlatList
+            data={projects}
+            keyExtractor={(p) => p.id}
+            ItemSeparatorComponent={() => <View style={styles.separator} />}
+            ListEmptyComponent={
+              <Text style={styles.cardSubtitle}>Sin proyectos</Text>
+            }
+            renderItem={({ item }) => (
+              <View style={styles.card}>
+                <Text style={styles.cardTitle}>
+                  {item.ref} · {item.clientName}
+                </Text>
+                <Text style={styles.cardSubtitle}>
+                  {item.location} · {item.progressPct}%
+                </Text>
+              </View>
+            )}
+          />
+        )}
       </View>
     </SafeAreaView>
   );
@@ -100,6 +140,15 @@ const styles = StyleSheet.create({
     letterSpacing: 2,
     textTransform: "uppercase",
     marginBottom: 40,
+  },
+  sectionLabel: {
+    color: colors.muted,
+    fontSize: 10,
+    letterSpacing: 3,
+    marginBottom: 12,
+  },
+  separator: {
+    height: 12,
   },
   card: {
     backgroundColor: colors.inputBg,

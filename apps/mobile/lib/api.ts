@@ -21,7 +21,43 @@ type SignInResult = SignInSuccess | SignInFailure;
 // and returns the same { token, user } shape — no changes needed in auth.tsx.
 // ─────────────────────────────────────────────────────────────────────────────
 
+// JSON shape of GET /api/v1/projects (see packages/core/src/projects.ts).
+// Dates arrive as ISO strings; budgetTotal is in cents.
+export type Project = {
+  id: string;
+  ref: string;
+  clientName: string;
+  areaM2: number;
+  type: "unifamiliar" | "adosado" | "duplex";
+  phase: string;
+  progressPct: number;
+  budgetTotal: number;
+  location: string;
+  expectedDeliveryDate: string | null;
+  advisor: { id: string; name: string | null } | null;
+};
+
+type ApiResult<T> = { data: T; error?: never } | { error: string; data?: never };
+
+async function authedGet<T>(path: string, token: string): Promise<ApiResult<T>> {
+  try {
+    const res = await fetch(`${API_BASE}${path}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const body = await res.json();
+    if (!res.ok) return { error: (body.error as string) ?? "request_failed" };
+    return { data: body as T };
+  } catch {
+    return { error: "network_error" };
+  }
+}
+
 export const api = {
+  getProjects(token: string) {
+    return authedGet<Project[]>("/api/v1/projects", token);
+  },
+
+
   async signIn(email: string, password: string): Promise<SignInResult> {
     try {
       const res = await fetch(`${API_BASE}/api/mobile/auth`, {
