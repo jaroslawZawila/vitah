@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
 import { beforeEach, describe, expect, it } from "vitest";
-import { db, eq, projectActivityLog, projects, users } from "@repo/db";
+import { db, eq, projects, users } from "@repo/db";
 import {
   createTestProject,
   createTestTenant,
@@ -17,12 +17,6 @@ async function findUser(email: string) {
 
 async function findProject(id: string) {
   return db.query.projects.findFirst({ where: eq(projects.id, id) });
-}
-
-async function activityFor(projectId: string) {
-  return db.query.projectActivityLog.findMany({
-    where: eq(projectActivityLog.projectId, projectId),
-  });
 }
 
 /** A tenant with an admin caller and one project. */
@@ -45,8 +39,8 @@ describe("normalizeEmail", () => {
 });
 
 describe("createProjectClient", () => {
-  it("creates a client user, attaches them to the project and logs it", async () => {
-    const { tenant, admin, project, ctx } = await setup();
+  it("creates a client user and attaches them to the project", async () => {
+    const { tenant, project, ctx } = await setup();
 
     const result = await svc.createProjectClient(ctx, project.id, {
       ...validInput,
@@ -59,13 +53,6 @@ describe("createProjectClient", () => {
     expect(client).toMatchObject({ tenantId: tenant.id, name: "Ana García", role: "client" });
     expect(await bcrypt.compare(validInput.password, client!.passwordHash!)).toBe(true);
     expect((await findProject(project.id))?.clientUserId).toBe(client!.id);
-    expect(await activityFor(project.id)).toEqual([
-      expect.objectContaining({
-        userId: admin.id,
-        action: "client_access_granted",
-        detail: "Acceso a la app concedido a ana@example.com",
-      }),
-    ]);
   });
 
   it.each([
@@ -83,7 +70,6 @@ describe("createProjectClient", () => {
       status,
     });
     expect(await findUser(validInput.email)).toBeUndefined();
-    expect(await activityFor(project.id)).toHaveLength(0);
   });
 
   it.each(["manager", "viewer"] as const)("is admin only (%s is forbidden)", async (role) => {
@@ -153,9 +139,9 @@ describe("getClientProject", () => {
     const { tenant, ctx } = await setup();
     const project = await createTestProject(tenant.id, {
       ref: "VTH-2026-014",
-      location: "Calle del Sol 5, Santander",
+      address: "Calle del Sol 5, Santander",
       startDate: new Date("2026-03-01T00:00:00Z"),
-      expectedDeliveryDate: new Date("2026-11-15T00:00:00Z"),
+      completionDate: new Date("2026-11-15T00:00:00Z"),
     });
     await svc.createProjectClient(ctx, project.id, validInput);
     const client = await findUser(validInput.email);
@@ -198,7 +184,7 @@ describe("getClientProject", () => {
 });
 
 describe("resetProjectClientPassword", () => {
-  it("replaces the client's password and logs it", async () => {
+  it("replaces the client's password", async () => {
     const { project, ctx } = await setup();
     await svc.createProjectClient(ctx, project.id, validInput);
 
@@ -209,9 +195,6 @@ describe("resetProjectClientPassword", () => {
     const client = await findUser(validInput.email);
     expect(await bcrypt.compare("brand-new-pass", client!.passwordHash!)).toBe(true);
     expect(await bcrypt.compare(validInput.password, client!.passwordHash!)).toBe(false);
-    expect((await activityFor(project.id)).map((a) => a.action)).toContain(
-      "client_password_reset",
-    );
   });
 
   it("rejects a short password", async () => {
@@ -255,7 +238,7 @@ describe("resetProjectClientPassword", () => {
 });
 
 describe("revokeProjectClient", () => {
-  it("deletes the client, frees the project and logs it", async () => {
+  it("deletes the client and frees the project", async () => {
     const { project, ctx } = await setup();
     await svc.createProjectClient(ctx, project.id, validInput);
 
@@ -265,9 +248,6 @@ describe("revokeProjectClient", () => {
 
     expect(await findUser(validInput.email)).toBeUndefined();
     expect((await findProject(project.id))?.clientUserId).toBeNull();
-    expect((await activityFor(project.id)).map((a) => a.action)).toContain(
-      "client_access_revoked",
-    );
     await expect(svc.createProjectClient(ctx, project.id, validInput)).resolves.toBeDefined();
   });
 

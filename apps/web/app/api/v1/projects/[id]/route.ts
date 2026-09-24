@@ -1,7 +1,7 @@
 import { notFound, projectsService } from "@repo/core";
 import { readJson, withContext } from "../../../../../lib/api";
 
-// GET    /api/v1/projects/:id → ProjectWithRelations
+// GET    /api/v1/projects/:id → ProjectDetail
 // PATCH  /api/v1/projects/:id → { projectId }
 // DELETE /api/v1/projects/:id → 204
 

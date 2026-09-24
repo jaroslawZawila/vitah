@@ -1,6 +1,5 @@
 import { and, db, eq, inArray, isClientUser, projects, users } from "@repo/db";
 import { hashPassword, normalizeEmail } from "./accounts";
-import { logActivity } from "./activity";
 import { requireAdmin, type Ctx } from "./context";
 import { MIN_PASSWORD_LENGTH, type MobileProject, type ProjectClientError } from "./contract";
 import { CoreError } from "./errors";
@@ -66,16 +65,16 @@ export async function getClientProject(
 ): Promise<MobileProject | null> {
   const project = await db.query.projects.findFirst({
     where: and(eq(projects.tenantId, tenantId), eq(projects.clientUserId, clientUserId)),
-    columns: { id: true, ref: true, location: true, startDate: true, expectedDeliveryDate: true },
+    columns: { id: true, ref: true, address: true, startDate: true, completionDate: true },
   });
   if (!project) return null;
 
   return {
     id: project.id,
     ref: project.ref,
-    address: project.location,
+    address: project.address,
     startDate: toCalendarDate(project.startDate),
-    completionDate: toCalendarDate(project.expectedDeliveryDate),
+    completionDate: toCalendarDate(project.completionDate),
   };
 }
 
@@ -132,7 +131,6 @@ export async function createProjectClient(
     throw error;
   }
 
-  await logActivity(ctx, projectId, "client_access_granted", `Acceso a la app concedido a ${email}`);
   return { projectId };
 }
 
@@ -155,7 +153,6 @@ export async function resetProjectClientPassword(
     .set({ passwordHash: await hashPassword(password), updatedAt: new Date() })
     .where(and(eq(users.id, clientUserId), eq(users.tenantId, ctx.tenantId)));
 
-  await logActivity(ctx, projectId, "client_password_reset", "Contraseña de la app restablecida");
   return { projectId };
 }
 
@@ -184,6 +181,5 @@ export async function revokeProjectClient(ctx: Ctx, projectId: string) {
     .returning({ id: users.id });
   if (deleted.length === 0) fail("no_client");
 
-  await logActivity(ctx, projectId, "client_access_revoked", "Acceso a la app revocado");
   return { projectId };
 }

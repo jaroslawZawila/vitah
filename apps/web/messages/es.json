@@ -16,415 +16,46 @@
     "greeting": "Hola, {email}"
   },
   "sidebar": {
-    "dashboard": "Dashboard",
-    "showroom": "Showroom",
     "projects": "Proyectos",
-    "technical": "Dpto. Técnico",
-    "logistics": "Logística",
-    "construction": "Montaje / Obra",
-    "clientApp": "App Cliente",
-    "finance": "Finanzas",
-    "certifications": "Certificaciones",
     "users": "Usuarios"
   },
   "topbar": {
     "titles": {
-      "dashboard": "Dashboard",
-      "showroom": "Showroom — Configurador & Sesiones",
       "projects": "Proyectos — Pipeline Completo",
-      "technical": "Departamento Técnico",
-      "logistics": "Logística — Pedidos & Cronograma",
-      "construction": "Montaje / Obra — Seguimiento",
-      "clientApp": "App Cliente — Seguimiento de Obra",
-      "finance": "Finanzas — Gestión & Facturación",
-      "certifications": "Certificaciones ViTAH",
       "users": "Gestión de Usuarios",
       "projectDetail": "Detalle de Proyecto"
-    },
-    "synced": "sincronizados",
-    "newProject": "Nuevo Proyecto",
-    "notifications": "Notificaciones",
-    "settings": "Configuración"
-  },
-  "dashboardPage": {
-    "kpi": {
-      "activeProjects": { "label": "Proyectos Activos", "sub": "{value} este mes" },
-      "activeSites": { "label": "Obras en Curso", "sub": "{value} nuevas semana" },
-      "monthlyBilling": { "label": "Facturación Mes", "sub": "↑ {value} anterior" },
-      "certifications2026": { "label": "Certif. 2026", "sub": "Objetivo: {value}" }
-    },
-    "pipeline": {
-      "title": "Pipeline Global — {count} proyectos activos",
-      "stages": {
-        "showroom": "Showroom",
-        "budget": "Presupuesto",
-        "technical": "Técnico",
-        "review": "Revisión",
-        "dossier": "Dossier",
-        "logistics": "Logística",
-        "construction": "Obra",
-        "certified": "Certif."
-      }
-    },
-    "activity": {
-      "title": "Actividad Reciente",
-      "placeholder": "La actividad reciente aparecerá aquí"
-    },
-    "systemStatus": {
-      "title": "Estado del Sistema ViTAH OS",
-      "items": {
-        "web": { "label": "Web vitah.es", "detail": "SSL activo · CDN operativo" },
-        "platform": { "label": "Plataforma OS", "detail": "18 usuarios conectados" },
-        "apps": { "label": "App iOS & Android", "detail": "47 clientes con acceso activo" },
-        "sync": { "label": "Sincronización", "detail": "WebSocket · última sync: 2s" },
-        "bim": { "label": "BIM / Revit Link", "detail": "4 proyectos en BIM LOD 400" }
-      },
-      "statuses": {
-        "online": "Online",
-        "active": "Activo",
-        "realtime": "Tiempo real",
-        "connected": "Conectado"
-      }
-    }
-  },
-  "showroomPage": {
-    "activeSession": {
-      "title": "Sesión Activa — García Ruiz",
-      "subtitle": "VTH-26-001 · Asesor: C. Vega · 140m² Unifamiliar · Santander",
-      "status": "● En curso — 52 min"
-    },
-    "stations": {
-      "digitalTwin": "Gemelo Digital",
-      "steelCore": "Core Acero",
-      "bioSkin": "Bio-Skin",
-      "carpentry": "Carpintería",
-      "mep360": "MEP & 360",
-      "energyZeb": "Energy ZEB",
-      "lifeFinishes": "Life — Acabados"
-    },
-    "stationDetail": {
-      "title": "EST 4 — MEP y Control 360",
-      "subtitle": "Sistema nervioso de la vivienda · App Gemelo Digital en tiempo real",
-      "placeholder": "Opciones de configuración MEP aparecerán aquí"
-    },
-    "upcomingVisits": {
-      "title": "Próximas Visitas al Showroom",
-      "placeholder": "Próximas visitas programadas aparecerán aquí"
-    },
-    "budgetConfigurator": {
-      "title": "Configurador de Presupuesto",
-      "areaLabel": "Superficie construida (m²)",
-      "qualityLabel": "Nivel de acabados",
-      "levels": {
-        "standard": "Estándar",
-        "premium": "Premium",
-        "luxury": "Luxury"
-      },
-      "total": "TOTAL ESTIMADO"
-    },
-    "selections": {
-      "title": "Selecciones García Ruiz",
-      "placeholder": "Selecciones del cliente aparecerán aquí"
     }
   },
   "projectsPage": {
-    "filters": {
-      "all": "Todos ({count})",
-      "export": "Exportar"
-    },
+    "count": "Todos ({count})",
     "newProject": "Nuevo Proyecto",
+    "empty": "Todavía no hay proyectos.",
     "table": {
       "ref": "Referencia",
+      "address": "Dirección",
       "client": "Cliente",
-      "type": "Tipo",
-      "budget": "Presupuesto",
-      "phase": "Fase",
-      "progress": "Progreso",
-      "advisor": "Asesor",
-      "location": "Localización",
+      "noClient": "Sin acceso a la app",
+      "startDate": "Inicio",
+      "completionDate": "Finalización",
       "view": "Ver"
-    },
-    "phases": {
-      "showroom": "Showroom",
-      "budget": "Presupuesto",
-      "technical": "Dpto. Técnico",
-      "review": "Revisión",
-      "dossier": "Dossier",
-      "logistics": "Logística",
-      "construction": "En Obra",
-      "certified": "Certificado"
     },
     "createForm": {
       "ref": "Referencia",
       "refPlaceholder": "VTH-26-007",
-      "clientName": "Cliente",
-      "clientPlaceholder": "Nombre del cliente",
-      "areaM2": "Superficie (m²)",
-      "type": "Tipo",
-      "location": "Localización",
-      "locationPlaceholder": "Santander",
-      "budget": "Presupuesto (€)",
-      "qualityLevel": "Calidad",
+      "address": "Dirección",
+      "addressPlaceholder": "Calle, número, CP, ciudad",
+      "startDate": "Fecha de inicio",
+      "completionDate": "Fecha de finalización",
       "create": "Crear proyecto",
       "cancel": "Cancelar",
-      "types": {
-        "unifamiliar": "Unifamiliar",
-        "adosado": "Adosado",
-        "duplex": "Dúplex"
-      },
-      "levels": {
-        "standard": "Estándar",
-        "premium": "Premium",
-        "luxury": "Luxury"
-      },
       "errors": {
-        "missing_fields": "Todos los campos obligatorios deben completarse.",
-        "ref_exists": "Ya existe un proyecto con esa referencia."
+        "missing_fields": "La referencia y la dirección son obligatorias.",
+        "ref_exists": "Ya existe un proyecto con esa referencia.",
+        "invalid_date": "Introduce una fecha válida."
       }
-    }
-  },
-  "technicalPage": {
-    "workQueue": {
-      "title": "Cola de Trabajo — Despacho Técnico P2",
-      "due": "Vence",
-      "tasks": {
-        "structuralCalc": "Cálculo estructural — Eurocódigo 3 EN1993",
-        "clientReview": "Revisión proyecto básico con cliente",
-        "basicProject": "Elaboración proyecto básico 135m²",
-        "buildingPermit": "Solicitud licencia de obra — Ayto. Camargo",
-        "asBuilt": "Planos as-built y libro del edificio"
-      },
-      "statuses": {
-        "inProcess": "En Proceso",
-        "pendingAppt": "Pendiente cita",
-        "pending": "Pendiente",
-        "inReview": "En Revisión"
-      }
-    },
-    "nextReview": {
-      "title": "Próxima revisión con cliente",
-      "detail": "Revisión proyecto básico 160m². Sala reuniones P2 — Torre Camargo"
-    },
-    "normativeAgent": {
-      "title": "Agente Normativo IA — CTE",
-      "subtitle": "Validación automática 256 reglas CTE",
-      "placeholder": "Estado de validación normativa aparecerá aquí"
-    },
-    "subDepartments": {
-      "title": "Sub-departamentos Técnicos",
-      "items": {
-        "architecture": "Arquitectura & BIM LOD 400",
-        "structural": "Cálculo Estructural",
-        "installations": "Proyectos Instalaciones",
-        "documentation": "Documentación Administrativa",
-        "bimControl": "Control BIM & Coordinación"
-      }
-    },
-    "permits": {
-      "title": "Estado Licencias de Obra",
-      "placeholder": "Estado de licencias aparecerá aquí"
-    },
-    "dossier": {
-      "title": "Apertura Dossier de Obra",
-      "placeholder": "Estado de dossiers aparecerá aquí"
-    }
-  },
-  "logisticsPage": {
-    "kpi": {
-      "activeOrders": "Pedidos Activos",
-      "inTransit": "En Tránsito",
-      "delivered": "Entregados (mes)",
-      "pendingGeneration": "Pendientes de generar"
-    },
-    "orders": {
-      "title": "Órdenes de Material",
-      "newOrder": "Nueva Orden",
-      "project": "Proyecto",
-      "material": "Material",
-      "supplier": "Proveedor",
-      "ordered": "Pedido",
-      "eta": "ETA",
-      "status": "Estado",
-      "statuses": {
-        "inTransit": "En Tránsito",
-        "confirmed": "Confirmado",
-        "ordered": "Pedido",
-        "delivered": "Entregado",
-        "pending": "Pendiente"
-      }
-    },
-    "jit": {
-      "title": "Cronograma JIT — VTH-26-003 Torres Const.",
-      "stages": {
-        "foundation": "Cimentación",
-        "steelDelivery": "Entrega acero",
-        "structureAssembly": "Montaje estr.",
-        "thermochip": "Thermochip",
-        "envelope": "Envolvente",
-        "carpentry": "Carpintería",
-        "mep": "MEP",
-        "delivery": "Entrega + Certif."
-      },
-      "description": "Sistema JIT: entregas coordinadas con hitos de montaje · Sin stock muerto en obra · Monitorización LME acero en tiempo real"
-    }
-  },
-  "constructionPage": {
-    "projectInfo": {
-      "subtitle": "Dúplex 175m² · Torrelavega · Jefe de obra: A. Pérez",
-      "week": "Semana {current}/{total}"
-    },
-    "milestones": {
-      "title": "Hitos de Obra — Validación y Fotografía",
-      "photos": "fotos · Validado cliente",
-      "inProgress": "En curso",
-      "items": {
-        "foundation": "Replanteo y Cimentación",
-        "steelStructure": "Estructura metálica montada",
-        "roofSeal": "Cubierta y estanqueidad",
-        "bioSkin": "Envolvente Bio-Skin finalizada",
-        "exteriorCarpentry": "Carpintería exterior instalada",
-        "mepRoughIn": "Instalaciones MEP rough-in",
-        "drywall": "Trasdosado y yeso",
-        "interiorFinishes": "Acabados interiores",
-        "finalInstallations": "Instalaciones definitivas",
-        "handover": "Entrega Llaves + Certificación ViTAH"
-      }
-    },
-    "activeSites": {
-      "title": "Obras Activas",
-      "notes": {
-        "pendingPermit": "Pendiente licencia"
-      }
-    },
-    "photos": {
-      "title": "Fotografías de Obra — H5 Carpintería",
-      "view": "Ver foto",
-      "upload": "Subir foto"
-    },
-    "qualityControl": {
-      "title": "Control de Calidad",
-      "items": {
-        "layout": { "name": "Replanteo OK", "detail": "Tolerancia ±5mm" },
-        "structurePlumb": { "name": "Estructura plomada", "detail": "0.2% desviación max" },
-        "blowerDoor": { "name": "Blower Door Test", "detail": "0.6 ACH@50Pa ✓" },
-        "thermochipSeal": { "name": "Thermochip sellado", "detail": "Sin puentes térmicos" },
-        "mepRoughIn": { "name": "MEP rough-in", "detail": "Pendiente hito H6" }
-      }
-    }
-  },
-  "clientAppPage": {
-    "title": "App ViTAH Cliente — Experiencia del propietario",
-    "subtitle": "Sincronizada en tiempo real con ViTAH OS · Simulación para Torres Const. (VTH-26-003)",
-    "overview": {
-      "title": "Mi Vivienda ViTAH",
-      "subtitle": "Dúplex 175m² · Torrelavega",
-      "completed": "completado",
-      "stats": {
-        "currentWeek": "Semana actual",
-        "activeMilestone": "Hito activo",
-        "estimatedDelivery": "Entrega est."
-      }
-    },
-    "milestones": {
-      "title": "Hitos",
-      "photos": "fotos",
-      "items": {
-        "foundation": "Replanteo y Cimentación",
-        "steelStructure": "Estructura metálica",
-        "roofSeal": "Cubierta y estanqueidad",
-        "bioSkin": "Envolvente Bio-Skin",
-        "exteriorCarpentry": "Carpintería exterior",
-        "mepInstallations": "Instalaciones MEP",
-        "drywall": "Trasdosado interior",
-        "interiorFinishes": "Acabados interiores",
-        "finalInstallations": "Instalaciones definitivas",
-        "handover": "Entrega + Certificación ViTAH"
-      }
-    },
-    "documents": {
-      "title": "Documentación",
-      "folders": {
-        "basicProject": "Proyecto Básico",
-        "constructionPlans": "Planos de Obra",
-        "licenses": "Licencias",
-        "qualityControl": "Control Calidad",
-        "photos": "Fotografías",
-        "certifications": "Certificaciones",
-        "warranties": "Garantías",
-        "buildingBook": "Libro Edificio",
-        "insurance": "Seguros"
-      }
-    },
-    "mobilePreview": {
-      "label": "App ViTAH iOS & Android",
-      "subtitle": "Seguimiento de Obra",
-      "myHome": "Mi Vivienda",
-      "progress": "Progreso",
-      "milestones": "Hitos"
-    }
-  },
-  "financePage": {
-    "kpi": {
-      "billingYtd": { "label": "Facturación YTD", "sub": "Objetivo: {value}" },
-      "grossMargin": { "label": "Margen Bruto", "sub": "Objetivo: {value} ✓" },
-      "pendingCollection": { "label": "Pendiente Cobro", "sub": "{value} facturas activas" },
-      "materialCost": { "label": "Coste Materiales", "sub": "YTD · Protegido {value}" }
-    },
-    "chart": {
-      "title": "Facturación vs Costes 2026 (K€)",
-      "revenue": "Facturación",
-      "costs": "Costes",
-      "marginYtd": "Margen acumulado YTD",
-      "projectedMargin": "Proyección anual margen",
-      "capexFund": "Fondo contingencia CAPEX"
-    },
-    "invoices": {
-      "title": "Facturas Pendientes de Cobro",
-      "due": "Vence",
-      "totalPending": "Total pendiente cobro",
-      "statuses": {
-        "dueSoon": "Vence pronto",
-        "issued": "Emitida"
-      }
-    },
-    "costControl": {
-      "title": "Control de Costes por Proyecto"
-    }
-  },
-  "certificationsPage": {
-    "kpi": {
-      "issued2026": { "label": "Certif. Emitidas 2026", "sub": "Objetivo: {value} anuales" },
-      "pendingApproval": { "label": "Pendientes aprobación", "sub": "Obras en curso" },
-      "autoGenActive": { "label": "Gen. automática activa", "sub": "Fin de obra detectado" }
-    },
-    "recent": {
-      "title": "Certificaciones ViTAH Recientes",
-      "issued": "Emitida",
-      "warranty50": "Garantía 50 años",
-      "autoDetection": {
-        "title": "Detección automática de fin de obra",
-        "description": "ViTAH OS detecta la validación del hito H10 y genera automáticamente el certificado PDF, lo registra en el Libro del Edificio digital y notifica al cliente vía app."
-      }
-    },
-    "preview": {
-      "title": "Certificado ViTAH — Preview",
-      "subtitle": "Generación automática al validar fin de obra · Enviado automáticamente al cliente",
-      "certTitle": "CERTIFICADO DE CALIDAD CONSTRUCTIVA",
-      "projectDescription": "Vivienda Unifamiliar 120m² · Castro Urdiales · Cantabria",
-      "specs": {
-        "blowerDoor": "Blower Door",
-        "energy": "Energía",
-        "structure": "Estructura",
-        "airtightness": "Estanqueidad",
-        "acoustics": "Acústica",
-        "buildingBook": "Libro Edificio"
-      },
-      "issuedDigitally": "Emitido digitalmente",
-      "download": "Descargar Certificado PDF"
     }
   },
   "projectDetailPage": {
-    "notFound": "Proyecto no encontrado",
     "backToProjects": "Volver a proyectos",
     "header": {
       "edit": "Editar",
@@ -432,187 +63,15 @@
       "cancel": "Cancelar",
       "delete": "Eliminar proyecto",
       "confirmDelete": "¿Seguro que deseas eliminar este proyecto?",
-      "week": "Semana {current}/{total}",
-      "budget": "Presupuesto",
-      "spent": "Gastado",
-      "startDate": "Inicio",
-      "delivery": "Entrega est.",
-      "advisor": "Asesor",
-      "qualityLevel": "Calidad",
-      "address": "Dirección"
-    },
-    "tabs": {
-      "overview": "Resumen",
-      "construction": "Obra",
-      "technical": "Técnico",
-      "logistics": "Logística",
-      "finance": "Finanzas",
-      "documents": "Documentos"
-    },
-    "overview": {
-      "pipeline": "Pipeline del Proyecto",
-      "keyDates": "Fechas Clave",
+      "address": "Dirección",
       "startDate": "Fecha de inicio",
-      "expectedDelivery": "Entrega estimada",
-      "daysRemaining": "días restantes",
-      "alerts": "Alertas y Bloqueos",
-      "noAlerts": "Sin alertas activas",
-      "recentActivity": "Actividad Reciente",
-      "noActivity": "Sin actividad registrada",
-      "upcomingDeadlines": "Próximos Vencimientos"
-    },
-    "construction": {
-      "milestones": "Hitos de Obra",
-      "photos": "fotos",
-      "qualityControl": "Control de Calidad",
-      "addQc": "Añadir QC",
-      "qcName": "Nombre",
-      "qcDetail": "Detalle",
-      "qcValue": "Valor medido",
-      "qcResult": "Resultado",
-      "noMilestones": "Sin hitos registrados"
-    },
-    "technical": {
-      "tasks": "Tareas Técnicas",
-      "addTask": "Nueva Tarea",
-      "title": "Título",
-      "department": "Departamento",
-      "priority": "Prioridad",
-      "status": "Estado",
-      "assignee": "Asignado a",
-      "dueDate": "Fecha límite",
-      "noTasks": "Sin tareas registradas",
-      "departments": {
-        "architecture": "Arquitectura",
-        "structural": "Estructural",
-        "installations": "Instalaciones",
-        "documentation": "Documentación",
-        "bim": "BIM"
-      },
-      "priorities": {
-        "low": "Baja",
-        "medium": "Media",
-        "high": "Alta"
-      },
-      "statuses": {
-        "pending": "Pendiente",
-        "in_process": "En Proceso",
-        "in_review": "En Revisión",
-        "completed": "Completada"
+      "completionDate": "Fecha de finalización",
+      "notSet": "Por confirmar",
+      "errors": {
+        "missing_fields": "La dirección es obligatoria.",
+        "invalid_date": "Introduce una fecha válida.",
+        "not_found": "Proyecto no encontrado."
       }
-    },
-    "logistics": {
-      "orders": "Pedidos de Material",
-      "addOrder": "Nuevo Pedido",
-      "material": "Material",
-      "supplier": "Proveedor",
-      "quantity": "Cantidad",
-      "orderDate": "Fecha pedido",
-      "eta": "ETA",
-      "status": "Estado",
-      "jitWeek": "Semana JIT",
-      "noOrders": "Sin pedidos registrados",
-      "jitTimeline": "Cronograma JIT",
-      "statuses": {
-        "pending": "Pendiente",
-        "ordered": "Pedido",
-        "confirmed": "Confirmado",
-        "in_transit": "En Tránsito",
-        "delivered": "Entregado"
-      }
-    },
-    "finance": {
-      "budgetOverview": "Resumen Presupuestario",
-      "total": "Total",
-      "spent": "Gastado",
-      "remaining": "Restante",
-      "consumed": "consumido",
-      "invoices": "Facturas",
-      "addInvoice": "Nueva Factura",
-      "amount": "Importe",
-      "description": "Descripción",
-      "dueDate": "Vencimiento",
-      "status": "Estado",
-      "noInvoices": "Sin facturas registradas",
-      "markPaid": "Marcar pagada",
-      "statuses": {
-        "draft": "Borrador",
-        "issued": "Emitida",
-        "due_soon": "Vence pronto",
-        "paid": "Pagada",
-        "overdue": "Vencida"
-      }
-    },
-    "documents": {
-      "title": "Documentos del Proyecto",
-      "addDocument": "Añadir Documento",
-      "fileName": "Nombre del archivo",
-      "fileUrl": "URL del archivo",
-      "noDocuments": "Sin documentos en esta categoría",
-      "categories": {
-        "basic_project": "Proyecto Básico",
-        "construction_plans": "Planos de Obra",
-        "licenses": "Licencias",
-        "quality_control": "Control Calidad",
-        "photos": "Fotografías",
-        "certifications": "Certificaciones",
-        "warranties": "Garantías",
-        "building_book": "Libro Edificio",
-        "insurance": "Seguros"
-      }
-    },
-    "phases": {
-      "showroom": "Showroom",
-      "budget": "Presupuesto",
-      "technical": "Dpto. Técnico",
-      "review": "Revisión",
-      "dossier": "Dossier",
-      "logistics": "Logística",
-      "construction": "En Obra",
-      "certified": "Certificado"
-    },
-    "types": {
-      "unifamiliar": "Unifamiliar",
-      "adosado": "Adosado",
-      "duplex": "Dúplex"
-    },
-    "qualityLevels": {
-      "standard": "Estándar",
-      "premium": "Premium",
-      "luxury": "Luxury"
-    },
-    "actions": {
-      "save": "Guardar",
-      "cancel": "Cancelar",
-      "delete": "Eliminar",
-      "edit": "Editar",
-      "create": "Crear",
-      "close": "Cerrar"
-    },
-    "activityActions": {
-      "project_created": "Proyecto creado",
-      "project_updated": "Proyecto actualizado",
-      "phase_changed": "Fase cambiada",
-      "milestone_updated": "Hito actualizado",
-      "milestone_completed": "Hito completado",
-      "qc_created": "QC creado",
-      "qc_passed": "QC aprobado",
-      "qc_failed": "QC fallido",
-      "qc_updated": "QC actualizado",
-      "task_created": "Tarea creada",
-      "task_updated": "Tarea actualizada",
-      "task_deleted": "Tarea eliminada",
-      "order_created": "Pedido creado",
-      "order_updated": "Pedido actualizado",
-      "invoice_created": "Factura creada",
-      "invoice_updated": "Factura actualizada",
-      "invoice_paid": "Factura pagada",
-      "document_uploaded": "Documento subido",
-      "project_certified": "Proyecto certificado",
-      "order_delivered": "Pedido entregado",
-      "client_access_granted": "Acceso a la app concedido",
-      "client_password_reset": "Contraseña de la app restablecida",
-      "client_access_revoked": "Acceso a la app revocado"
     },
     "clientAccess": {
       "title": "Acceso del cliente a la app",

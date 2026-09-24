@@ -1,37 +1,11 @@
 /* Shared admin layout utilities */
 
-/* Grid layouts */
-.grid2 {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-}
-
-.grid3 {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 12px;
-}
-
-.grid4 {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
-}
-
 /* Cards */
 .card {
   background: var(--admin-card);
   border-radius: 10px;
   border: 1px solid var(--admin-card-border);
   padding: 16px;
-}
-
-.cardSm {
-  background: var(--admin-card);
-  border-radius: 9px;
-  border: 1px solid var(--admin-card-border);
-  padding: 14px;
 }
 
 .cardTitle {
@@ -57,65 +31,10 @@
   color: #4a5e2c;
 }
 
-.badgeOrange {
-  composes: chip;
-  background: rgba(196, 99, 42, 0.13);
-  color: #c4632a;
-}
-
-.badgeBlue {
-  composes: chip;
-  background: rgba(42, 90, 138, 0.13);
-  color: #2a5a8a;
-}
-
-.badgeMuted {
-  composes: chip;
-  background: var(--admin-muted-bg);
-  color: var(--admin-muted);
-}
-
 /* Typography */
 .muted {
   color: var(--admin-muted);
   font-size: 11px;
-}
-
-/* Progress bar */
-.progressWrap {
-  height: 4px;
-  background: var(--blanco-calido);
-  border-radius: 2px;
-  overflow: hidden;
-}
-
-.progressFill {
-  height: 100%;
-  border-radius: 2px;
-  background: var(--verde-oliva);
-  transition: width 0.3s;
-}
-
-/* Status dot */
-.dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-/* Row separator */
-.rowSep {
-  border-bottom: 1px solid var(--admin-separator);
-}
-
-/* Spacing */
-.mb12 {
-  margin-bottom: 12px;
-}
-
-.mb16 {
-  margin-bottom: 16px;
 }
 
 /* Table */
@@ -145,12 +64,4 @@
 
 .table tr:hover td {
   background: #fafaf8;
-}
-
-/* Section header */
-.sectionHeader {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 16px;
 }

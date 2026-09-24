@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createTestProject, createTestTenant, createTestUser, resetDatabase } from "@repo/db/testing";
 import { createMobileToken } from "@repo/auth/mobile";
 import type { UserRole } from "@repo/db";
-import { GET } from "./route";
+import { GET, POST } from "./route";
 
 // Bearer requests never read the NextAuth session, and next-auth itself
 // can't load outside Next.js.
@@ -50,5 +50,71 @@ describe("GET /api/v1/projects", () => {
 
     expect(res.status).toBe(401);
     expect(await res.json()).toEqual({ error: "unauthorized" });
+  });
+
+  it("returns the minimal project shape with the client", async () => {
+    const tenant = await createTestTenant();
+    const client = await createTestUser(tenant.id, { role: "client", name: "Ana" });
+    const project = await createTestProject(tenant.id, {
+      ref: "VTH-1",
+      address: "Calle 1",
+      startDate: new Date("2026-03-01T00:00:00Z"),
+      clientUserId: client.id,
+    });
+
+    const res = await get(await tokenFor(tenant.id, "viewer"));
+
+    expect(await res.json()).toEqual([
+      {
+        id: project.id,
+        tenantId: tenant.id,
+        ref: "VTH-1",
+        address: "Calle 1",
+        startDate: "2026-03-01T00:00:00.000Z",
+        completionDate: null,
+        clientUserId: client.id,
+        client: { id: client.id, name: "Ana", email: client.email },
+        createdAt: expect.any(String),
+        updatedAt: expect.any(String),
+      },
+    ]);
+  });
+});
+
+describe("POST /api/v1/projects", () => {
+  function post(token: string, body: unknown) {
+    return POST(
+      new Request("http://localhost/api/v1/projects", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+    );
+  }
+
+  it("creates a project", async () => {
+    const tenant = await createTestTenant();
+
+    const res = await post(await tokenFor(tenant.id, "manager"), {
+      ref: "VTH-1",
+      address: "Calle 1",
+      completionDate: "2026-11-15",
+    });
+
+    expect(res.status).toBe(201);
+    expect(await res.json()).toEqual({ id: expect.any(String) });
+  });
+
+  it("returns validation errors as JSON", async () => {
+    const tenant = await createTestTenant();
+    const token = await tokenFor(tenant.id, "manager");
+
+    const missing = await post(token, { ref: "VTH-1" });
+    expect(missing.status).toBe(400);
+    expect(await missing.json()).toEqual({ error: "missing_fields" });
+
+    const notObject = await post(token, ["VTH-1"]);
+    expect(notObject.status).toBe(400);
+    expect(await notObject.json()).toEqual({ error: "invalid_body" });
   });
 });

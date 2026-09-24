@@ -93,10 +93,7 @@ export async function createTestProject(
     .values({
       tenantId,
       ref: `VTH-${unique()}`,
-      clientName: "Familia García",
-      areaM2: 120,
-      type: "unifamiliar",
-      location: "Calle Mayor 1, Santander",
+      address: "Calle Mayor 1, Santander",
       ...overrides,
     })
     .returning();

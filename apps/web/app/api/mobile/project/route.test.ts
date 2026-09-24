@@ -38,9 +38,9 @@ describe("GET /api/mobile/project", () => {
     const tenant = await createTestTenant();
     const project = await createTestProject(tenant.id, {
       ref: "VTH-2026-014",
-      location: "Calle del Sol 5, Santander",
+      address: "Calle del Sol 5, Santander",
       startDate: new Date("2026-03-01T00:00:00Z"),
-      expectedDeliveryDate: new Date("2026-11-15T00:00:00Z"),
+      completionDate: new Date("2026-11-15T00:00:00Z"),
     });
     await svc.createProjectClient(await adminCtx(tenant.id), project.id, {
       name: "Ana",

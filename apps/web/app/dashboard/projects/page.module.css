@@ -5,39 +5,19 @@
   flex-wrap: wrap;
 }
 
-.filterActive {
-  padding: 5px 12px;
-  background: var(--verde-oliva);
-  color: white;
-  border: none;
-  border-radius: 6px;
+.count {
+  display: flex;
+  align-items: center;
   font-size: 11px;
   font-weight: 500;
-  font-family: inherit;
-  cursor: pointer;
-}
-
-.filterBtn {
-  padding: 5px 12px;
-  border-radius: 6px;
-  border: 1px solid var(--admin-card-border);
-  background: white;
   color: #6b6b6b;
-  font-size: 11px;
-  font-family: inherit;
-  cursor: pointer;
-  margin-left: auto;
-}
-
-.filterBtn:hover {
-  border-color: var(--verde-oliva);
 }
 
 .tableWrapper {
   background: var(--admin-card);
   border-radius: 10px;
   border: 1px solid var(--admin-card-border);
-  overflow: hidden;
+  overflow-x: auto;
 }
 
 .viewBtn {

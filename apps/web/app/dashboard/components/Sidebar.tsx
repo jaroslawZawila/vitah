@@ -6,21 +6,22 @@ import { useTranslations } from "next-intl";
 import styles from "./Sidebar.module.css";
 
 const NAV_ITEMS = [
-  { key: "dashboard", href: "/dashboard", icon: "\u229E" },
-  { key: "showroom", href: "/dashboard/showroom", icon: "\u2302" },
-  { key: "projects", href: "/dashboard/projects", icon: "\u25EB" },
-  { key: "technical", href: "/dashboard/technical", icon: "\u2699" },
-  { key: "logistics", href: "/dashboard/logistics", icon: "\u25C8" },
-  { key: "construction", href: "/dashboard/construction", icon: "\u25E7" },
-  { key: "clientApp", href: "/dashboard/client-app", icon: "\u25A3" },
-  { key: "finance", href: "/dashboard/finance", icon: "\u25C9" },
-  { key: "certifications", href: "/dashboard/certifications", icon: "\u25C6" },
-  { key: "users", href: "/dashboard/users", icon: "\u25D0" },
+  { key: "projects", href: "/dashboard/projects", icon: "◫", adminOnly: false },
+  { key: "users", href: "/dashboard/users", icon: "◐", adminOnly: true },
 ] as const;
 
-export default function Sidebar() {
+export default function Sidebar({
+  name,
+  email,
+  isAdmin,
+}: {
+  name: string | null;
+  email: string | null;
+  isAdmin: boolean;
+}) {
   const pathname = usePathname();
   const t = useTranslations("sidebar");
+  const displayName = name || email || "";
 
   return (
     <aside className={styles.sidebar}>
@@ -33,30 +34,29 @@ export default function Sidebar() {
       </div>
 
       <nav className={styles.nav}>
-        {NAV_ITEMS.map((item) => {
-          const isActive =
-            item.href === "/dashboard"
-              ? pathname === "/dashboard"
-              : pathname.startsWith(item.href);
-
-          return (
-            <Link
-              key={item.key}
-              href={item.href}
-              className={isActive ? styles.navItemActive : styles.navItem}
-            >
-              <span className={styles.navIcon}>{item.icon}</span>
-              {t(item.key)}
-            </Link>
-          );
-        })}
+        {NAV_ITEMS.filter((item) => isAdmin || !item.adminOnly).map((item) => (
+          <Link
+            key={item.key}
+            href={item.href}
+            className={
+              pathname.startsWith(item.href)
+                ? styles.navItemActive
+                : styles.navItem
+            }
+          >
+            <span className={styles.navIcon}>{item.icon}</span>
+            {t(item.key)}
+          </Link>
+        ))}
       </nav>
 
       <div className={styles.userArea}>
-        <div className={styles.avatar}>A</div>
+        <div className={styles.avatar}>
+          {displayName.charAt(0).toUpperCase()}
+        </div>
         <div>
-          <div className={styles.userName}>Admin ViTAH</div>
-          <div className={styles.userLocation}>Santander · HQ</div>
+          <div className={styles.userName}>{displayName}</div>
+          {name && email && <div className={styles.userLocation}>{email}</div>}
         </div>
       </div>
     </aside>

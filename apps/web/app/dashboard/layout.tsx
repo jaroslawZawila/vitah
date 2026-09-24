@@ -14,7 +14,11 @@ export default async function DashboardLayout({
 
   return (
     <div className={styles.wrapper}>
-      <Sidebar />
+      <Sidebar
+        name={session.user.name ?? null}
+        email={session.user.email ?? null}
+        isAdmin={session.user.role === "admin"}
+      />
       <div className={styles.main}>
         <Topbar />
         <div className={styles.content}>{children}</div>
