@@ -4,13 +4,14 @@ import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { colors } from "../../constants/theme";
 import { useAuth } from "../../lib/auth";
 import { DocumentsProvider } from "../../lib/documents";
+import { PUSH_NOTIFICATIONS } from "../../lib/features";
 import { useI18n } from "../../lib/i18n";
 import { usePushNotifications } from "../../lib/push";
 
 export default function AppLayout() {
   const { token, isLoading } = useAuth();
   const { t, language } = useI18n();
-  usePushNotifications(token, language);
+  usePushNotifications(PUSH_NOTIFICATIONS ? token : null, language);
 
   if (isLoading) {
     return (

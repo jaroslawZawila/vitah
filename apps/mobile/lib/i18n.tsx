@@ -24,13 +24,14 @@ type Params = Record<string, string | number>;
 export type Translate = (key: MessageKey, params?: Params) => string;
 
 function translator(language: AppLanguage): Translate {
-  const plural = new Intl.PluralRules(language);
   return (key, params = {}) => {
     let value: unknown = MESSAGES[language];
     for (const part of key.split(".")) value = (value as Record<string, unknown>)[part];
     if (typeof value === "object" && value !== null) {
+      // Spanish and English: "one" for exactly 1. (Not Intl.PluralRules:
+      // Hermes, the app's JS engine, doesn't have it.)
       const forms = value as { one: string; other: string };
-      value = plural.select(Number(params.count)) === "one" ? forms.one : forms.other;
+      value = Number(params.count) === 1 ? forms.one : forms.other;
     }
     return String(value).replace(/\{(\w+)\}/g, (match, name: string) =>
       name in params ? String(params[name]) : match,
@@ -40,8 +41,12 @@ function translator(language: AppLanguage): Translate {
 
 /** The phone's language, if the app supports it; otherwise Spanish. */
 export function deviceLanguage(): AppLanguage {
-  const locale = Intl.DateTimeFormat().resolvedOptions().locale;
-  return locale.toLowerCase().startsWith("en") ? "en" : "es";
+  try {
+    const locale = Intl.DateTimeFormat().resolvedOptions().locale;
+    return locale.toLowerCase().startsWith("en") ? "en" : "es";
+  } catch {
+    return "es"; // The engine can't tell: the default.
+  }
 }
 
 type I18nValue = {

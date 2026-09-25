@@ -40,6 +40,20 @@ describe("useI18n", () => {
     expect(t("documents.count", { count: 3 })).toBe("3 documentos");
   });
 
+  it("works without Intl.PluralRules, which Hermes (the app's engine) lacks", () => {
+    const intl = Intl as { PluralRules?: typeof Intl.PluralRules };
+    const { PluralRules } = intl;
+    delete intl.PluralRules; // Simulating Hermes.
+    try {
+      const { result } = renderHook(() => useI18n(), { wrapper });
+      act(() => result.current.setLanguage("en"));
+      expect(result.current.t("photos.count", { count: 1 })).toBe("1 photo");
+      expect(result.current.t("photos.count", { count: 2 })).toBe("2 photos");
+    } finally {
+      intl.PluralRules = PluralRules;
+    }
+  });
+
   it("switches language and remembers it", async () => {
     const { result } = renderHook(() => useI18n(), { wrapper });
 
