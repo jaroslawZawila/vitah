@@ -5,6 +5,7 @@ import React, {
   useEffect,
   useCallback,
 } from "react";
+import { Image } from "expo-image";
 import * as SecureStore from "expo-secure-store";
 import { api, type AuthUser } from "./api";
 import { clearDocuments } from "./document-store";
@@ -72,8 +73,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       SecureStore.deleteItemAsync(TOKEN_KEY),
       SecureStore.deleteItemAsync(USER_KEY),
     ]);
-    // The phone may be shared: don't leave the client's documents behind.
+    // The phone may be shared: don't leave the client's documents or photos behind.
     clearDocuments();
+    await Promise.all([Image.clearDiskCache(), Image.clearMemoryCache()]);
     setState({ token: null, user: null, isLoading: false });
   }, []);
 

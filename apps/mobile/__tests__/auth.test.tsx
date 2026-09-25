@@ -3,6 +3,7 @@ import * as SecureStore from "expo-secure-store";
 import type { ReactNode } from "react";
 import { api } from "../lib/api";
 import { AuthProvider, useAuth } from "../lib/auth";
+import { Image } from "expo-image";
 import { clearDocuments } from "../lib/document-store";
 
 jest.mock("expo-secure-store", () => {
@@ -16,6 +17,9 @@ jest.mock("expo-secure-store", () => {
 });
 jest.mock("../lib/api", () => ({ api: { signIn: jest.fn() } }));
 jest.mock("../lib/document-store", () => ({ clearDocuments: jest.fn() }));
+jest.mock("expo-image", () => ({
+  Image: { clearDiskCache: jest.fn(async () => true), clearMemoryCache: jest.fn(async () => true) },
+}));
 
 const store = (SecureStore as unknown as { __store: Map<string, string> }).__store;
 const user = { id: "u", email: "ana@example.com", name: "Ana", role: "client" as const, tenantId: "t" };
@@ -87,5 +91,8 @@ describe("AuthProvider", () => {
     expect(result.current.token).toBeNull();
     expect(store.size).toBe(0);
     expect(clearDocuments).toHaveBeenCalled();
+    // Cached site photos go too.
+    expect(Image.clearDiskCache).toHaveBeenCalled();
+    expect(Image.clearMemoryCache).toHaveBeenCalled();
   });
 });

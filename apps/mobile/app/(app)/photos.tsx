@@ -3,7 +3,6 @@ import { useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
-  Image,
   Modal,
   Pressable,
   RefreshControl,
@@ -11,6 +10,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { MobilePhoto, PhotoSize } from "@repo/core/contract";
 import { Button } from "../../components/button";
@@ -80,17 +80,22 @@ export default function PhotosScreen() {
   );
 }
 
-/** The image of a photo (grids use the thumbnail), fetched with the client's token. */
+/**
+ * The image of a photo (grids use the thumbnail), fetched with the client's
+ * token. expo-image, not React Native's Image: RN's new architecture drops
+ * `source.headers`, so the API answered 401. Photos never change (new id per
+ * upload), so they're kept in expo-image's disk cache, wiped on sign-out.
+ */
 function PhotoImage({
   photo,
   size,
   style,
-  resizeMode = "cover",
+  contentFit = "cover",
 }: {
   photo: MobilePhoto;
   size: PhotoSize;
   style: object;
-  resizeMode?: "cover" | "contain";
+  contentFit?: "cover" | "contain";
 }) {
   const { token } = useAuth();
   return (
@@ -99,7 +104,9 @@ function PhotoImage({
         uri: api.photoUrl(photo.id, size),
         headers: { Authorization: `Bearer ${token}` },
       }}
-      resizeMode={resizeMode}
+      cachePolicy="disk"
+      contentFit={contentFit}
+      transition={150}
       style={style}
       accessibilityIgnoresInvertColors
     />
@@ -191,7 +198,7 @@ function Viewer({ photo, onClose }: { photo: MobilePhoto | null; onClose: () => 
           <PhotoImage
             photo={photo}
             size="full"
-            resizeMode="contain"
+            contentFit="contain"
             style={{ flex: 1, width: "100%" }}
           />
           <View style={{ padding: spacing.lg, gap: 4 }}>

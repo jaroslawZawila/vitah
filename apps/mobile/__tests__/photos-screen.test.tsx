@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react-native";
-import { Image } from "react-native";
+import { Image } from "expo-image";
 import type { MobilePhoto } from "@repo/core/contract";
 import PhotosScreen from "../app/(app)/photos";
 import { usePhotos } from "../lib/use-photos";
