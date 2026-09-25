@@ -1,5 +1,4 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react-native";
-import type { ReactNode } from "react";
 import ProjectScreen from "../app/(app)/index";
 import { api, type Project } from "../lib/api";
 
@@ -13,9 +12,7 @@ jest.mock("../lib/api", () => ({ api: { getProject: jest.fn() } }));
 // Render the header's right button inline so it can be pressed.
 jest.mock("expo-router", () => ({
   Tabs: {
-    Screen: ({ options }: { options: { title: string; headerRight: () => ReactNode } }) => (
-      <>{options.headerRight()}</>
-    ),
+    Screen: () => null,
   },
 }));
 
@@ -101,13 +98,11 @@ describe("ProjectScreen", () => {
     await waitFor(() => expect(mockSignOut).toHaveBeenCalled());
   });
 
-  it("signs out from the header", async () => {
+  it("has no sign-out button (it moved to Perfil)", async () => {
     getProject.mockResolvedValue({ ok: true, data: { project } });
     render(<ProjectScreen />);
+
     await screen.findByText("VTH-2026-014");
-
-    fireEvent.press(screen.getByRole("button", { name: "Salir" }));
-
-    expect(mockSignOut).toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: "Salir" })).toBeNull();
   });
 });

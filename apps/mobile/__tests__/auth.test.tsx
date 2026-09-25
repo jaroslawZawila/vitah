@@ -1,27 +1,18 @@
 import { act, renderHook, waitFor } from "@testing-library/react-native";
-import * as SecureStore from "expo-secure-store";
 import type { ReactNode } from "react";
 import { api } from "../lib/api";
 import { AuthProvider, useAuth } from "../lib/auth";
 import { Image } from "expo-image";
 import { clearDocuments } from "../lib/document-store";
+import { secureStore } from "../test-utils/secure-store";
 
-jest.mock("expo-secure-store", () => {
-  const store = new Map<string, string>();
-  return {
-    __store: store,
-    getItemAsync: jest.fn(async (key: string) => store.get(key) ?? null),
-    setItemAsync: jest.fn(async (key: string, value: string) => void store.set(key, value)),
-    deleteItemAsync: jest.fn(async (key: string) => void store.delete(key)),
-  };
-});
 jest.mock("../lib/api", () => ({ api: { signIn: jest.fn() } }));
 jest.mock("../lib/document-store", () => ({ clearDocuments: jest.fn() }));
 jest.mock("expo-image", () => ({
   Image: { clearDiskCache: jest.fn(async () => true), clearMemoryCache: jest.fn(async () => true) },
 }));
 
-const store = (SecureStore as unknown as { __store: Map<string, string> }).__store;
+const store = secureStore;
 const user = { id: "u", email: "ana@example.com", name: "Ana", role: "client" as const, tenantId: "t" };
 
 const wrapper = ({ children }: { children: ReactNode }) => <AuthProvider>{children}</AuthProvider>;

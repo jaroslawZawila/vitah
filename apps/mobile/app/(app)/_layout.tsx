@@ -1,12 +1,16 @@
 import Feather from "@expo/vector-icons/Feather";
 import { Redirect, Tabs } from "expo-router";
-import { View, ActivityIndicator, StyleSheet } from "react-native";
+import { ActivityIndicator, StyleSheet, View } from "react-native";
+import { colors } from "../../constants/theme";
 import { useAuth } from "../../lib/auth";
 import { DocumentsProvider } from "../../lib/documents";
-import { colors } from "../../constants/theme";
+import { useI18n } from "../../lib/i18n";
+import { usePushNotifications } from "../../lib/push";
 
 export default function AppLayout() {
   const { token, isLoading } = useAuth();
+  const { t, language } = useI18n();
+  usePushNotifications(token, language);
 
   if (isLoading) {
     return (
@@ -39,14 +43,14 @@ export default function AppLayout() {
         <Tabs.Screen
           name="index"
           options={{
-            tabBarLabel: "Inicio",
+            tabBarLabel: t("tabs.home"),
             tabBarIcon: ({ color }) => <Feather name="home" size={22} color={color} />,
           }}
         />
         <Tabs.Screen
           name="photos"
           options={{
-            title: "Fotos",
+            title: t("tabs.photos"),
             headerShown: false,
             tabBarIcon: ({ color }) => <Feather name="image" size={22} color={color} />,
           }}
@@ -54,9 +58,17 @@ export default function AppLayout() {
         <Tabs.Screen
           name="documents"
           options={{
-            title: "Documentos",
+            title: t("tabs.documents"),
             headerShown: false,
             tabBarIcon: ({ color }) => <Feather name="file-text" size={22} color={color} />,
+          }}
+        />
+        <Tabs.Screen
+          name="profile"
+          options={{
+            title: t("tabs.profile"),
+            headerShown: false,
+            tabBarIcon: ({ color }) => <Feather name="user" size={22} color={color} />,
           }}
         />
       </Tabs>

@@ -100,6 +100,45 @@ export const clientProfiles = pgTable("client_profiles", {
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 });
 
+// --- Client app settings ---
+
+// A mobile-app client's notification choices, set from the app's Perfil tab.
+// No row means the defaults (DEFAULT_SETTINGS in @repo/core): all on.
+export const clientSettings = pgTable("client_settings", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  tenantId: text("tenant_id")
+    .notNull()
+    .references(() => tenants.id, { onDelete: "cascade" }),
+  notifyProgress: boolean("notify_progress").default(true).notNull(),
+  notifyDocuments: boolean("notify_documents").default(true).notNull(),
+  notifyMessages: boolean("notify_messages").default(true).notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+// An Expo push token of a phone signed in to the app. A phone belongs to
+// whoever signed in on it last, so the token itself is the key. `language`
+// is the phone's app language ("es" | "en"): pushes are written in it.
+export const pushTokens = pgTable(
+  "push_tokens",
+  {
+    token: text("token").primaryKey(),
+    language: text("language").default("es").notNull(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => ({
+    userIdx: index("push_tokens_user_idx").on(table.userId),
+  }),
+);
+
 /** SQL filters splitting portal staff from mobile-app clients. */
 export const isClientUser = eq(users.role, "client");
 export const isStaffUser = ne(users.role, "client");

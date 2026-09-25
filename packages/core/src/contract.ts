@@ -131,3 +131,39 @@ export type PhotoError =
   | "project_not_found"
   | "not_found"
   | "forbidden";
+
+// ─── Client account (app Perfil tab) ─────────────────────────────────────────
+
+export const APP_LANGUAGES = ["es", "en"] as const;
+export type AppLanguage = (typeof APP_LANGUAGES)[number];
+
+/** Which push notifications a client wants. */
+export type NotificationPrefs = {
+  /** New site photos. */
+  progress: boolean;
+  /** New documents. */
+  documents: boolean;
+  /** Messages from the team (nothing sends these yet). */
+  messages: boolean;
+};
+
+/** GET/PUT /api/mobile/settings. (The language belongs to the phone: see /push-token.) */
+export type MobileSettings = { notifications: NotificationPrefs };
+
+/**
+ * The rule for a password a client picks in the app: at least 10 characters,
+ * with an uppercase letter and a number. Passwords staff set in the portal
+ * only need MIN_PASSWORD_LENGTH.
+ */
+export function isStrongPassword(password: string) {
+  return password.length >= 10 && /[A-Z]/.test(password) && /\d/.test(password);
+}
+
+/** Error codes of the client account service (`{ error: code }` in the API). */
+export type AccountError =
+  | "missing_fields"
+  | "wrong_password"
+  | "weak_password"
+  | "invalid_settings"
+  | "invalid_token"
+  | "not_found";

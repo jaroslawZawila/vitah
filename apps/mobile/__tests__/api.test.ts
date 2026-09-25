@@ -139,3 +139,52 @@ describe("api.photoUrl", () => {
     expect(api.photoUrl("p1", "thumb")).toMatch(/\/api\/mobile\/photos\/p1\?size=thumb$/);
   });
 });
+
+describe("account endpoints", () => {
+  it("reads and saves settings with the token", async () => {
+    const settings = { notifications: { progress: true, documents: false, messages: true } };
+    respond(200, settings);
+    respond(200, settings);
+
+    expect(await api.getSettings("tok")).toEqual({ ok: true, data: settings });
+    expect(await api.updateSettings("tok", { documents: false })).toEqual({
+      ok: true,
+      data: settings,
+    });
+    const [url, init] = fetchMock.mock.calls[1];
+    expect(url).toMatch(/\/api\/mobile\/settings$/);
+    expect(init).toMatchObject({ method: "PUT", body: JSON.stringify({ notifications: { documents: false } }) });
+    expect(init.headers).toMatchObject({ Authorization: "Bearer tok" });
+  });
+
+  it("passes a 4xx's error code through, e.g. a wrong current password", async () => {
+    respond(400, { error: "wrong_password" });
+
+    expect(await api.changePassword("tok", "old", "CasaNordica26")).toEqual({
+      ok: false,
+      error: "wrong_password",
+    });
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toMatch(/\/api\/mobile\/password$/);
+    expect(JSON.parse(init.body)).toEqual({ currentPassword: "old", newPassword: "CasaNordica26" });
+  });
+
+  it("keeps a 5xx's body to itself", async () => {
+    respond(500, { error: "boom" });
+
+    expect(await api.getSettings("tok")).toEqual({ ok: false, error: "server_error" });
+  });
+
+  it("registers and removes the phone's push token", async () => {
+    respond(200, { success: true });
+    respond(200, { success: true });
+
+    await api.registerPushToken("tok", "ExponentPushToken[x]", "en");
+    await api.removePushToken("tok", "ExponentPushToken[x]");
+
+    expect(fetchMock.mock.calls.map(([url, init]) => [url.replace(/^.*\/api/, "/api"), init.method, init.body])).toEqual([
+      ["/api/mobile/push-token", "POST", JSON.stringify({ token: "ExponentPushToken[x]", language: "en" })],
+      ["/api/mobile/push-token", "DELETE", JSON.stringify({ token: "ExponentPushToken[x]" })],
+    ]);
+  });
+});

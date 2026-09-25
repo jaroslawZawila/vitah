@@ -7,6 +7,7 @@ import {
   type MobileDocument,
   type ProjectDocument,
 } from "./contract";
+import { notifyProjectClient } from "./notifications";
 import {
   fail,
   openStoredFile,
@@ -80,6 +81,7 @@ export async function addDocument(ctx: Ctx, projectId: string, input: Record<str
       uploadedById: ctx.userId,
     }),
   );
+  await notifyProjectClient(ctx.tenantId, projectId, { kind: "document", title });
 
   return { documentId: id };
 }

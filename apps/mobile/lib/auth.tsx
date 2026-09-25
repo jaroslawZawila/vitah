@@ -9,6 +9,7 @@ import { Image } from "expo-image";
 import * as SecureStore from "expo-secure-store";
 import { api, type AuthUser } from "./api";
 import { clearDocuments } from "./document-store";
+import { retryPendingRemoval, unregisterPush } from "./push";
 
 const TOKEN_KEY = "vitah_token";
 const USER_KEY = "vitah_user";
@@ -50,6 +51,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }
     void restore();
+    void retryPendingRemoval().catch(() => {});
   }, []);
 
   const signIn = useCallback(
@@ -69,6 +71,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   const signOut = useCallback(async () => {
+    // While the token still works: stop this phone getting the client's pushes.
+    if (state.token) await unregisterPush(state.token).catch(() => {});
     await Promise.all([
       SecureStore.deleteItemAsync(TOKEN_KEY),
       SecureStore.deleteItemAsync(USER_KEY),
@@ -77,7 +81,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     clearDocuments();
     await Promise.all([Image.clearDiskCache(), Image.clearMemoryCache()]);
     setState({ token: null, user: null, isLoading: false });
-  }, []);
+  }, [state.token]);
 
   return (
     <AuthContext value={{ ...state, signIn, signOut }}>

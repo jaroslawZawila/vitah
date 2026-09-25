@@ -1,4 +1,4 @@
-import { and, db, desc, eq, projectPhotos, projects, users } from "@repo/db";
+import { and, db, desc, eq, gt, ne, projectPhotos, projects, users } from "@repo/db";
 import type { Ctx } from "./context";
 import {
   MAX_CAPTION_LENGTH,
@@ -9,6 +9,7 @@ import {
   type PhotoType,
   type ProjectPhoto,
 } from "./contract";
+import { notifyProjectClient } from "./notifications";
 import {
   fail,
   openStoredFile,
@@ -32,6 +33,9 @@ const EXTENSIONS: Record<PhotoType, string> = {
 
 /** The small copy grids show. `px` is its longest side: sharp on a 3× phone's grid tile. */
 const THUMBNAIL = { px: 800, contentType: "image/webp", extension: "webp" } as const;
+
+/** After a photo push, more photos of the project within this time send none. */
+const PHOTO_PUSH_QUIET_MS = 10 * 60 * 1000;
 
 /** A photo's thumbnail sits next to it: "<id>.jpg" → "<id>.thumb.webp". */
 const thumbPath = (pathname: string) =>
@@ -119,6 +123,16 @@ export async function addPhoto(ctx: Ctx, projectId: string, input: Record<string
         uploadedById: ctx.userId,
       }),
   );
+  // One push per visit, not per photo: the first photo of a batch tells them.
+  const recent = await db.query.projectPhotos.findFirst({
+    where: and(
+      eq(projectPhotos.projectId, projectId),
+      ne(projectPhotos.id, id),
+      gt(projectPhotos.createdAt, new Date(Date.now() - PHOTO_PUSH_QUIET_MS)),
+    ),
+    columns: { id: true },
+  });
+  if (!recent) await notifyProjectClient(ctx.tenantId, projectId, { kind: "photo" });
 
   return { photoId: id };
 }

@@ -26,3 +26,11 @@ describe("formatFileSize", () => {
     expect(formatFileSize(4 * 1024 * 1024)).toBe("4 MB");
   });
 });
+
+describe("in English", () => {
+  it("formats dates and sizes the English way", () => {
+    expect(formatDate("2026-03-01", "en")).toBe("1 March 2026");
+    expect(formatShortDate("2026-09-22T10:00:00.000Z", "en")).toMatch(/^22 Sept?$/);
+    expect(formatFileSize(3.1 * 1024 * 1024, "en")).toBe("3.1 MB");
+  });
+});

@@ -16,7 +16,17 @@
       },
       "package": "app.vitah"
     },
-    "plugins": ["expo-router", "expo-secure-store"],
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-notifications",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "ViTAH usa Face ID para proteger el acceso a tu proyecto."
+        }
+      ]
+    ],
     "experiments": {
       "typedRoutes": true
     }

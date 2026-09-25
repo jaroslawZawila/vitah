@@ -5,11 +5,6 @@ import type { LocalDocument } from "../lib/document-store";
 import { useDocuments } from "../lib/documents";
 
 jest.mock("../lib/documents", () => ({ useDocuments: jest.fn() }));
-// The real icon loads its font asynchronously and updates outside act().
-jest.mock("@expo/vector-icons/Feather", () => () => null);
-jest.mock("react-native-safe-area-context", () => ({
-  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
-}));
 
 const doc = (overrides: Partial<LocalDocument>): LocalDocument => ({
   id: "d1",

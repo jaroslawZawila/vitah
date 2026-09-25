@@ -6,11 +6,6 @@ import { usePhotos } from "../lib/use-photos";
 
 jest.mock("../lib/use-photos", () => ({ usePhotos: jest.fn() }));
 jest.mock("../lib/auth", () => ({ useAuth: () => ({ token: "tok" }) }));
-// The real icon loads its font asynchronously and updates outside act().
-jest.mock("@expo/vector-icons/Feather", () => () => null);
-jest.mock("react-native-safe-area-context", () => ({
-  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
-}));
 
 const photo = (overrides: Partial<MobilePhoto>): MobilePhoto => ({
   id: "p1",

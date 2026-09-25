@@ -18,17 +18,12 @@ import { colors, radius, spacing, type } from "../../constants/theme";
 import type { LocalDocument } from "../../lib/document-store";
 import { useDocuments } from "../../lib/documents";
 import { formatFileSize, formatShortDate } from "../../lib/format";
-
-const CATEGORY_LABELS: Record<DocumentCategory, string> = {
-  contract: "Contrato",
-  plans: "Planos",
-  certificates: "Certificados",
-  other: "Otros",
-};
+import { useI18n } from "../../lib/i18n";
 
 export default function DocumentsScreen() {
   const insets = useSafeAreaInsets();
   const { documents, syncing, offline, sync, open } = useDocuments();
+  const { t } = useI18n();
   const [picked, setCategory] = useState<DocumentCategory | null>(null);
 
   const categories = [...new Set(documents?.map((doc) => doc.category))];
@@ -38,10 +33,7 @@ export default function DocumentsScreen() {
 
   async function handleOpen(doc: LocalDocument) {
     if (!(await open(doc))) {
-      Alert.alert(
-        "Documento no disponible",
-        "Todavía no se ha descargado. Conéctate a internet y vuelve a intentarlo.",
-      );
+      Alert.alert(t("documents.unavailableTitle"), t("documents.unavailableText"));
       void sync();
     }
   }
@@ -50,23 +42,23 @@ export default function DocumentsScreen() {
     <View style={{ gap: spacing.lg, paddingBottom: spacing.md }}>
       <View style={{ gap: spacing.sm }}>
         <Text style={type.label}>
-          {documents?.length === 1 ? "1 documento" : `${documents?.length ?? 0} documentos`}
+          {t("documents.count", { count: documents?.length ?? 0 })}
         </Text>
         <Text accessibilityRole="header" style={type.display}>
-          Documentos
+          {t("documents.title")}
         </Text>
       </View>
       {offline && documents && documents.length > 0 && (
-        <Text style={type.subhead}>Sin conexión. Mostrando los documentos guardados.</Text>
+        <Text style={type.subhead}>{t("documents.offline")}</Text>
       )}
       {categories.length > 1 && (
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           <View style={{ flexDirection: "row", gap: spacing.sm }}>
-            <Chip label="Todos" selected={!category} onPress={() => setCategory(null)} />
+            <Chip label={t("documents.all")} selected={!category} onPress={() => setCategory(null)} />
             {categories.map((c) => (
               <Chip
                 key={c}
-                label={CATEGORY_LABELS[c]}
+                label={t(`documents.categories.${c}`)}
                 selected={category === c}
                 onPress={() => setCategory(c)}
               />
@@ -118,13 +110,14 @@ function Empty({
   failed: boolean;
   onRetry: () => void;
 }) {
+  const { t } = useI18n();
   if (loading) {
     return (
       <View style={styles.center}>
         <ActivityIndicator
           color={colors.verdeOliva}
           size="large"
-          accessibilityLabel="Cargando tus documentos"
+          accessibilityLabel={t("documents.loading")}
         />
       </View>
     );
@@ -133,15 +126,15 @@ function Empty({
     return (
       <View style={[styles.center, { gap: spacing.lg }]}>
         <Text style={[type.body, { textAlign: "center" }]}>
-          No hemos podido cargar tus documentos. Comprueba tu conexión.
+          {t("documents.loadFailed")}
         </Text>
-        <Button title="Reintentar" variant="secondary" onPress={onRetry} />
+        <Button title={t("common.retry")} variant="secondary" onPress={onRetry} />
       </View>
     );
   }
   return (
     <Text style={type.subhead}>
-      Todavía no hay documentos. Aquí aparecerán los que comparta tu asesor de ViTAH.
+      {t("documents.empty")}
     </Text>
   );
 }
@@ -169,13 +162,14 @@ function Chip({
 }
 
 function DocumentRow({ doc, onPress }: { doc: LocalDocument; onPress: () => void }) {
-  const meta = `${formatShortDate(doc.uploadedAt)} · ${formatFileSize(doc.sizeBytes)}`;
+  const { t, language } = useI18n();
+  const meta = `${formatShortDate(doc.uploadedAt, language)} · ${formatFileSize(doc.sizeBytes, language)}`;
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={`${doc.title}${doc.isNew ? ", nuevo" : ""}, ${meta}`}
-      accessibilityHint={doc.downloaded ? "Abre el documento" : "Todavía no se ha descargado"}
+      accessibilityLabel={`${doc.title}${doc.isNew ? t("documents.newLabel") : ""}, ${meta}`}
+      accessibilityHint={t(doc.downloaded ? "documents.openHint" : "documents.notDownloadedHint")}
       style={({ pressed }) => [styles.row, pressed && { opacity: 0.6 }]}
     >
       <View style={styles.tile}>
@@ -188,7 +182,7 @@ function DocumentRow({ doc, onPress }: { doc: LocalDocument; onPress: () => void
           </Text>
           {doc.isNew && (
             <View style={styles.badge}>
-              <Text style={styles.badgeText}>NUEVO</Text>
+              <Text style={styles.badgeText}>{t("documents.new")}</Text>
             </View>
           )}
         </View>

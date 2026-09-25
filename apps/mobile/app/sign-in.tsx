@@ -11,11 +11,13 @@ import {
 import { useState } from "react";
 import { Redirect } from "expo-router";
 import { useAuth } from "../lib/auth";
+import { useI18n } from "../lib/i18n";
 import { colors } from "../constants/theme";
 import { Button } from "../components/button";
 
 export default function SignInScreen() {
   const { signIn, token, isLoading: authLoading } = useAuth();
+  const { t } = useI18n();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -35,7 +37,7 @@ export default function SignInScreen() {
 
   async function handleSignIn() {
     if (!email.trim() || !password) {
-      setError("Introduce tu email y contraseña");
+      setError(t("signIn.missingFields"));
       return;
     }
     setLoading(true);
@@ -43,7 +45,7 @@ export default function SignInScreen() {
     const result = await signIn(email.trim(), password);
     setLoading(false);
     if (result.error) {
-      setError("Email o contraseña incorrectos");
+      setError(t("signIn.invalidCredentials"));
     }
   }
 
@@ -57,14 +59,14 @@ export default function SignInScreen() {
           {/* Logo */}
           <View style={styles.logoSection}>
             <Text style={styles.logo}>ViTAH</Text>
-            <Text style={styles.tagline}>TECNOLOGÍA PARA VIVIR MEJOR</Text>
+            <Text style={styles.tagline}>{t("signIn.tagline")}</Text>
           </View>
 
           {/* Form */}
           <View style={styles.form}>
             <TextInput
               style={styles.input}
-              placeholder="Email"
+              placeholder={t("signIn.email")}
               placeholderTextColor={colors.muted}
               value={email}
               onChangeText={setEmail}
@@ -76,7 +78,7 @@ export default function SignInScreen() {
             />
             <TextInput
               style={styles.input}
-              placeholder="Contraseña"
+              placeholder={t("signIn.password")}
               placeholderTextColor={colors.muted}
               value={password}
               onChangeText={setPassword}
@@ -89,7 +91,7 @@ export default function SignInScreen() {
             {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
             <Button
-              title="Iniciar sesión"
+              title={t("signIn.submit")}
               onPress={handleSignIn}
               loading={loading}
               style={{ marginTop: 4 }}

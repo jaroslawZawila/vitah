@@ -26,6 +26,10 @@ export const colors = {
   chipBorder: "#3c3c37",
   tabBar: "#181817",
   inactive: "#8a8a84",
+  // Destructive text on dark ("Cerrar sesión"); `error` is too dark there.
+  destructive: "#d98080",
+  // Least prominent text, e.g. the version footer.
+  faint: "#6a6a64",
 
   // Status
   statusOrange: "#c4632a",

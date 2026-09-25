@@ -12,12 +12,13 @@ import {
 } from "react-native";
 import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import type { MobilePhoto, PhotoSize } from "@repo/core/contract";
+import type { AppLanguage, MobilePhoto, PhotoSize } from "@repo/core/contract";
 import { Button } from "../../components/button";
 import { colors, spacing, type } from "../../constants/theme";
 import { api } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
 import { formatShortDate } from "../../lib/format";
+import { useI18n, type Translate } from "../../lib/i18n";
 import { groupByWeek, type PhotoWeek } from "../../lib/photo-weeks";
 import { usePhotos } from "../../lib/use-photos";
 
@@ -29,19 +30,20 @@ import { usePhotos } from "../../lib/use-photos";
 export default function PhotosScreen() {
   const insets = useSafeAreaInsets();
   const { photos, error, refreshing, refresh, retry } = usePhotos();
+  const { t } = useI18n();
   const [viewing, setViewing] = useState<MobilePhoto | null>(null);
   const weeks = useMemo(() => groupByWeek(photos ?? []), [photos]);
 
   const header = (
     <View style={{ gap: spacing.sm, paddingBottom: spacing.lg }}>
       <Text style={type.label}>
-        {photos?.length === 1 ? "1 foto" : `${photos?.length ?? 0} fotos`}
+        {t("photos.count", { count: photos?.length ?? 0 })}
       </Text>
       <Text accessibilityRole="header" style={type.display}>
-        Fotografías
+        {t("photos.title")}
       </Text>
       {error && photos && photos.length > 0 && (
-        <Text style={type.subhead}>Sin conexión. No hemos podido actualizar las fotos.</Text>
+        <Text style={type.subhead}>{t("photos.offline")}</Text>
       )}
     </View>
   );
@@ -113,20 +115,21 @@ function PhotoImage({
   );
 }
 
-function photoLabel(photo: MobilePhoto) {
-  return photo.caption ?? `Foto del ${formatShortDate(photo.uploadedAt)}`;
+function photoLabel(photo: MobilePhoto, t: Translate, language: AppLanguage) {
+  return photo.caption ?? t("photos.untitled", { date: formatShortDate(photo.uploadedAt, language) });
 }
 
 function Week({ week, onOpen }: { week: PhotoWeek; onOpen: (photo: MobilePhoto) => void }) {
+  const { t, language } = useI18n();
   const [first, ...rest] = week.photos;
   if (!first) return null;
   return (
     <View style={{ gap: 12 }}>
       <View style={styles.weekHeader}>
         <Text accessibilityRole="header" style={[type.body, { fontSize: 15 }]}>
-          Semana {week.week}
+          {t("photos.week", { week: week.week })}
         </Text>
-        <Text style={[type.subhead, { fontSize: 13 }]}>{formatShortDate(first.uploadedAt)}</Text>
+        <Text style={[type.subhead, { fontSize: 13 }]}>{formatShortDate(first.uploadedAt, language)}</Text>
       </View>
       <Tile photo={first} onPress={() => onOpen(first)} style={styles.lead}>
         {first.caption && (
@@ -159,12 +162,13 @@ function Tile({
   style: object;
   children?: React.ReactNode;
 }) {
+  const { t, language } = useI18n();
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="imagebutton"
-      accessibilityLabel={photoLabel(photo)}
-      accessibilityHint="Abre la foto a pantalla completa"
+      accessibilityLabel={photoLabel(photo, t, language)}
+      accessibilityHint={t("photos.openHint")}
       style={({ pressed }) => [style, styles.tile, pressed && { opacity: 0.7 }]}
     >
       <PhotoImage photo={photo} size="thumb" style={StyleSheet.absoluteFill} />
@@ -175,6 +179,7 @@ function Tile({
 
 function Viewer({ photo, onClose }: { photo: MobilePhoto | null; onClose: () => void }) {
   const insets = useSafeAreaInsets();
+  const { t, language } = useI18n();
   return (
     <Modal
       visible={photo !== null}
@@ -188,7 +193,7 @@ function Viewer({ photo, onClose }: { photo: MobilePhoto | null; onClose: () => 
             <Pressable
               onPress={onClose}
               accessibilityRole="button"
-              accessibilityLabel="Cerrar"
+              accessibilityLabel={t("common.close")}
               hitSlop={8}
               style={styles.close}
             >
@@ -204,7 +209,7 @@ function Viewer({ photo, onClose }: { photo: MobilePhoto | null; onClose: () => 
           <View style={{ padding: spacing.lg, gap: 4 }}>
             {photo.caption && <Text style={type.body}>{photo.caption}</Text>}
             <Text style={[type.subhead, { fontSize: 13 }]}>
-              {formatShortDate(photo.uploadedAt)}
+              {formatShortDate(photo.uploadedAt, language)}
             </Text>
           </View>
         </View>
@@ -222,13 +227,14 @@ function Empty({
   failed: boolean;
   onRetry: () => void;
 }) {
+  const { t } = useI18n();
   if (loading) {
     return (
       <View style={styles.center}>
         <ActivityIndicator
           color={colors.verdeOliva}
           size="large"
-          accessibilityLabel="Cargando las fotos de tu obra"
+          accessibilityLabel={t("photos.loading")}
         />
       </View>
     );
@@ -237,15 +243,15 @@ function Empty({
     return (
       <View style={[styles.center, { gap: spacing.lg }]}>
         <Text style={[type.body, { textAlign: "center" }]}>
-          No hemos podido cargar las fotos. Comprueba tu conexión.
+          {t("photos.loadFailed")}
         </Text>
-        <Button title="Reintentar" variant="secondary" onPress={onRetry} />
+        <Button title={t("common.retry")} variant="secondary" onPress={onRetry} />
       </View>
     );
   }
   return (
     <Text style={type.subhead}>
-      Todavía no hay fotos. Aquí aparecerán las que comparta tu asesor de ViTAH sobre tu obra.
+      {t("photos.empty")}
     </Text>
   );
 }
