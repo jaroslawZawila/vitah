@@ -8,6 +8,7 @@ import {
   text,
   timestamp,
   unique,
+  index,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 
@@ -22,6 +23,13 @@ export const userRoleEnum = pgEnum("user_role", [
 ]);
 
 export type UserRole = (typeof userRoleEnum.enumValues)[number];
+
+export const documentCategoryEnum = pgEnum("document_category", [
+  "contract",
+  "plans",
+  "certificates",
+  "other",
+]);
 export type StaffRole = Exclude<UserRole, "client">;
 export const STAFF_ROLES = userRoleEnum.enumValues.filter(
   (role): role is StaffRole => role !== "client",
@@ -165,6 +173,37 @@ export const projects = pgTable(
   }),
 );
 
+// --- Project documents ---
+
+// A PDF shared with the project's client. The file lives in a private Vercel
+// Blob store under `pathname`; it is only ever served through our API.
+export const projectDocuments = pgTable(
+  "project_documents",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    category: documentCategoryEnum("category").notNull(),
+    pathname: text("pathname").unique().notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    uploadedById: text("uploaded_by_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => ({
+    projectIdx: index("project_documents_project_idx").on(table.projectId),
+  }),
+);
+
 // --- Relations ---
 
 export const tenantsRelations = relations(tenants, ({ many }) => ({
@@ -187,7 +226,7 @@ export const clientProfilesRelations = relations(clientProfiles, ({ one }) => ({
   }),
 }));
 
-export const projectsRelations = relations(projects, ({ one }) => ({
+export const projectsRelations = relations(projects, ({ one, many }) => ({
   tenant: one(tenants, {
     fields: [projects.tenantId],
     references: [tenants.id],
@@ -195,5 +234,13 @@ export const projectsRelations = relations(projects, ({ one }) => ({
   client: one(users, {
     fields: [projects.clientUserId],
     references: [users.id],
+  }),
+  documents: many(projectDocuments),
+}));
+
+export const projectDocumentsRelations = relations(projectDocuments, ({ one }) => ({
+  project: one(projects, {
+    fields: [projectDocuments.projectId],
+    references: [projects.id],
   }),
 }));

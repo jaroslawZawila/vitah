@@ -8,3 +8,5 @@ export * as projectClientService from "./project-client";
 export * as usersService from "./users";
 export type { UserListItem } from "./users";
 export * as clientsService from "./clients";
+export * as documentsService from "./documents";
+export { canManageDocuments, type DocumentFile } from "./documents";

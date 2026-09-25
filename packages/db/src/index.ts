@@ -13,6 +13,7 @@ export {
   type StaffRole,
   projects,
   clientProfiles,
+  projectDocuments,
 } from "./schema";
 export { eq, ne, and, desc, asc, sql, count, sum, inArray, isNull, isNotNull, type SQL } from "drizzle-orm";
 

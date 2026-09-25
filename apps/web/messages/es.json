@@ -81,6 +81,37 @@
         "no_client": "Este proyecto no tiene ningún cliente asignado.",
         "forbidden": "Solo los administradores pueden gestionar el acceso."
       }
+    },
+    "documents": {
+      "title": "Documentos",
+      "empty": "Todavía no hay documentos. El cliente verá aquí los PDF que subas.",
+      "delete": "Eliminar",
+      "deleteLabel": "Eliminar {title}",
+      "confirmDelete": "¿Eliminar «{title}»? El cliente dejará de verlo en la app.",
+      "upload": "Subir documento",
+      "file": "Archivo PDF",
+      "fileHint": "Solo PDF, hasta 4 MB.",
+      "documentTitle": "Título",
+      "category": "Categoría",
+      "chooseCategory": "Selecciona una categoría…",
+      "submit": "Subir",
+      "uploading": "Subiendo…",
+      "categories": {
+        "contract": "Contrato",
+        "plans": "Planos",
+        "certificates": "Certificados",
+        "other": "Otros"
+      },
+      "errors": {
+        "missing_fields": "Escribe un título.",
+        "missing_file": "Selecciona un archivo PDF.",
+        "invalid_category": "Selecciona una categoría.",
+        "invalid_file_type": "El archivo no es un PDF válido.",
+        "file_too_large": "El archivo supera el máximo de 4 MB.",
+        "project_not_found": "Proyecto no encontrado.",
+        "not_found": "Documento no encontrado.",
+        "forbidden": "Solo administradores y gestores pueden gestionar documentos."
+      }
     }
   },
   "usersPage": {

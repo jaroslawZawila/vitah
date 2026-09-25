@@ -2,6 +2,8 @@ import { db, projects, eq, and, desc } from "@repo/db";
 import { requireAdmin, type Ctx } from "./context";
 import { invalid, notFound } from "./errors";
 import { clientConflict, requireAssignableClient } from "./project-client";
+import { projectFolder } from "./documents";
+import { deleteFolder } from "./storage";
 
 // Every function here takes `ctx` and filters by `ctx.tenantId`.
 // A project holds exactly what the client's mobile app shows.
@@ -115,11 +117,17 @@ export async function updateProject(ctx: Ctx, id: string, input: Record<string, 
   return { projectId: id };
 }
 
+/** Deletes the project, its rows (cascade) and its stored files. */
 export async function deleteProject(ctx: Ctx, id: string) {
   const deleted = await db
     .delete(projects)
     .where(and(eq(projects.id, id), eq(projects.tenantId, ctx.tenantId)))
     .returning({ id: projects.id });
   if (deleted.length === 0) throw notFound();
+
+  // The project is gone either way; a failure here only leaves orphaned files.
+  await deleteFolder(projectFolder(ctx.tenantId, id)).catch((error: unknown) => {
+    console.error("Failed to delete files of project", id, error);
+  });
   return { projectId: id };
 }

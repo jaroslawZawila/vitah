@@ -12,7 +12,7 @@ jest.mock("../lib/auth", () => ({
 jest.mock("../lib/api", () => ({ api: { getProject: jest.fn() } }));
 // Render the header's right button inline so it can be pressed.
 jest.mock("expo-router", () => ({
-  Stack: {
+  Tabs: {
     Screen: ({ options }: { options: { title: string; headerRight: () => ReactNode } }) => (
       <>{options.headerRight()}</>
     ),

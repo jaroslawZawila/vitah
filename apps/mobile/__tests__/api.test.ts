@@ -83,3 +83,29 @@ describe("api.getProject", () => {
     expect(await api.getProject("tok")).toEqual({ ok: false, error: "server_error" });
   });
 });
+
+describe("api.listDocuments", () => {
+  it("fetches the client's documents with the token", async () => {
+    const documents = [
+      { id: "d1", title: "Contrato", category: "contract", sizeBytes: 1, uploadedAt: "2026-09-22T10:00:00.000Z" },
+    ];
+    respond(200, { documents });
+
+    expect(await api.listDocuments("tok")).toEqual({ ok: true, data: { documents } });
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toMatch(/\/api\/mobile\/documents$/);
+    expect(init.headers).toEqual({ Authorization: "Bearer tok" });
+  });
+
+  it("maps an expired session", async () => {
+    respond(401, { error: "unauthorized" });
+
+    expect(await api.listDocuments("tok")).toEqual({ ok: false, error: "unauthorized" });
+  });
+});
+
+describe("api.documentUrl", () => {
+  it("points at the document's file", () => {
+    expect(api.documentUrl("a/b")).toMatch(/\/api\/mobile\/documents\/a%2Fb$/);
+  });
+});

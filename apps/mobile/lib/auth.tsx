@@ -7,6 +7,7 @@ import React, {
 } from "react";
 import * as SecureStore from "expo-secure-store";
 import { api, type AuthUser } from "./api";
+import { clearDocuments } from "./document-store";
 
 const TOKEN_KEY = "vitah_token";
 const USER_KEY = "vitah_user";
@@ -71,6 +72,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       SecureStore.deleteItemAsync(TOKEN_KEY),
       SecureStore.deleteItemAsync(USER_KEY),
     ]);
+    // The phone may be shared: don't leave the client's documents behind.
+    clearDocuments();
     setState({ token: null, user: null, isLoading: false });
   }, []);
 

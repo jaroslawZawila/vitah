@@ -1,4 +1,4 @@
-import type { MobileProject, MobileSession } from "@repo/core/contract";
+import type { MobileDocument, MobileProject, MobileSession } from "@repo/core/contract";
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
 
@@ -53,5 +53,16 @@ export const api = {
     return request<{ project: Project | null }>("/api/mobile/project", {
       headers: { Authorization: `Bearer ${token}` },
     });
+  },
+
+  listDocuments(token: string) {
+    return request<{ documents: MobileDocument[] }>("/api/mobile/documents", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+
+  /** The PDF itself; fetch it with the same Bearer token. */
+  documentUrl(id: string) {
+    return `${API_BASE}/api/mobile/documents/${encodeURIComponent(id)}`;
   },
 };

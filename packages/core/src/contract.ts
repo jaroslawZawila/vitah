@@ -57,3 +57,36 @@ export type MobileSession = {
   token: string;
   user: { id: string; email: string; name: string | null; tenantId: string };
 };
+
+export const DOCUMENT_CATEGORIES = ["contract", "plans", "certificates", "other"] as const;
+export type DocumentCategory = (typeof DOCUMENT_CATEGORIES)[number];
+
+/**
+ * Largest PDF accepted. Uploads pass through our functions, whose request body
+ * is capped at 4.5 MB by Vercel; this leaves room for the form overhead.
+ */
+export const MAX_DOCUMENT_BYTES = 4 * 1024 * 1024;
+
+/** A project document as listed by GET /api/mobile/documents. */
+export type MobileDocument = {
+  id: string;
+  title: string;
+  category: DocumentCategory;
+  sizeBytes: number;
+  /** ISO timestamp. */
+  uploadedAt: string;
+};
+
+/** A project document as listed in the portal and by /api/v1. */
+export type ProjectDocument = MobileDocument & { uploadedBy: string | null };
+
+/** Error codes of the documents service (`{ error: code }` in the API). */
+export type DocumentError =
+  | "missing_fields"
+  | "missing_file"
+  | "invalid_category"
+  | "invalid_file_type"
+  | "file_too_large"
+  | "project_not_found"
+  | "not_found"
+  | "forbidden";

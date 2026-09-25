@@ -162,13 +162,21 @@ mockups don't cover, extend the same visual language. Concept B on the canvas wa
 - `proxy.ts` protects all routes except `/`, `/api/auth/*`, `/api/mobile/*`, `/api/v1/*` (these authenticate per request), and static assets
 - User roles: `admin`, `manager`, `viewer` (staff, portal only) and `client` (homeowner, mobile app only) — Postgres enum. Use `isStaffUser` / `isClientUser` / `STAFF_ROLES` from `@repo/db`. `Ctx` is staff-only: client tokens are rejected by `/api/v1`
 - Clients are created on the **Clients** tab (`/dashboard/clients`, admin only): first name, surnames, date of birth, address, phone, email and app password. Personal details live in `client_profiles`; login data stays on `users`. Client emails are unique across tenants. A project has at most one client, picked from the existing clients on the project page ("Client app access" card); removing them only detaches, the account stays
-- Mobile client API: `POST /api/mobile/auth` (clients only, returns a 30d JWT) and `GET /api/mobile/project` (`Authorization: Bearer`). Each request re-checks the client is still active
+- Mobile client API: `POST /api/mobile/auth` (clients only, returns a 30d JWT), `GET /api/mobile/project`, `GET /api/mobile/documents` and `GET /api/mobile/documents/:id` (the PDF) — all `Authorization: Bearer`, via `withMobileClient` in `apps/web/lib/api.ts`. Each request re-checks the client is still active
 - Admin-only server actions guarded by `requireAdmin()` check
 
 ### Database
 
 - **Driver:** `postgres` (postgres.js) — works with any PostgreSQL (local Docker, Vercel Postgres, AWS RDS, etc.)
-- Schema in `packages/db/src/schema.ts` — tables: `tenants`, `users`, `client_profiles`, `accounts`, `sessions`, `verification_tokens`, `projects`. A project is deliberately minimal — exactly what the mobile app shows: `ref`, `address`, `start_date`, `completion_date`, plus `client_user_id` linking it to its mobile app client
+- Schema in `packages/db/src/schema.ts` — tables: `tenants`, `users`, `client_profiles`, `accounts`, `sessions`, `verification_tokens`, `projects`, `project_documents`. A project is deliberately minimal — exactly what the mobile app shows: `ref`, `address`, `start_date`, `completion_date`, plus `client_user_id` linking it to its mobile app client
+- Prod migrations are additive SQL files in `packages/db/sql/`, applied by hand (no plain `db:push` on prod)
+
+### Project documents
+
+- PDFs (≤ 4 MB, `MAX_DOCUMENT_BYTES`) shared with a project's client. Admins/managers upload and delete on the project page; all staff can download. Service: `packages/core/src/documents.ts`
+- Files live in a **private Vercel Blob store** (`packages/core/src/storage.ts`) and are only ever streamed through our API after an auth check — no public or presigned URLs. Uploads go through our functions, hence the 4 MB cap (Vercel's 4.5 MB body limit)
+- The mobile app keeps offline copies (`apps/mobile/lib/document-store.ts`), syncs on app open / foreground / pull-to-refresh, and wipes them on sign-out
+- Tests swap storage for an in-memory one: `vi.mock("@repo/core/storage", () => import("@repo/core/testing"))`
 - Drizzle Kit for migrations: `pnpm db:generate`, `pnpm db:migrate`, `pnpm db:push`
 - Seed script: `pnpm db:seed` creates the tenant, the admin user, project VTH-26-001 and its mobile app client
 - Local dev: Docker Compose with PostgreSQL 16 (`docker-compose.yml` at root)
@@ -215,7 +223,7 @@ apps/web/
     actions/users.ts               # Server actions for user management (admin)
     components/LoginForm.tsx       # Client Component with useActionState
     dashboard/page.tsx             # Redirects to /dashboard/projects
-    dashboard/projects/            # Project list + detail (header, client app access)
+    dashboard/projects/            # Project list + detail (header, client app access, documents)
     dashboard/projects/new/        # New-project wizard: steps/index.ts is the step registry
     dashboard/components/wizard/   # Generic multi-step flow: useWizard (logic), Wizard/ReviewStep (views)
     dashboard/clients/             # Mobile app clients (admin): ClientsScreen container + pure views in components/
@@ -250,9 +258,11 @@ Each app needs `.env.local` (not committed):
 ```
 NEXTAUTH_SECRET=<generated-secret>
 POSTGRES_URL=postgres://vitah:vitah_dev@localhost:4432/vitah   # local Docker default
+BLOB_READ_WRITE_TOKEN=<token of a private Blob store>           # apps/web only, for documents
 ```
 
-On Vercel, `POSTGRES_URL` is injected automatically from the linked Vercel Postgres store.
+On Vercel, `POSTGRES_URL` is injected automatically from the linked Vercel Postgres store, and Blob
+credentials from the connected private Blob store.
 
 ## Brand Reference
 

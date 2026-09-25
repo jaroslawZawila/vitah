@@ -33,7 +33,7 @@ function toCalendarDate(date: Date | null): string | null {
   return date ? date.toISOString().slice(0, 10) : null;
 }
 
-function projectInTenant(tenantId: string, projectId: string) {
+export function projectInTenant(tenantId: string, projectId: string) {
   return and(eq(projects.id, projectId), eq(projects.tenantId, tenantId));
 }
 

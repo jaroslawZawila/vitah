@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createTestProject,
   createTestTenant,
@@ -6,6 +6,8 @@ import {
   resetDatabase,
 } from "@repo/db/testing";
 import { projectsService as svc, type Ctx } from "../src";
+
+vi.mock("../src/storage", () => import("../src/testing"));
 
 async function setup() {
   const tenant = await createTestTenant();

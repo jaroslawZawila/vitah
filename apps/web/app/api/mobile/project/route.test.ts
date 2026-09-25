@@ -1,9 +1,13 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createTestProject, createTestTenant, createTestUser, resetDatabase } from "@repo/db/testing";
 import { createMobileToken } from "@repo/auth/mobile";
 import { projectClientService as svc, type Ctx } from "@repo/core";
 import { db, eq, users } from "@repo/db";
 import { GET } from "./route";
+
+// lib/api also serves /api/v1, which can read the NextAuth session; next-auth
+// itself can't load outside Next.js.
+vi.mock("@repo/auth", () => ({ auth: vi.fn() }));
 
 function get(token?: string) {
   return GET(

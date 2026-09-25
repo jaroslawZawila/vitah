@@ -81,6 +81,37 @@
         "no_client": "This project has no client assigned.",
         "forbidden": "Only admins can manage app access."
       }
+    },
+    "documents": {
+      "title": "Documents",
+      "empty": "No documents yet. The client will see the PDFs you upload here.",
+      "delete": "Delete",
+      "deleteLabel": "Delete {title}",
+      "confirmDelete": "Delete “{title}”? The client will no longer see it in the app.",
+      "upload": "Upload document",
+      "file": "PDF file",
+      "fileHint": "PDF only, up to 4 MB.",
+      "documentTitle": "Title",
+      "category": "Category",
+      "chooseCategory": "Choose a category…",
+      "submit": "Upload",
+      "uploading": "Uploading…",
+      "categories": {
+        "contract": "Contract",
+        "plans": "Plans",
+        "certificates": "Certificates",
+        "other": "Other"
+      },
+      "errors": {
+        "missing_fields": "Enter a title.",
+        "missing_file": "Choose a PDF file.",
+        "invalid_category": "Choose a category.",
+        "invalid_file_type": "The file isn't a valid PDF.",
+        "file_too_large": "The file is larger than the 4 MB limit.",
+        "project_not_found": "Project not found.",
+        "not_found": "Document not found.",
+        "forbidden": "Only admins and managers can manage documents."
+      }
     }
   },
   "usersPage": {

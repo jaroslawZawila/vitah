@@ -3,6 +3,7 @@ import * as SecureStore from "expo-secure-store";
 import type { ReactNode } from "react";
 import { api } from "../lib/api";
 import { AuthProvider, useAuth } from "../lib/auth";
+import { clearDocuments } from "../lib/document-store";
 
 jest.mock("expo-secure-store", () => {
   const store = new Map<string, string>();
@@ -14,6 +15,7 @@ jest.mock("expo-secure-store", () => {
   };
 });
 jest.mock("../lib/api", () => ({ api: { signIn: jest.fn() } }));
+jest.mock("../lib/document-store", () => ({ clearDocuments: jest.fn() }));
 
 const store = (SecureStore as unknown as { __store: Map<string, string> }).__store;
 const user = { id: "u", email: "ana@example.com", name: "Ana", role: "client" as const, tenantId: "t" };
@@ -84,5 +86,6 @@ describe("AuthProvider", () => {
 
     expect(result.current.token).toBeNull();
     expect(store.size).toBe(0);
+    expect(clearDocuments).toHaveBeenCalled();
   });
 });

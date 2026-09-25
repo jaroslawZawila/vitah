@@ -8,7 +8,7 @@ import bcrypt from "bcryptjs";
 import { sql } from "drizzle-orm";
 import postgres from "postgres";
 import { db } from "./client";
-import { projects, tenants, users, type UserRole } from "./schema";
+import { projectDocuments, projects, tenants, users, type UserRole } from "./schema";
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -98,4 +98,24 @@ export async function createTestProject(
     })
     .returning();
   return project!;
+}
+
+export async function createTestDocument(
+  tenantId: string,
+  projectId: string,
+  overrides: Partial<typeof projectDocuments.$inferInsert> = {},
+) {
+  const [document] = await db
+    .insert(projectDocuments)
+    .values({
+      tenantId,
+      projectId,
+      title: "Contrato de obra",
+      category: "contract",
+      pathname: `tenants/${tenantId}/projects/${projectId}/${unique()}.pdf`,
+      sizeBytes: 1024,
+      ...overrides,
+    })
+    .returning();
+  return document!;
 }

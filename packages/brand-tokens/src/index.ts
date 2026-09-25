@@ -19,6 +19,14 @@ export const colors = {
   inputBorder: "#3a3a3a",
   error: "#c75050",
 
+  // Mobile app chrome (doc/mobile-app-design/README.md)
+  surface: "#262624",
+  surfaceBorder: "#34342f",
+  divider: "#2e2e2b",
+  chipBorder: "#3c3c37",
+  tabBar: "#181817",
+  inactive: "#8a8a84",
+
   // Status
   statusOrange: "#c4632a",
   statusBlue: "#2a5a8a",

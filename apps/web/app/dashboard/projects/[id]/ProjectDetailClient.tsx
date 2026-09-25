@@ -2,20 +2,25 @@
 
 import { useTranslations } from "next-intl";
 import Link from "next/link";
-import type { ClientOption } from "@repo/core/contract";
+import type { ClientOption, ProjectDocument } from "@repo/core/contract";
 import type { ProjectDetail } from "../../../actions/projects";
 import ProjectHeader from "./components/ProjectHeader";
 import ClientAccessCard from "./components/ClientAccessCard";
+import DocumentsCard from "./components/DocumentsCard";
 import styles from "./page.module.css";
 
 export default function ProjectDetailClient({
   project,
   canManageClient,
   assignableClients,
+  documents,
+  canManageDocuments,
 }: {
   project: ProjectDetail;
   canManageClient: boolean;
   assignableClients: ClientOption[];
+  documents: ProjectDocument[];
+  canManageDocuments: boolean;
 }) {
   const t = useTranslations("projectDetailPage");
 
@@ -27,13 +32,20 @@ export default function ProjectDetailClient({
 
       <ProjectHeader project={project} />
 
-      {canManageClient && (
-        <ClientAccessCard
+      <div className={styles.cards}>
+        {canManageClient && (
+          <ClientAccessCard
+            projectId={project.id}
+            client={project.client}
+            assignableClients={assignableClients}
+          />
+        )}
+        <DocumentsCard
           projectId={project.id}
-          client={project.client}
-          assignableClients={assignableClients}
+          documents={documents}
+          canManage={canManageDocuments}
         />
-      )}
+      </div>
     </>
   );
 }

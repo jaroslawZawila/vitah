@@ -15,6 +15,13 @@
   color: var(--verde-oliva);
 }
 
+/* Cards below the header */
+.cards {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
 /* Header card */
 .header {
   background: var(--admin-card);

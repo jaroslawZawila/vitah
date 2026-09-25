@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import type { ClientOption, ProjectClientError } from "@repo/core/contract";
-import ClientAccessError from "./ClientAccessError";
+import FormError from "./FormError";
 import styles from "./ClientAccessCard.module.css";
 
 /** Presentational: pick an existing client for the project. */
@@ -50,7 +50,7 @@ export default function ClientPicker({
           ))}
         </select>
       </div>
-      <ClientAccessError error={error} />
+      <FormError namespace="projectDetailPage.clientAccess.errors" error={error} />
       <div className={styles.actions}>
         <button type="submit" className={styles.primary} disabled={pending}>
           {pending ? t("assigning") : t("assign")}

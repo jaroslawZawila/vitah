@@ -1,5 +1,5 @@
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } from "react-native";
-import { Stack } from "expo-router";
+import { Tabs } from "expo-router";
 import { Button } from "../../components/button";
 import { colors, spacing, type } from "../../constants/theme";
 import type { Project } from "../../lib/api";
@@ -15,7 +15,7 @@ export default function ProjectScreen() {
 
   return (
     <>
-      <Stack.Screen
+      <Tabs.Screen
         options={{
           title: "Mi proyecto",
           headerRight: () => (

@@ -7,7 +7,9 @@
     ".": "./src/index.ts",
     "./contract": "./src/contract.ts",
     "./projects": "./src/projects.ts",
-    "./users": "./src/users.ts"
+    "./users": "./src/users.ts",
+    "./storage": "./src/storage.ts",
+    "./testing": "./src/testing.ts"
   },
   "scripts": {
     "check-types": "tsc --noEmit",
@@ -15,6 +17,7 @@
   },
   "dependencies": {
     "@repo/db": "workspace:*",
+    "@vercel/blob": "^2.8.0",
     "bcryptjs": "^2.4.3"
   },
   "devDependencies": {
