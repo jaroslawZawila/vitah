@@ -86,8 +86,8 @@ export default function ProfileScreen() {
         </Pressable>
         {lock.available && (
           <ToggleRow
-            icon="smile"
-            label={t("profile.biometricLock", { method: t(`biometrics.${lock.method}`) })}
+            icon="shield"
+            label={t("profile.biometricLock")}
             value={lock.enabled}
             onChange={(on) => void lock.setEnabled(on)}
           />

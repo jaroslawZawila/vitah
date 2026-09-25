@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react-native";
+import { fireEvent, render, screen } from "@testing-library/react-native";
 import ProfileScreen from "../app/(app)/profile";
 import { I18nProvider } from "../lib/i18n";
 import { secureStore } from "../test-utils/secure-store";
@@ -60,9 +60,9 @@ describe("ProfileScreen", () => {
 
   it("offers the biometric lock only when the phone has it", async () => {
     const { rerender } = await renderProfile();
-    expect(await screen.findByRole("switch", { name: "Acceso con Face ID" })).toBeOnTheScreen();
+    expect(await screen.findByRole("switch", { name: "Acceso biométrico" })).toBeOnTheScreen();
 
-    fireEvent(toggle("Acceso con Face ID"), "valueChange", true);
+    fireEvent(toggle("Acceso biométrico"), "valueChange", true);
     expect(mockLock.setEnabled).toHaveBeenCalledWith(true);
 
     mockLock.available = false;
@@ -71,7 +71,7 @@ describe("ProfileScreen", () => {
         <ProfileScreen />
       </I18nProvider>,
     );
-    expect(screen.queryByRole("switch", { name: "Acceso con Face ID" })).toBeNull();
+    expect(screen.queryByRole("switch", { name: "Acceso biométrico" })).toBeNull();
   });
 
   it("hides notifications until push is set up", async () => {

@@ -6,9 +6,9 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
-  SafeAreaView,
 } from "react-native";
-import { useState } from "react";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useEffect, useRef, useState } from "react";
 import { Redirect } from "expo-router";
 import { useAuth } from "../lib/auth";
 import { useI18n } from "../lib/i18n";
@@ -16,12 +16,35 @@ import { colors } from "../constants/theme";
 import { Button } from "../components/button";
 
 export default function SignInScreen() {
-  const { signIn, token, isLoading: authLoading } = useAuth();
+  const {
+    signIn,
+    signInWithBiometrics,
+    biometric,
+    signedOut,
+    token,
+    isLoading: authLoading,
+  } = useAuth();
   const { t } = useI18n();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // With biometric sign-in on, ask straight away (once) when the app opens
+  // signed out, but not right after the client signs out themselves.
+  const asked = useRef(false);
+  useEffect(() => {
+    if (!authLoading && !token && biometric && !signedOut && !asked.current) {
+      asked.current = true;
+      void handleBiometricSignIn();
+    }
+  });
+
+  async function handleBiometricSignIn() {
+    setError("");
+    const result = await signInWithBiometrics(t("signIn.biometricPrompt"));
+    if (result.error === "expired") setError(t("signIn.sessionExpired"));
+  }
 
   if (authLoading) {
     return (
@@ -96,6 +119,13 @@ export default function SignInScreen() {
               loading={loading}
               style={{ marginTop: 4 }}
             />
+            {biometric && (
+              <Button
+                title={t("signIn.biometric")}
+                variant="secondary"
+                onPress={() => void handleBiometricSignIn()}
+              />
+            )}
           </View>
         </View>
       </KeyboardAvoidingView>

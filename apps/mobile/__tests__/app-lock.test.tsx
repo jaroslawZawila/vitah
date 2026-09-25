@@ -2,76 +2,82 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react-
 import * as LocalAuthentication from "expo-local-authentication";
 import { Text } from "react-native";
 import { AppLockProvider, useAppLock } from "../lib/app-lock";
+import { AuthProvider, useAuth } from "../lib/auth";
 import { secureStore } from "../test-utils/secure-store";
 
-const mockAuth = { token: "tok" as string | null, isLoading: false, signOut: jest.fn() };
-jest.mock("../lib/auth", () => ({ useAuth: () => mockAuth }));
+jest.mock("../lib/api", () => ({ api: {} }));
+jest.mock("../lib/document-store", () => ({ clearDocuments: jest.fn() }));
+jest.mock("../lib/push", () => ({
+  unregisterPush: jest.fn(async () => {}),
+  retryPendingRemoval: jest.fn(async () => {}),
+}));
+jest.mock("expo-image", () => ({
+  Image: { clearDiskCache: jest.fn(async () => true), clearMemoryCache: jest.fn(async () => true) },
+}));
+
+const user = { id: "u1", email: "ana@example.com", name: "Ana", tenantId: "t" };
+const session = JSON.stringify({ token: "tok", user });
 
 let lock: ReturnType<typeof useAppLock>;
+let auth: ReturnType<typeof useAuth>;
 function Probe() {
   lock = useAppLock();
+  auth = useAuth();
   return <Text>contenido</Text>;
 }
 
 const renderLock = () =>
   render(
-    <AppLockProvider>
-      <Probe />
-    </AppLockProvider>,
+    <AuthProvider>
+      <AppLockProvider>
+        <Probe />
+      </AppLockProvider>
+    </AuthProvider>,
   );
+
+/** Signed in, as the app finds it on launch. */
+function signedIn() {
+  secureStore.set("vitah_token", "tok");
+  secureStore.set("vitah_user", JSON.stringify(user));
+}
+
+const cancel = () =>
+  jest
+    .mocked(LocalAuthentication.authenticateAsync)
+    .mockResolvedValueOnce({ success: false, error: "user_cancel" });
 
 beforeEach(() => {
   jest.clearAllMocks();
   secureStore.clear();
-  mockAuth.token = "tok";
 });
 
 describe("AppLockProvider", () => {
-  it("reports the phone's biometrics", async () => {
+  it("knows whether the phone has biometrics", async () => {
     renderLock();
-    await screen.findByText("contenido");
 
     await waitFor(() => expect(lock.available).toBe(true));
-    // Face recognition; "faceId" on iOS (the test platform).
-    expect(lock.method).toBe("faceId");
     expect(lock.enabled).toBe(false);
   });
 
-  it("asks for biometrics before turning the lock on", async () => {
+  it("asks for biometrics before turning biometric access on, without locking", async () => {
+    signedIn();
     renderLock();
     await screen.findByText("contenido");
-    jest
-      .mocked(LocalAuthentication.authenticateAsync)
-      .mockResolvedValueOnce({ success: false, error: "user_cancel" });
+    cancel();
 
     await act(async () => expect(await lock.setEnabled(true)).toBe(false));
     expect(lock.enabled).toBe(false);
 
     await act(async () => expect(await lock.setEnabled(true)).toBe(true));
     expect(lock.enabled).toBe(true);
-    expect(secureStore.get("vitah_app_lock")).toBe("1");
-    // They've just passed biometrics: no lock screen now.
+    expect(JSON.parse(secureStore.get("vitah_biometric_session")!)).toEqual({ token: "tok", user });
     expect(screen.queryByText("ViTAH está bloqueada")).toBeNull();
-    expect(LocalAuthentication.authenticateAsync).toHaveBeenCalledTimes(2);
   });
 
-  it("shows nothing of the app until it knows whether to lock", async () => {
-    secureStore.set("vitah_app_lock", "1");
-    jest
-      .mocked(LocalAuthentication.authenticateAsync)
-      .mockResolvedValueOnce({ success: false, error: "user_cancel" });
-
-    renderLock();
-
-    expect(screen.queryByText("contenido")).toBeNull();
-    expect(await screen.findByText("ViTAH está bloqueada")).toBeOnTheScreen();
-  });
-
-  it("locks when the app opens with the lock on, until biometrics succeed", async () => {
-    secureStore.set("vitah_app_lock", "1");
-    jest
-      .mocked(LocalAuthentication.authenticateAsync)
-      .mockResolvedValueOnce({ success: false, error: "user_cancel" });
+  it("opens locked when signed in with biometric access on, until biometrics succeed", async () => {
+    signedIn();
+    secureStore.set("vitah_biometric_session", session);
+    cancel();
 
     renderLock();
 
@@ -80,8 +86,9 @@ describe("AppLockProvider", () => {
     await waitFor(() => expect(screen.queryByText("ViTAH está bloqueada")).toBeNull());
   });
 
-  it("lets a locked-out client sign out instead", async () => {
-    secureStore.set("vitah_app_lock", "1");
+  it("lets a locked-out client sign out, keeping biometric sign-in", async () => {
+    signedIn();
+    secureStore.set("vitah_biometric_session", session);
     jest
       .mocked(LocalAuthentication.authenticateAsync)
       .mockResolvedValue({ success: false, error: "user_cancel" });
@@ -89,17 +96,21 @@ describe("AppLockProvider", () => {
     renderLock();
     fireEvent.press(await screen.findByRole("button", { name: "Cerrar sesión" }));
 
-    expect(mockAuth.signOut).toHaveBeenCalled();
+    await waitFor(() => expect(auth.token).toBeNull());
+    expect(screen.queryByText("ViTAH está bloqueada")).toBeNull();
+    expect(auth.biometric).toBe(true);
     jest.mocked(LocalAuthentication.authenticateAsync).mockResolvedValue({ success: true });
   });
 
-  it("turns the lock off on sign-out, for the next person on the phone", async () => {
-    secureStore.set("vitah_app_lock", "1");
-    mockAuth.token = null;
-
+  it("turning it off forgets the saved session", async () => {
+    signedIn();
+    secureStore.set("vitah_biometric_session", session);
     renderLock();
+    await screen.findByText("contenido");
 
-    await waitFor(() => expect(secureStore.has("vitah_app_lock")).toBe(false));
-    expect(screen.queryByText("ViTAH está bloqueada")).toBeNull();
+    await act(async () => expect(await lock.setEnabled(false)).toBe(true));
+
+    expect(lock.enabled).toBe(false);
+    expect(secureStore.has("vitah_biometric_session")).toBe(false);
   });
 });

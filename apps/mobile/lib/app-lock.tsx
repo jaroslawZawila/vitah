@@ -1,25 +1,21 @@
 import * as LocalAuthentication from "expo-local-authentication";
-import * as SecureStore from "expo-secure-store";
 import React, { createContext, use, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AppState, Platform, StyleSheet, Text, View } from "react-native";
+import { AppState, StyleSheet, Text, View } from "react-native";
 import { Button } from "../components/button";
 import { colors, spacing, type } from "../constants/theme";
 import { useAuth } from "./auth";
 import { useI18n } from "./i18n";
 
-// "Acceso con Face ID" (Perfil): when on, the app asks for Face ID, Touch ID
-// or a fingerprint when it opens and when it returns after a minute away.
-// The choice is kept on this phone only and cleared on sign-out.
+// "Acceso biométrico" (Perfil): with it on, the client gets in with their
+// fingerprint or face instead of the password. Signed out, the sign-in screen
+// offers it (see signInWithBiometrics in ./auth); signed in, the app asks for
+// it when it opens and when it returns after a minute away.
 
-const LOCK_KEY = "vitah_app_lock";
 const RELOCK_AFTER_MS = 60_000;
-
-export type BiometricMethod = "faceId" | "touchId" | "face" | "fingerprint" | "other";
 
 type AppLockValue = {
   /** The phone has biometrics set up. */
   available: boolean;
-  method: BiometricMethod;
   enabled: boolean;
   /** Turning it on asks for biometrics first; returns whether it changed. */
   setEnabled: (on: boolean) => Promise<boolean>;
@@ -27,56 +23,30 @@ type AppLockValue = {
 
 const AppLockContext = createContext<AppLockValue | null>(null);
 
-async function detectMethod(): Promise<{ available: boolean; method: BiometricMethod }> {
-  const [hardware, enrolled, types] = await Promise.all([
-    LocalAuthentication.hasHardwareAsync(),
-    LocalAuthentication.isEnrolledAsync(),
-    LocalAuthentication.supportedAuthenticationTypesAsync(),
-  ]);
-  const { FACIAL_RECOGNITION, FINGERPRINT } = LocalAuthentication.AuthenticationType;
-  const ios = Platform.OS === "ios";
-  const method: BiometricMethod = types.includes(FACIAL_RECOGNITION)
-    ? ios
-      ? "faceId"
-      : "face"
-    : types.includes(FINGERPRINT)
-      ? ios
-        ? "touchId"
-        : "fingerprint"
-      : "other";
-  return { available: hardware && enrolled, method };
-}
-
 export function AppLockProvider({ children }: { children: React.ReactNode }) {
-  const { token, isLoading, signOut } = useAuth();
+  const { token, isLoading, biometric, enableBiometrics, disableBiometrics, signOut } = useAuth();
   const { t } = useI18n();
-  const [biometrics, setBiometrics] = useState({ available: false, method: "other" as BiometricMethod });
-  const [enabled, setEnabledState] = useState<boolean | undefined>(undefined);
+  const [available, setAvailable] = useState(false);
   const [locked, setLocked] = useState(false);
+  const [openChecked, setOpenChecked] = useState(false);
   const backgroundedAt = useRef<number | null>(null);
 
+  // Decided in the same render the session is restored, so nothing shows
+  // before the lock. Only at launch: turning it on later doesn't lock.
+  if (!isLoading && !openChecked) {
+    setOpenChecked(true);
+    if (token && biometric) setLocked(true);
+  }
+
   useEffect(() => {
-    void detectMethod().then(setBiometrics).catch(() => {});
-    // On with the setting read, before anything renders: the app opens locked
-    // (turning the lock on later doesn't lock straight away).
-    void SecureStore.getItemAsync(LOCK_KEY)
-      .then((value) => {
-        setLocked(value === "1");
-        setEnabledState(value === "1");
-      })
-      .catch(() => setEnabledState(false));
+    void Promise.all([LocalAuthentication.hasHardwareAsync(), LocalAuthentication.isEnrolledAsync()])
+      .then(([hardware, enrolled]) => setAvailable(hardware && enrolled))
+      .catch(() => {});
   }, []);
 
-  // Signed out: the next person on this phone starts without the lock.
   useEffect(() => {
-    if (!isLoading && !token && enabled !== undefined) {
-      setLocked(false);
-      if (enabled) {
-        setEnabledState(false);
-        void SecureStore.deleteItemAsync(LOCK_KEY).catch(() => {});
-      }
-    }
-  }, [isLoading, token, enabled]);
+    if (!token) setLocked(false);
+  }, [token]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (status) => {
@@ -84,18 +54,18 @@ export function AppLockProvider({ children }: { children: React.ReactNode }) {
       if (status === "active" && backgroundedAt.current !== null) {
         const away = Date.now() - backgroundedAt.current;
         backgroundedAt.current = null;
-        if (enabled && token && away >= RELOCK_AFTER_MS) setLocked(true);
+        if (biometric && token && away >= RELOCK_AFTER_MS) setLocked(true);
       }
     });
     return () => subscription.remove();
-  }, [enabled, token]);
+  }, [biometric, token]);
 
   const unlock = useCallback(async () => {
     const result = await LocalAuthentication.authenticateAsync({ promptMessage: t("lock.prompt") });
     if (result.success) setLocked(false);
   }, [t]);
 
-  // Ask straight away when the lock screen appears (once signed in).
+  // Ask straight away when the lock screen appears.
   useEffect(() => {
     if (locked && token) void unlock();
   }, [locked, token, unlock]);
@@ -103,28 +73,23 @@ export function AppLockProvider({ children }: { children: React.ReactNode }) {
   const setEnabled = useCallback(
     async (on: boolean) => {
       if (on) {
-        const method = t(`biometrics.${biometrics.method}`);
         const result = await LocalAuthentication.authenticateAsync({
-          promptMessage: t("profile.biometricPrompt", { method }),
+          promptMessage: t("profile.biometricPrompt"),
         });
         if (!result.success) return false;
-        await SecureStore.setItemAsync(LOCK_KEY, "1");
+        await enableBiometrics();
       } else {
-        await SecureStore.deleteItemAsync(LOCK_KEY);
+        await disableBiometrics();
       }
-      setEnabledState(on);
       return true;
     },
-    [biometrics.method, t],
+    [enableBiometrics, disableBiometrics, t],
   );
 
   const value = useMemo(
-    () => ({ ...biometrics, enabled: enabled === true, setEnabled }),
-    [biometrics, enabled, setEnabled],
+    () => ({ available, enabled: biometric, setEnabled }),
+    [available, biometric, setEnabled],
   );
-
-  // Nothing renders until we know whether to lock, so no data shows first.
-  if (enabled === undefined) return null;
 
   return (
     <AppLockContext value={value}>

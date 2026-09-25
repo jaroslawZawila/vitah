@@ -33,6 +33,10 @@ jest.mock("expo-secure-store", () => {
 // The real icon loads its font asynchronously and updates outside act().
 jest.mock("@expo/vector-icons/Feather", () => () => null);
 
-jest.mock("react-native-safe-area-context", () => ({
-  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
-}));
+jest.mock("react-native-safe-area-context", () => {
+  const { View } = jest.requireActual("react-native");
+  return {
+    useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+    SafeAreaView: View,
+  };
+});
