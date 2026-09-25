@@ -1,6 +1,21 @@
--- Additive prod migration for project documents. Safe to run once; does not
--- touch existing tables.
+-- Prod migration for project documents.
+--
+-- Prod still had the pre-"start over" `project_documents` table and
+-- `document_category` enum (empty; nothing referenced them). They are
+-- dropped first, but only while the legacy `file_url` column is there, so
+-- re-running this can never drop the new table.
 BEGIN;
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'project_documents' AND column_name = 'file_url'
+  ) THEN
+    DROP TABLE "project_documents";
+    DROP TYPE "document_category";
+  END IF;
+END $$;
 
 CREATE TYPE "document_category" AS ENUM ('contract', 'plans', 'certificates', 'other');
 
