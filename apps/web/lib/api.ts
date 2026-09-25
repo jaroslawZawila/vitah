@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { CoreError, type Ctx, type DocumentFile } from "@repo/core";
+import { CoreError, type Ctx, type StoredFile } from "@repo/core";
 import { getRequestContext } from "@repo/auth/context";
 import { authenticateMobileRequest, type MobileTokenPayload } from "@repo/auth/mobile";
 
@@ -65,14 +65,20 @@ export async function readForm(request: Request): Promise<Record<string, unknown
   }
 }
 
-/** Streams a stored PDF to the caller. Never cached by shared caches. */
-export function fileResponse({ title, sizeBytes, body }: DocumentFile) {
+/**
+ * Streams a stored file to the caller. Never cached by shared caches;
+ * `immutable` files (photos: new id per upload) may stay in the caller's own.
+ */
+export function fileResponse(
+  { filename, contentType, sizeBytes, body }: StoredFile,
+  { immutable = false } = {},
+) {
   return new Response(body, {
     headers: {
-      "Content-Type": "application/pdf",
+      "Content-Type": contentType,
       "Content-Length": String(sizeBytes),
-      "Content-Disposition": `inline; filename*=UTF-8''${encodeURIComponent(`${title}.pdf`)}`,
-      "Cache-Control": "private, no-store",
+      "Content-Disposition": `inline; filename*=UTF-8''${encodeURIComponent(filename)}`,
+      "Cache-Control": immutable ? "private, max-age=31536000, immutable" : "private, no-store",
       "X-Content-Type-Options": "nosniff",
     },
   });

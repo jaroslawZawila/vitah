@@ -9,4 +9,5 @@ export * as usersService from "./users";
 export type { UserListItem } from "./users";
 export * as clientsService from "./clients";
 export * as documentsService from "./documents";
-export { canManageDocuments, type DocumentFile } from "./documents";
+export * as photosService from "./photos";
+export { canManageProjectFiles, type StoredFile } from "./project-files";

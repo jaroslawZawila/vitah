@@ -1,4 +1,9 @@
-import type { MobileDocument, MobileProject, MobileSession } from "@repo/core/contract";
+import type {
+  MobileDocument,
+  MobilePhoto,
+  MobileProject,
+  MobileSession,
+} from "@repo/core/contract";
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
 
@@ -7,7 +12,7 @@ export type Project = MobileProject;
 
 type ApiError = "invalid_credentials" | "unauthorized" | "network_error" | "server_error";
 
-type Result<T> = { ok: true; data: T } | { ok: false; error: ApiError };
+export type Result<T> = { ok: true; data: T } | { ok: false; error: ApiError };
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<Result<T>> {
   let res: Response;
@@ -64,5 +69,16 @@ export const api = {
   /** The PDF itself; fetch it with the same Bearer token. */
   documentUrl(id: string) {
     return `${API_BASE}/api/mobile/documents/${encodeURIComponent(id)}`;
+  },
+
+  listPhotos(token: string) {
+    return request<{ photos: MobilePhoto[] }>("/api/mobile/photos", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+
+  /** The image itself; load it with the same Bearer token. */
+  photoUrl(id: string) {
+    return `${API_BASE}/api/mobile/photos/${encodeURIComponent(id)}`;
   },
 };

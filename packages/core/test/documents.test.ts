@@ -200,7 +200,11 @@ describe("openDocument", () => {
 
     const file = await svc.openDocument({ ...ctx, role: "viewer" }, project.id, documentId);
 
-    expect(file).toMatchObject({ title: "Contrato", sizeBytes: pdf().size });
+    expect(file).toMatchObject({
+      filename: "Contrato.pdf",
+      contentType: "application/pdf",
+      sizeBytes: pdf().size,
+    });
     expect(await text(file.body)).toBe("%PDF-1.7\ncontenido");
   });
 

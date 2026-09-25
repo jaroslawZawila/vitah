@@ -3,7 +3,7 @@
 import { useFormatter, useTranslations } from "next-intl";
 import type { DocumentError, ProjectDocument } from "@repo/core/contract";
 import FormError from "./FormError";
-import styles from "./DocumentsCard.module.css";
+import styles from "./documents.module.css";
 
 const MB = 1024 * 1024;
 
@@ -24,10 +24,6 @@ export default function DocumentList({
 }) {
   const t = useTranslations("projectDetailPage.documents");
   const format = useFormatter();
-
-  if (documents.length === 0) {
-    return <p className={styles.empty}>{t("empty")}</p>;
-  }
 
   const size = (bytes: number) =>
     bytes < MB

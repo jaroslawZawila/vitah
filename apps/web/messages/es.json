@@ -18,7 +18,13 @@
   "sidebar": {
     "projects": "Proyectos",
     "clients": "Clientes",
-    "users": "Usuarios"
+    "users": "Usuarios",
+    "projectTabs": {
+      "label": "Secciones del proyecto",
+      "general": "General",
+      "documents": "Documentos",
+      "photos": "Fotos"
+    }
   },
   "topbar": {
     "titles": {
@@ -84,7 +90,9 @@
     },
     "documents": {
       "title": "Documentos",
-      "empty": "Todavía no hay documentos. El cliente verá aquí los PDF que subas.",
+      "count": "{count, plural, =0 {Ningún documento} one {# documento} other {# documentos}}",
+      "emptyTitle": "Todavía no hay documentos",
+      "emptyText": "Aquí solo vive una araña. Sube el primer PDF y el cliente lo verá en la app.",
       "delete": "Eliminar",
       "deleteLabel": "Eliminar {title}",
       "confirmDelete": "¿Eliminar «{title}»? El cliente dejará de verlo en la app.",
@@ -96,6 +104,7 @@
       "chooseCategory": "Selecciona una categoría…",
       "submit": "Subir",
       "uploading": "Subiendo…",
+      "cancel": "Cancelar",
       "categories": {
         "contract": "Contrato",
         "plans": "Planos",
@@ -111,6 +120,35 @@
         "project_not_found": "Proyecto no encontrado.",
         "not_found": "Documento no encontrado.",
         "forbidden": "Solo administradores y gestores pueden gestionar documentos."
+      }
+    },
+    "close": "Cerrar",
+    "photos": {
+      "title": "Fotos",
+      "count": "{count, plural, =0 {Ninguna foto} one {# foto} other {# fotos}}",
+      "emptyTitle": "Todavía no hay fotos",
+      "emptyText": "La cámara se ha echado la siesta. Sube la primera foto de la obra y el cliente la verá en la app.",
+      "upload": "Subir foto",
+      "file": "Imagen",
+      "fileHint": "JPG, PNG o WebP, hasta 4 MB.",
+      "caption": "Pie de foto",
+      "captionHint": "Opcional. Por ejemplo: «Fachada sur».",
+      "preview": "Vista previa",
+      "submit": "Subir",
+      "uploading": "Subiendo…",
+      "cancel": "Cancelar",
+      "untitled": "Foto del {date}",
+      "open": "Abrir foto a tamaño completo",
+      "delete": "Eliminar",
+      "deleteLabel": "Eliminar {name}",
+      "confirmDelete": "¿Eliminar esta foto? El cliente dejará de verla en la app.",
+      "errors": {
+        "missing_file": "Selecciona una imagen.",
+        "invalid_file_type": "El archivo no es una imagen JPG, PNG o WebP.",
+        "file_too_large": "La imagen supera el máximo de 4 MB.",
+        "project_not_found": "Proyecto no encontrado.",
+        "not_found": "Foto no encontrada.",
+        "forbidden": "Solo administradores y gestores pueden gestionar fotos."
       }
     }
   },

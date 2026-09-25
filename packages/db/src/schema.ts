@@ -204,6 +204,37 @@ export const projectDocuments = pgTable(
   }),
 );
 
+// --- Project photos ---
+
+// A site photo shared with the project's client (JPEG, PNG or WebP). Stored
+// like documents: private Blob store, only served through our API.
+export const projectPhotos = pgTable(
+  "project_photos",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    caption: text("caption"),
+    pathname: text("pathname").unique().notNull(),
+    contentType: text("content_type").notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    uploadedById: text("uploaded_by_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => ({
+    projectIdx: index("project_photos_project_idx").on(table.projectId),
+  }),
+);
+
 // --- Relations ---
 
 export const tenantsRelations = relations(tenants, ({ many }) => ({
@@ -236,11 +267,19 @@ export const projectsRelations = relations(projects, ({ one, many }) => ({
     references: [users.id],
   }),
   documents: many(projectDocuments),
+  photos: many(projectPhotos),
 }));
 
 export const projectDocumentsRelations = relations(projectDocuments, ({ one }) => ({
   project: one(projects, {
     fields: [projectDocuments.projectId],
+    references: [projects.id],
+  }),
+}));
+
+export const projectPhotosRelations = relations(projectPhotos, ({ one }) => ({
+  project: one(projects, {
+    fields: [projectPhotos.projectId],
     references: [projects.id],
   }),
 }));

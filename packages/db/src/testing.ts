@@ -8,7 +8,14 @@ import bcrypt from "bcryptjs";
 import { sql } from "drizzle-orm";
 import postgres from "postgres";
 import { db } from "./client";
-import { projectDocuments, projects, tenants, users, type UserRole } from "./schema";
+import {
+  projectDocuments,
+  projectPhotos,
+  projects,
+  tenants,
+  users,
+  type UserRole,
+} from "./schema";
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -118,4 +125,24 @@ export async function createTestDocument(
     })
     .returning();
   return document!;
+}
+
+export async function createTestPhoto(
+  tenantId: string,
+  projectId: string,
+  overrides: Partial<typeof projectPhotos.$inferInsert> = {},
+) {
+  const [photo] = await db
+    .insert(projectPhotos)
+    .values({
+      tenantId,
+      projectId,
+      caption: "Fachada sur",
+      pathname: `tenants/${tenantId}/projects/${projectId}/photos/${unique()}.jpg`,
+      contentType: "image/jpeg",
+      sizeBytes: 2048,
+      ...overrides,
+    })
+    .returning();
+  return photo!;
 }

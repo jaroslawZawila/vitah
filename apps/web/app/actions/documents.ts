@@ -1,11 +1,11 @@
 "use server";
 
 // Thin portal adapters over @repo/core (packages/core/src/documents.ts),
-// behind the "Documents" card on the project page.
+// behind the project's Documents page.
 
 import {
   CoreError,
-  canManageDocuments,
+  canManageProjectFiles,
   documentsService as svc,
   type Ctx,
   type DocumentError,
@@ -29,7 +29,7 @@ export async function getProjectDocuments(
     if (err instanceof CoreError) return [];
     throw err;
   });
-  return { documents, canManage: canManageDocuments(ctx.role) };
+  return { documents, canManage: canManageProjectFiles(ctx.role) };
 }
 
 /** Runs a core mutation; returns `{ error: code }` for expected failures. */
@@ -45,7 +45,8 @@ async function mutate(
     if (err instanceof CoreError) return { error: err.code as DocumentError };
     throw err;
   }
-  revalidatePath(`/dashboard/projects/${projectId}`);
+  // Every tab of the project, so counts and lists stay in step.
+  revalidatePath(`/dashboard/projects/${projectId}`, "layout");
   return { success: true };
 }
 

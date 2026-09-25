@@ -1,14 +1,8 @@
 /* Mobile first: stacked rows and fields, 44px touch targets. */
 
-.empty {
-  margin: 0 0 16px;
-  font-size: 12px;
-  color: var(--admin-muted);
-}
-
 .list {
   list-style: none;
-  margin: 0 0 16px;
+  margin: 0;
   padding: 0;
 }
 
@@ -19,6 +13,10 @@
   min-height: 56px;
   padding: 8px 0;
   border-bottom: 1px solid var(--admin-separator);
+}
+
+.row:last-child {
+  border-bottom: none;
 }
 
 .fileType {
@@ -63,45 +61,19 @@
 }
 
 .delete {
-  flex: none;
-  min-height: 44px;
-  padding: 0 8px;
-  border: none;
-  background: none;
-  color: var(--error);
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.delete:disabled {
-  opacity: 0.6;
-  cursor: default;
+  composes: rowAction from "./cardForm.module.css";
 }
 
 .form {
   composes: form from "./cardForm.module.css";
 }
 
-.formTitle {
-  margin: 0;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--admin-foreground);
-}
-
 .field {
   composes: field from "./cardForm.module.css";
 }
 
-.field input[type="file"] {
-  padding: 10px 12px;
-  font-size: 14px;
-}
-
 .hint {
-  font-size: 11px;
-  color: var(--admin-muted);
+  composes: hint from "./cardForm.module.css";
 }
 
 .actions {
@@ -110,4 +82,8 @@
 
 .primary {
   composes: primary from "./cardForm.module.css";
+}
+
+.secondary {
+  composes: secondary from "./cardForm.module.css";
 }

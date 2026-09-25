@@ -90,3 +90,33 @@ export type DocumentError =
   | "project_not_found"
   | "not_found"
   | "forbidden";
+
+export const PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
+export type PhotoType = (typeof PHOTO_TYPES)[number];
+
+/** Largest photo accepted; same body limit as documents. */
+export const MAX_PHOTO_BYTES = MAX_DOCUMENT_BYTES;
+
+/** Longer captions are cut to this length. */
+export const MAX_CAPTION_LENGTH = 200;
+
+/** A site photo as listed by GET /api/mobile/photos. */
+export type MobilePhoto = {
+  id: string;
+  caption: string | null;
+  sizeBytes: number;
+  /** ISO timestamp. */
+  uploadedAt: string;
+};
+
+/** A site photo as listed in the portal and by /api/v1. */
+export type ProjectPhoto = MobilePhoto & { uploadedBy: string | null };
+
+/** Error codes of the photos service (`{ error: code }` in the API). */
+export type PhotoError =
+  | "missing_file"
+  | "invalid_file_type"
+  | "file_too_large"
+  | "project_not_found"
+  | "not_found"
+  | "forbidden";

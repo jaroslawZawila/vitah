@@ -2,7 +2,7 @@ import { db, projects, eq, and, desc } from "@repo/db";
 import { requireAdmin, type Ctx } from "./context";
 import { invalid, notFound } from "./errors";
 import { clientConflict, requireAssignableClient } from "./project-client";
-import { projectFolder } from "./documents";
+import { projectFolder } from "./project-files";
 import { deleteFolder } from "./storage";
 
 // Every function here takes `ctx` and filters by `ctx.tenantId`.

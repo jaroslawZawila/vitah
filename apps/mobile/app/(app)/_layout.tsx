@@ -44,6 +44,14 @@ export default function AppLayout() {
           }}
         />
         <Tabs.Screen
+          name="photos"
+          options={{
+            title: "Fotos",
+            headerShown: false,
+            tabBarIcon: ({ color }) => <Feather name="image" size={22} color={color} />,
+          }}
+        />
+        <Tabs.Screen
           name="documents"
           options={{
             title: "Documentos",

@@ -109,3 +109,29 @@ describe("api.documentUrl", () => {
     expect(api.documentUrl("a/b")).toMatch(/\/api\/mobile\/documents\/a%2Fb$/);
   });
 });
+
+describe("api.listPhotos", () => {
+  it("fetches the client's photos with the token", async () => {
+    const photos = [
+      { id: "p1", caption: "Fachada sur", sizeBytes: 1, uploadedAt: "2026-09-22T10:00:00.000Z" },
+    ];
+    respond(200, { photos });
+
+    expect(await api.listPhotos("tok")).toEqual({ ok: true, data: { photos } });
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toMatch(/\/api\/mobile\/photos$/);
+    expect(init.headers).toEqual({ Authorization: "Bearer tok" });
+  });
+
+  it("maps an expired session", async () => {
+    respond(401, { error: "unauthorized" });
+
+    expect(await api.listPhotos("tok")).toEqual({ ok: false, error: "unauthorized" });
+  });
+});
+
+describe("api.photoUrl", () => {
+  it("points at the photo's image", () => {
+    expect(api.photoUrl("a/b")).toMatch(/\/api\/mobile\/photos\/a%2Fb$/);
+  });
+});

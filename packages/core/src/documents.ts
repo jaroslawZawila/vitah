@@ -4,55 +4,23 @@ import {
   DOCUMENT_CATEGORIES,
   MAX_DOCUMENT_BYTES,
   type DocumentCategory,
-  type DocumentError,
   type MobileDocument,
   type ProjectDocument,
 } from "./contract";
-import { CoreError } from "./errors";
-import { projectInTenant } from "./project-client";
-import { deleteFile, putFile, readFile } from "./storage";
+import {
+  fail,
+  openStoredFile,
+  projectFolder,
+  removeFile,
+  requireFileManager,
+  requireProject,
+  storeFile,
+} from "./project-files";
 
 // ─── Project documents ────────────────────────────────────────────────────────
-// PDFs staff share with a project's client. Admins and managers upload and
-// delete them; every staff member can list and download them. The client sees
-// their own project's documents in the mobile app.
+// PDFs staff share with a project's client (see ./project-files for who may
+// do what). The client sees their own project's documents in the mobile app.
 // ─────────────────────────────────────────────────────────────────────────────
-
-const STATUS: Record<DocumentError, number> = {
-  missing_fields: 400,
-  missing_file: 400,
-  invalid_category: 400,
-  invalid_file_type: 400,
-  file_too_large: 413,
-  project_not_found: 404,
-  not_found: 404,
-  forbidden: 403,
-};
-
-function fail(code: DocumentError): never {
-  throw new CoreError(code, STATUS[code]);
-}
-
-/** Where a project's files live; everything under it belongs to the project. */
-export const projectFolder = (tenantId: string, projectId: string) =>
-  `tenants/${tenantId}/projects/${projectId}/`;
-
-/** Admins and managers upload and delete; other roles only read. */
-export function canManageDocuments(role: Ctx["role"]) {
-  return role === "admin" || role === "manager";
-}
-
-function requireManager(ctx: Ctx) {
-  if (!canManageDocuments(ctx.role)) fail("forbidden");
-}
-
-async function requireProject(tenantId: string, projectId: string) {
-  const project = await db.query.projects.findFirst({
-    where: projectInTenant(tenantId, projectId),
-    columns: { id: true },
-  });
-  if (!project) fail("project_not_found");
-}
 
 function documentInProject(ctx: Ctx, projectId: string, documentId: string) {
   return and(
@@ -87,7 +55,7 @@ function toMobileDocument({ createdAt, ...doc }: DocumentRow): MobileDocument {
 
 /** Body (multipart form): { title, category, file } — file is a PDF of at most 4 MB. */
 export async function addDocument(ctx: Ctx, projectId: string, input: Record<string, unknown>) {
-  requireManager(ctx);
+  requireFileManager(ctx);
 
   const { file, category } = input;
   const title = typeof input.title === "string" ? input.title.trim() : "";
@@ -100,9 +68,8 @@ export async function addDocument(ctx: Ctx, projectId: string, input: Record<str
 
   const id = crypto.randomUUID();
   const pathname = `${projectFolder(ctx.tenantId, projectId)}${id}.pdf`;
-  await putFile(pathname, file, "application/pdf");
-  try {
-    await db.insert(projectDocuments).values({
+  await storeFile(pathname, file, "application/pdf", () =>
+    db.insert(projectDocuments).values({
       id,
       tenantId: ctx.tenantId,
       projectId,
@@ -111,11 +78,8 @@ export async function addDocument(ctx: Ctx, projectId: string, input: Record<str
       pathname,
       sizeBytes: file.size,
       uploadedById: ctx.userId,
-    });
-  } catch (error) {
-    await deleteFile(pathname).catch(() => {});
-    throw error;
-  }
+    }),
+  );
 
   return { documentId: id };
 }
@@ -143,24 +107,16 @@ export async function listDocuments(ctx: Ctx, projectId: string): Promise<Projec
 }
 
 export async function deleteDocument(ctx: Ctx, projectId: string, documentId: string) {
-  requireManager(ctx);
+  requireFileManager(ctx);
 
   const where = documentInProject(ctx, projectId, documentId);
   const doc = await db.query.projectDocuments.findFirst({ where, columns: { pathname: true } });
   if (!doc) fail("not_found");
 
-  // File first: if that fails the row stays and the delete can be retried.
-  await deleteFile(doc.pathname);
-  await db.delete(projectDocuments).where(where);
+  await removeFile(doc.pathname, () => db.delete(projectDocuments).where(where));
 
   return { documentId };
 }
-
-export type DocumentFile = {
-  title: string;
-  sizeBytes: number;
-  body: ReadableStream<Uint8Array>;
-};
 
 const fileColumns = {
   title: projectDocuments.title,
@@ -168,13 +124,10 @@ const fileColumns = {
   pathname: projectDocuments.pathname,
 };
 
-async function openFile(
-  doc: { title: string; sizeBytes: number; pathname: string } | undefined,
-): Promise<DocumentFile> {
+function openFile(doc: { title: string; sizeBytes: number; pathname: string } | undefined) {
   if (!doc) fail("not_found");
-  const body = await readFile(doc.pathname);
-  if (!body) fail("not_found");
-  return { title: doc.title, sizeBytes: doc.sizeBytes, body };
+  const { title, ...file } = doc;
+  return openStoredFile({ ...file, filename: `${title}.pdf`, contentType: "application/pdf" });
 }
 
 /** A document's file, for staff of the project's tenant. */

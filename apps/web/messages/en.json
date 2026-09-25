@@ -18,7 +18,13 @@
   "sidebar": {
     "projects": "Projects",
     "clients": "Clients",
-    "users": "Users"
+    "users": "Users",
+    "projectTabs": {
+      "label": "Project sections",
+      "general": "General",
+      "documents": "Documents",
+      "photos": "Photos"
+    }
   },
   "topbar": {
     "titles": {
@@ -84,7 +90,9 @@
     },
     "documents": {
       "title": "Documents",
-      "empty": "No documents yet. The client will see the PDFs you upload here.",
+      "count": "{count, plural, =0 {No documents} one {# document} other {# documents}}",
+      "emptyTitle": "No documents yet",
+      "emptyText": "Only a spider lives here. Upload the first PDF and the client will see it in the app.",
       "delete": "Delete",
       "deleteLabel": "Delete {title}",
       "confirmDelete": "Delete “{title}”? The client will no longer see it in the app.",
@@ -96,6 +104,7 @@
       "chooseCategory": "Choose a category…",
       "submit": "Upload",
       "uploading": "Uploading…",
+      "cancel": "Cancel",
       "categories": {
         "contract": "Contract",
         "plans": "Plans",
@@ -111,6 +120,35 @@
         "project_not_found": "Project not found.",
         "not_found": "Document not found.",
         "forbidden": "Only admins and managers can manage documents."
+      }
+    },
+    "close": "Close",
+    "photos": {
+      "title": "Photos",
+      "count": "{count, plural, =0 {No photos} one {# photo} other {# photos}}",
+      "emptyTitle": "No photos yet",
+      "emptyText": "The camera is taking a nap. Upload the first site photo and the client will see it in the app.",
+      "upload": "Upload photo",
+      "file": "Image",
+      "fileHint": "JPG, PNG or WebP, up to 4 MB.",
+      "caption": "Caption",
+      "captionHint": "Optional. For example: “South façade”.",
+      "preview": "Preview",
+      "submit": "Upload",
+      "uploading": "Uploading…",
+      "cancel": "Cancel",
+      "untitled": "Photo from {date}",
+      "open": "Open full-size photo",
+      "delete": "Delete",
+      "deleteLabel": "Delete {name}",
+      "confirmDelete": "Delete this photo? The client will no longer see it in the app.",
+      "errors": {
+        "missing_file": "Choose an image.",
+        "invalid_file_type": "The file isn't a JPG, PNG or WebP image.",
+        "file_too_large": "The image is larger than the 4 MB limit.",
+        "project_not_found": "Project not found.",
+        "not_found": "Photo not found.",
+        "forbidden": "Only admins and managers can manage photos."
       }
     }
   },

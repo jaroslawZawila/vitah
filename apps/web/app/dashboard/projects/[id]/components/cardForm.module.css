@@ -33,6 +33,16 @@
   font-size: 16px; /* prevents iOS zoom on focus */
 }
 
+.field input[type="file"] {
+  padding: 10px 12px;
+  font-size: 14px;
+}
+
+.hint {
+  font-size: 11px;
+  color: var(--admin-muted);
+}
+
 .field input:focus-visible,
 .field select:focus-visible {
   outline: 2px solid var(--verde-oliva);
@@ -45,9 +55,10 @@
   color: var(--error);
 }
 
+/* Stacked on phones with the primary (last) button on top. */
 .actions {
   display: flex;
-  flex-direction: column;
+  flex-direction: column-reverse;
   gap: 8px;
 }
 
@@ -61,6 +72,25 @@
   min-height: 44px;
 }
 
+.secondary {
+  composes: btnSmall from "../page.module.css";
+  min-height: 44px;
+}
+
+/* Text button inside a list row or tile, e.g. "Delete". */
+.rowAction {
+  flex: none;
+  min-height: 44px;
+  padding: 0 8px;
+  border: none;
+  background: none;
+  color: var(--error);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.rowAction:disabled,
 .primary:disabled,
 .danger:disabled {
   opacity: 0.6;

@@ -8,17 +8,19 @@ import {
   type DocumentError,
 } from "@repo/core/contract";
 import FormError from "./FormError";
-import styles from "./DocumentsCard.module.css";
+import styles from "./documents.module.css";
 
-/** Presentational: upload a PDF with a title and category. */
+/** Presentational: upload a PDF with a title and category (shown in a modal). */
 export default function DocumentUploadForm({
   action,
   pending,
   error,
+  onCancel,
 }: {
   action: (formData: FormData) => void;
   pending: boolean;
   error?: DocumentError;
+  onCancel: () => void;
 }) {
   const t = useTranslations("projectDetailPage.documents");
   // Checked here too so an oversized file fails before it is sent.
@@ -36,7 +38,6 @@ export default function DocumentUploadForm({
 
   return (
     <form action={action} className={styles.form}>
-      <h3 className={styles.formTitle}>{t("upload")}</h3>
       <div className={styles.field}>
         <label htmlFor="document-file">{t("file")}</label>
         <input
@@ -71,6 +72,9 @@ export default function DocumentUploadForm({
         error={tooLarge ? "file_too_large" : error}
       />
       <div className={styles.actions}>
+        <button type="button" className={styles.secondary} onClick={onCancel}>
+          {t("cancel")}
+        </button>
         <button type="submit" className={styles.primary} disabled={pending || tooLarge}>
           {pending ? t("uploading") : t("submit")}
         </button>

@@ -45,7 +45,7 @@ beforeEach(async () => {
 });
 
 describe("document actions", () => {
-  it("uploads a document and revalidates the project page", async () => {
+  it("uploads a document and revalidates the project", async () => {
     const { project } = await setup();
 
     const state = await addProjectDocumentAction(
@@ -55,7 +55,7 @@ describe("document actions", () => {
     );
 
     expect(state).toEqual({ success: true });
-    expect(revalidatePath).toHaveBeenCalledWith(`/dashboard/projects/${project.id}`);
+    expect(revalidatePath).toHaveBeenCalledWith(`/dashboard/projects/${project.id}`, "layout");
     expect(await getProjectDocuments(project.id)).toEqual({
       documents: [expect.objectContaining({ title: "Contrato", category: "contract" })],
       canManage: true,
