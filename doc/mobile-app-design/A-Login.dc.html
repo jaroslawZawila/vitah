@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>ViTAH · Acceso</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#141413;font-family:'Geist',system-ui,sans-serif;color:#e8e7e2}
+a{color:#8a9b62;text-decoration:none}a:hover{color:#a3b37a}
+input,button{font-family:inherit}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #1e1e1e; padding: 64px 28px 40px; display: flex; flex-direction: column; font-family: 'Geist', system-ui, sans-serif; color: #e8e7e2;">
+  <div style="display: flex; justify-content: flex-end; gap: 4px;">
+    <button type="button" style="min-width: 44px; min-height: 44px; background: none; border: none; color: #e8e7e2; font-size: 12px; letter-spacing: 0.16em; cursor: pointer;">ES</button>
+    <button type="button" style="min-width: 44px; min-height: 44px; background: none; border: none; color: #9a9a94; font-size: 12px; letter-spacing: 0.16em; cursor: pointer;">EN</button>
+  </div>
+  <div style="flex-grow: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;">
+    <div style="font-size: 44px; font-weight: 300; letter-spacing: 0.42em; margin-right: -0.42em;">ViTAH</div>
+    <div style="font-size: 9px; font-weight: 500; letter-spacing: 0.34em; color: #9a9a94;">TECNOLOGÍA PARA VIVIR MEJOR</div>
+  </div>
+  <form style="display: flex; flex-direction: column; gap: 18px;">
+    <div style="font-size: 22px; font-weight: 300; margin-bottom: 4px;">Bienvenido a tu hogar</div>
+    <label style="display: flex; flex-direction: column; gap: 8px; font-size: 11px; font-weight: 500; letter-spacing: 0.2em; color: #9a9a94;">CORREO ELECTRÓNICO
+      <input type="email" value="cliente@vitah.es" style="height: 52px; box-sizing: border-box; padding: 0 16px; background: #262624; border: 1px solid #34342f; border-radius: 8px; color: #e8e7e2; font-size: 16px; letter-spacing: 0;">
+    </label>
+    <label style="display: flex; flex-direction: column; gap: 8px; font-size: 11px; font-weight: 500; letter-spacing: 0.2em; color: #9a9a94;">CONTRASEÑA
+      <input type="password" value="vitah2026" style="height: 52px; box-sizing: border-box; padding: 0 16px; background: #262624; border: 1px solid #34342f; border-radius: 8px; color: #e8e7e2; font-size: 16px; letter-spacing: 0;">
+    </label>
+    <a href="A-Home.dc.html" style="height: 54px; margin-top: 8px; display: flex; align-items: center; justify-content: center; background: #4a5e2c; border-radius: 8px; color: #f5f4f0; font-size: 13px; font-weight: 500; letter-spacing: 0.22em;">ENTRAR</a>
+    <a href="#" style="min-height: 44px; display: flex; align-items: center; justify-content: center; font-size: 14px;">¿Has olvidado tu contraseña?</a>
+  </form>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>
