@@ -5,7 +5,7 @@ import { NextIntlClientProvider } from "next-intl";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import messages from "../../../../messages/es.json";
 import type { StepProps, WizardStep } from "../../components/wizard/types";
-import type { ProjectDraft } from "./draft";
+import type { ProjectDraft, ProjectFlowOptions } from "./draft";
 import NewProjectScreen from "./NewProjectScreen";
 import { PROJECT_STEPS } from "./steps";
 
@@ -14,10 +14,17 @@ vi.mock("next/navigation", () => ({ useRouter: () => router }));
 vi.mock("../../../actions/projects", () => ({ createProject: vi.fn() }));
 const { createProject } = await import("../../../actions/projects");
 
-function renderScreen(steps = PROJECT_STEPS) {
+const ana = { id: "client-1", name: "Ana García", email: "ana@example.com" };
+const luis = { id: "client-2", name: null, email: "luis@example.com" };
+
+/** A manager: no client step. */
+const staffOptions: ProjectFlowOptions = { canAssignClient: false, clients: [] };
+const adminOptions: ProjectFlowOptions = { canAssignClient: true, clients: [ana, luis] };
+
+function renderScreen(options = staffOptions, allSteps = PROJECT_STEPS) {
   return render(
     <NextIntlClientProvider locale="es" messages={messages} timeZone="UTC">
-      <NewProjectScreen steps={steps} />
+      <NewProjectScreen options={options} allSteps={allSteps} />
     </NextIntlClientProvider>,
   );
 }
@@ -56,6 +63,7 @@ describe("NewProjectScreen", () => {
       address: "Calle Mayor 1, Santander",
       startDate: "2026-10-01",
       completionDate: "",
+      clientId: "",
     });
   });
 
@@ -107,7 +115,7 @@ describe("NewProjectScreen", () => {
   it("runs any extra registered step before the review", async () => {
     // Stand-in for a future step such as "style": only the registry changes.
     type Draft = ProjectDraft & { style?: string };
-    const StyleStep = ({ draft, onChange }: StepProps<Draft>) => (
+    const StyleStep = ({ draft, onChange }: StepProps<Draft, ProjectFlowOptions>) => (
       <label>
         Style
         <input
@@ -118,7 +126,7 @@ describe("NewProjectScreen", () => {
       </label>
     );
     const StyleSummary = ({ draft }: { draft: Draft }) => <p>Style: {draft.style}</p>;
-    const styleStep: WizardStep<Draft> = {
+    const styleStep: WizardStep<Draft, ProjectFlowOptions> = {
       id: "style",
       titleKey: "review", // any existing title key works for the test
       Component: StyleStep,
@@ -126,7 +134,7 @@ describe("NewProjectScreen", () => {
       isComplete: (draft) => Boolean(draft.style),
     };
     vi.mocked(createProject).mockResolvedValue({ success: true, id: "new-id" });
-    renderScreen([...PROJECT_STEPS, styleStep] as typeof PROJECT_STEPS);
+    renderScreen(staffOptions, [...PROJECT_STEPS, styleStep] as typeof PROJECT_STEPS);
 
     await fillDetails();
     await next();
@@ -139,5 +147,89 @@ describe("NewProjectScreen", () => {
     await waitFor(() =>
       expect(createProject).toHaveBeenCalledWith(expect.objectContaining({ style: "nordic" })),
     );
+  });
+});
+
+describe("NewProjectScreen client step", () => {
+  it("lets an admin pick a client and creates the project with them", async () => {
+    vi.mocked(createProject).mockResolvedValue({ success: true, id: "new-id" });
+    renderScreen(adminOptions);
+
+    await fillDetails();
+    await next();
+    expect(screen.getByText("Paso 2 de 3 · Cliente")).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: /Sin cliente por ahora/ })).toBeChecked();
+
+    await userEvent.click(screen.getByRole("radio", { name: /Ana García/ }));
+    await next();
+
+    expect(screen.getByText("Ana García (ana@example.com)")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Crear proyecto" }));
+    await waitFor(() =>
+      expect(createProject).toHaveBeenCalledWith(expect.objectContaining({ clientId: "client-1" })),
+    );
+  });
+
+  it("allows creating without a client", async () => {
+    vi.mocked(createProject).mockResolvedValue({ success: true, id: "new-id" });
+    renderScreen(adminOptions);
+
+    await fillDetails();
+    await next();
+    await next();
+
+    expect(screen.getByText("Sin cliente por ahora")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Crear proyecto" }));
+    await waitFor(() =>
+      expect(createProject).toHaveBeenCalledWith(expect.objectContaining({ clientId: "" })),
+    );
+  });
+
+  it("returns to the client step when the client was taken meanwhile", async () => {
+    vi.mocked(createProject).mockResolvedValue({ error: "client_has_project" });
+    renderScreen(adminOptions);
+    await fillDetails();
+    await next();
+    await userEvent.click(screen.getByRole("radio", { name: /luis@example.com/ }));
+    await next();
+
+    await userEvent.click(screen.getByRole("button", { name: "Crear proyecto" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("ya está asignado a otro proyecto");
+    expect(screen.getByText("Paso 2 de 3 · Cliente")).toBeInTheDocument();
+  });
+
+  it("explains when there are no free clients", async () => {
+    renderScreen({ canAssignClient: true, clients: [] });
+    await fillDetails();
+    await next();
+
+    expect(screen.getByText(/No hay clientes libres/)).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: /Sin cliente por ahora/ })).toBeChecked();
+  });
+
+  it("filters a long client list", async () => {
+    const many = Array.from({ length: 8 }, (_, i) => ({
+      id: `c${i}`,
+      name: `Cliente ${i}`,
+      email: `c${i}@example.com`,
+    }));
+    renderScreen({ canAssignClient: true, clients: many });
+    await fillDetails();
+    await next();
+
+    await userEvent.type(screen.getByLabelText("Buscar cliente"), "c7@");
+
+    expect(screen.getByRole("radio", { name: /Cliente 7/ })).toBeInTheDocument();
+    expect(screen.queryByRole("radio", { name: /Cliente 1/ })).not.toBeInTheDocument();
+  });
+
+  it("is hidden from non-admins", async () => {
+    renderScreen(staffOptions);
+    await fillDetails();
+    await next();
+
+    expect(screen.getByText("Paso 2 de 2 · Revisión")).toBeInTheDocument();
+    expect(screen.queryByText("Cliente")).not.toBeInTheDocument();
   });
 });

@@ -4,7 +4,7 @@ import type { WizardStep } from "./types";
 // Wizard state and navigation, without any UI. Positions 0..steps.length-1
 // are the steps; position steps.length is the review screen.
 
-export function useWizard<D>(steps: readonly WizardStep<D>[], initialDraft: D) {
+export function useWizard<D, O>(steps: readonly WizardStep<D, O>[], initialDraft: D) {
   const [draft, setDraft] = useState(initialDraft);
   const [position, setPosition] = useState(0);
 

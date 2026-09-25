@@ -200,6 +200,7 @@
     "creating": "Creando…",
     "steps": {
       "details": "Datos del proyecto",
+      "client": "Cliente",
       "review": "Revisión"
     },
     "details": {
@@ -214,7 +215,20 @@
       "missing_fields": "La referencia y la dirección son obligatorias.",
       "ref_exists": "Ya existe un proyecto con esa referencia.",
       "invalid_date": "Introduce una fecha válida.",
-      "generic": "No se ha podido crear el proyecto. Inténtalo de nuevo."
+      "generic": "No se ha podido crear el proyecto. Inténtalo de nuevo.",
+      "client_not_found": "El cliente ya no está disponible. Elige otro.",
+      "client_has_project": "Ese cliente ya está asignado a otro proyecto. Elige otro.",
+      "forbidden": "Solo los administradores pueden asignar clientes."
+    },
+    "client": {
+      "intro": "Elige el cliente que verá este proyecto en la app móvil. Puedes asignarlo más tarde desde la página del proyecto.",
+      "label": "Cliente",
+      "none": "Sin cliente por ahora",
+      "noneHint": "Se puede asignar más tarde",
+      "search": "Buscar cliente",
+      "searchPlaceholder": "Nombre o email",
+      "noClients": "No hay clientes libres. Créalos en la pestaña Clientes.",
+      "noMatches": "Ningún cliente coincide con la búsqueda."
     }
   }
 }

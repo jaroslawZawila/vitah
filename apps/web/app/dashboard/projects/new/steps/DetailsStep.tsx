@@ -3,11 +3,10 @@
 import { useFormatter, useTranslations } from "next-intl";
 import { fieldStyles as f } from "../../../components/wizard/fields";
 import SummaryList from "../../../components/wizard/SummaryList";
-import type { StepProps } from "../../../components/wizard/types";
-import type { ProjectDraft } from "../draft";
+import type { ProjectDraft, ProjectStepProps } from "../draft";
 
 /** Step: the basics the mobile app shows — reference, address and dates. */
-export function DetailsStep({ draft, onChange }: StepProps<ProjectDraft>) {
+export function DetailsStep({ draft, onChange }: ProjectStepProps) {
   const t = useTranslations("newProjectPage.details");
 
   return (

@@ -3,24 +3,29 @@
 // Container: the only part of the flow that talks to the server. It runs the
 // wizard over PROJECT_STEPS and submits the draft on the review screen.
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { createProject } from "../../../actions/projects";
 import ReviewStep from "../../components/wizard/ReviewStep";
 import Wizard from "../../components/wizard/Wizard";
+import { activeSteps } from "../../components/wizard/types";
 import { useWizard } from "../../components/wizard/useWizard";
-import { EMPTY_PROJECT_DRAFT, type ProjectDraft } from "./draft";
+import { EMPTY_PROJECT_DRAFT, type ProjectFlowOptions } from "./draft";
 import { PROJECT_STEPS } from "./steps";
 
 export default function NewProjectScreen({
-  steps = PROJECT_STEPS,
+  options,
+  allSteps = PROJECT_STEPS,
 }: {
-  steps?: typeof PROJECT_STEPS;
+  options: ProjectFlowOptions;
+  /** Overridable for tests. */
+  allSteps?: typeof PROJECT_STEPS;
 }) {
   const t = useTranslations("newProjectPage");
   const router = useRouter();
-  const wizard = useWizard<ProjectDraft>(steps, EMPTY_PROJECT_DRAFT);
+  const steps = useMemo(() => activeSteps(allSteps, options), [allSteps, options]);
+  const wizard = useWizard(steps, EMPTY_PROJECT_DRAFT);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -78,9 +83,14 @@ export default function NewProjectScreen({
       }}
     >
       {Step ? (
-        <Step draft={wizard.draft} onChange={wizard.update} />
+        <Step draft={wizard.draft} onChange={wizard.update} options={options} />
       ) : (
-        <ReviewStep sections={sections} draft={wizard.draft} onEdit={wizard.goTo} />
+        <ReviewStep
+          sections={sections}
+          draft={wizard.draft}
+          options={options}
+          onEdit={wizard.goTo}
+        />
       )}
     </Wizard>
   );

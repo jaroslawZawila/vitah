@@ -1,6 +1,7 @@
 import { db, projects, eq, and, desc } from "@repo/db";
-import type { Ctx } from "./context";
+import { requireAdmin, type Ctx } from "./context";
 import { invalid, notFound } from "./errors";
+import { clientConflict, requireAssignableClient } from "./project-client";
 
 // Every function here takes `ctx` and filters by `ctx.tenantId`.
 // A project holds exactly what the client's mobile app shows.
@@ -44,13 +45,18 @@ export async function getProject(ctx: Ctx, id: string) {
 export type ProjectListItem = Awaited<ReturnType<typeof listProjects>>[number];
 export type ProjectDetail = NonNullable<Awaited<ReturnType<typeof getProject>>>;
 
-/** Body: { ref, address, startDate?, completionDate? } — dates as YYYY-MM-DD. */
+/**
+ * Body: { ref, address, startDate?, completionDate?, clientId? } — dates as
+ * YYYY-MM-DD. `clientId` (admin only) attaches an existing, free client.
+ */
 export async function createProject(ctx: Ctx, input: Record<string, unknown>) {
   const ref = str(input.ref);
   const address = str(input.address);
   if (!ref || !address) throw invalid("missing_fields");
   const startDate = date(input.startDate) ?? null;
   const completionDate = date(input.completionDate) ?? null;
+  const clientId = str(input.clientId) ?? null;
+  if (clientId) requireAdmin(ctx);
 
   const existing = await db.query.projects.findFirst({
     where: and(eq(projects.tenantId, ctx.tenantId), eq(projects.ref, ref)),
@@ -58,13 +64,28 @@ export async function createProject(ctx: Ctx, input: Record<string, unknown>) {
   });
   if (existing) throw invalid("ref_exists");
 
-  const [created] = await db
-    .insert(projects)
-    .values({ tenantId: ctx.tenantId, ref, address, startDate, completionDate })
-    .returning({ id: projects.id });
-  if (!created) throw new Error("Project insert returned no row");
+  try {
+    return await db.transaction(async (tx) => {
+      if (clientId) await requireAssignableClient(tx, ctx.tenantId, clientId);
 
-  return { id: created.id };
+      const [created] = await tx
+        .insert(projects)
+        .values({
+          tenantId: ctx.tenantId,
+          ref,
+          address,
+          startDate,
+          completionDate,
+          clientUserId: clientId,
+        })
+        .returning({ id: projects.id });
+      if (!created) throw new Error("Project insert returned no row");
+
+      return { id: created.id };
+    });
+  } catch (error) {
+    throw clientConflict(error);
+  }
 }
 
 /**

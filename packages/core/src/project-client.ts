@@ -60,6 +60,33 @@ export async function getClientProject(
   };
 }
 
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+/**
+ * Throws `client_not_found` unless `clientId` is an active client of the
+ * tenant. Whether they're free is enforced by the unique `client_user_id`
+ * (see `clientConflict`).
+ */
+export async function requireAssignableClient(tx: Tx, tenantId: string, clientId: string) {
+  const client = await tx.query.users.findFirst({
+    where: and(
+      eq(users.id, clientId),
+      eq(users.tenantId, tenantId),
+      isClientUser,
+      eq(users.active, true),
+    ),
+    columns: { id: true },
+  });
+  if (!client) fail("client_not_found");
+}
+
+/** Maps "client already on another project" to `client_has_project`. */
+export function clientConflict(error: unknown): unknown {
+  return isUniqueViolation(error, "projects_client_user_unique")
+    ? new CoreError("client_has_project", STATUS.client_has_project)
+    : error;
+}
+
 /** Active clients of the tenant that aren't attached to any project yet. */
 export async function listAssignableClients(ctx: Ctx): Promise<ClientOption[]> {
   requireAdmin(ctx);
@@ -100,16 +127,7 @@ export async function assignProjectClient(
       if (!project) fail("project_not_found");
       if (project.clientUserId) fail("client_already_attached");
 
-      const client = await tx.query.users.findFirst({
-        where: and(
-          eq(users.id, clientId),
-          eq(users.tenantId, ctx.tenantId),
-          isClientUser,
-          eq(users.active, true),
-        ),
-        columns: { id: true },
-      });
-      if (!client) fail("client_not_found");
+      await requireAssignableClient(tx, ctx.tenantId, clientId);
 
       await tx
         .update(projects)
@@ -117,9 +135,7 @@ export async function assignProjectClient(
         .where(eq(projects.id, projectId));
     });
   } catch (error) {
-    // projects.client_user_id is unique: the client is on another project.
-    if (isUniqueViolation(error)) fail("client_has_project");
-    throw error;
+    throw clientConflict(error);
   }
 
   return { projectId };

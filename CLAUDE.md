@@ -76,7 +76,8 @@ route. In the portal, keep UI separate from logic: a page's container component 
 `ClientsScreen.tsx`) is the only file that calls server actions; presentational components in
 `components/` take data and callbacks as props only. Multi-step flows use `dashboard/components/wizard`: to add a
 step to new-project creation, extend `ProjectDraft` and core `createProject`, write a step component
-+ summary in `projects/new/steps/`, and register it in `PROJECT_STEPS`. Keep `/api/v1` backwards compatible — installed mobile builds lag behind.
++ summary in `projects/new/steps/`, and register it in `PROJECT_STEPS`. Server data a step needs goes in
+`ProjectFlowOptions` (loaded in `projects/new/page.tsx`); `when` hides a step (e.g. the client step for non-admins). Keep `/api/v1` backwards compatible — installed mobile builds lag behind.
 
 ### Mobile-first responsive design (apps/web)
 

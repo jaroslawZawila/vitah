@@ -7,13 +7,20 @@ const BCRYPT_COST = Number(process.env.BCRYPT_COST ?? 12);
 
 export const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-/** True for a Postgres unique-constraint violation (e.g. a taken email). */
-export function isUniqueViolation(error: unknown): boolean {
+type PgError = { code?: unknown; constraint_name?: unknown };
+
+function pgError(error: unknown): PgError | undefined {
   // Drizzle wraps driver errors, keeping the original as `cause`.
   const candidates = [error, (error as { cause?: unknown } | null)?.cause];
-  return candidates.some(
-    (e) => typeof e === "object" && e !== null && (e as { code?: unknown }).code === "23505",
+  return candidates.find(
+    (e): e is PgError => typeof e === "object" && e !== null && (e as PgError).code === "23505",
   );
+}
+
+/** True for a Postgres unique-constraint violation (e.g. a taken email). */
+export function isUniqueViolation(error: unknown, constraint?: string): boolean {
+  const pg = pgError(error);
+  return pg !== undefined && (constraint === undefined || pg.constraint_name === constraint);
 }
 
 export function normalizeEmail(email: string): string {

@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { createTestProject, createTestTenant, createTestUser, resetDatabase } from "@repo/db/testing";
+import {
+  createTestProject,
+  createTestTenant,
+  createTestUser,
+  resetDatabase,
+} from "@repo/db/testing";
 import { projectsService as svc, type Ctx } from "../src";
 
 async function setup() {
@@ -16,6 +21,93 @@ async function otherTenantCtx(): Promise<Ctx> {
 
 beforeEach(async () => {
   await resetDatabase();
+});
+
+describe("createProject with a client", () => {
+  const base = { ref: "VTH-26-020", address: "Calle Mayor 1, Santander" };
+
+  it("attaches a free client in the same step", async () => {
+    const { tenant, ctx } = await setup();
+    const client = await createTestUser(tenant.id, { role: "client" });
+
+    const { id } = await svc.createProject(ctx, {
+      ...base,
+      clientId: client.id,
+    });
+
+    expect((await svc.getProject(ctx, id))?.client?.id).toBe(client.id);
+  });
+
+  it("treats an empty clientId as no client", async () => {
+    const { ctx } = await setup();
+
+    const { id } = await svc.createProject(ctx, { ...base, clientId: "" });
+
+    expect((await svc.getProject(ctx, id))?.clientUserId).toBeNull();
+  });
+
+  it("is admin only when a client is given", async () => {
+    const { tenant, ctx } = await setup();
+    const client = await createTestUser(tenant.id, { role: "client" });
+
+    await expect(
+      svc.createProject(
+        { ...ctx, role: "manager" },
+        { ...base, clientId: client.id },
+      ),
+    ).rejects.toMatchObject({ code: "forbidden", status: 403 });
+    expect(await svc.listProjects(ctx)).toEqual([]);
+  });
+
+  it.each([
+    [
+      "another tenant's client",
+      async () =>
+        (
+          await createTestUser((await createTestTenant()).id, {
+            role: "client",
+          })
+        ).id,
+    ],
+    [
+      "a staff user",
+      async (tenantId: string) => (await createTestUser(tenantId)).id,
+    ],
+    [
+      "an inactive client",
+      async (tenantId: string) =>
+        (await createTestUser(tenantId, { role: "client", active: false })).id,
+    ],
+  ])(
+    "rejects %s without creating the project",
+    async (_label, makeClientId) => {
+      const { tenant, ctx } = await setup();
+      const clientId = await makeClientId(tenant.id);
+
+      await expect(
+        svc.createProject(ctx, { ...base, clientId }),
+      ).rejects.toMatchObject({
+        code: "client_not_found",
+        status: 404,
+      });
+      expect(await svc.listProjects(ctx)).toEqual([]);
+    },
+  );
+
+  it("rejects a client already on another project", async () => {
+    const { tenant, ctx } = await setup();
+    const client = await createTestUser(tenant.id, { role: "client" });
+    await svc.createProject(ctx, { ...base, clientId: client.id });
+
+    await expect(
+      svc.createProject(ctx, {
+        ...base,
+        ref: "VTH-26-021",
+        clientId: client.id,
+      }),
+    ).rejects.toMatchObject({ code: "client_has_project", status: 409 });
+    expect(await svc.listProjects(ctx)).toHaveLength(1);
+  });
 });
 
 describe("createProject", () => {
@@ -44,9 +136,16 @@ describe("createProject", () => {
   it("leaves dates empty when they are not given", async () => {
     const { ctx } = await setup();
 
-    const { id } = await svc.createProject(ctx, { ref: "VTH-1", address: "Calle 1", startDate: "" });
+    const { id } = await svc.createProject(ctx, {
+      ref: "VTH-1",
+      address: "Calle 1",
+      startDate: "",
+    });
 
-    expect(await svc.getProject(ctx, id)).toMatchObject({ startDate: null, completionDate: null });
+    expect(await svc.getProject(ctx, id)).toMatchObject({
+      startDate: null,
+      completionDate: null,
+    });
   });
 
   it.each([
@@ -67,7 +166,11 @@ describe("createProject", () => {
     const { ctx } = await setup();
 
     await expect(
-      svc.createProject(ctx, { ref: "VTH-1", address: "Calle 1", startDate: "not-a-date" }),
+      svc.createProject(ctx, {
+        ref: "VTH-1",
+        address: "Calle 1",
+        startDate: "not-a-date",
+      }),
     ).rejects.toMatchObject({ code: "invalid_date", status: 400 });
   });
 
@@ -75,11 +178,14 @@ describe("createProject", () => {
     const { ctx } = await setup();
     await svc.createProject(ctx, { ref: "VTH-1", address: "Calle 1" });
 
-    await expect(svc.createProject(ctx, { ref: "VTH-1", address: "Calle 2" })).rejects.toMatchObject(
-      { code: "ref_exists", status: 400 },
-    );
     await expect(
-      svc.createProject(await otherTenantCtx(), { ref: "VTH-1", address: "Calle 2" }),
+      svc.createProject(ctx, { ref: "VTH-1", address: "Calle 2" }),
+    ).rejects.toMatchObject({ code: "ref_exists", status: 400 });
+    await expect(
+      svc.createProject(await otherTenantCtx(), {
+        ref: "VTH-1",
+        address: "Calle 2",
+      }),
     ).resolves.toHaveProperty("id");
   });
 });
@@ -87,8 +193,13 @@ describe("createProject", () => {
 describe("listProjects / getProject", () => {
   it("returns only the caller's tenant projects, newest first, with their client", async () => {
     const { tenant, ctx } = await setup();
-    const client = await createTestUser(tenant.id, { role: "client", name: "Ana" });
-    const older = await createTestProject(tenant.id, { createdAt: new Date("2026-01-01") });
+    const client = await createTestUser(tenant.id, {
+      role: "client",
+      name: "Ana",
+    });
+    const older = await createTestProject(tenant.id, {
+      createdAt: new Date("2026-01-01"),
+    });
     const newer = await createTestProject(tenant.id, {
       createdAt: new Date("2026-02-01"),
       clientUserId: client.id,
@@ -97,7 +208,11 @@ describe("listProjects / getProject", () => {
 
     const list = await svc.listProjects(ctx);
     expect(list.map((p) => p.id)).toEqual([newer.id, older.id]);
-    expect(list[0]!.client).toEqual({ id: client.id, name: "Ana", email: client.email });
+    expect(list[0]!.client).toEqual({
+      id: client.id,
+      name: "Ana",
+      email: client.email,
+    });
     expect(list[1]!.client).toBeNull();
 
     expect(await svc.getProject(ctx, foreign.id)).toBeNull();
@@ -150,7 +265,9 @@ describe("updateProject", () => {
     const { tenant, ctx } = await setup();
     const project = await createTestProject(tenant.id);
 
-    await expect(svc.updateProject(ctx, project.id, { address: " " })).rejects.toMatchObject({
+    await expect(
+      svc.updateProject(ctx, project.id, { address: " " }),
+    ).rejects.toMatchObject({
       code: "missing_fields",
     });
   });
@@ -160,9 +277,19 @@ describe("updateProject", () => {
     const project = await createTestProject(tenant.id, { address: "Calle 1" });
 
     await expect(
-      svc.updateProject(await otherTenantCtx(), project.id, { address: "Hacked" }),
+      svc.updateProject(await otherTenantCtx(), project.id, {
+        address: "Hacked",
+      }),
     ).rejects.toMatchObject({ code: "not_found", status: 404 });
-    expect((await svc.listProjects({ tenantId: tenant.id, userId: "x", role: "admin" }))[0]).toMatchObject({
+    expect(
+      (
+        await svc.listProjects({
+          tenantId: tenant.id,
+          userId: "x",
+          role: "admin",
+        })
+      )[0],
+    ).toMatchObject({
       address: "Calle 1",
     });
   });
@@ -173,7 +300,9 @@ describe("deleteProject", () => {
     const { tenant, ctx } = await setup();
     const project = await createTestProject(tenant.id);
 
-    await expect(svc.deleteProject(ctx, project.id)).resolves.toEqual({ projectId: project.id });
+    await expect(svc.deleteProject(ctx, project.id)).resolves.toEqual({
+      projectId: project.id,
+    });
     expect(await svc.getProject(ctx, project.id)).toBeNull();
   });
 
@@ -181,7 +310,9 @@ describe("deleteProject", () => {
     const { tenant, ctx } = await setup();
     const project = await createTestProject(tenant.id);
 
-    await expect(svc.deleteProject(await otherTenantCtx(), project.id)).rejects.toMatchObject({
+    await expect(
+      svc.deleteProject(await otherTenantCtx(), project.id),
+    ).rejects.toMatchObject({
       code: "not_found",
     });
     expect(await svc.getProject(ctx, project.id)).not.toBeNull();

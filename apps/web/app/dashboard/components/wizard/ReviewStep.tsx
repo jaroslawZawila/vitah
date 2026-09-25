@@ -4,20 +4,22 @@ import type { ComponentType } from "react";
 import { useTranslations } from "next-intl";
 import styles from "./wizard.module.css";
 
-export type ReviewSection<D> = {
+export type ReviewSection<D, O> = {
   id: string;
   title: string;
-  Summary: ComponentType<{ draft: D }>;
+  Summary: ComponentType<{ draft: D; options: O }>;
 };
 
 /** Presentational: every step's summary, each with an "Edit" link back to it. */
-export default function ReviewStep<D>({
+export default function ReviewStep<D, O>({
   sections,
   draft,
+  options,
   onEdit,
 }: {
-  sections: ReviewSection<D>[];
+  sections: ReviewSection<D, O>[];
   draft: D;
+  options: O;
   onEdit: (index: number) => void;
 }) {
   const t = useTranslations("wizard");
@@ -40,7 +42,7 @@ export default function ReviewStep<D>({
               {t("edit")}
             </button>
           </div>
-          <Summary draft={draft} />
+          <Summary draft={draft} options={options} />
         </section>
       ))}
     </div>

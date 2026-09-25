@@ -200,6 +200,7 @@
     "creating": "Creating…",
     "steps": {
       "details": "Project details",
+      "client": "Client",
       "review": "Review"
     },
     "details": {
@@ -214,7 +215,20 @@
       "missing_fields": "Reference and address are required.",
       "ref_exists": "A project with that reference already exists.",
       "invalid_date": "Enter a valid date.",
-      "generic": "The project couldn't be created. Please try again."
+      "generic": "The project couldn't be created. Please try again.",
+      "client_not_found": "That client is no longer available. Choose another one.",
+      "client_has_project": "That client is already assigned to another project. Choose another one.",
+      "forbidden": "Only admins can assign clients."
+    },
+    "client": {
+      "intro": "Choose the client who will see this project in the mobile app. You can also assign one later from the project page.",
+      "label": "Client",
+      "none": "No client for now",
+      "noneHint": "Can be assigned later",
+      "search": "Search clients",
+      "searchPlaceholder": "Name or email",
+      "noClients": "There are no free clients. Create them on the Clients tab.",
+      "noMatches": "No client matches your search."
     }
   }
 }
