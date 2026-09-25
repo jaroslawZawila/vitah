@@ -1,5 +1,4 @@
 import { and, db, desc, eq, projectPhotos, projects, users } from "@repo/db";
-import sharp from "sharp";
 import type { Ctx } from "./context";
 import {
   MAX_CAPTION_LENGTH,
@@ -43,6 +42,10 @@ const thumbPath = (pathname: string) =>
  * its thumbnail: upright (EXIF orientation applied), no metadata.
  */
 async function readImage(file: Blob) {
+  // Loaded on first upload, not with the module: @repo/core is imported by
+  // every route (and the proxy), and sharp is a native library. If it can't
+  // load, uploads fail with a server error; nothing else is affected.
+  const { default: sharp } = await import("sharp");
   try {
     const image = sharp(Buffer.from(await file.arrayBuffer()));
     const { format } = await image.metadata();
