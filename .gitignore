@@ -41,3 +41,6 @@ yarn-error.log*
 # Claude Code (personal settings, worktrees)
 .claude/settings.local.json
 .claude/worktrees/
+
+# Local scratch
+feature_photo
