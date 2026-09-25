@@ -74,6 +74,15 @@ The portal and the mobile app share one backend. Layers:
 When adding a feature: write it in `packages/core`, then add the server action and the `/api/v1`
 route. Keep `/api/v1` backwards compatible — installed mobile builds lag behind.
 
+### Mobile app design (apps/mobile) — MUST follow
+
+The approved client app design is **Concept A "Grafito"**, documented in
+`doc/mobile-app-design/README.md`, with one `A-*.dc.html` mockup per screen in the same folder
+(live prototype: https://claude.ai/artifact/DjsuyQ9747VaRm7toZmpBj, top row only).
+Before building or changing any mobile screen or feature, read that README and the screen's mockup,
+and match its layout, navigation (5-tab bar), colours, type scale and components. For a feature the
+mockups don't cover, extend the same visual language. Concept B on the canvas was rejected.
+
 ### Mobile-first responsive design (apps/web)
 
 `apps/web` must always be mobile-friendly:
@@ -223,3 +232,4 @@ On Vercel, `POSTGRES_URL` is injected automatically from the linked Vercel Postg
 Design docs in `/doc/`:
 - `ViTAH_Libro_de_Estilo_v1.pdf` — full brand book (colors, typography, logo usage, voice & tone)
 - `Diseño Showroom ViTAH- Experiencia de Vivienda Sal....pdf` — showroom experience design
+- `mobile-app-design/` — approved mobile app design (Concept A), spec + per-screen mockups
