@@ -45,6 +45,25 @@ pnpm db:seed                         # Seed tenant, admin, one project + its app
 pnpm db:studio                       # Open Drizzle Studio (DB browser)
 ```
 
+## Ways of Working
+
+Every change goes through this, in order. Nothing gets committed until every step is done.
+
+1. **Implement the whole feature.** A feature is done only when every surface it touches works:
+   - **Platform**: `packages/core` logic, then the server action, the `/api/v1` route (backwards compatible),
+     the portal UI, and the DB schema. Prod changes use additive SQL only (no plain `db:push`)
+   - **App** (`apps/mobile`): the screens, API client and types (from `@repo/core/contract`), following
+     `doc/mobile-app-design/`
+   - Both `es.json` and `en.json` for any new text. Don't leave a half-done side: if the app needs it,
+     build the app part too. If a feature really is web-only or app-only, say so explicitly
+2. **Test it.** All new or changed code has tests: core (Vitest, real DB), server actions and
+   `/api/v1` routes (Vitest), and mobile (jest-expo). Cover the happy path, errors and tenant isolation.
+3. **Review and simplify.** Run `/simplify` on the diff, then `/code-review`, and fix what they find.
+   Re-run the tests afterwards.
+4. **Green, then commit.** `pnpm test`, `pnpm exec turbo check-types` and `pnpm exec turbo lint` must all
+   pass (DB tests need `pnpm db:up`). A Claude Code hook (`.claude/hooks/commit-gate.sh`) runs all
+   three on every `git commit` and blocks the commit if any of them fail. Never bypass it or skip failing tests.
+
 ## Tech Stack
 
 - **Next.js 16.2.0** (App Router, Turbopack)
