@@ -224,6 +224,9 @@ export const projectPhotos = pgTable(
     pathname: text("pathname").unique().notNull(),
     contentType: text("content_type").notNull(),
     sizeBytes: integer("size_bytes").notNull(),
+    // Size of the small copy for grids, stored next to the photo as
+    // "<id>.thumb.webp". Null for photos uploaded before thumbnails existed.
+    thumbSizeBytes: integer("thumb_size_bytes"),
     uploadedById: text("uploaded_by_id").references(() => users.id, {
       onDelete: "set null",
     }),

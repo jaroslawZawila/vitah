@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createTestProject,
   createTestTenant,
@@ -8,7 +8,7 @@ import {
 import { createMobileToken } from "@repo/auth/mobile";
 import { db, eq, users } from "@repo/db";
 import { photosService, type Ctx } from "@repo/core";
-import { files } from "@repo/core/testing";
+import { files, testImage } from "@repo/core/testing";
 import { GET as list } from "./route";
 import { GET as download } from "./[id]/route";
 
@@ -17,11 +17,14 @@ import { GET as download } from "./[id]/route";
 vi.mock("@repo/auth", () => ({ auth: vi.fn() }));
 vi.mock("@repo/core/storage", () => import("@repo/core/testing"));
 
-const JPEG = new Uint8Array([0xff, 0xd8, 0xff, 0xe0]);
-const jpeg = () => new File([JPEG, "pixels"], "f.jpg", { type: "image/jpeg" });
+let photo: File;
 
-function request(token?: string) {
-  return new Request("http://localhost/api/mobile/photos", {
+beforeAll(async () => {
+  photo = await testImage("jpeg");
+});
+
+function request(token?: string, query = "") {
+  return new Request(`http://localhost/api/mobile/photos${query}`, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
 }
@@ -35,7 +38,7 @@ async function setup() {
   const ctx: Ctx = { tenantId: tenant.id, userId: admin.id, role: "admin" };
   const { photoId } = await photosService.addPhoto(ctx, project.id, {
     caption: "Fachada sur",
-    file: jpeg(),
+    file: photo,
   });
   const token = await createMobileToken({
     sub: client.id,
@@ -65,7 +68,7 @@ describe("GET /api/mobile/photos", () => {
         {
           id: photoId,
           caption: "Fachada sur",
-          sizeBytes: jpeg().size,
+          sizeBytes: photo.size,
           uploadedAt: expect.any(String),
         },
       ],
@@ -93,7 +96,20 @@ describe("GET /api/mobile/photos/:id", () => {
 
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toBe("image/jpeg");
-    expect(new Uint8Array(await res.arrayBuffer()).slice(0, 4)).toEqual(JPEG);
+    expect(new Uint8Array(await res.arrayBuffer())).toEqual(
+      new Uint8Array(await photo.arrayBuffer()),
+    );
+  });
+
+  it("streams the thumbnail with ?size=thumb", async () => {
+    const { photoId, token } = await setup();
+
+    const res = await download(request(token, "?size=thumb"), {
+      params: Promise.resolve({ id: photoId }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe("image/webp");
   });
 
   it("returns 404 for another client's photo", async () => {

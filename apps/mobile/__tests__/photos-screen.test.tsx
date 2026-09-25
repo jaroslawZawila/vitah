@@ -55,12 +55,12 @@ describe("PhotosScreen", () => {
     expect(screen.getByText("Fachada sur")).toBeOnTheScreen();
   });
 
-  it("loads each image with the client's token", () => {
+  it("loads thumbnails in the grid with the client's token", () => {
     render(<PhotosScreen />);
 
     const images = screen.UNSAFE_getAllByType(Image);
     expect(images[0]?.props.source).toEqual({
-      uri: expect.stringMatching(/\/api\/mobile\/photos\/p1$/),
+      uri: expect.stringMatching(/\/api\/mobile\/photos\/p1\?size=thumb$/),
       headers: { Authorization: "Bearer tok" },
     });
   });
@@ -76,6 +76,9 @@ describe("PhotosScreen", () => {
 
     fireEvent.press(screen.getByRole("imagebutton", { name: "Aislamiento" }));
     expect(screen.getByRole("button", { name: "Cerrar" })).toBeOnTheScreen();
+    // The viewer shows the original.
+    const sources = screen.UNSAFE_getAllByType(Image).map((image) => image.props.source.uri);
+    expect(sources).toContainEqual(expect.stringMatching(/\/api\/mobile\/photos\/p3$/));
     // On the tile and, now, under the full-size photo.
     expect(screen.getAllByText("Aislamiento")).toHaveLength(2);
 

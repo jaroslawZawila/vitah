@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import sharp from "sharp";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { db, eq, projectPhotos, projects } from "@repo/db";
 import {
   createTestPhoto,
@@ -7,17 +8,23 @@ import {
   createTestUser,
   resetDatabase,
 } from "@repo/db/testing";
-import { MAX_PHOTO_BYTES, photosService as svc, projectsService, type Ctx } from "../src";
-import { files } from "../src/testing";
+import {
+  MAX_PHOTO_BYTES,
+  parsePhotoSize,
+  photoSizeQuery,
+  photosService as svc,
+  projectsService,
+  type Ctx,
+} from "../src";
+import { files, testImage } from "../src/testing";
 
 vi.mock("../src/storage", () => import("../src/testing"));
 
-const JPEG = [0xff, 0xd8, 0xff, 0xe0];
-const PNG = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
-const image = (magic: number[], name = "fachada.jpg") =>
-  new File([new Uint8Array(magic), "pixels"], name, { type: "image/jpeg" });
-const jpeg = () => image(JPEG);
-const webp = () => new File(["RIFF\0\0\0\0WEBPVP8 "], "obra.webp");
+let photo: File; // a 1600×1200 JPEG
+
+beforeAll(async () => {
+  photo = await testImage();
+});
 
 /** A tenant with an admin caller, a project, and its client. */
 async function setup() {
@@ -30,7 +37,7 @@ async function setup() {
 }
 
 const upload = (ctx: Ctx, projectId: string, input: Record<string, unknown> = {}) =>
-  svc.addPhoto(ctx, projectId, { caption: "Fachada sur", file: jpeg(), ...input });
+  svc.addPhoto(ctx, projectId, { caption: "Fachada sur", file: photo, ...input });
 
 async function bytes(stream: ReadableStream<Uint8Array>) {
   return new Uint8Array(await new Response(stream).arrayBuffer());
@@ -53,18 +60,51 @@ describe("addPhoto", () => {
       projectId: project.id,
       caption: "Fachada sur",
       contentType: "image/jpeg",
-      sizeBytes: jpeg().size,
+      sizeBytes: photo.size,
       uploadedById: ctx.userId,
     });
     expect(row?.pathname).toBe(`tenants/${tenant.id}/projects/${project.id}/photos/${photoId}.jpg`);
     expect(files.has(row!.pathname)).toBe(true);
   });
 
-  it.each([
-    ["image/png", "png", image(PNG, "x.png")],
-    ["image/webp", "webp", webp()],
-  ])("detects %s from the file's bytes", async (contentType, extension, file) => {
+  it("makes an upright WebP thumbnail of at most 800 px", async () => {
+    const { tenant, project, ctx } = await setup();
+    // Stored landscape; EXIF orientation 6 turns it portrait.
+    const rotated = await sharp(await photo.arrayBuffer()).withMetadata({ orientation: 6 }).toBuffer();
+
+    const { photoId } = await upload(ctx, project.id, { file: new File([new Uint8Array(rotated)], "x.jpg") });
+
+    const row = await db.query.projectPhotos.findFirst({ where: eq(projectPhotos.id, photoId) });
+    const thumb = files.get(
+      `tenants/${tenant.id}/projects/${project.id}/photos/${photoId}.thumb.webp`,
+    )!;
+    expect(row?.thumbSizeBytes).toBe(thumb.size);
+    expect(thumb.size).toBeLessThan(photo.size);
+    const meta = await sharp(await thumb.arrayBuffer()).metadata();
+    expect(meta).toMatchObject({ format: "webp", width: 600, height: 800 });
+    expect(meta.orientation).toBeUndefined();
+  });
+
+  it("does not enlarge small photos for the thumbnail", async () => {
     const { project, ctx } = await setup();
+
+    const { photoId } = await upload(ctx, project.id, { file: await testImage("png", 300, 200) });
+
+    const row = await db.query.projectPhotos.findFirst({ where: eq(projectPhotos.id, photoId) });
+    const thumb = files.get(row!.pathname.replace(".png", ".thumb.webp"))!;
+    expect(await sharp(await thumb.arrayBuffer()).metadata()).toMatchObject({
+      width: 300,
+      height: 200,
+    });
+  });
+
+  it.each([
+    ["image/png", "png", "png"],
+    ["image/webp", "webp", "webp"],
+  ] as const)("detects %s from the file's bytes", async (contentType, extension, format) => {
+    const { project, ctx } = await setup();
+    // Named and typed as a JPEG: only the bytes count.
+    const file = new File([await testImage(format)], "x.jpg", { type: "image/jpeg" });
 
     const { photoId } = await upload(ctx, project.id, { file });
 
@@ -105,6 +145,9 @@ describe("addPhoto", () => {
     ["missing_file", { file: new File([], "empty.jpg") }],
     ["missing_file", { file: "not a file" }],
     ["invalid_file_type", { file: new File(["%PDF-1.7"], "fake.jpg", { type: "image/jpeg" }) }],
+    // A JPEG header with nothing decodable behind it.
+    ["invalid_file_type", { file: new File([new Uint8Array([0xff, 0xd8, 0xff, 0xe0]), "x"], "cut.jpg") }],
+    ["invalid_file_type", { file: new File(["<svg xmlns='http://www.w3.org/2000/svg'/>"], "x.svg") }],
   ])("rejects %s", async (code, input) => {
     const { project, ctx } = await setup();
 
@@ -114,7 +157,7 @@ describe("addPhoto", () => {
 
   it("rejects files over the size limit", async () => {
     const { project, ctx } = await setup();
-    const big = new File([new Uint8Array(JPEG), new Uint8Array(MAX_PHOTO_BYTES)], "big.jpg");
+    const big = new File([photo, new Uint8Array(MAX_PHOTO_BYTES)], "big.jpg");
 
     await expect(upload(ctx, project.id, { file: big })).rejects.toMatchObject({
       code: "file_too_large",
@@ -196,7 +239,7 @@ describe("deletePhoto", () => {
     await expect(
       svc.deletePhoto({ ...ctx, role: "viewer" }, project.id, photoId),
     ).rejects.toMatchObject({ code: "forbidden" });
-    expect(files.size).toBe(1);
+    expect(files.size).toBe(2); // the photo and its thumbnail
   });
 
   it("does not delete another tenant's photo", async () => {
@@ -208,7 +251,7 @@ describe("deletePhoto", () => {
       code: "not_found",
       status: 404,
     });
-    expect(files.size).toBe(1);
+    expect(files.size).toBe(2); // the photo and its thumbnail
   });
 });
 
@@ -222,9 +265,31 @@ describe("openPhoto", () => {
     expect(file).toMatchObject({
       filename: `${photoId}.jpg`,
       contentType: "image/jpeg",
-      sizeBytes: jpeg().size,
+      sizeBytes: photo.size,
     });
-    expect(await bytes(file.body)).toEqual(new Uint8Array(await jpeg().arrayBuffer()));
+    expect(await bytes(file.body)).toEqual(new Uint8Array(await photo.arrayBuffer()));
+  });
+
+  it("streams the thumbnail on request", async () => {
+    const { project, ctx } = await setup();
+    const { photoId } = await upload(ctx, project.id);
+
+    const file = await svc.openPhoto(ctx, project.id, photoId, "thumb");
+
+    expect(file).toMatchObject({ filename: `${photoId}.thumb.webp`, contentType: "image/webp" });
+    const body = await bytes(file.body);
+    expect(body.length).toBe(file.sizeBytes);
+    expect(await sharp(body).metadata()).toMatchObject({ width: 800, height: 600 });
+  });
+
+  it("falls back to the photo for photos stored before thumbnails", async () => {
+    const { tenant, project, ctx } = await setup();
+    const old = await createTestPhoto(tenant.id, project.id, { sizeBytes: photo.size });
+    files.set(old.pathname, photo);
+
+    const file = await svc.openPhoto(ctx, project.id, old.id, "thumb");
+
+    expect(file).toMatchObject({ contentType: "image/jpeg", sizeBytes: photo.size });
   });
 
   it("is not found for another tenant", async () => {
@@ -259,7 +324,7 @@ describe("client photos", () => {
       {
         id: photoId,
         caption: "Fachada sur",
-        sizeBytes: jpeg().size,
+        sizeBytes: photo.size,
         uploadedAt: expect.any(String),
       },
     ]);
@@ -280,7 +345,9 @@ describe("client photos", () => {
     const file = await svc.openClientPhoto(tenant.id, client.id, photoId);
 
     expect(file.contentType).toBe("image/jpeg");
-    expect((await bytes(file.body)).length).toBe(jpeg().size);
+    expect((await bytes(file.body)).length).toBe(photo.size);
+    const thumb = await svc.openClientPhoto(tenant.id, client.id, photoId, "thumb");
+    expect(thumb.contentType).toBe("image/webp");
   });
 
   it("does not open another client's photo", async () => {
@@ -315,6 +382,24 @@ describe("deleteProject", () => {
 
     await projectsService.deleteProject(ctx, project.id);
 
-    expect([...files.keys()]).toEqual([expect.stringContaining(other.project.id)]);
+    // Only the other project's photo and thumbnail are left.
+    expect([...files.keys()]).toEqual([
+      expect.stringContaining(other.project.id),
+      expect.stringContaining(other.project.id),
+    ]);
+  });
+});
+
+describe("photo sizes in URLs", () => {
+  it("asks for the thumbnail with ?size=thumb and the original with nothing", () => {
+    expect(photoSizeQuery("thumb")).toBe("?size=thumb");
+    expect(photoSizeQuery("full")).toBe("");
+  });
+
+  it("reads ?size=, treating missing or unknown values as the original", () => {
+    expect(parsePhotoSize("thumb")).toBe("thumb");
+    expect(parsePhotoSize("full")).toBe("full");
+    expect(parsePhotoSize(null)).toBe("full");
+    expect(parsePhotoSize("huge")).toBe("full");
   });
 });

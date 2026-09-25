@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createTestPhoto,
   createTestProject,
@@ -6,7 +6,7 @@ import {
   createTestUser,
   resetDatabase,
 } from "@repo/db/testing";
-import { files } from "@repo/core/testing";
+import { files, testImage } from "@repo/core/testing";
 import { signInAs } from "../../test/session";
 import { addProjectPhotoAction, deleteProjectPhotoAction, getProjectPhotos } from "./photos";
 
@@ -24,10 +24,11 @@ function form(fields: Record<string, string | File>) {
   return data;
 }
 
-const jpeg = () =>
-  new File([new Uint8Array([0xff, 0xd8, 0xff, 0xe0]), "pixels"], "fachada.jpg", {
-    type: "image/jpeg",
-  });
+let image: File;
+
+beforeAll(async () => {
+  image = await testImage("jpeg");
+});
 
 async function setup(role: "admin" | "manager" | "viewer" = "manager") {
   const tenant = await createTestTenant();
@@ -50,7 +51,7 @@ describe("photo actions", () => {
     const state = await addProjectPhotoAction(
       project.id,
       null,
-      form({ caption: "Fachada sur", file: jpeg() }),
+      form({ caption: "Fachada sur", file: image }),
     );
 
     expect(state).toEqual({ success: true });
@@ -78,7 +79,7 @@ describe("photo actions", () => {
     const { tenant, project } = await setup("viewer");
     const photo = await createTestPhoto(tenant.id, project.id);
 
-    expect(await addProjectPhotoAction(project.id, null, form({ file: jpeg() }))).toEqual({
+    expect(await addProjectPhotoAction(project.id, null, form({ file: image }))).toEqual({
       error: "forbidden",
     });
     expect(await deleteProjectPhotoAction(project.id, photo.id)).toEqual({ error: "forbidden" });

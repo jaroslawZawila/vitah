@@ -47,25 +47,28 @@ export async function requireProject(tenantId: string, projectId: string) {
   if (!project) fail("project_not_found");
 }
 
-/** Stores the file, then records it; the file is removed again if the row can't be. */
-export async function storeFile(
-  pathname: string,
-  file: Blob,
-  contentType: string,
-  insertRow: () => Promise<unknown>,
-) {
-  await putFile(pathname, file, contentType);
+type NewFile = { pathname: string; body: Blob; contentType: string };
+
+/** Stores a row's files, then records it; the files are removed again if anything fails. */
+export async function storeFiles(files: NewFile[], insertRow: () => Promise<unknown>) {
   try {
+    // allSettled: clean up only once every upload has stopped, or one still
+    // in flight could land after its delete and be orphaned.
+    const puts = await Promise.allSettled(
+      files.map((f) => putFile(f.pathname, f.body, f.contentType)),
+    );
+    const failed = puts.find((put) => put.status === "rejected");
+    if (failed) throw failed.reason;
     await insertRow();
   } catch (error) {
-    await deleteFile(pathname).catch(() => {});
+    await Promise.all(files.map((f) => deleteFile(f.pathname).catch(() => {})));
     throw error;
   }
 }
 
-/** File first: if that fails the row stays and the delete can be retried. */
-export async function removeFile(pathname: string, deleteRow: () => Promise<unknown>) {
-  await deleteFile(pathname);
+/** Files first: if that fails the row stays and the delete can be retried. */
+export async function removeFiles(pathnames: string[], deleteRow: () => Promise<unknown>) {
+  await Promise.all(pathnames.map(deleteFile));
   await deleteRow();
 }
 

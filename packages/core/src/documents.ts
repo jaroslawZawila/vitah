@@ -11,10 +11,10 @@ import {
   fail,
   openStoredFile,
   projectFolder,
-  removeFile,
+  removeFiles,
   requireFileManager,
   requireProject,
-  storeFile,
+  storeFiles,
 } from "./project-files";
 
 // ─── Project documents ────────────────────────────────────────────────────────
@@ -68,7 +68,7 @@ export async function addDocument(ctx: Ctx, projectId: string, input: Record<str
 
   const id = crypto.randomUUID();
   const pathname = `${projectFolder(ctx.tenantId, projectId)}${id}.pdf`;
-  await storeFile(pathname, file, "application/pdf", () =>
+  await storeFiles([{ pathname, body: file, contentType: "application/pdf" }], () =>
     db.insert(projectDocuments).values({
       id,
       tenantId: ctx.tenantId,
@@ -113,7 +113,7 @@ export async function deleteDocument(ctx: Ctx, projectId: string, documentId: st
   const doc = await db.query.projectDocuments.findFirst({ where, columns: { pathname: true } });
   if (!doc) fail("not_found");
 
-  await removeFile(doc.pathname, () => db.delete(projectDocuments).where(where));
+  await removeFiles([doc.pathname], () => db.delete(projectDocuments).where(where));
 
   return { documentId };
 }

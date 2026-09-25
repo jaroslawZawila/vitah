@@ -1,8 +1,9 @@
-import { photosService } from "@repo/core";
+import { parsePhotoSize, photosService } from "@repo/core";
 import { fileResponse, withContext } from "../../../../../../../lib/api";
 
 // ─── /api/v1/projects/:id/photos/:photoId ─────────────────────────────────────
-// GET    → the image itself (image/jpeg, image/png or image/webp)
+// GET    → the image itself (image/jpeg, image/png or image/webp);
+//          ?size=thumb → a WebP of at most 800 px, for grids
 // DELETE → 204
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -10,8 +11,11 @@ type Params = { params: Promise<{ id: string; photoId: string }> };
 
 export async function GET(request: Request, { params }: Params) {
   const { id, photoId } = await params;
+  const size = parsePhotoSize(new URL(request.url).searchParams.get("size"));
   return withContext(request, async (ctx) =>
-    fileResponse(await photosService.openPhoto(ctx, id, photoId), { immutable: true }),
+    fileResponse(await photosService.openPhoto(ctx, id, photoId, size), {
+      immutable: true,
+    }),
   );
 }
 

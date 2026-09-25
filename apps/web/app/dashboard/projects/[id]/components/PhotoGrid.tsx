@@ -1,11 +1,11 @@
 "use client";
 
 import { useFormatter, useTranslations } from "next-intl";
-import type { PhotoError, ProjectPhoto } from "@repo/core/contract";
+import type { PhotoError, PhotoSize, ProjectPhoto } from "@repo/core/contract";
 import FormError from "./FormError";
 import styles from "./photos.module.css";
 
-/** Presentational: the project's photos as a grid; each opens full size. */
+/** Presentational: the project's photos as a grid of thumbnails; each opens full size. */
 export default function PhotoGrid({
   photos,
   fileUrl,
@@ -14,7 +14,7 @@ export default function PhotoGrid({
   error,
 }: {
   photos: ProjectPhoto[];
-  fileUrl: (photo: ProjectPhoto) => string;
+  fileUrl: (photo: ProjectPhoto, size: PhotoSize) => string;
   /** Omitted for users who can't delete. */
   onDelete?: (photo: ProjectPhoto) => void;
   deleting: boolean;
@@ -34,11 +34,10 @@ export default function PhotoGrid({
             timeZone: "Europe/Madrid",
           });
           const name = photo.caption ?? t("untitled", { date });
-          const url = fileUrl(photo);
           return (
             <li key={photo.id} className={styles.tile}>
               <a
-                href={url}
+                href={fileUrl(photo, "full")}
                 target="_blank"
                 rel="noreferrer"
                 title={t("open")}
@@ -46,7 +45,12 @@ export default function PhotoGrid({
               >
                 {/* Served by our authenticated API, so next/image can't optimise it. */}
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={url} alt={name} loading="lazy" className={styles.image} />
+                <img
+                  src={fileUrl(photo, "thumb")}
+                  alt={name}
+                  loading="lazy"
+                  className={styles.image}
+                />
               </a>
               <div className={styles.details}>
                 <div className={styles.text}>

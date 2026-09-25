@@ -63,13 +63,13 @@ beforeEach(() => {
 });
 
 describe("PhotosScreen", () => {
-  it("shows the photos, each linking to the full-size image", () => {
+  it("shows thumbnails, each linking to the full-size image", () => {
     renderScreen();
 
     expect(screen.getByRole("heading", { name: "Fotos" })).toBeInTheDocument();
     expect(screen.getByText("2 fotos")).toBeInTheDocument();
     const image = screen.getByRole("img", { name: "Fachada sur" });
-    expect(image).toHaveAttribute("src", "/api/v1/projects/project-1/photos/photo-1");
+    expect(image).toHaveAttribute("src", "/api/v1/projects/project-1/photos/photo-1?size=thumb");
     expect(image.closest("a")).toHaveAttribute("href", "/api/v1/projects/project-1/photos/photo-1");
     const tile = image.closest("li")!;
     expect(within(tile).getByText("22 sept 2026 · Laura")).toBeInTheDocument();

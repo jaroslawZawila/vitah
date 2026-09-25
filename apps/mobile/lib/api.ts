@@ -3,6 +3,7 @@ import type {
   MobilePhoto,
   MobileProject,
   MobileSession,
+  PhotoSize,
 } from "@repo/core/contract";
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
@@ -77,8 +78,10 @@ export const api = {
     });
   },
 
-  /** The image itself; load it with the same Bearer token. */
-  photoUrl(id: string) {
-    return `${API_BASE}/api/mobile/photos/${encodeURIComponent(id)}`;
+  /** The image itself (or its small WebP thumbnail); load it with the same Bearer token. */
+  photoUrl(id: string, size: PhotoSize = "full") {
+    // Same rule as photoSizeQuery in @repo/core/contract (the app imports only its types).
+    const query = size === "full" ? "" : `?size=${size}`;
+    return `${API_BASE}/api/mobile/photos/${encodeURIComponent(id)}${query}`;
   },
 };

@@ -97,6 +97,17 @@ export type PhotoType = (typeof PHOTO_TYPES)[number];
 /** Largest photo accepted; same body limit as documents. */
 export const MAX_PHOTO_BYTES = MAX_DOCUMENT_BYTES;
 
+/** Which file of a photo to fetch: the original, or a small copy for grids. */
+export const PHOTO_SIZES = ["full", "thumb"] as const;
+export type PhotoSize = (typeof PHOTO_SIZES)[number];
+
+/** The query string asking a photo URL for `size`: "" or "?size=thumb". */
+export const photoSizeQuery = (size: PhotoSize) => (size === "full" ? "" : `?size=${size}`);
+
+/** Reads `?size=`; anything missing or unknown means the original. */
+export const parsePhotoSize = (value: string | null): PhotoSize =>
+  PHOTO_SIZES.find((size) => size === value) ?? "full";
+
 /** Longer captions are cut to this length. */
 export const MAX_CAPTION_LENGTH = 200;
 

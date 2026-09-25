@@ -21,3 +21,20 @@ export async function deleteFolder(prefix: string) {
     if (pathname.startsWith(prefix)) files.delete(pathname);
   }
 }
+
+/** A real image for upload tests, e.g. `await testImage("png", 1600, 1200)`. */
+export async function testImage(
+  format: "jpeg" | "png" | "webp" = "jpeg",
+  width = 1600,
+  height = 1200,
+) {
+  const { default: sharp } = await import("sharp");
+  const bytes = await sharp({
+    create: { width, height, channels: 3, background: { r: 107, g: 122, b: 74 } },
+  })
+    .toFormat(format)
+    .toBuffer();
+  return new File([new Uint8Array(bytes)], `obra.${format === "jpeg" ? "jpg" : format}`, {
+    type: `image/${format}`,
+  });
+}

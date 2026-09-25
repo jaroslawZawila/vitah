@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createTestProject,
   createTestTenant,
@@ -7,7 +7,7 @@ import {
 } from "@repo/db/testing";
 import { createMobileToken } from "@repo/auth/mobile";
 import { MAX_PHOTO_BYTES } from "@repo/core/contract";
-import { files } from "@repo/core/testing";
+import { files, testImage } from "@repo/core/testing";
 import { GET as list, POST } from "./route";
 import { DELETE, GET as download } from "./[photoId]/route";
 
@@ -21,8 +21,11 @@ async function staffToken(tenantId: string, role: "manager" | "viewer" = "manage
   return createMobileToken({ sub: user.id, email: user.email, name: user.name, role, tenantId });
 }
 
-function request(token: string, init: { method?: string; body?: BodyInit } = {}) {
-  return new Request("http://localhost/api/v1/projects/x/photos", {
+function request(
+  token: string,
+  init: { method?: string; body?: BodyInit; query?: string } = {},
+) {
+  return new Request(`http://localhost/api/v1/projects/x/photos${init.query ?? ""}`, {
     method: init.method ?? "GET",
     headers: { Authorization: `Bearer ${token}` },
     body: init.body,
@@ -37,7 +40,11 @@ function upload(projectId: string, token: string, file: File) {
 }
 
 const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
-const png = new File([PNG, "pixels"], "cubierta.png", { type: "image/png" });
+let png: File;
+
+beforeAll(async () => {
+  png = await testImage("png");
+});
 const projectParams = (id: string) => ({ params: Promise.resolve({ id }) });
 const params = (id: string, photoId: string) => ({ params: Promise.resolve({ id, photoId }) });
 
@@ -70,6 +77,11 @@ describe("/api/v1/projects/:id/photos", () => {
     expect(file.headers.get("cache-control")).toBe("private, max-age=31536000, immutable");
     expect(new Uint8Array(await file.arrayBuffer()).slice(0, 8)).toEqual(PNG);
 
+    const thumb = await download(request(token, { query: "?size=thumb" }), params(project.id, photoId));
+    expect(thumb.status).toBe(200);
+    expect(thumb.headers.get("content-type")).toBe("image/webp");
+    expect(Number(thumb.headers.get("content-length"))).toBeLessThan(png.size);
+
     const deleted = await DELETE(request(token, { method: "DELETE" }), params(project.id, photoId));
     expect(deleted.status).toBe(204);
     expect(files.size).toBe(0);
@@ -82,7 +94,7 @@ describe("/api/v1/projects/:id/photos", () => {
     const tooLarge = await upload(
       project.id,
       await staffToken(tenant.id),
-      new File([PNG, new Uint8Array(MAX_PHOTO_BYTES)], "big.png"),
+      new File([png, new Uint8Array(MAX_PHOTO_BYTES)], "big.png"),
     );
     expect(tooLarge.status).toBe(413);
     expect(await tooLarge.json()).toEqual({ error: "file_too_large" });
@@ -112,7 +124,7 @@ describe("/api/v1/projects/:id/photos", () => {
       params(project.id, photoId),
     );
     expect(deleted.status).toBe(404);
-    expect(files.size).toBe(1);
+    expect(files.size).toBe(2); // the photo and its thumbnail
   });
 
   it("requires authentication", async () => {

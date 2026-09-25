@@ -6,7 +6,7 @@
 import { useActionState, useState, useTransition } from "react";
 import { ImagePlus } from "lucide-react";
 import { useTranslations } from "next-intl";
-import type { ProjectPhoto } from "@repo/core/contract";
+import { photoSizeQuery, type ProjectPhoto } from "@repo/core/contract";
 import {
   addProjectPhotoAction,
   deleteProjectPhotoAction,
@@ -69,7 +69,9 @@ export default function PhotosScreen({
       ) : (
         <PhotoGrid
           photos={photos}
-          fileUrl={(photo) => `/api/v1/projects/${projectId}/photos/${photo.id}`}
+          fileUrl={(photo, size) =>
+            `/api/v1/projects/${projectId}/photos/${photo.id}${photoSizeQuery(size)}`
+          }
           onDelete={canManage ? handleDelete : undefined}
           deleting={deleting}
           error={deleteState?.error}

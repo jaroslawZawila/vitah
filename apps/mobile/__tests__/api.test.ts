@@ -134,4 +134,8 @@ describe("api.photoUrl", () => {
   it("points at the photo's image", () => {
     expect(api.photoUrl("a/b")).toMatch(/\/api\/mobile\/photos\/a%2Fb$/);
   });
+
+  it("points at the photo's thumbnail", () => {
+    expect(api.photoUrl("p1", "thumb")).toMatch(/\/api\/mobile\/photos\/p1\?size=thumb$/);
+  });
 });

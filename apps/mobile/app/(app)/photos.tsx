@@ -12,7 +12,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import type { MobilePhoto } from "@repo/core/contract";
+import type { MobilePhoto, PhotoSize } from "@repo/core/contract";
 import { Button } from "../../components/button";
 import { colors, spacing, type } from "../../constants/theme";
 import { api } from "../../lib/api";
@@ -80,20 +80,25 @@ export default function PhotosScreen() {
   );
 }
 
-/** The image of a photo, fetched with the client's token. */
+/** The image of a photo (grids use the thumbnail), fetched with the client's token. */
 function PhotoImage({
   photo,
+  size,
   style,
   resizeMode = "cover",
 }: {
   photo: MobilePhoto;
+  size: PhotoSize;
   style: object;
   resizeMode?: "cover" | "contain";
 }) {
   const { token } = useAuth();
   return (
     <Image
-      source={{ uri: api.photoUrl(photo.id), headers: { Authorization: `Bearer ${token}` } }}
+      source={{
+        uri: api.photoUrl(photo.id, size),
+        headers: { Authorization: `Bearer ${token}` },
+      }}
       resizeMode={resizeMode}
       style={style}
       accessibilityIgnoresInvertColors
@@ -155,7 +160,7 @@ function Tile({
       accessibilityHint="Abre la foto a pantalla completa"
       style={({ pressed }) => [style, styles.tile, pressed && { opacity: 0.7 }]}
     >
-      <PhotoImage photo={photo} style={StyleSheet.absoluteFill} />
+      <PhotoImage photo={photo} size="thumb" style={StyleSheet.absoluteFill} />
       {children}
     </Pressable>
   );
@@ -185,6 +190,7 @@ function Viewer({ photo, onClose }: { photo: MobilePhoto | null; onClose: () => 
           </View>
           <PhotoImage
             photo={photo}
+            size="full"
             resizeMode="contain"
             style={{ flex: 1, width: "100%" }}
           />
