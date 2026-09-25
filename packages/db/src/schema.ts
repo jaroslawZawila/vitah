@@ -1,6 +1,7 @@
 import { eq, ne, relations, sql } from "drizzle-orm";
 import {
   boolean,
+  date,
   integer,
   pgEnum,
   pgTable,
@@ -69,6 +70,27 @@ export const users = pgTable(
       .where(sql`${table.role} = 'client'`),
   }),
 );
+
+// --- Client profiles ---
+
+// Personal details of a mobile-app client (a `users` row with role "client").
+// Login data (email, password) stays on `users`.
+export const clientProfiles = pgTable("client_profiles", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  tenantId: text("tenant_id")
+    .notNull()
+    .references(() => tenants.id, { onDelete: "cascade" }),
+  firstName: text("first_name").notNull(),
+  surnames: text("surnames").notNull(),
+  // Calendar date, YYYY-MM-DD.
+  dateOfBirth: date("date_of_birth", { mode: "string" }),
+  address: text("address"),
+  phone: text("phone"),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+});
 
 /** SQL filters splitting portal staff from mobile-app clients. */
 export const isClientUser = eq(users.role, "client");
@@ -154,6 +176,14 @@ export const usersRelations = relations(users, ({ one }) => ({
   tenant: one(tenants, {
     fields: [users.tenantId],
     references: [tenants.id],
+  }),
+  clientProfile: one(clientProfiles),
+}));
+
+export const clientProfilesRelations = relations(clientProfiles, ({ one }) => ({
+  user: one(users, {
+    fields: [clientProfiles.userId],
+    references: [users.id],
   }),
 }));
 

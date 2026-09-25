@@ -10,7 +10,9 @@ export default function Topbar() {
 
   const titleKey = pathname.startsWith("/dashboard/users")
     ? "users"
-    : pathname.startsWith("/dashboard/projects/")
+    : pathname.startsWith("/dashboard/clients")
+      ? "clients"
+      : pathname.startsWith("/dashboard/projects/")
       ? "projectDetail"
       : "projects";
 

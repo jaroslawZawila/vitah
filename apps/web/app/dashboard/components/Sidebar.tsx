@@ -7,6 +7,7 @@ import styles from "./Sidebar.module.css";
 
 const NAV_ITEMS = [
   { key: "projects", href: "/dashboard/projects", icon: "◫", adminOnly: false },
+  { key: "clients", href: "/dashboard/clients", icon: "◉", adminOnly: true },
   { key: "users", href: "/dashboard/users", icon: "◐", adminOnly: true },
 ] as const;
 

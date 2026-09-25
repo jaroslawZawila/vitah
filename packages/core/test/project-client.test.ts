@@ -1,4 +1,3 @@
-import bcrypt from "bcryptjs";
 import { beforeEach, describe, expect, it } from "vitest";
 import { db, eq, projects, users } from "@repo/db";
 import {
@@ -9,23 +8,22 @@ import {
 } from "@repo/db/testing";
 import { normalizeEmail, projectClientService as svc, type Ctx } from "../src";
 
-const validInput = { name: "Ana García", email: "ana@example.com", password: "s3cret-pass" };
-
-async function findUser(email: string) {
-  return db.query.users.findFirst({ where: eq(users.email, email) });
-}
-
 async function findProject(id: string) {
   return db.query.projects.findFirst({ where: eq(projects.id, id) });
 }
 
-/** A tenant with an admin caller and one project. */
+/** A tenant with an admin caller, one project and one unassigned client. */
 async function setup() {
   const tenant = await createTestTenant();
   const admin = await createTestUser(tenant.id, { role: "admin" });
   const project = await createTestProject(tenant.id);
+  const client = await createTestUser(tenant.id, {
+    role: "client",
+    name: "Ana García",
+    email: `ana-${tenant.slug}@example.com`,
+  });
   const ctx: Ctx = { tenantId: tenant.id, userId: admin.id, role: "admin" };
-  return { tenant, admin, project, ctx };
+  return { tenant, admin, project, client, ctx };
 }
 
 beforeEach(async () => {
@@ -38,115 +36,162 @@ describe("normalizeEmail", () => {
   });
 });
 
-describe("createProjectClient", () => {
-  it("creates a client user and attaches them to the project", async () => {
-    const { tenant, project, ctx } = await setup();
+describe("listAssignableClients", () => {
+  it("lists active clients without a project", async () => {
+    const { tenant, project, client, ctx } = await setup();
+    const assigned = await createTestUser(tenant.id, { role: "client" });
+    await db.update(projects).set({ clientUserId: assigned.id }).where(eq(projects.id, project.id));
+    await createTestUser(tenant.id, { role: "client", active: false });
+    await createTestUser(tenant.id, { role: "manager" });
+    await setup(); // another tenant's client
 
-    const result = await svc.createProjectClient(ctx, project.id, {
-      ...validInput,
-      name: "  Ana García ",
-      email: " ANA@example.com",
-    });
-
-    expect(result).toEqual({ projectId: project.id });
-    const client = await findUser("ana@example.com");
-    expect(client).toMatchObject({ tenantId: tenant.id, name: "Ana García", role: "client" });
-    expect(await bcrypt.compare(validInput.password, client!.passwordHash!)).toBe(true);
-    expect((await findProject(project.id))?.clientUserId).toBe(client!.id);
+    expect(await svc.listAssignableClients(ctx)).toEqual([
+      { id: client.id, name: "Ana García", email: client.email },
+    ]);
   });
 
-  it.each([
-    [{ ...validInput, name: "  " }, "missing_fields", 400],
-    [{ ...validInput, email: "" }, "missing_fields", 400],
-    [{ ...validInput, password: "" }, "missing_fields", 400],
-    [{ name: 1, email: 2, password: 3 }, "missing_fields", 400],
-    [{ ...validInput, email: "not-an-email" }, "invalid_email", 400],
-    [{ ...validInput, password: "short" }, "password_too_short", 400],
-  ])("rejects invalid input %j with %s", async (input, code, status) => {
-    const { project, ctx } = await setup();
+  it("is admin only", async () => {
+    const { ctx } = await setup();
 
-    await expect(svc.createProjectClient(ctx, project.id, input)).rejects.toMatchObject({
-      code,
-      status,
+    await expect(svc.listAssignableClients({ ...ctx, role: "manager" })).rejects.toMatchObject({
+      code: "forbidden",
     });
-    expect(await findUser(validInput.email)).toBeUndefined();
   });
+});
 
-  it.each(["manager", "viewer"] as const)("is admin only (%s is forbidden)", async (role) => {
-    const { project, ctx } = await setup();
+describe("assignProjectClient", () => {
+  it("attaches the client to the project", async () => {
+    const { project, client, ctx } = await setup();
 
     await expect(
-      svc.createProjectClient({ ...ctx, role }, project.id, validInput),
-    ).rejects.toMatchObject({ code: "forbidden", status: 403 });
+      svc.assignProjectClient(ctx, project.id, { clientId: client.id }),
+    ).resolves.toEqual({ projectId: project.id });
+
+    expect((await findProject(project.id))?.clientUserId).toBe(client.id);
+  });
+
+  it("requires a client id", async () => {
+    const { project, ctx } = await setup();
+
+    await expect(svc.assignProjectClient(ctx, project.id, { clientId: " " })).rejects.toMatchObject(
+      { code: "missing_fields", status: 400 },
+    );
   });
 
   it("rejects a project from another tenant", async () => {
-    const { ctx } = await setup();
-    const other = await createTestTenant();
-    const project = await createTestProject(other.id);
+    const { client, ctx } = await setup();
+    const other = await setup();
 
-    await expect(svc.createProjectClient(ctx, project.id, validInput)).rejects.toMatchObject({
-      code: "project_not_found",
+    await expect(
+      svc.assignProjectClient(ctx, other.project.id, { clientId: client.id }),
+    ).rejects.toMatchObject({ code: "project_not_found", status: 404 });
+    expect((await findProject(other.project.id))?.clientUserId).toBeNull();
+  });
+
+  it.each([
+    ["a client from another tenant", async () => (await setup()).client.id],
+    ["a staff user", async (tenantId: string) => (await createTestUser(tenantId)).id],
+    [
+      "an inactive client",
+      async (tenantId: string) =>
+        (await createTestUser(tenantId, { role: "client", active: false })).id,
+    ],
+    ["an unknown id", async () => "missing"],
+  ])("rejects %s", async (_label, makeClientId) => {
+    const { tenant, project, ctx } = await setup();
+    const clientId = await makeClientId(tenant.id);
+
+    await expect(svc.assignProjectClient(ctx, project.id, { clientId })).rejects.toMatchObject({
+      code: "client_not_found",
       status: 404,
     });
-    expect(await findUser(validInput.email)).toBeUndefined();
+    expect((await findProject(project.id))?.clientUserId).toBeNull();
   });
 
   it("rejects a project that already has a client", async () => {
-    const { project, ctx } = await setup();
-    await svc.createProjectClient(ctx, project.id, validInput);
+    const { tenant, project, client, ctx } = await setup();
+    const second = await createTestUser(tenant.id, { role: "client" });
+    await svc.assignProjectClient(ctx, project.id, { clientId: client.id });
 
     await expect(
-      svc.createProjectClient(ctx, project.id, { ...validInput, email: "other@example.com" }),
+      svc.assignProjectClient(ctx, project.id, { clientId: second.id }),
     ).rejects.toMatchObject({ code: "client_already_attached", status: 409 });
-    expect(await findUser("other@example.com")).toBeUndefined();
   });
 
-  it("rejects an email already used by a client in another tenant", async () => {
-    const a = await setup();
-    const b = await setup();
-    await svc.createProjectClient(a.ctx, a.project.id, validInput);
+  it("rejects a client already on another project", async () => {
+    const { tenant, project, client, ctx } = await setup();
+    const otherProject = await createTestProject(tenant.id);
+    await svc.assignProjectClient(ctx, project.id, { clientId: client.id });
 
-    await expect(svc.createProjectClient(b.ctx, b.project.id, validInput)).rejects.toMatchObject({
-      code: "email_exists",
-      status: 409,
-    });
-    expect((await findProject(b.project.id))?.clientUserId).toBeNull();
+    await expect(
+      svc.assignProjectClient(ctx, otherProject.id, { clientId: client.id }),
+    ).rejects.toMatchObject({ code: "client_has_project", status: 409 });
   });
 
-  it("rejects an email already used by staff in the same tenant", async () => {
-    const { tenant, project, ctx } = await setup();
-    await createTestUser(tenant.id, { email: validInput.email, role: "manager" });
+  it.each(["manager", "viewer"] as const)("is admin only (%s is forbidden)", async (role) => {
+    const { project, client, ctx } = await setup();
 
-    await expect(svc.createProjectClient(ctx, project.id, validInput)).rejects.toMatchObject({
-      code: "email_exists",
-    });
+    await expect(
+      svc.assignProjectClient({ ...ctx, role }, project.id, { clientId: client.id }),
+    ).rejects.toMatchObject({ code: "forbidden", status: 403 });
   });
+});
 
-  it("allows an email used by staff in another tenant", async () => {
-    const { project, ctx } = await setup();
-    const other = await createTestTenant();
-    await createTestUser(other.id, { email: validInput.email, role: "admin" });
+describe("unassignProjectClient", () => {
+  it("detaches the client but keeps their account", async () => {
+    const { project, client, ctx } = await setup();
+    await svc.assignProjectClient(ctx, project.id, { clientId: client.id });
 
-    await expect(svc.createProjectClient(ctx, project.id, validInput)).resolves.toEqual({
+    await expect(svc.unassignProjectClient(ctx, project.id)).resolves.toEqual({
       projectId: project.id,
     });
+
+    expect((await findProject(project.id))?.clientUserId).toBeNull();
+    expect(await db.query.users.findFirst({ where: eq(users.id, client.id) })).toBeDefined();
+    expect((await svc.listAssignableClients(ctx)).map((c) => c.id)).toEqual([client.id]);
+  });
+
+  it("reports when the project has no client", async () => {
+    const { project, ctx } = await setup();
+
+    await expect(svc.unassignProjectClient(ctx, project.id)).rejects.toMatchObject({
+      code: "no_client",
+      status: 404,
+    });
+  });
+
+  it("does not touch projects from another tenant", async () => {
+    const a = await setup();
+    const b = await setup();
+    await svc.assignProjectClient(a.ctx, a.project.id, { clientId: a.client.id });
+
+    await expect(svc.unassignProjectClient(b.ctx, a.project.id)).rejects.toMatchObject({
+      code: "no_client",
+    });
+    expect((await findProject(a.project.id))?.clientUserId).toBe(a.client.id);
+  });
+
+  it("is admin only", async () => {
+    const { project, ctx } = await setup();
+
+    await expect(
+      svc.unassignProjectClient({ ...ctx, role: "viewer" }, project.id),
+    ).rejects.toMatchObject({ code: "forbidden" });
   });
 });
 
 describe("getClientProject", () => {
   it("returns the project attached to the client in mobile shape", async () => {
-    const { tenant, ctx } = await setup();
+    const { tenant, client, ctx } = await setup();
     const project = await createTestProject(tenant.id, {
       ref: "VTH-2026-014",
       address: "Calle del Sol 5, Santander",
       startDate: new Date("2026-03-01T00:00:00Z"),
       completionDate: new Date("2026-11-15T00:00:00Z"),
     });
-    await svc.createProjectClient(ctx, project.id, validInput);
-    const client = await findUser(validInput.email);
+    await svc.assignProjectClient(ctx, project.id, { clientId: client.id });
 
-    expect(await svc.getClientProject(tenant.id, client!.id)).toEqual({
+    expect(await svc.getClientProject(tenant.id, client.id)).toEqual({
       id: project.id,
       ref: "VTH-2026-014",
       address: "Calle del Sol 5, Santander",
@@ -156,125 +201,26 @@ describe("getClientProject", () => {
   });
 
   it("returns null dates when they are not set", async () => {
-    const { tenant, project, ctx } = await setup();
-    await svc.createProjectClient(ctx, project.id, validInput);
-    const client = await findUser(validInput.email);
+    const { tenant, project, client, ctx } = await setup();
+    await svc.assignProjectClient(ctx, project.id, { clientId: client.id });
 
-    expect(await svc.getClientProject(tenant.id, client!.id)).toMatchObject({
+    expect(await svc.getClientProject(tenant.id, client.id)).toMatchObject({
       startDate: null,
       completionDate: null,
     });
   });
 
-  it("returns null when the user has no project", async () => {
-    const tenant = await createTestTenant();
-    const client = await createTestUser(tenant.id, { role: "client" });
+  it("returns null when the client has no project", async () => {
+    const { tenant, client } = await setup();
 
     expect(await svc.getClientProject(tenant.id, client.id)).toBeNull();
   });
 
   it("does not return a project from another tenant", async () => {
-    const { project, ctx } = await setup();
-    await svc.createProjectClient(ctx, project.id, validInput);
-    const client = await findUser(validInput.email);
+    const { project, client, ctx } = await setup();
+    await svc.assignProjectClient(ctx, project.id, { clientId: client.id });
     const other = await createTestTenant();
 
-    expect(await svc.getClientProject(other.id, client!.id)).toBeNull();
-  });
-});
-
-describe("resetProjectClientPassword", () => {
-  it("replaces the client's password", async () => {
-    const { project, ctx } = await setup();
-    await svc.createProjectClient(ctx, project.id, validInput);
-
-    await expect(
-      svc.resetProjectClientPassword(ctx, project.id, { password: "brand-new-pass" }),
-    ).resolves.toEqual({ projectId: project.id });
-
-    const client = await findUser(validInput.email);
-    expect(await bcrypt.compare("brand-new-pass", client!.passwordHash!)).toBe(true);
-    expect(await bcrypt.compare(validInput.password, client!.passwordHash!)).toBe(false);
-  });
-
-  it("rejects a short password", async () => {
-    const { project, ctx } = await setup();
-    await svc.createProjectClient(ctx, project.id, validInput);
-
-    await expect(
-      svc.resetProjectClientPassword(ctx, project.id, { password: "short" }),
-    ).rejects.toMatchObject({ code: "password_too_short" });
-  });
-
-  it("reports when the project has no client", async () => {
-    const { project, ctx } = await setup();
-
-    await expect(
-      svc.resetProjectClientPassword(ctx, project.id, { password: "brand-new-pass" }),
-    ).rejects.toMatchObject({ code: "no_client", status: 404 });
-  });
-
-  it("does not touch projects from another tenant", async () => {
-    const a = await setup();
-    const b = await setup();
-    await svc.createProjectClient(a.ctx, a.project.id, validInput);
-
-    await expect(
-      svc.resetProjectClientPassword(b.ctx, a.project.id, { password: "brand-new-pass" }),
-    ).rejects.toMatchObject({ code: "no_client" });
-    const client = await findUser(validInput.email);
-    expect(await bcrypt.compare(validInput.password, client!.passwordHash!)).toBe(true);
-  });
-
-  it("is admin only", async () => {
-    const { project, ctx } = await setup();
-
-    await expect(
-      svc.resetProjectClientPassword({ ...ctx, role: "manager" }, project.id, {
-        password: "brand-new-pass",
-      }),
-    ).rejects.toMatchObject({ code: "forbidden" });
-  });
-});
-
-describe("revokeProjectClient", () => {
-  it("deletes the client and frees the project", async () => {
-    const { project, ctx } = await setup();
-    await svc.createProjectClient(ctx, project.id, validInput);
-
-    await expect(svc.revokeProjectClient(ctx, project.id)).resolves.toEqual({
-      projectId: project.id,
-    });
-
-    expect(await findUser(validInput.email)).toBeUndefined();
-    expect((await findProject(project.id))?.clientUserId).toBeNull();
-    await expect(svc.createProjectClient(ctx, project.id, validInput)).resolves.toBeDefined();
-  });
-
-  it("reports when the project has no client", async () => {
-    const { project, ctx } = await setup();
-
-    await expect(svc.revokeProjectClient(ctx, project.id)).rejects.toMatchObject({
-      code: "no_client",
-    });
-  });
-
-  it("does not touch projects from another tenant", async () => {
-    const a = await setup();
-    const b = await setup();
-    await svc.createProjectClient(a.ctx, a.project.id, validInput);
-
-    await expect(svc.revokeProjectClient(b.ctx, a.project.id)).rejects.toMatchObject({
-      code: "no_client",
-    });
-    expect(await findUser(validInput.email)).toBeDefined();
-  });
-
-  it("is admin only", async () => {
-    const { project, ctx } = await setup();
-
-    await expect(
-      svc.revokeProjectClient({ ...ctx, role: "viewer" }, project.id),
-    ).rejects.toMatchObject({ code: "forbidden" });
+    expect(await svc.getClientProject(other.id, client.id)).toBeNull();
   });
 });

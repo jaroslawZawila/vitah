@@ -17,13 +17,15 @@
   },
   "sidebar": {
     "projects": "Projects",
+    "clients": "Clients",
     "users": "Users"
   },
   "topbar": {
     "titles": {
       "projects": "Projects — Full Pipeline",
       "users": "User Management",
-      "projectDetail": "Project Detail"
+      "projectDetail": "Project Detail",
+      "clients": "App Clients"
     }
   },
   "projectsPage": {
@@ -75,29 +77,22 @@
     },
     "clientAccess": {
       "title": "Client app access",
-      "intro": "Create the account the client will use to see their project in the ViTAH mobile app.",
-      "name": "Name",
-      "email": "Email",
-      "password": "Password",
-      "newPassword": "New password",
-      "passwordHint": "At least 8 characters. Share it with the client securely.",
-      "grant": "Grant access",
-      "granting": "Creating…",
+      "intro": "Choose the client who will see this project in the ViTAH mobile app.",
+      "noClients": "No clients available. Create one on the <link>Clients</link> tab.",
+      "client": "Client",
+      "choose": "Select a client…",
+      "assign": "Assign client",
+      "assigning": "Assigning…",
       "active": "Access active",
-      "resetPassword": "Reset password",
-      "savePassword": "Save password",
-      "passwordUpdated": "Password updated.",
-      "cancel": "Cancel",
-      "revoke": "Revoke access",
-      "confirmRevoke": "Revoke access for {email}? Their app account will be deleted.",
+      "remove": "Remove from project",
+      "confirmRemove": "Remove {email} from this project? Their account stays, but they will no longer see the project in the app.",
       "errors": {
-        "missing_fields": "Fill in all fields.",
-        "invalid_email": "Enter a valid email.",
-        "password_too_short": "The password must be at least 8 characters.",
-        "email_exists": "This email is already in use.",
+        "missing_fields": "Select a client.",
         "project_not_found": "Project not found.",
-        "client_already_attached": "This project already has a client with access.",
-        "no_client": "This project has no client with access.",
+        "client_not_found": "Client not found or inactive.",
+        "client_already_attached": "This project already has a client.",
+        "client_has_project": "This client is already assigned to another project.",
+        "no_client": "This project has no client assigned.",
         "forbidden": "Only admins can manage app access."
       }
     }
@@ -150,6 +145,58 @@
     },
     "success": {
       "created": "User created successfully."
+    }
+  },
+  "clientsPage": {
+    "title": "Clients",
+    "newClient": "New client",
+    "created": "Client created. They can now sign in to the app.",
+    "empty": "No clients yet.",
+    "table": {
+      "name": "Name",
+      "email": "Email",
+      "phone": "Phone",
+      "dateOfBirth": "Date of birth",
+      "address": "Address",
+      "status": "Status",
+      "actions": "Actions"
+    },
+    "statuses": {
+      "active": "Active",
+      "inactive": "Inactive"
+    },
+    "setPassword": "Set password",
+    "setPasswordFor": "Set password for {name}",
+    "form": {
+      "title": "New client",
+      "firstName": "First name",
+      "surnames": "Surnames",
+      "dateOfBirth": "Date of birth",
+      "phone": "Phone number",
+      "phonePlaceholder": "+34 600 000 000",
+      "address": "Address",
+      "email": "Email",
+      "password": "App password",
+      "passwordHint": "At least {min} characters. Share it with the client securely.",
+      "create": "Create client",
+      "creating": "Creating…",
+      "cancel": "Cancel"
+    },
+    "passwordForm": {
+      "title": "App password for {name}",
+      "password": "New password",
+      "save": "Save password",
+      "cancel": "Cancel"
+    },
+    "errors": {
+      "missing_fields": "Fill in first name, surnames, email and password.",
+      "invalid_email": "Enter a valid email.",
+      "invalid_date_of_birth": "Enter a valid date of birth.",
+      "invalid_phone": "Enter a valid phone number.",
+      "password_too_short": "The password must be at least 8 characters.",
+      "email_exists": "This email is already in use.",
+      "not_found": "Client not found.",
+      "forbidden": "Only admins can manage clients."
     }
   }
 }

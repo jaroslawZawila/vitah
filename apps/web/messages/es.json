@@ -17,13 +17,15 @@
   },
   "sidebar": {
     "projects": "Proyectos",
+    "clients": "Clientes",
     "users": "Usuarios"
   },
   "topbar": {
     "titles": {
       "projects": "Proyectos — Pipeline Completo",
       "users": "Gestión de Usuarios",
-      "projectDetail": "Detalle de Proyecto"
+      "projectDetail": "Detalle de Proyecto",
+      "clients": "Clientes de la app"
     }
   },
   "projectsPage": {
@@ -75,29 +77,22 @@
     },
     "clientAccess": {
       "title": "Acceso del cliente a la app",
-      "intro": "Crea la cuenta con la que el cliente verá su proyecto en la app móvil de ViTAH.",
-      "name": "Nombre",
-      "email": "Email",
-      "password": "Contraseña",
-      "newPassword": "Nueva contraseña",
-      "passwordHint": "Mínimo 8 caracteres. Compártela con el cliente de forma segura.",
-      "grant": "Dar acceso",
-      "granting": "Creando…",
+      "intro": "Elige el cliente que verá este proyecto en la app móvil de ViTAH.",
+      "noClients": "No hay clientes disponibles. Crea uno en la pestaña <link>Clientes</link>.",
+      "client": "Cliente",
+      "choose": "Selecciona un cliente…",
+      "assign": "Asignar cliente",
+      "assigning": "Asignando…",
       "active": "Acceso activo",
-      "resetPassword": "Restablecer contraseña",
-      "savePassword": "Guardar contraseña",
-      "passwordUpdated": "Contraseña actualizada.",
-      "cancel": "Cancelar",
-      "revoke": "Revocar acceso",
-      "confirmRevoke": "¿Revocar el acceso de {email}? Se eliminará su cuenta de la app.",
+      "remove": "Quitar del proyecto",
+      "confirmRemove": "¿Quitar a {email} de este proyecto? Su cuenta se mantiene, pero dejará de ver el proyecto en la app.",
       "errors": {
-        "missing_fields": "Completa todos los campos.",
-        "invalid_email": "Introduce un email válido.",
-        "password_too_short": "La contraseña debe tener al menos 8 caracteres.",
-        "email_exists": "Este email ya está en uso.",
+        "missing_fields": "Selecciona un cliente.",
         "project_not_found": "Proyecto no encontrado.",
-        "client_already_attached": "Este proyecto ya tiene un cliente con acceso.",
-        "no_client": "Este proyecto no tiene ningún cliente con acceso.",
+        "client_not_found": "Cliente no encontrado o inactivo.",
+        "client_already_attached": "Este proyecto ya tiene un cliente.",
+        "client_has_project": "Este cliente ya está asignado a otro proyecto.",
+        "no_client": "Este proyecto no tiene ningún cliente asignado.",
         "forbidden": "Solo los administradores pueden gestionar el acceso."
       }
     }
@@ -150,6 +145,58 @@
     },
     "success": {
       "created": "Usuario creado correctamente."
+    }
+  },
+  "clientsPage": {
+    "title": "Clientes",
+    "newClient": "Nuevo cliente",
+    "created": "Cliente creado. Ya puede acceder a la app.",
+    "empty": "Todavía no hay clientes.",
+    "table": {
+      "name": "Nombre",
+      "email": "Email",
+      "phone": "Teléfono",
+      "dateOfBirth": "Fecha de nacimiento",
+      "address": "Dirección",
+      "status": "Estado",
+      "actions": "Acciones"
+    },
+    "statuses": {
+      "active": "Activo",
+      "inactive": "Inactivo"
+    },
+    "setPassword": "Cambiar contraseña",
+    "setPasswordFor": "Cambiar contraseña de {name}",
+    "form": {
+      "title": "Nuevo cliente",
+      "firstName": "Nombre",
+      "surnames": "Apellidos",
+      "dateOfBirth": "Fecha de nacimiento",
+      "phone": "Teléfono",
+      "phonePlaceholder": "+34 600 000 000",
+      "address": "Dirección",
+      "email": "Email",
+      "password": "Contraseña de la app",
+      "passwordHint": "Mínimo {min} caracteres. Compártela con el cliente de forma segura.",
+      "create": "Crear cliente",
+      "creating": "Creando…",
+      "cancel": "Cancelar"
+    },
+    "passwordForm": {
+      "title": "Contraseña de la app de {name}",
+      "password": "Nueva contraseña",
+      "save": "Guardar contraseña",
+      "cancel": "Cancelar"
+    },
+    "errors": {
+      "missing_fields": "Completa nombre, apellidos, email y contraseña.",
+      "invalid_email": "Introduce un email válido.",
+      "invalid_date_of_birth": "Introduce una fecha de nacimiento válida.",
+      "invalid_phone": "Introduce un teléfono válido.",
+      "password_too_short": "La contraseña debe tener al menos 8 caracteres.",
+      "email_exists": "Este email ya está en uso.",
+      "not_found": "Cliente no encontrado.",
+      "forbidden": "Solo los administradores pueden gestionar clientes."
     }
   }
 }

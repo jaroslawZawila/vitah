@@ -72,7 +72,9 @@ The portal and the mobile app share one backend. Layers:
    Errors are JSON `{ error: code }`.
 
 When adding a feature: write it in `packages/core`, then add the server action and the `/api/v1`
-route. Keep `/api/v1` backwards compatible — installed mobile builds lag behind.
+route. In the portal, keep UI separate from logic: a page's container component (e.g.
+`ClientsScreen.tsx`) is the only file that calls server actions; presentational components in
+`components/` take data and callbacks as props only. Keep `/api/v1` backwards compatible — installed mobile builds lag behind.
 
 ### Mobile-first responsive design (apps/web)
 
@@ -128,14 +130,14 @@ route. Keep `/api/v1` backwards compatible — installed mobile builds lag behin
 - Login page is `/`, authenticated users redirect to `/dashboard` (which redirects to `/dashboard/projects`)
 - `proxy.ts` protects all routes except `/`, `/api/auth/*`, `/api/mobile/*`, `/api/v1/*` (these authenticate per request), and static assets
 - User roles: `admin`, `manager`, `viewer` (staff, portal only) and `client` (homeowner, mobile app only) — Postgres enum. Use `isStaffUser` / `isClientUser` / `STAFF_ROLES` from `@repo/db`. `Ctx` is staff-only: client tokens are rejected by `/api/v1`
-- Clients are created from the project page ("Client app access" card), one project per client; client emails are unique across tenants
+- Clients are created on the **Clients** tab (`/dashboard/clients`, admin only): first name, surnames, date of birth, address, phone, email and app password. Personal details live in `client_profiles`; login data stays on `users`. Client emails are unique across tenants. A project has at most one client, picked from the existing clients on the project page ("Client app access" card); removing them only detaches, the account stays
 - Mobile client API: `POST /api/mobile/auth` (clients only, returns a 30d JWT) and `GET /api/mobile/project` (`Authorization: Bearer`). Each request re-checks the client is still active
 - Admin-only server actions guarded by `requireAdmin()` check
 
 ### Database
 
 - **Driver:** `postgres` (postgres.js) — works with any PostgreSQL (local Docker, Vercel Postgres, AWS RDS, etc.)
-- Schema in `packages/db/src/schema.ts` — tables: `tenants`, `users`, `accounts`, `sessions`, `verification_tokens`, `projects`. A project is deliberately minimal — exactly what the mobile app shows: `ref`, `address`, `start_date`, `completion_date`, plus `client_user_id` linking it to its mobile app client
+- Schema in `packages/db/src/schema.ts` — tables: `tenants`, `users`, `client_profiles`, `accounts`, `sessions`, `verification_tokens`, `projects`. A project is deliberately minimal — exactly what the mobile app shows: `ref`, `address`, `start_date`, `completion_date`, plus `client_user_id` linking it to its mobile app client
 - Drizzle Kit for migrations: `pnpm db:generate`, `pnpm db:migrate`, `pnpm db:push`
 - Seed script: `pnpm db:seed` creates the tenant, the admin user, project VTH-26-001 and its mobile app client
 - Local dev: Docker Compose with PostgreSQL 16 (`docker-compose.yml` at root)
@@ -183,6 +185,7 @@ apps/web/
     components/LoginForm.tsx       # Client Component with useActionState
     dashboard/page.tsx             # Redirects to /dashboard/projects
     dashboard/projects/            # Project list + detail (header, client app access)
+    dashboard/clients/             # Mobile app clients (admin): ClientsScreen container + pure views in components/
     dashboard/users/               # User management page (admin)
     api/auth/[...nextauth]/route.ts
 ```

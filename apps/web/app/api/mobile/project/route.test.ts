@@ -42,11 +42,8 @@ describe("GET /api/mobile/project", () => {
       startDate: new Date("2026-03-01T00:00:00Z"),
       completionDate: new Date("2026-11-15T00:00:00Z"),
     });
-    await svc.createProjectClient(await adminCtx(tenant.id), project.id, {
-      name: "Ana",
-      email: "ana@example.com",
-      password: "client-pass",
-    });
+    const client = await createTestUser(tenant.id, { email: "ana@example.com", role: "client" });
+    await svc.assignProjectClient(await adminCtx(tenant.id), project.id, { clientId: client.id });
 
     const res = await get(await tokenFor("ana@example.com"));
 
@@ -83,17 +80,25 @@ describe("GET /api/mobile/project", () => {
     expect((await get("garbage")).status).toBe(401);
   });
 
-  it("returns 401 once the client's access is revoked", async () => {
+  it("returns null once the client is removed from the project", async () => {
     const tenant = await createTestTenant();
     const project = await createTestProject(tenant.id);
-    await svc.createProjectClient(await adminCtx(tenant.id), project.id, {
-      name: "Ana",
-      email: "ana@example.com",
-      password: "client-pass",
-    });
+    const client = await createTestUser(tenant.id, { email: "ana@example.com", role: "client" });
+    const ctx = await adminCtx(tenant.id);
+    await svc.assignProjectClient(ctx, project.id, { clientId: client.id });
     const token = await tokenFor("ana@example.com");
 
-    await svc.revokeProjectClient(await adminCtx(tenant.id), project.id);
+    await svc.unassignProjectClient(ctx, project.id);
+
+    expect(await (await get(token)).json()).toEqual({ project: null });
+  });
+
+  it("returns 401 once the client's account is deactivated", async () => {
+    const tenant = await createTestTenant();
+    await createTestUser(tenant.id, { email: "ana@example.com", role: "client" });
+    const token = await tokenFor("ana@example.com");
+
+    await db.update(users).set({ active: false }).where(eq(users.email, "ana@example.com"));
 
     expect((await get(token)).status).toBe(401);
   });

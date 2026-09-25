@@ -89,6 +89,14 @@ async function seed() {
     .returning({ id: schema.users.id });
 
   if (demoClient) {
+    await db.insert(schema.clientProfiles).values({
+      userId: demoClient.id,
+      tenantId,
+      firstName: "Cliente",
+      surnames: "Demo",
+      address: "Calle Castelar 12, 39004 Santander",
+      phone: "+34 600 000 000",
+    });
     await db
       .update(schema.projects)
       .set({ clientUserId: demoClient.id })

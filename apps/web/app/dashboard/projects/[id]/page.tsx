@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { auth } from "../../../../auth";
+import { getAssignableClients } from "../../../actions/project-client";
 import { getProject } from "../../../actions/projects";
 import ProjectDetailClient from "./ProjectDetailClient";
 
@@ -15,10 +16,16 @@ export default async function ProjectDetailPage({
     redirect("/dashboard/projects");
   }
 
+  const canManageClient = session?.user?.role === "admin";
+  // Only needed to pick a client, i.e. when the project has none.
+  const assignableClients =
+    canManageClient && !project.client ? await getAssignableClients() : [];
+
   return (
     <ProjectDetailClient
       project={project}
-      canManageClient={session?.user?.role === "admin"}
+      canManageClient={canManageClient}
+      assignableClients={assignableClients}
     />
   );
 }

@@ -26,7 +26,8 @@
   letter-spacing: 0.04em;
 }
 
-.field input {
+.field input,
+.field select {
   min-height: 44px;
   padding: 8px 12px;
   border: 1px solid var(--admin-card-border);
@@ -36,14 +37,15 @@
   font-size: 16px; /* prevents iOS zoom on focus */
 }
 
-.field input:focus-visible {
+.field input:focus-visible,
+.field select:focus-visible {
   outline: 2px solid var(--verde-oliva);
   outline-offset: 1px;
 }
 
-.hint {
-  font-size: 11px;
-  color: var(--admin-muted);
+.link {
+  color: var(--verde-oliva);
+  font-weight: 600;
 }
 
 .error,
@@ -71,18 +73,12 @@
   min-height: 44px;
 }
 
-.secondary {
-  composes: btnSmall from "../page.module.css";
-  min-height: 44px;
-}
-
 .danger {
   composes: btnDanger from "../page.module.css";
   min-height: 44px;
 }
 
 .primary:disabled,
-.secondary:disabled,
 .danger:disabled {
   opacity: 0.6;
   cursor: default;
