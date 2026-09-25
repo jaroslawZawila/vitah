@@ -1,0 +1,329 @@
+/* Mobile first: stacked layout, full-width buttons, 44px touch targets. */
+
+.wizard {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 760px;
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.title {
+  margin: 0;
+  font-size: clamp(16px, 2.5vw, 20px);
+  font-weight: 600;
+  color: var(--admin-foreground);
+}
+
+.progress {
+  margin: 0;
+  font-size: 12px;
+  color: var(--admin-muted);
+}
+
+/* Stepper: on phones only the numbers show; titles appear from 768px. */
+.stepper {
+  display: flex;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.stepper li {
+  flex: 1;
+  min-width: 0;
+}
+
+.stepLink {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  padding: 6px 8px;
+  border: 1px solid var(--admin-card-border);
+  border-radius: 8px;
+  background: var(--admin-card);
+  color: var(--admin-muted);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.stepLink:disabled {
+  cursor: default;
+}
+
+.stepLink[data-state="current"] {
+  border-color: var(--verde-oliva);
+  color: var(--admin-foreground);
+  font-weight: 600;
+}
+
+.stepLink[data-state="done"] {
+  color: var(--verde-oliva);
+}
+
+.stepLink:not(:disabled):hover {
+  background: var(--admin-separator);
+}
+
+.stepNumber {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--admin-muted-bg);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.stepLink[data-state="current"] .stepNumber {
+  background: var(--verde-oliva);
+  color: #ffffff;
+}
+
+.stepTitle {
+  display: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+  background: var(--admin-card);
+  border: 1px solid var(--admin-card-border);
+  border-radius: 10px;
+}
+
+.stepHeading {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--admin-foreground);
+}
+
+.intro {
+  margin: 0;
+  font-size: 12px;
+  color: var(--admin-muted);
+}
+
+.error {
+  margin: 0;
+  font-size: 12px;
+  color: var(--error);
+}
+
+/* Fields: steps use these through `fieldStyles` (see ./fields.ts). */
+.fields {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.field label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--admin-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.field input,
+.field select,
+.field textarea {
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--admin-card-border);
+  border-radius: 6px;
+  background: #ffffff;
+  color: var(--admin-foreground);
+  font: inherit;
+  font-size: 16px; /* prevents iOS zoom on focus */
+}
+
+.field input:focus-visible,
+.field select:focus-visible,
+.field textarea:focus-visible {
+  outline: 2px solid var(--verde-oliva);
+  outline-offset: 1px;
+}
+
+.wide {
+  grid-column: 1 / -1;
+}
+
+/* Review */
+.review {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.reviewSection {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--admin-separator);
+}
+
+.reviewHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.reviewTitle {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--admin-foreground);
+}
+
+.edit {
+  min-height: 44px;
+  padding: 0 8px;
+  border: none;
+  background: none;
+  color: var(--verde-oliva);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.summary {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.summaryRow {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.summaryRow dt {
+  font-size: 11px;
+  color: var(--admin-muted);
+}
+
+.summaryRow dd {
+  margin: 0;
+  font-size: 13px;
+  color: var(--admin-foreground);
+  overflow-wrap: anywhere;
+}
+
+/* Footer */
+.footer {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 8px;
+}
+
+.navButtons {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 8px;
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 8px 16px;
+  border: 1px solid var(--admin-card-border);
+  border-radius: 6px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.primary {
+  composes: button;
+  background: var(--verde-oliva);
+  border-color: var(--verde-oliva);
+  color: #ffffff;
+}
+
+.primary:hover:not(:disabled) {
+  background: var(--verde-oliva-hover);
+}
+
+.secondary {
+  composes: button;
+  background: var(--admin-card);
+  color: var(--admin-foreground);
+}
+
+.secondary:hover:not(:disabled) {
+  background: var(--admin-separator);
+}
+
+.cancel {
+  composes: button;
+  border-color: transparent;
+  background: none;
+  color: var(--admin-muted);
+}
+
+@media (min-width: 768px) {
+  .stepTitle {
+    display: inline;
+  }
+
+  .fields {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .summary {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .footer,
+  .navButtons {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .navButtons {
+    justify-content: flex-end;
+  }
+}

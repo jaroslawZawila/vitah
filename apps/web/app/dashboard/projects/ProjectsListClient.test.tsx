@@ -1,15 +1,9 @@
 // @vitest-environment jsdom
-import { render, screen, waitFor, within } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { render, screen, within } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import messages from "../../../messages/es.json";
 import ProjectsListClient from "./ProjectsListClient";
-
-const router = { push: vi.fn() };
-vi.mock("next/navigation", () => ({ useRouter: () => router }));
-vi.mock("../../actions/projects", () => ({ createProject: vi.fn() }));
-const { createProject } = await import("../../actions/projects");
 
 const projects = [
   {
@@ -37,11 +31,6 @@ function renderList(list = projects) {
     </NextIntlClientProvider>,
   );
 }
-
-beforeEach(() => {
-  vi.mocked(createProject).mockReset();
-  router.push.mockReset();
-});
 
 describe("ProjectsListClient", () => {
   it("lists projects with their address, client and dates", () => {
@@ -71,51 +60,12 @@ describe("ProjectsListClient", () => {
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
   });
 
-  it("creates a project and opens it", async () => {
-    vi.mocked(createProject).mockResolvedValue({ success: true, id: "new-id" });
+  it("links to the new-project flow", () => {
     renderList();
 
-    await userEvent.click(
-      screen.getByRole("button", { name: "+ Nuevo Proyecto" }),
+    expect(screen.getByRole("link", { name: "+ Nuevo Proyecto" })).toHaveAttribute(
+      "href",
+      "/dashboard/projects/new",
     );
-    await userEvent.type(screen.getByLabelText("Referencia"), "VTH-3");
-    await userEvent.type(screen.getByLabelText("Dirección"), "Calle 3");
-    await userEvent.type(
-      screen.getByLabelText("Fecha de inicio"),
-      "2026-05-01",
-    );
-    await userEvent.click(
-      screen.getByRole("button", { name: "Crear proyecto" }),
-    );
-
-    await waitFor(() =>
-      expect(router.push).toHaveBeenCalledWith("/dashboard/projects/new-id"),
-    );
-    const data = vi.mocked(createProject).mock.calls[0]![1];
-    expect(Object.fromEntries(data)).toEqual({
-      ref: "VTH-3",
-      address: "Calle 3",
-      startDate: "2026-05-01",
-      completionDate: "",
-    });
-  });
-
-  it("shows create errors", async () => {
-    vi.mocked(createProject).mockResolvedValue({ error: "ref_exists" });
-    renderList();
-
-    await userEvent.click(
-      screen.getByRole("button", { name: "+ Nuevo Proyecto" }),
-    );
-    await userEvent.type(screen.getByLabelText("Referencia"), "VTH-1");
-    await userEvent.type(screen.getByLabelText("Dirección"), "Calle 1");
-    await userEvent.click(
-      screen.getByRole("button", { name: "Crear proyecto" }),
-    );
-
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "Ya existe un proyecto con esa referencia.",
-    );
-    expect(router.push).not.toHaveBeenCalled();
   });
 });

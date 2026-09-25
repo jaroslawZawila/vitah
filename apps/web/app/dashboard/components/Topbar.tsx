@@ -12,7 +12,9 @@ export default function Topbar() {
     ? "users"
     : pathname.startsWith("/dashboard/clients")
       ? "clients"
-      : pathname.startsWith("/dashboard/projects/")
+      : pathname === "/dashboard/projects/new"
+        ? "newProject"
+        : pathname.startsWith("/dashboard/projects/")
       ? "projectDetail"
       : "projects";
 

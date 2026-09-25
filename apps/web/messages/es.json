@@ -25,7 +25,8 @@
       "projects": "Proyectos — Pipeline Completo",
       "users": "Gestión de Usuarios",
       "projectDetail": "Detalle de Proyecto",
-      "clients": "Clientes de la app"
+      "clients": "Clientes de la app",
+      "newProject": "Nuevo proyecto"
     }
   },
   "projectsPage": {
@@ -40,21 +41,6 @@
       "startDate": "Inicio",
       "completionDate": "Finalización",
       "view": "Ver"
-    },
-    "createForm": {
-      "ref": "Referencia",
-      "refPlaceholder": "VTH-26-007",
-      "address": "Dirección",
-      "addressPlaceholder": "Calle, número, CP, ciudad",
-      "startDate": "Fecha de inicio",
-      "completionDate": "Fecha de finalización",
-      "create": "Crear proyecto",
-      "cancel": "Cancelar",
-      "errors": {
-        "missing_fields": "La referencia y la dirección son obligatorias.",
-        "ref_exists": "Ya existe un proyecto con esa referencia.",
-        "invalid_date": "Introduce una fecha válida."
-      }
     }
   },
   "projectDetailPage": {
@@ -197,6 +183,38 @@
       "email_exists": "Este email ya está en uso.",
       "not_found": "Cliente no encontrado.",
       "forbidden": "Solo los administradores pueden gestionar clientes."
+    }
+  },
+  "wizard": {
+    "stepOf": "Paso {current} de {total}",
+    "back": "Atrás",
+    "next": "Siguiente",
+    "cancel": "Cancelar",
+    "edit": "Editar",
+    "editSection": "Editar {section}",
+    "reviewIntro": "Revisa los datos antes de crear el proyecto."
+  },
+  "newProjectPage": {
+    "title": "Nuevo proyecto",
+    "create": "Crear proyecto",
+    "creating": "Creando…",
+    "steps": {
+      "details": "Datos del proyecto",
+      "review": "Revisión"
+    },
+    "details": {
+      "ref": "Referencia",
+      "refPlaceholder": "VTH-26-007",
+      "address": "Dirección",
+      "addressPlaceholder": "Calle, número, CP, ciudad",
+      "startDate": "Fecha de inicio",
+      "completionDate": "Fecha de finalización"
+    },
+    "errors": {
+      "missing_fields": "La referencia y la dirección son obligatorias.",
+      "ref_exists": "Ya existe un proyecto con esa referencia.",
+      "invalid_date": "Introduce una fecha válida.",
+      "generic": "No se ha podido crear el proyecto. Inténtalo de nuevo."
     }
   }
 }

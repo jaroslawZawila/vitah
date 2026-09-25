@@ -40,7 +40,11 @@
 
 /* New project button */
 .newProjectBtn {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
   padding: 5px 14px;
+  text-decoration: none;
   background: var(--verde-oliva);
   color: white;
   border: none;
@@ -56,86 +60,6 @@
   background: var(--verde-oliva-hover);
 }
 
-/* Create form */
-.createForm {
-  background: var(--admin-card);
-  border: 1px solid var(--admin-card-border);
-  border-radius: 10px;
-  padding: 16px;
-  margin-bottom: 14px;
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 12px;
-}
-
-.createField {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.createField label {
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--admin-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.createField input,
-.createField select {
-  padding: 6px 10px;
-  border: 1px solid var(--admin-card-border);
-  border-radius: 6px;
-  background: #ffffff;
-  color: var(--admin-foreground);
-  font-size: 13px;
-  font-family: inherit;
-}
-
-.createActions {
-  grid-column: 1 / -1;
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.createSubmit {
-  padding: 6px 16px;
-  background: var(--verde-oliva);
-  color: white;
-  border: none;
-  border-radius: 6px;
-  font-size: 12px;
-  font-weight: 600;
-  font-family: inherit;
-  cursor: pointer;
-}
-
-.createSubmit:hover {
-  background: var(--verde-oliva-hover);
-}
-
-.createCancel {
-  padding: 6px 14px;
-  border: 1px solid var(--admin-card-border);
-  border-radius: 6px;
-  background: var(--admin-card);
-  color: var(--admin-foreground);
-  font-size: 12px;
-  font-family: inherit;
-  cursor: pointer;
-}
-
-.createCancel:hover {
-  background: var(--admin-separator);
-}
-
-.createError {
-  font-size: 12px;
-  color: var(--error);
-  margin-left: 8px;
-}
 
 @media (max-width: 768px) {
   .createForm {

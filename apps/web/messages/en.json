@@ -25,7 +25,8 @@
       "projects": "Projects — Full Pipeline",
       "users": "User Management",
       "projectDetail": "Project Detail",
-      "clients": "App Clients"
+      "clients": "App Clients",
+      "newProject": "New project"
     }
   },
   "projectsPage": {
@@ -40,21 +41,6 @@
       "startDate": "Start",
       "completionDate": "Completion",
       "view": "View"
-    },
-    "createForm": {
-      "ref": "Reference",
-      "refPlaceholder": "VTH-26-007",
-      "address": "Address",
-      "addressPlaceholder": "Street, number, postcode, city",
-      "startDate": "Start date",
-      "completionDate": "Completion date",
-      "create": "Create project",
-      "cancel": "Cancel",
-      "errors": {
-        "missing_fields": "Reference and address are required.",
-        "ref_exists": "A project with that reference already exists.",
-        "invalid_date": "Enter a valid date."
-      }
     }
   },
   "projectDetailPage": {
@@ -197,6 +183,38 @@
       "email_exists": "This email is already in use.",
       "not_found": "Client not found.",
       "forbidden": "Only admins can manage clients."
+    }
+  },
+  "wizard": {
+    "stepOf": "Step {current} of {total}",
+    "back": "Back",
+    "next": "Next",
+    "cancel": "Cancel",
+    "edit": "Edit",
+    "editSection": "Edit {section}",
+    "reviewIntro": "Check the details before creating the project."
+  },
+  "newProjectPage": {
+    "title": "New project",
+    "create": "Create project",
+    "creating": "Creating…",
+    "steps": {
+      "details": "Project details",
+      "review": "Review"
+    },
+    "details": {
+      "ref": "Reference",
+      "refPlaceholder": "VTH-26-007",
+      "address": "Address",
+      "addressPlaceholder": "Street, number, postcode, city",
+      "startDate": "Start date",
+      "completionDate": "Completion date"
+    },
+    "errors": {
+      "missing_fields": "Reference and address are required.",
+      "ref_exists": "A project with that reference already exists.",
+      "invalid_date": "Enter a valid date.",
+      "generic": "The project couldn't be created. Please try again."
     }
   }
 }

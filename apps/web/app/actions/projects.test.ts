@@ -25,12 +25,6 @@ vi.mock(
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 const { revalidatePath } = await import("next/cache");
 
-function form(fields: Record<string, string>) {
-  const data = new FormData();
-  for (const [key, value] of Object.entries(fields)) data.set(key, value);
-  return data;
-}
-
 async function setup() {
   const tenant = await createTestTenant();
   const user = await createTestUser(tenant.id, { role: "manager" });
@@ -63,7 +57,7 @@ describe("project actions", () => {
     expect(await getProjects()).toEqual([]);
     expect(await getProject(project.id)).toBeNull();
     await expect(
-      createProject(null, form({ ref: "VTH-1", address: "Calle 1" })),
+      createProject({ ref: "VTH-1", address: "Calle 1" }),
     ).rejects.toThrow("Unauthorized");
     await expect(updateProject(project.id, { address: "X" })).rejects.toThrow(
       "Unauthorized",
@@ -71,18 +65,15 @@ describe("project actions", () => {
     await expect(deleteProject(project.id)).rejects.toThrow("Unauthorized");
   });
 
-  it("creates a project from the form and revalidates the list", async () => {
+  it("creates a project from the wizard draft and revalidates the list", async () => {
     await setup();
 
-    const result = await createProject(
-      null,
-      form({
-        ref: "VTH-1",
-        address: "Calle 1",
-        startDate: "2026-03-01",
-        completionDate: "",
-      }),
-    );
+    const result = await createProject({
+      ref: "VTH-1",
+      address: "Calle 1",
+      startDate: "2026-03-01",
+      completionDate: "",
+    });
 
     expect(result).toEqual({ success: true, id: expect.any(String) });
     expect(await reload(result!.id!)).toMatchObject({
@@ -97,7 +88,7 @@ describe("project actions", () => {
   it("returns core errors as form state", async () => {
     await setup();
 
-    expect(await createProject(null, form({ ref: "VTH-1" }))).toEqual({
+    expect(await createProject({ ref: "VTH-1" })).toEqual({
       error: "missing_fields",
     });
     expect(revalidatePath).not.toHaveBeenCalled();

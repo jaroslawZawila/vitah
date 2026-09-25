@@ -46,13 +46,11 @@ export async function getProject(id: string) {
   return svc.getProject(ctx, id);
 }
 
-export async function createProject(
-  _prevState: ProjectFormState,
-  formData: FormData,
-) {
+/** Creates a project from the new-project wizard's draft (plain values). */
+export async function createProject(draft: Record<string, unknown>) {
   const ctx = await requireAuth();
   return formResult(async () => {
-    const { id } = await svc.createProject(ctx, Object.fromEntries(formData));
+    const { id } = await svc.createProject(ctx, draft);
     revalidatePath("/dashboard/projects");
     return { success: true, id };
   });

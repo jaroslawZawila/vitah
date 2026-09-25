@@ -1,10 +1,7 @@
 "use client";
 
-import { useState, useActionState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useFormatter, useTranslations } from "next-intl";
-import { createProject, type ProjectFormState } from "../../actions/projects";
 import shared from "../shared.module.css";
 import styles from "./page.module.css";
 
@@ -24,21 +21,6 @@ export default function ProjectsListClient({
 }) {
   const t = useTranslations("projectsPage");
   const format = useFormatter();
-  const router = useRouter();
-  const [showForm, setShowForm] = useState(false);
-
-  const [state, formAction, isPending] = useActionState(
-    async (prev: ProjectFormState, formData: FormData) => {
-      const result = await createProject(prev, formData);
-      if (result?.success && result.id) {
-        setShowForm(false);
-        router.push(`/dashboard/projects/${result.id}`);
-      }
-      return result;
-    },
-    null,
-  );
-
   // Calendar dates are stored at UTC midnight.
   const formatDate = (date: Date | null) =>
     date
@@ -51,68 +33,10 @@ export default function ProjectsListClient({
         <span className={styles.count}>
           {t("count", { count: projects.length })}
         </span>
-        <button
-          type="button"
-          className={styles.newProjectBtn}
-          onClick={() => setShowForm(!showForm)}
-        >
+        <Link href="/dashboard/projects/new" className={styles.newProjectBtn}>
           + {t("newProject")}
-        </button>
+        </Link>
       </div>
-
-      {showForm && (
-        <form action={formAction} className={styles.createForm}>
-          <div className={styles.createField}>
-            <label htmlFor="new-ref">{t("createForm.ref")}</label>
-            <input
-              id="new-ref"
-              name="ref"
-              required
-              placeholder={t("createForm.refPlaceholder")}
-            />
-          </div>
-          <div className={styles.createField}>
-            <label htmlFor="new-address">{t("createForm.address")}</label>
-            <input
-              id="new-address"
-              name="address"
-              required
-              placeholder={t("createForm.addressPlaceholder")}
-            />
-          </div>
-          <div className={styles.createField}>
-            <label htmlFor="new-start">{t("createForm.startDate")}</label>
-            <input id="new-start" name="startDate" type="date" />
-          </div>
-          <div className={styles.createField}>
-            <label htmlFor="new-completion">
-              {t("createForm.completionDate")}
-            </label>
-            <input id="new-completion" name="completionDate" type="date" />
-          </div>
-          <div className={styles.createActions}>
-            <button
-              type="submit"
-              className={styles.createSubmit}
-              disabled={isPending}
-            >
-              {isPending ? "..." : t("createForm.create")}
-            </button>
-            <button
-              type="button"
-              className={styles.createCancel}
-              onClick={() => setShowForm(false)}
-            >
-              {t("createForm.cancel")}
-            </button>
-            {state?.error && (
-              <span role="alert" className={styles.createError}>
-                {t(`createForm.errors.${state.error}`)}
-              </span>
-            )}
-          </div>
-        </form>
-      )}
 
       {projects.length === 0 ? (
         <p className={shared.muted}>{t("empty")}</p>

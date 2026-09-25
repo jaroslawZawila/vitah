@@ -74,7 +74,9 @@ The portal and the mobile app share one backend. Layers:
 When adding a feature: write it in `packages/core`, then add the server action and the `/api/v1`
 route. In the portal, keep UI separate from logic: a page's container component (e.g.
 `ClientsScreen.tsx`) is the only file that calls server actions; presentational components in
-`components/` take data and callbacks as props only. Keep `/api/v1` backwards compatible — installed mobile builds lag behind.
+`components/` take data and callbacks as props only. Multi-step flows use `dashboard/components/wizard`: to add a
+step to new-project creation, extend `ProjectDraft` and core `createProject`, write a step component
++ summary in `projects/new/steps/`, and register it in `PROJECT_STEPS`. Keep `/api/v1` backwards compatible — installed mobile builds lag behind.
 
 ### Mobile-first responsive design (apps/web)
 
@@ -185,6 +187,8 @@ apps/web/
     components/LoginForm.tsx       # Client Component with useActionState
     dashboard/page.tsx             # Redirects to /dashboard/projects
     dashboard/projects/            # Project list + detail (header, client app access)
+    dashboard/projects/new/        # New-project wizard: steps/index.ts is the step registry
+    dashboard/components/wizard/   # Generic multi-step flow: useWizard (logic), Wizard/ReviewStep (views)
     dashboard/clients/             # Mobile app clients (admin): ClientsScreen container + pure views in components/
     dashboard/users/               # User management page (admin)
     api/auth/[...nextauth]/route.ts
