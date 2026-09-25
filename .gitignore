@@ -11,6 +11,7 @@ node_modules
 .env.development.local
 .env.test.local
 .env.production.local
+.env.vercel
 
 # Testing
 coverage
@@ -36,3 +37,7 @@ yarn-error.log*
 # Misc
 .DS_Store
 *.pem
+
+# Claude Code (personal settings, worktrees)
+.claude/settings.local.json
+.claude/worktrees/
