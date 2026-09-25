@@ -1,4 +1,5 @@
 import { act, renderHook, waitFor } from "@testing-library/react-native";
+import { AppState } from "react-native";
 import type { Result } from "../lib/api";
 import { useClientData } from "../lib/use-client-data";
 
@@ -33,6 +34,23 @@ describe("useClientData", () => {
     act(() => result.current.retry());
     await waitFor(() => expect(result.current.data).toEqual(["a", "b"]));
     expect(result.current.error).toBe(false);
+  });
+
+  it("loads again when the app returns to the foreground", async () => {
+    const listeners: ((status: string) => void)[] = [];
+    jest
+      .spyOn(AppState, "addEventListener")
+      .mockImplementation((_type, listener) => {
+        listeners.push(listener as (status: string) => void);
+        return { remove: jest.fn() } as never;
+      });
+    load.mockResolvedValueOnce({ ok: true, data: ["a"] }).mockResolvedValueOnce({ ok: true, data: ["a", "b"] });
+    const { result } = renderHook(() => useClientData(load));
+    await waitFor(() => expect(result.current.data).toEqual(["a"]));
+
+    act(() => listeners.forEach((listener) => listener("active")));
+
+    await waitFor(() => expect(result.current.data).toEqual(["a", "b"]));
   });
 
   it("signs out when the session is rejected", async () => {

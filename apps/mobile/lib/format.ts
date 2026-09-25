@@ -1,16 +1,18 @@
 import type { AppLanguage } from "@repo/core/contract";
+import { SPAIN_TZ, calendarDayUtc } from "./dates";
 
 const LOCALES: Record<AppLanguage, string> = { es: "es-ES", en: "en-GB" };
 
-/** Formats a calendar date (YYYY-MM-DD) as "1 de marzo de 2026" / "1 March 2026". */
-export function formatDate(calendarDate: string, language: AppLanguage = "es"): string {
-  const [year, month, day] = calendarDate.split("-").map(Number);
-  return new Date(Date.UTC(year!, month! - 1, day!)).toLocaleDateString(LOCALES[language], {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-    timeZone: "UTC",
-  });
+/** Formats a calendar date (YYYY-MM-DD) as "10 mar 2026" / "10 Mar 2026". */
+export function formatMediumDate(calendarDate: string, language: AppLanguage = "es"): string {
+  return new Date(calendarDayUtc(calendarDate))
+    .toLocaleDateString(LOCALES[language], {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+      timeZone: "UTC",
+    })
+    .replace(/\./g, "");
 }
 
 /** Formats an ISO timestamp as a short date in Spain's time zone: "22 sept" / "22 Sept". */
@@ -18,7 +20,7 @@ export function formatShortDate(iso: string, language: AppLanguage = "es"): stri
   return new Date(iso).toLocaleDateString(LOCALES[language], {
     day: "numeric",
     month: "short",
-    timeZone: "Europe/Madrid",
+    timeZone: SPAIN_TZ,
   });
 }
 

@@ -1,5 +1,5 @@
 import Feather from "@expo/vector-icons/Feather";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -10,16 +10,14 @@ import {
   Text,
   View,
 } from "react-native";
-import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import type { AppLanguage, MobilePhoto, PhotoSize } from "@repo/core/contract";
+import type { AppLanguage, MobilePhoto } from "@repo/core/contract";
 import { Button } from "../../components/button";
+import { PhotoImage } from "../../components/photo-image";
 import { colors, spacing, type } from "../../constants/theme";
-import { api } from "../../lib/api";
-import { useAuth } from "../../lib/auth";
 import { formatShortDate } from "../../lib/format";
 import { useI18n, type Translate } from "../../lib/i18n";
-import { groupByWeek, type PhotoWeek } from "../../lib/photo-weeks";
+import type { PhotoWeek } from "../../lib/photo-weeks";
 import { usePhotos } from "../../lib/use-photos";
 
 // Tab "Fotos" — doc/mobile-app-design/A-Gallery.dc.html: photos grouped by
@@ -29,10 +27,9 @@ import { usePhotos } from "../../lib/use-photos";
 
 export default function PhotosScreen() {
   const insets = useSafeAreaInsets();
-  const { photos, error, refreshing, refresh, retry } = usePhotos();
+  const { photos, weeks, error, refreshing, refresh, retry } = usePhotos();
   const { t } = useI18n();
   const [viewing, setViewing] = useState<MobilePhoto | null>(null);
-  const weeks = useMemo(() => groupByWeek(photos ?? []), [photos]);
 
   const header = (
     <View style={{ gap: spacing.sm, paddingBottom: spacing.lg }}>
@@ -79,39 +76,6 @@ export default function PhotosScreen() {
       />
       <Viewer photo={viewing} onClose={() => setViewing(null)} />
     </>
-  );
-}
-
-/**
- * The image of a photo (grids use the thumbnail), fetched with the client's
- * token. expo-image, not React Native's Image: RN's new architecture drops
- * `source.headers`, so the API answered 401. Photos never change (new id per
- * upload), so they're kept in expo-image's disk cache, wiped on sign-out.
- */
-function PhotoImage({
-  photo,
-  size,
-  style,
-  contentFit = "cover",
-}: {
-  photo: MobilePhoto;
-  size: PhotoSize;
-  style: object;
-  contentFit?: "cover" | "contain";
-}) {
-  const { token } = useAuth();
-  return (
-    <Image
-      source={{
-        uri: api.photoUrl(photo.id, size),
-        headers: { Authorization: `Bearer ${token}` },
-      }}
-      cachePolicy="disk"
-      contentFit={contentFit}
-      transition={150}
-      style={style}
-      accessibilityIgnoresInvertColors
-    />
   );
 }
 

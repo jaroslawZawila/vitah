@@ -1,14 +1,4 @@
-import { formatDate, formatFileSize, formatShortDate } from "../lib/format";
-
-describe("formatDate", () => {
-  it("formats a calendar date in Spanish", () => {
-    expect(formatDate("2026-03-01")).toBe("1 de marzo de 2026");
-  });
-
-  it("does not shift the day across time zones", () => {
-    expect(formatDate("2026-12-31")).toBe("31 de diciembre de 2026");
-  });
-});
+import { formatFileSize, formatMediumDate, formatShortDate } from "../lib/format";
 
 describe("formatShortDate", () => {
   it("shows day and short month in Spain's time zone", () => {
@@ -29,8 +19,15 @@ describe("formatFileSize", () => {
 
 describe("in English", () => {
   it("formats dates and sizes the English way", () => {
-    expect(formatDate("2026-03-01", "en")).toBe("1 March 2026");
     expect(formatShortDate("2026-09-22T10:00:00.000Z", "en")).toMatch(/^22 Sept?$/);
     expect(formatFileSize(3.1 * 1024 * 1024, "en")).toBe("3.1 MB");
   });
 });
+
+describe("formatMediumDate", () => {
+  it("shows day, short month and year, as in the design", () => {
+    expect(formatMediumDate("2026-03-10")).toBe("10 mar 2026");
+    expect(formatMediumDate("2027-01-15", "en")).toBe("15 Jan 2027");
+  });
+});
+

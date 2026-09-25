@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react-native";
 import { Image } from "expo-image";
 import type { MobilePhoto } from "@repo/core/contract";
 import PhotosScreen from "../app/(app)/photos";
+import { groupByWeek } from "../lib/photo-weeks";
 import { usePhotos } from "../lib/use-photos";
 
 jest.mock("../lib/use-photos", () => ({ usePhotos: jest.fn() }));
@@ -23,8 +24,10 @@ const refresh = jest.fn();
 const retry = jest.fn();
 
 function state(overrides: Partial<ReturnType<typeof usePhotos>> = {}) {
+  const photos = "photos" in overrides ? overrides.photos : [facade, roof, insulation];
   jest.mocked(usePhotos).mockReturnValue({
-    photos: [facade, roof, insulation],
+    photos,
+    weeks: groupByWeek(photos ?? []),
     error: false,
     refreshing: false,
     refresh,

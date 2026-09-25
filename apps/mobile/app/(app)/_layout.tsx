@@ -7,6 +7,8 @@ import { DocumentsProvider } from "../../lib/documents";
 import { PUSH_NOTIFICATIONS } from "../../lib/features";
 import { useI18n } from "../../lib/i18n";
 import { usePushNotifications } from "../../lib/push";
+import { PhotosProvider } from "../../lib/use-photos";
+import { ProjectProvider } from "../../lib/use-project";
 
 export default function AppLayout() {
   const { token, isLoading } = useAuth();
@@ -26,7 +28,10 @@ export default function AppLayout() {
   }
 
   return (
-    // Above the tabs so documents sync on app open, whichever tab is shown.
+    // Above the tabs: one copy of the client's data for every tab, and
+    // documents sync on app open whichever tab is shown.
+    <ProjectProvider>
+    <PhotosProvider>
     <DocumentsProvider>
       <Tabs
         screenOptions={{
@@ -44,7 +49,8 @@ export default function AppLayout() {
         <Tabs.Screen
           name="index"
           options={{
-            tabBarLabel: t("tabs.home"),
+            title: t("tabs.home"),
+            headerShown: false,
             tabBarIcon: ({ color }) => <Feather name="home" size={22} color={color} />,
           }}
         />
@@ -74,6 +80,8 @@ export default function AppLayout() {
         />
       </Tabs>
     </DocumentsProvider>
+    </PhotosProvider>
+    </ProjectProvider>
   );
 }
 

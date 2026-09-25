@@ -15,6 +15,10 @@ export const spacing = {
 
 export const radius = {
   md: 8,
+  /** Tiles, e.g. Home's shortcuts. */
+  lg: 12,
+  /** Cards. */
+  xl: 16,
 } as const;
 
 /** "Minimalista de lujo": light weights, wide tracking on labels. */
@@ -22,6 +26,8 @@ export const type = {
   display: { fontSize: 30, fontWeight: "300", color: colors.blancoCalido },
   title: { fontSize: 22, fontWeight: "300", color: colors.blancoCalido },
   body: { fontSize: 17, fontWeight: "400", color: colors.blancoCalido },
+  /** List rows and card text (15). */
+  row: { fontSize: 15, fontWeight: "400", color: colors.blancoCalido },
   subhead: { fontSize: 15, fontWeight: "400", color: colors.muted },
   label: {
     fontSize: 11,
@@ -31,3 +37,11 @@ export const type = {
     color: colors.muted,
   },
 } as const satisfies Record<string, TextStyle>;
+
+/** A card: "Card" in doc/mobile-app-design/README.md. */
+export const card = {
+  backgroundColor: colors.surface,
+  borderWidth: 1,
+  borderColor: colors.surfaceBorder,
+  borderRadius: radius.xl,
+} as const;

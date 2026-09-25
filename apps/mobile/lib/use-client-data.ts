@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { AppState } from "react-native";
 import type { Result } from "./api";
 import { useAuth } from "./auth";
 
@@ -12,8 +13,9 @@ type State<T> = {
 
 /**
  * Loads data for the signed-in client with `fetch` (keep it stable, e.g. a
- * module-level function). Signs out when the server rejects the session
- * (e.g. access was revoked in the portal).
+ * module-level function), and again quietly whenever the app returns to the
+ * foreground. Signs out when the server rejects the session (e.g. access was
+ * revoked in the portal).
  */
 export function useClientData<T>(fetch: (token: string) => Promise<Result<T>>) {
   const { token, signOut } = useAuth();
@@ -37,6 +39,10 @@ export function useClientData<T>(fetch: (token: string) => Promise<Result<T>>) {
 
   useEffect(() => {
     void load();
+    const subscription = AppState.addEventListener("change", (status) => {
+      if (status === "active") void load();
+    });
+    return () => subscription.remove();
   }, [load]);
 
   const refresh = useCallback(() => {
@@ -49,5 +55,5 @@ export function useClientData<T>(fetch: (token: string) => Promise<Result<T>>) {
     void load();
   }, [load]);
 
-  return { ...state, refresh, retry };
+  return useMemo(() => ({ ...state, refresh, retry }), [state, refresh, retry]);
 }

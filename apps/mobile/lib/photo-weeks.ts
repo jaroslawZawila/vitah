@@ -1,4 +1,5 @@
 import type { MobilePhoto } from "@repo/core/contract";
+import { spanishDayUtc } from "./dates";
 
 export type PhotoWeek = {
   /** e.g. "2026-W39"; stable React key. */
@@ -8,21 +9,9 @@ export type PhotoWeek = {
   photos: MobilePhoto[];
 };
 
-// The calendar day in Spain. Built once: creating formatters is slow on Hermes.
-const spanishDay = new Intl.DateTimeFormat("en", {
-  timeZone: "Europe/Madrid",
-  year: "numeric",
-  month: "numeric",
-  day: "numeric",
-});
-
 /** The ISO week (year and number) of a timestamp, as a calendar day in Spain. */
 function isoWeek(iso: string) {
-  // Read by part: the order and separators of a formatted date vary by ICU version.
-  const parts = spanishDay.formatToParts(new Date(iso));
-  const part = (type: Intl.DateTimeFormatPartTypes) =>
-    Number(parts.find((p) => p.type === type)?.value);
-  const d = new Date(Date.UTC(part("year"), part("month") - 1, part("day")));
+  const d = new Date(spanishDayUtc(new Date(iso)));
   // Thursday of the same week decides the week's year.
   d.setUTCDate(d.getUTCDate() + 3 - ((d.getUTCDay() + 6) % 7));
   const weekYear = d.getUTCFullYear();
