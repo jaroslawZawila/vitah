@@ -16,9 +16,9 @@ import {
   setActaPhotosAction,
   updateCheckAction,
   updateHitoAction,
-  uploadHitoFileAction,
-  type ObraState,
+  uploadHitoFileAction
 } from "../../../../../actions/obra";
+import type { ObraState } from "../../../../../actions/run";
 import FormError from "../../components/FormError";
 import Modal from "../../components/Modal";
 import FieldsForm from "../../components/obra/FieldsForm";

@@ -20,7 +20,7 @@ import {
   updateLineAction,
   updateRevisionAction,
 } from "../../../../actions/budget";
-import type { ObraState } from "../../../../actions/obra";
+import type { ObraState } from "../../../../actions/run";
 import EmptyState from "../components/EmptyState";
 import FormError from "../components/FormError";
 import { SleepingCamera } from "../components/illustrations";

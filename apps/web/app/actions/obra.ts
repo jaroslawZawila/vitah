@@ -13,8 +13,6 @@ import {
 } from "@repo/core";
 import { mutate, read, type ObraState } from "./run";
 
-export type { ObraState };
-
 // ─── Reads ───────────────────────────────────────────────────────────────────
 
 export async function getProjectObra(projectId: string) {

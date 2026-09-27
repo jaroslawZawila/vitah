@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import type { ObraState } from "../../../../../actions/obra";
+import type { ObraState } from "../../../../../actions/run";
 
 /**
  * Runs the obra screens' server actions: keeps the last result (for its
