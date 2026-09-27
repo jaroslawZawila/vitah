@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Portal · Presupuesto</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;900&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#f5f4f0;font-family:'Geist',system-ui,sans-serif;color:#1e1e1e}
+a{color:#6b7a4a;text-decoration:none}a:hover{color:#7d8e58}
+button,input{font-family:inherit}
+</style>
+</helmet>
+<div style="width: 1440px; height: 2200px; display: flex; background: #f5f4f0; font-family: 'Geist', system-ui, sans-serif; color: #1e1e1e; font-size: 13px; overflow: hidden;">
+
+  <aside style="width: 210px; flex-shrink: 0; background: #12120e; display: flex; flex-direction: column;">
+    <div style="padding: 18px 16px 14px; border-bottom: 1px solid rgba(255,255,255,0.07); display: flex; align-items: center; gap: 10px;">
+      <div style="width: 32px; height: 32px; background: #6b7a4a; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 900; color: #ffffff; font-size: 16px; font-style: italic;">V</div>
+      <div><div style="color: #e8e7e2; font-weight: 700; font-size: 15px; letter-spacing: 0.5px;">ViTAH</div><div style="color: #6b7a4a; font-size: 8px; letter-spacing: 2px;">OS PLATFORM</div></div>
+    </div>
+    <nav aria-label="Principal" style="flex-grow: 1; padding: 8px 0;">
+      <a href="P-Obra.dc.html" style="display: flex; align-items: center; gap: 9px; padding: 9px 16px; background: rgba(107,122,74,0.2); color: #e8e7e2; font-size: 12.5px; border-left: 3px solid #6b7a4a;"><span style="width: 18px; text-align: center; font-size: 14px;">◫</span>Proyectos</a>
+      <ul aria-label="Secciones del proyecto" style="list-style: none; margin: 2px 0 6px 25px; padding: 0; border-left: 1px solid rgba(255,255,255,0.1);">
+        <li><a href="P-Obra.dc.html" style="display: flex; align-items: center; min-height: 36px; padding: 0 12px; margin-left: -1px; border-left: 1px solid transparent; color: #8a8a82; font-size: 12px;">General</a></li>
+        <li><a href="P-Obra.dc.html" style="display: flex; align-items: center; min-height: 36px; padding: 0 12px; margin-left: -1px; border-left: 1px solid transparent; color: #8a8a82; font-size: 12px;">Obra</a></li>
+        <li><a href="P-Presupuesto.dc.html" aria-current="page" style="display: flex; align-items: center; min-height: 36px; padding: 0 12px; margin-left: -1px; border-left: 1px solid #6b7a4a; color: #e8e7e2; font-size: 12px; font-weight: 600;">Presupuesto</a></li>
+        <li><a href="P-Hitos.dc.html" style="display: flex; align-items: center; min-height: 36px; padding: 0 12px; margin-left: -1px; border-left: 1px solid transparent; color: #8a8a82; font-size: 12px;">Pagos</a></li>
+        <li><a href="P-Obra.dc.html" style="display: flex; align-items: center; min-height: 36px; padding: 0 12px; margin-left: -1px; border-left: 1px solid transparent; color: #8a8a82; font-size: 12px;">Documentos</a></li>
+        <li><a href="P-Obra.dc.html" style="display: flex; align-items: center; min-height: 36px; padding: 0 12px; margin-left: -1px; border-left: 1px solid transparent; color: #8a8a82; font-size: 12px;">Fotos</a></li>
+      </ul>
+      <a href="P-Obra.dc.html" style="display: flex; align-items: center; gap: 9px; padding: 9px 16px; color: #8a8a82; font-size: 12.5px; border-left: 3px solid transparent;"><span style="width: 18px; text-align: center; font-size: 14px;">◉</span>Clientes</a>
+      <a href="P-Obra.dc.html" style="display: flex; align-items: center; gap: 9px; padding: 9px 16px; color: #8a8a82; font-size: 12.5px; border-left: 3px solid transparent;"><span style="width: 18px; text-align: center; font-size: 14px;">◐</span>Usuarios</a>
+    </nav>
+    <div style="padding: 12px 16px; border-top: 1px solid rgba(255,255,255,0.07); display: flex; align-items: center; gap: 8px;">
+      <div style="width: 26px; height: 26px; border-radius: 50%; background: #4a5e2c; display: flex; align-items: center; justify-content: center; color: #ffffff; font-size: 12px; font-weight: 700;">A</div>
+      <div><div style="color: #e8e7e2; font-size: 11px; font-weight: 600;">Admin ViTAH</div><div style="color: #6b7a4a; font-size: 9px;">admin@vitah.es</div></div>
+    </div>
+  </aside>
+
+  <div style="flex-grow: 1; display: flex; flex-direction: column; min-width: 0;">
+    <header style="height: 52px; flex-shrink: 0; background: #ffffff; border-bottom: 1px solid #e0ded8; display: flex; align-items: center; padding: 0 20px;">
+      <div style="font-size: 14px; font-weight: 600;">Detalle de Proyecto</div>
+    </header>
+
+    <main style="flex-grow: 1; padding: 16px 20px; display: flex; flex-direction: column; gap: 16px;">
+      <a href="P-Obra.dc.html" style="font-size: 12px; color: #8a8a82;">← Volver a proyectos</a>
+
+      <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 16px;">
+        <div>
+          <p style="margin: 0 0 4px; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; color: #6b7a4a;">VTH-26-001</p>
+          <h1 style="margin: 0; font-size: 22px; font-weight: 600;">Presupuesto</h1>
+          <p style="margin: 2px 0 0; font-size: 12px; color: #8a8a82;">Nº 036/2026 · Ejecución por contrata (PEC) · precio cerrado · válido 90 días desde su emisión</p>
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <button type="button" style="min-height: 44px; padding: 0 16px; border-radius: 6px; border: 1px solid #e0ded8; background: #ffffff; color: #1e1e1e; font-size: 13px; font-weight: 600; cursor: pointer;">Exportar PDF</button>
+          <button type="button" style="min-height: 44px; padding: 0 16px; border-radius: 6px; border: 1px solid #6b7a4a; background: #6b7a4a; color: #ffffff; font-size: 13px; font-weight: 600; cursor: pointer;">Nueva revisión</button>
+        </div>
+      </div>
+
+      <nav aria-label="Revisiones" style="display: flex; gap: 8px; align-items: center;">
+        <span style="font-size: 10px; font-weight: 600; letter-spacing: 0.5px; color: #8a8a82; margin-right: 4px;">REVISIÓN</span>
+        <a href="P-Presupuesto.dc.html" style="min-height: 36px; display: inline-flex; align-items: center; gap: 8px; padding: 0 14px; border-radius: 999px; border: 1px solid #e0ded8; background: #ffffff; color: #8a8a82; font-size: 12px;">Rev.2 · 419.500,73 € · superada</a>
+        <a href="P-Presupuesto.dc.html" aria-current="true" style="min-height: 36px; display: inline-flex; align-items: center; gap: 8px; padding: 0 14px; border-radius: 999px; background: #1e1e1e; color: #ffffff; font-size: 12px; font-weight: 600;">Rev.3 · 448.205,05 € · aceptada 12 jun 2026</a>
+      </nav>
+
+      <section style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px;">
+        <div style="background: #ffffff; border: 1px solid #e0ded8; border-radius: 10px; padding: 16px 20px; display: flex; flex-direction: column; gap: 4px;">
+          <div style="font-size: 10px; font-weight: 600; letter-spacing: 0.5px; color: #8a8a82;">TOTAL PEC (SIN IVA)</div>
+          <div style="font-size: 24px; font-weight: 600;">448.205,05 €</div>
+          <div style="font-size: 12px; color: #8a8a82;">+28.704,32 € respecto a Rev.2</div>
+        </div>
+        <div style="background: #ffffff; border: 1px solid #e0ded8; border-radius: 10px; padding: 16px 20px; display: flex; flex-direction: column; gap: 4px;">
+          <div style="font-size: 10px; font-weight: 600; letter-spacing: 0.5px; color: #8a8a82;">IVA 10 % · AUTOPROMOCIÓN</div>
+          <div style="font-size: 24px; font-weight: 600;">493.025,56 €</div>
+          <div style="font-size: 12px; color: #8a8a82;">IVA 44.820,51 €</div>
+        </div>
+        <div style="background: #ffffff; border: 1px solid #e0ded8; border-radius: 10px; padding: 16px 20px; display: flex; flex-direction: column; gap: 4px;">
+          <div style="font-size: 10px; font-weight: 600; letter-spacing: 0.5px; color: #8a8a82;">SUPERFICIES</div>
+          <div style="font-size: 24px; font-weight: 600;">253,45 m²<span style="font-size: 13px; font-weight: 400; color: #8a8a82;"> construidos</span></div>
+          <div style="font-size: 12px; color: #8a8a82;">208,25 m² útiles · parcela 3.262 m²</div>
+        </div>
+        <div style="background: #ffffff; border: 1px solid #e0ded8; border-radius: 10px; padding: 16px 20px; display: flex; flex-direction: column; gap: 4px;">
+          <div style="font-size: 10px; font-weight: 600; letter-spacing: 0.5px; color: #8a8a82;">RATIOS</div>
+          <div style="font-size: 24px; font-weight: 600;">1.768,42 €<span style="font-size: 13px; font-weight: 400; color: #8a8a82;">/m²c</span></div>
+          <div style="font-size: 12px; color: #8a8a82;">2.152,25 €/m² útil</div>
+        </div>
+      </section>
+
+      <section style="background: #ffffff; border: 1px solid #e0ded8; border-radius: 10px; padding: 20px;">
+        <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px;">
+          <h2 style="margin: 0; font-size: 15px; font-weight: 600;">Cambios respecto a Rev.2</h2>
+          <span style="font-size: 12px; color: #8a8a82;">Cruce con el BC3 real (Castrillon_1.bc3) y la Memoria Constructiva visada</span>
+        </div>
+        <div role="table" aria-label="Cambios" style="display: flex; flex-direction: column;">
+          <div role="row" style="display: grid; grid-template-columns: 56px 300px 120px 120px 120px minmax(0, 1fr); gap: 16px; padding: 8px 0; border-bottom: 1px solid #e0ded8; font-size: 10px; font-weight: 600; letter-spacing: 0.5px; color: #8a8a82;">
+            <span role="columnheader">CAP.</span><span role="columnheader">PARTIDA</span><span role="columnheader" style="text-align: right;">REV.2</span><span role="columnheader" style="text-align: right;">REV.3</span><span role="columnheader" style="text-align: right;">VARIACIÓN</span><span role="columnheader">JUSTIFICACIÓN</span>
+          </div>
+          <sc-for list="{{changes}}" as="r" hint-placeholder-count="6">
+            <div role="row" style="display: grid; grid-template-columns: 56px 300px 120px 120px 120px minmax(0, 1fr); gap: 16px; align-items: center; min-height: 44px; padding: 6px 0; border-bottom: 1px solid #f5f4f0;">
+              <span role="cell" style="font-weight: 600; color: #6b7a4a;">{{r.code}}</span>
+              <span role="cell" style="font-weight: 500;">{{r.name}}</span>
+              <span role="cell" style="text-align: right; color: #8a8a82; font-variant-numeric: tabular-nums;">{{r.before}}</span>
+              <span role="cell" style="text-align: right; font-variant-numeric: tabular-nums;">{{r.after}}</span>
+              <span role="cell" style="text-align: right; font-weight: 600; font-variant-numeric: tabular-nums;">{{r.delta}}</span>
+              <span role="cell" style="font-size: 12px; color: #8a8a82; line-height: 1.4;">{{r.why}}</span>
+            </div>
+          </sc-for>
+        </div>
+      </section>
+
+      <section style="background: #ffffff; border: 1px solid #e0ded8; border-radius: 10px; padding: 20px;">
+        <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px;">
+          <h2 style="margin: 0; font-size: 15px; font-weight: 600;">Presupuesto detallado</h2>
+          <span style="font-size: 12px; color: #8a8a82;">17 capítulos · 102 partidas · solo lo ve el equipo; el cliente ve el resumen por capítulos</span>
+        </div>
+
+        <div style="border: 1px solid #e0ded8; border-radius: 8px; overflow: hidden;">
+          <button type="button" aria-expanded="true" style="width: 100%; min-height: 48px; display: flex; align-items: center; gap: 16px; padding: 0 16px; border: none; background: #f0efe8; color: #1e1e1e; font-size: 13px; cursor: pointer; text-align: left;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg>
+            <span style="font-weight: 700; color: #6b7a4a; width: 32px;">01</span>
+            <span style="flex-grow: 1; font-weight: 600;">Actuaciones Previas y Movimiento de Tierras <span style="color: #6b7a4a;">★</span></span>
+            <span style="color: #8a8a82;">9 partidas · 2,79 %</span>
+            <span style="width: 120px; text-align: right; font-weight: 700;">12.500,00 €</span>
+          </button>
+          <div style="padding: 10px 16px; font-size: 12px; color: #8a8a82; border-bottom: 1px solid #e0ded8;">Corregido en Rev.3: el BC3 real confirma 265 m³ de vaciado a menos de 2 m (no 1.800 m³ a −3,00 m). Ahorro: −12.385 €.</div>
+          <div role="table" aria-label="Partidas del capítulo 01" style="display: flex; flex-direction: column; padding: 0 16px;">
+            <div role="row" style="display: grid; grid-template-columns: 64px minmax(0, 1fr) 48px 96px 110px 120px 32px; gap: 12px; padding: 8px 0; border-bottom: 1px solid #e0ded8; font-size: 10px; font-weight: 600; letter-spacing: 0.5px; color: #8a8a82;">
+              <span role="columnheader">CÓDIGO</span><span role="columnheader">DESCRIPCIÓN DE LA UNIDAD DE OBRA</span><span role="columnheader">UD.</span><span role="columnheader" style="text-align: right;">CANT.</span><span role="columnheader" style="text-align: right;">P.U. (€)</span><span role="columnheader" style="text-align: right;">IMPORTE (€)</span><span role="columnheader"></span>
+            </div>
+            <sc-for list="{{lines}}" as="l" hint-placeholder-count="9">
+              <div role="row" style="display: grid; grid-template-columns: 64px minmax(0, 1fr) 48px 96px 110px 120px 32px; gap: 12px; align-items: center; min-height: 48px; border-bottom: 1px solid #f5f4f0;">
+                <span role="cell" style="color: #8a8a82; font-variant-numeric: tabular-nums;">{{l.code}}</span>
+                <span role="cell" style="line-height: 1.4;">{{l.text}}</span>
+                <span role="cell" style="color: #8a8a82;">{{l.unit}}</span>
+                <span role="cell"><input aria-label="Cantidad {{l.code}}" value="{{l.qty}}" style="width: 100%; box-sizing: border-box; min-height: 36px; padding: 0 8px; border: 1px solid #e0ded8; border-radius: 6px; text-align: right; font-size: 13px; color: #1e1e1e; background: #ffffff;"></span>
+                <span role="cell"><input aria-label="Precio unitario {{l.code}}" value="{{l.price}}" style="width: 100%; box-sizing: border-box; min-height: 36px; padding: 0 8px; border: 1px solid #e0ded8; border-radius: 6px; text-align: right; font-size: 13px; color: #1e1e1e; background: #ffffff;"></span>
+                <span role="cell" style="text-align: right; font-weight: 600; font-variant-numeric: tabular-nums;">{{l.amount}}</span>
+                <button type="button" aria-label="Más acciones {{l.code}}" style="width: 32px; height: 32px; border: none; background: none; color: #8a8a82; cursor: pointer; font-size: 16px;">⋯</button>
+              </div>
+            </sc-for>
+            <div style="display: flex; justify-content: space-between; align-items: center; min-height: 48px;">
+              <button type="button" style="min-height: 36px; padding: 0 12px; border-radius: 6px; border: 1px dashed #c9c8c2; background: none; color: #6b7a4a; font-size: 12px; font-weight: 600; cursor: pointer;">+ Añadir partida</button>
+              <span style="font-weight: 700;">Subtotal Cap. 01 · 12.500,00 €</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; margin-top: 8px;">
+          <sc-for list="{{collapsed}}" as="c" hint-placeholder-count="16">
+            <button type="button" aria-expanded="false" style="width: 100%; min-height: 48px; display: flex; align-items: center; gap: 16px; padding: 0 16px; border: none; border-bottom: 1px solid #f5f4f0; background: #ffffff; color: #1e1e1e; font-size: 13px; cursor: pointer; text-align: left;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8a8a82" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"></path></svg>
+              <span style="font-weight: 700; color: #6b7a4a; width: 32px;">{{c.code}}</span>
+              <span style="flex-grow: 1; font-weight: 500;">{{c.name}}</span>
+              <span style="color: #8a8a82;">{{c.lines}} partidas · {{c.share}}</span>
+              <span style="width: 120px; text-align: right; font-weight: 600;">{{c.amount}}</span>
+            </button>
+          </sc-for>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 12px; padding: 16px; border-radius: 8px; background: #1e1e1e; color: #e8e7e2;">
+          <span style="font-weight: 700; letter-spacing: 0.02em;">TOTAL PEC (sin IVA) — Revisión 3</span>
+          <span style="display: flex; gap: 24px; align-items: baseline;"><span style="font-size: 12px; color: #9a9a94;">1.768,42 €/m²c</span><span style="font-size: 20px; font-weight: 700;">448.205,05 €</span></span>
+        </div>
+      </section>
+
+      <section style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px;">
+        <a href="P-Hitos.dc.html" style="background: #ffffff; border: 1px solid #e0ded8; border-radius: 10px; padding: 16px 20px; color: #1e1e1e; display: flex; flex-direction: column; gap: 4px;">
+          <span style="font-size: 10px; font-weight: 600; letter-spacing: 0.5px; color: #8a8a82;">§4 PLAN DE PAGOS</span>
+          <span style="font-weight: 600;">Hitos H0–H9 →</span>
+          <span style="font-size: 12px; color: #8a8a82;">Importes recalculados con cada revisión aceptada</span>
+        </a>
+        <div style="background: #ffffff; border: 1px solid #e0ded8; border-radius: 10px; padding: 16px 20px; display: flex; flex-direction: column; gap: 4px;">
+          <span style="font-size: 10px; font-weight: 600; letter-spacing: 0.5px; color: #8a8a82;">§5 GASTOS NO INCLUIDOS</span>
+          <span style="font-weight: 600;">9 exclusiones</span>
+          <span style="font-size: 12px; color: #8a8a82;">Geotécnico, honorarios (~8 % PEM), IVA e ICIO, parcela completa, piscina, auxiliar, acometidas, mobiliario</span>
+        </div>
+        <div style="background: #ffffff; border: 1px solid #e0ded8; border-radius: 10px; padding: 16px 20px; display: flex; flex-direction: column; gap: 4px;">
+          <span style="font-size: 10px; font-weight: 600; letter-spacing: 0.5px; color: #8a8a82;">§6–§8 GARANTÍAS, DOCUMENTACIÓN Y CONTRATO</span>
+          <span style="font-weight: 600;">LOE 1 · 3 · 10 años · 9 documentos · 16 cláusulas</span>
+          <span style="font-size: 12px; color: #8a8a82;">La documentación a entregar es la lista de control del hito H9</span>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":2200}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      changes: [
+        { code: '01', name: 'Actuaciones previas (excavación)', before: '24.885,38 €', after: '12.500,00 €', delta: '−12.385,38 €', why: 'BC3 real: 265 m³ de vaciado a menos de 2 m. Rev.2 asumía 1.800 m³ a −3 m sin datos reales.' },
+        { code: '05', name: 'Envolvente Thermochip', before: '81.169,59 €', after: '86.304,39 €', delta: '+5.134,80 €', why: 'Precio de mercado: fachada 88 → 98 €/m², cubierta 103 → 110 €/m².' },
+        { code: '06', name: 'Fachada (mortero + remates)', before: '12.000,00 €', after: '15.339,84 €', delta: '+3.339,84 €', why: 'Mortero 22 → 25 €/m²; vierteaguas 413 → 2.850 € (12–15 huecos en el BC3).' },
+        { code: '07', name: 'Cubiertas (remates)', before: '22.441,12 €', after: '25.013,08 €', delta: '+2.571,96 €', why: 'Remates 1.628 → 4.200 €: 3 chimeneas, limahoyas, cumbrera y aleros, 303 m².' },
+        { code: '17', name: 'PA remates y coordinación final (nuevo)', before: '—', after: '21.343,10 €', delta: '+21.343,10 €', why: '5 % del PEC base (426.861,95 €), a justificar.' },
+        { code: '16', name: 'SS + control de calidad + RCD (nuevo)', before: '—', after: '8.700,00 €', delta: '+8.700,00 €', why: 'Obligatorio (RD 1627/1997 y RD 105/2008). Estaba en el BC3, faltaba en Rev.2.' },
+      ],
+      lines: [
+        { code: '01.01', text: 'Desbroce y limpieza superficial del terreno, medios mecánicos', unit: 'm²', qty: '265', price: '3,50', amount: '927,50' },
+        { code: '01.02', text: 'Excavación mecánica en vaciado a cota −1,50 m en terreno compacto', unit: 'm³', qty: '265', price: '10,00', amount: '2.650,00' },
+        { code: '01.03', text: 'Carga y transporte de tierras a vertedero autorizado, distancia ≤15 km', unit: 'm³', qty: '265', price: '5,50', amount: '1.457,50' },
+        { code: '01.04', text: 'Excavación zanjas instalaciones y anclajes de losa', unit: 'm³', qty: '219,76', price: '8,00', amount: '1.758,08' },
+        { code: '01.05', text: 'Excavación zanjas saneamiento', unit: 'm³', qty: '25,28', price: '15,00', amount: '379,20' },
+        { code: '01.06', text: 'Extendido y compactación arena con aporte', unit: 'm³', qty: '87', price: '14,00', amount: '1.218,00' },
+        { code: '01.07', text: 'Extendido y compactación grava con aporte', unit: 'm³', qty: '9', price: '14,00', amount: '126,00' },
+        { code: '01.08', text: 'Topografía, replanteo y levantamiento taquimétrico previo a cimentación', unit: 'pa', qty: '1', price: '1.500,00', amount: '1.500,00' },
+        { code: '01.09', text: 'Medios auxiliares, señalización de obra y vallado perimetral de seguridad', unit: 'pa', qty: '1', price: '2.483,72', amount: '2.483,72' },
+      ],
+      collapsed: [
+        { code: '02', name: 'Red de Saneamiento y Drenajes', lines: 7, share: '2,12 %', amount: '9.500,00 €' },
+        { code: '03', name: 'Cimentación y Protección Radón — DB-HS 6', lines: 7, share: '9,23 %', amount: '41.354,30 €' },
+        { code: '04', name: 'Estructura Steel Frame e Ingeniería BIM', lines: 6, share: '14,81 %', amount: '66.394,85 €' },
+        { code: '05', name: 'Envolvente Térmica — Paneles Thermochip ★', lines: 6, share: '19,26 %', amount: '86.304,39 €' },
+        { code: '06', name: 'Fachada — Mortero Monocapa Proyectado + Pintura Acrílica Exterior ★', lines: 4, share: '3,42 %', amount: '15.339,84 €' },
+        { code: '07', name: 'Cubiertas y Recogida de Aguas Pluviales ★', lines: 6, share: '5,58 %', amount: '25.013,08 €' },
+        { code: '08', name: 'Tabiquería, Aislamientos y Falsos Techos', lines: 5, share: '6,37 %', amount: '28.530,22 €' },
+        { code: '09', name: 'Revestimientos Interiores, Pavimentos y Pintura', lines: 6, share: '5,02 %', amount: '22.500,00 €' },
+        { code: '10', name: 'Carpintería Exterior y Acristalamientos', lines: 4, share: '5,92 %', amount: '26.535,00 €' },
+        { code: '11', name: 'Carpintería Interior y Protecciones', lines: 6, share: '3,68 %', amount: '16.500,00 €' },
+        { code: '12', name: 'Fontanería y Aparatos Sanitarios', lines: 8, share: '3,90 %', amount: '17.500,00 €' },
+        { code: '13', name: 'Electricidad, Iluminación y Telecomunicaciones', lines: 8, share: '3,33 %', amount: '14.902,60 €' },
+        { code: '14', name: 'Climatización — Aerotermia Mitsubishi Ecodan + ACS + VMC', lines: 8, share: '5,60 %', amount: '25.105,65 €' },
+        { code: '15', name: 'Urbanización, Varios y Limpieza Final', lines: 7, share: '2,27 %', amount: '10.182,02 €' },
+        { code: '17', name: 'Partida Alzada de Remates y Coordinación Final de Obra ★', lines: 1, share: '4,76 %', amount: '21.343,10 €' },
+        { code: '16', name: 'Seguridad y Salud + Control de Calidad + Gestión RCD ✦', lines: 4, share: '1,94 %', amount: '8.700,00 €' },
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>

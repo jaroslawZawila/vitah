@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Portal · Pagos por hitos</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;900&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#f5f4f0;font-family:'Geist',system-ui,sans-serif;color:#1e1e1e}
+a{color:#6b7a4a;text-decoration:none}a:hover{color:#7d8e58}
+button{font-family:inherit}
+</style>
+</helmet>
+<div style="width: 1440px; height: 1180px; display: flex; background: #f5f4f0; font-family: 'Geist', system-ui, sans-serif; color: #1e1e1e; font-size: 13px; overflow: hidden;">
+
+  <aside style="width: 210px; flex-shrink: 0; background: #12120e; display: flex; flex-direction: column;">
+    <div style="padding: 18px 16px 14px; border-bottom: 1px solid rgba(255,255,255,0.07); display: flex; align-items: center; gap: 10px;">
+      <div style="width: 32px; height: 32px; background: #6b7a4a; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 900; color: #ffffff; font-size: 16px; font-style: italic;">V</div>
+      <div><div style="color: #e8e7e2; font-weight: 700; font-size: 15px; letter-spacing: 0.5px;">ViTAH</div><div style="color: #6b7a4a; font-size: 8px; letter-spacing: 2px;">OS PLATFORM</div></div>
+    </div>
+    <nav aria-label="Principal" style="flex-grow: 1; padding: 8px 0;">
+      <a href="P-Obra.dc.html" style="display: flex; align-items: center; gap: 9px; padding: 9px 16px; background: rgba(107,122,74,0.2); color: #e8e7e2; font-size: 12.5px; border-left: 3px solid #6b7a4a;"><span style="width: 18px; text-align: center; font-size: 14px;">◫</span>Proyectos</a>
+      <ul aria-label="Secciones del proyecto" style="list-style: none; margin: 2px 0 6px 25px; padding: 0; border-left: 1px solid rgba(255,255,255,0.1);">
+        <li><a href="P-Obra.dc.html" style="display: flex; align-items: center; min-height: 36px; padding: 0 12px; margin-left: -1px; border-left: 1px solid transparent; color: #8a8a82; font-size: 12px;">General</a></li>
+        <li><a href="P-Obra.dc.html" style="display: flex; align-items: center; min-height: 36px; padding: 0 12px; margin-left: -1px; border-left: 1px solid transparent; color: #8a8a82; font-size: 12px;">Obra</a></li>
+        <li><a href="P-Presupuesto.dc.html" style="display: flex; align-items: center; min-height: 36px; padding: 0 12px; margin-left: -1px; border-left: 1px solid transparent; color: #8a8a82; font-size: 12px;">Presupuesto</a></li>
+        <li><a href="P-Hitos.dc.html" aria-current="page" style="display: flex; align-items: center; min-height: 36px; padding: 0 12px; margin-left: -1px; border-left: 1px solid #6b7a4a; color: #e8e7e2; font-size: 12px; font-weight: 600;">Pagos</a></li>
+        <li><a href="P-Obra.dc.html" style="display: flex; align-items: center; min-height: 36px; padding: 0 12px; margin-left: -1px; border-left: 1px solid transparent; color: #8a8a82; font-size: 12px;">Documentos</a></li>
+        <li><a href="P-Obra.dc.html" style="display: flex; align-items: center; min-height: 36px; padding: 0 12px; margin-left: -1px; border-left: 1px solid transparent; color: #8a8a82; font-size: 12px;">Fotos</a></li>
+      </ul>
+      <a href="P-Obra.dc.html" style="display: flex; align-items: center; gap: 9px; padding: 9px 16px; color: #8a8a82; font-size: 12.5px; border-left: 3px solid transparent;"><span style="width: 18px; text-align: center; font-size: 14px;">◉</span>Clientes</a>
+      <a href="P-Obra.dc.html" style="display: flex; align-items: center; gap: 9px; padding: 9px 16px; color: #8a8a82; font-size: 12.5px; border-left: 3px solid transparent;"><span style="width: 18px; text-align: center; font-size: 14px;">◐</span>Usuarios</a>
+    </nav>
+    <div style="padding: 12px 16px; border-top: 1px solid rgba(255,255,255,0.07); display: flex; align-items: center; gap: 8px;">
+      <div style="width: 26px; height: 26px; border-radius: 50%; background: #4a5e2c; display: flex; align-items: center; justify-content: center; color: #ffffff; font-size: 12px; font-weight: 700;">A</div>
+      <div><div style="color: #e8e7e2; font-size: 11px; font-weight: 600;">Admin ViTAH</div><div style="color: #6b7a4a; font-size: 9px;">admin@vitah.es</div></div>
+    </div>
+  </aside>
+
+  <div style="flex-grow: 1; display: flex; flex-direction: column; min-width: 0;">
+    <header style="height: 52px; flex-shrink: 0; background: #ffffff; border-bottom: 1px solid #e0ded8; display: flex; align-items: center; padding: 0 20px;">
+      <div style="font-size: 14px; font-weight: 600;">Detalle de Proyecto</div>
+    </header>
+
+    <main style="flex-grow: 1; padding: 16px 20px; display: flex; flex-direction: column; gap: 16px;">
+      <a href="P-Obra.dc.html" style="font-size: 12px; color: #8a8a82;">← Volver a proyectos</a>
+
+      <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 16px;">
+        <div>
+          <p style="margin: 0 0 4px; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; color: #6b7a4a;">VTH-26-001</p>
+          <h1 style="margin: 0; font-size: 22px; font-weight: 600;">Pagos</h1>
+          <p style="margin: 2px 0 0; font-size: 12px; color: #8a8a82;">Plan de pagos por hitos H0–H9 · Rev.3 · 448.205,05 € sin IVA · precio cerrado · pago a 5 días hábiles desde el acta</p>
+        </div>
+        <button type="button" style="min-height: 44px; padding: 0 16px; border-radius: 6px; border: 1px solid #e0ded8; background: #ffffff; color: #1e1e1e; font-size: 13px; font-weight: 600; cursor: pointer;">Editar % y capítulos</button>
+      </div>
+
+      <section style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px;">
+        <div style="background: #ffffff; border: 1px solid #e0ded8; border-radius: 10px; padding: 16px 20px; display: flex; flex-direction: column; gap: 4px;">
+          <div style="font-size: 10px; font-weight: 600; letter-spacing: 0.5px; color: #8a8a82;">COBRADO</div>
+          <div style="font-size: 24px; font-weight: 600;">107.569,21 €</div>
+          <div style="font-size: 12px; color: #8a8a82;">H0, H1 y H2 · 24 %</div>
+        </div>
+        <div style="background: #ffffff; border: 1px solid #e0ded8; border-radius: 10px; padding: 16px 20px; display: flex; flex-direction: column; gap: 4px;">
+          <div style="font-size: 10px; font-weight: 600; letter-spacing: 0.5px; color: #8a8a82;">FACTURADO, PENDIENTE DE COBRO</div>
+          <div style="font-size: 24px; font-weight: 600;">67.230,76 €</div>
+          <div style="font-size: 12px; color: #8a8a82;">H3 · vence el 1 oct 2026</div>
+        </div>
+        <div style="background: #ffffff; border: 1px solid #e0ded8; border-radius: 10px; padding: 16px 20px; display: flex; flex-direction: column; gap: 4px;">
+          <div style="font-size: 10px; font-weight: 600; letter-spacing: 0.5px; color: #8a8a82;">POR FACTURAR</div>
+          <div style="font-size: 24px; font-weight: 600;">273.405,08 €</div>
+          <div style="font-size: 12px; color: #8a8a82;">H4–H9 · 61 %</div>
+        </div>
+      </section>
+
+      <section style="background: #ffffff; border: 1px solid #e0ded8; border-radius: 10px; padding: 20px;">
+        <div role="table" aria-label="Hitos de pago" style="display: flex; flex-direction: column;">
+          <div role="row" style="display: grid; grid-template-columns: 44px 250px 48px 110px 200px minmax(0, 1fr) 150px; gap: 16px; padding: 8px 0; border-bottom: 1px solid #e0ded8; font-size: 10px; font-weight: 600; letter-spacing: 0.5px; color: #8a8a82;">
+            <span role="columnheader">HITO</span><span role="columnheader">DENOMINACIÓN</span><span role="columnheader" style="text-align: right;">%</span><span role="columnheader" style="text-align: right;">IMPORTE</span><span role="columnheader">MOMENTO DE FACTURACIÓN</span><span role="columnheader">CAPÍTULOS QUE CIERRA</span><span role="columnheader">ESTADO</span>
+          </div>
+          <sc-for list="{{hitos}}" as="h" hint-placeholder-count="10">
+            <div role="row" style="display: grid; grid-template-columns: 44px 250px 48px 110px 200px minmax(0, 1fr) 150px; gap: 16px; align-items: center; min-height: 60px; padding: 6px 0; border-bottom: 1px solid #f5f4f0;">
+              <span role="cell" style="font-weight: 700; color: #6b7a4a;">{{h.id}}</span>
+              <a role="cell" href="P-Hito.dc.html" style="color: #1e1e1e; font-weight: 500; line-height: 1.35;">{{h.name}}</a>
+              <span role="cell" style="text-align: right; color: #8a8a82;">{{h.pct}}</span>
+              <span role="cell" style="text-align: right; font-variant-numeric: tabular-nums;">{{h.amount}}</span>
+              <span role="cell" style="font-size: 12px; color: #8a8a82; line-height: 1.35;">{{h.when}}</span>
+              <span role="cell" style="display: flex; flex-wrap: wrap; gap: 6px;">
+                <sc-for list="{{h.chapters}}" as="c" hint-placeholder-count="2">
+                  <span style="display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 999px; border: 1px solid #e0ded8; font-size: 11px;"><span style="font-weight: 600; color: #6b7a4a;">{{c.code}}</span><span style="color: #8a8a82;">{{c.pct}}</span></span>
+                </sc-for>
+              </span>
+              <span role="cell" style="display: flex; flex-direction: column; gap: 3px; align-items: flex-start;">
+                <sc-if value="{{h.paid}}" hint-placeholder-val="{{false}}"><span style="padding: 3px 8px; border-radius: 999px; background: #eef0e6; color: #4a5e2c; font-size: 11px; font-weight: 600;">Pagado</span></sc-if>
+                <sc-if value="{{h.invoiced}}" hint-placeholder-val="{{false}}"><span style="padding: 3px 8px; border-radius: 999px; background: #1e1e1e; color: #ffffff; font-size: 11px; font-weight: 600;">Facturado</span></sc-if>
+                <sc-if value="{{h.active}}" hint-placeholder-val="{{false}}"><span style="padding: 3px 8px; border-radius: 999px; border: 1px solid #6b7a4a; color: #4a5e2c; font-size: 11px; font-weight: 600;">En curso</span></sc-if>
+                <sc-if value="{{h.todo}}" hint-placeholder-val="{{true}}"><span style="padding: 3px 8px; border-radius: 999px; background: #f0efe8; color: #8a8a82; font-size: 11px; font-weight: 600;">Pendiente</span></sc-if>
+                <span style="font-size: 11px; color: #8a8a82;">{{h.date}}</span>
+              </span>
+            </div>
+          </sc-for>
+          <div role="row" style="display: grid; grid-template-columns: 44px 250px 48px 110px 200px minmax(0, 1fr) 150px; gap: 16px; align-items: center; min-height: 48px; font-weight: 700;">
+            <span role="cell"></span><span role="cell">TOTAL PLAN H0–H9</span><span role="cell" style="text-align: right;">100 %</span><span role="cell" style="text-align: right;">448.205,05 €</span><span role="cell"></span><span role="cell"></span><span role="cell"></span>
+          </div>
+        </div>
+      </section>
+
+      <section aria-label="Cómo avanza un hito" style="display: flex; align-items: center; gap: 12px; font-size: 12px; color: #8a8a82;">
+        <span style="font-weight: 600; color: #1e1e1e;">Cada hito:</span>
+        <span>En curso</span><span>→</span><span>Listo para acta (capítulos al 100 % y pruebas hechas)</span><span>→</span><span>Acta fotográfica firmada</span><span>→</span><span>Facturado</span><span>→</span><span>Pagado (≤ 5 días hábiles)</span>
+      </section>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1180}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const h = (id, name, pct, amount, when, chapters, state, date) => ({ id, name, pct, amount, when, chapters, date, paid: state === 'paid', invoiced: state === 'invoiced', active: state === 'active', todo: state === 'todo' });
+    const c = (code, pct) => ({ code, pct });
+    return {
+      hitos: [
+        h('H0', 'Señal de reserva', '5 %', '22.410,25 €', 'En la firma del contrato', [c('Contrato', 'firmado')], 'paid', '3 feb 2026'),
+        h('H1', 'Ingeniería BIM + proyecto + licencia', '7 %', '31.374,35 €', 'Entrega modelo BIM y licencia', [c('04.01', '100 %'), c('Licencia', 'concedida')], 'paid', '20 abr 2026'),
+        h('H2', 'Cimentación completa', '12 %', '53.784,61 €', 'Finalización losa y saneamiento', [c('01', '100 %'), c('02', '100 %'), c('03', '100 %')], 'paid', '24 jul 2026'),
+        h('H3', 'Estructura Steel Frame', '15 %', '67.230,76 €', 'Estructura levantada', [c('04', '100 %')], 'invoiced', 'Vence 1 oct 2026'),
+        h('H4', 'Envolvente estanca (Thermochip + carp. exterior)', '13 %', '58.266,66 €', 'Vivienda cerrada al agua y al aire', [c('05', '80 %'), c('07', '60 %'), c('10', '40 %')], 'active', '69 % listo'),
+        h('H5', 'Fontanería y saneamiento interior', '10 %', '44.820,51 €', 'Red de fontanería probada', [c('12', '15 %')], 'todo', ''),
+        h('H6', 'Electricidad y telecomunicaciones', '8 %', '35.856,40 €', 'Cuadro eléctrico y circuitos completos', [c('13', '10 %')], 'todo', ''),
+        h('H7', 'Climatización — Ecodan + suelo radiante + VMC', '8 %', '35.856,40 €', 'Sistemas climáticos probados', [c('14', '0 %')], 'todo', ''),
+        h('H8', 'Acabados interiores + fachada + carp. interior', '19 %', '85.158,96 €', 'Acabados exteriores e interiores completos', [c('06', '0 %'), c('08', '0 %'), c('09', '0 %'), c('11', '0 %')], 'todo', ''),
+        h('H9', 'Liquidación final — entrega de llaves', '3 %', '13.446,15 €', 'Contra entrega de llaves y CFO', [c('15', '0 %'), c('16', '50 %'), c('17', '0 %'), c('Documentos', '0 de 9')], 'todo', 'Menos penalizaciones'),
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>

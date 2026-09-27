@@ -19,7 +19,10 @@ seed. In the app every string goes through i18n (`es` + `en`), and data comes fr
 |------|--------|---------|--------------|
 | `A-Login.dc.html` | Acceso | Sign in (client), ES/EN switch, forgot password | App start |
 | `A-Home.dc.html` | Inicio | Project details + progress summary, latest update, shortcuts | Tab **Inicio** |
-| `A-Progress.dc.html` | Avance de obra | Overall %, week, status, 8-phase vertical timeline; current phase expands to sub-tasks | Tab **Obra** |
+| `A-Progress.dc.html` | Avance de obra | **One screen, no scrolling:** overall %, week, status, delivery date, next payment, and the 9 phases (pre-construction + hitos H2–H9) with done / current % / pending | Tab **Obra** |
+| `A-Fase.dc.html` | Fase de obra | One phase: %, the budget chapters in it with their %, latest photos, what is left to close it, the payment it triggers | Obra › a phase |
+| `A-Obra-Pagos.dc.html` | Pagos | Paid so far, next payment, H0–H9 timeline (paid · to pay · in progress · pending) | Obra › "Próximo pago", Fase › payment |
+| `A-Hito.dc.html` | Hito de pago | One hito: amount + VAT, due date, scope, chapters, acta photos, signed acta and invoice (read-only) | Pagos |
 | `A-Gallery.dc.html` | Fotografías | Site photos grouped by week/phase, filter chips | Tab **Fotos** |
 | `A-Documents.dc.html` | Documentos | Search, category chips, recent + project docs, download, "NUEVO" badge, locked docs | Tab **Documentos** |
 | `A-Settings.dc.html` | Ajustes / Perfil | Profile, language (ES/EN), change password, Face ID, notification toggles, help, logout | Tab **Perfil** |
@@ -86,7 +89,7 @@ This matches the existing scale in `apps/mobile/constants/theme.ts`:
 - **Input:** height 52, `#262624` fill, `#34342f` border (focused/valid: `#6b7a4a`), 16 px text, uppercase label above.
 - **Chip:** height 40–44, fully rounded; off = transparent with `#3c3c37` border, on = `#e8e7e2` fill with dark text (filters) or `#4a5e2c` fill (form choice).
 - **List row:** min height 52–68, bottom divider `#2e2e2b`, trailing chevron or download icon in `muted`.
-- **Segmented progress:** one segment per phase (8), 4 px high, gap 4; done = `#8a9b62`, empty = `#3c3c37`.
+- **Segmented progress:** one segment per step (10 hitos on Pagos), 4 px high, gap 4; done = `#8a9b62`, empty = `#3c3c37`.
 - **Timeline:** 24 px markers — done = filled `#4a5e2c` with a check, current = `#8a9b62` ring with a dot and an expanded card, upcoming = `#4a4a45` ring with muted text.
 - **Switch:** 52×32, on `#6b7a4a` with a light knob, off `#3c3c37` with a `muted` knob.
 - **Tab bar:** height 84 including the bottom inset, `#181817`, 5 equal items, icon above a 10 pt label; active = `#e8e7e2`, inactive = `#8a8a84`.
@@ -99,7 +102,7 @@ needs the following. Add each one to `packages/core` + `/api/v1` (backwards comp
 feature is built:
 
 - Collection name; overall progress %; status ("En plazo"); week N of M (derivable from the dates).
-- Phases (8, ordered) with status, dates, % and sub-tasks.
+- The construction process (`features/construction_process/PROCESS.md`): stage 1–8, the budget's chapters with executed %, and hitos H0–H9 with status, acta and invoice.
 - Photo updates: date, week, phase, caption, author, photos.
 - Documents: category, type, size, date, "new" flag, locked-until-handover flag, download URL.
 - Warranty claims: type, room, description, photos, urgent flag, status list ("Mis solicitudes").
