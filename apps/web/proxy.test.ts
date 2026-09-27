@@ -21,6 +21,9 @@ describe("proxy matcher", () => {
     "/api/mobile/project",
     "/_next/static/chunk.js",
     "/favicon.ico",
+    // Vercel Speed Insights: its script and beacon must work signed out, e.g. on the login page.
+    "/_vercel/speed-insights/script.js",
+    "/_vercel/speed-insights/vitals",
   ])("skips %s", (url) => {
     expect(matches(url)).toBe(false);
   });
