@@ -6,7 +6,7 @@
 import { useActionState, useState, useTransition } from "react";
 import { ImagePlus } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { photoSizeQuery, type ProjectPhoto } from "@repo/core/contract";
+import type { ProjectPhoto } from "@repo/core/contract";
 import {
   addProjectPhotoAction,
   deleteProjectPhotoAction,
@@ -17,6 +17,7 @@ import { SleepingCamera } from "../components/illustrations";
 import Modal from "../components/Modal";
 import PhotoGrid from "../components/PhotoGrid";
 import PhotoUploadForm from "../components/PhotoUploadForm";
+import { projectPhotoUrl } from "../components/photoUrl";
 import TabHeader from "../components/TabHeader";
 import tabStyles from "../components/TabHeader.module.css";
 
@@ -69,9 +70,7 @@ export default function PhotosScreen({
       ) : (
         <PhotoGrid
           photos={photos}
-          fileUrl={(photo, size) =>
-            `/api/v1/projects/${projectId}/photos/${photo.id}${photoSizeQuery(size)}`
-          }
+          fileUrl={(photo, size) => projectPhotoUrl(projectId, photo.id, size)}
           onDelete={canManage ? handleDelete : undefined}
           deleting={deleting}
           error={deleteState?.error}
@@ -87,8 +86,19 @@ export default function PhotosScreen({
   );
 }
 
-/** Mounted only while the modal is open, so each upload starts afresh. */
-function UploadPhoto({ projectId, onDone }: { projectId: string; onDone: () => void }) {
+/**
+ * Uploads a photo (optionally of a budget chapter). Mounted only while its
+ * modal is open, so each upload starts afresh.
+ */
+export function UploadPhoto({
+  projectId,
+  chapterCode,
+  onDone,
+}: {
+  projectId: string;
+  chapterCode?: string;
+  onDone: () => void;
+}) {
   const [state, upload, uploading] = useActionState(
     async (prev: PhotosState, formData: FormData) => {
       const result = await addProjectPhotoAction(projectId, prev, formData);
@@ -98,6 +108,12 @@ function UploadPhoto({ projectId, onDone }: { projectId: string; onDone: () => v
     null,
   );
   return (
-    <PhotoUploadForm action={upload} pending={uploading} error={state?.error} onCancel={onDone} />
+    <PhotoUploadForm
+      action={upload}
+      pending={uploading}
+      error={state?.error}
+      onCancel={onDone}
+      chapterCode={chapterCode}
+    />
   );
 }

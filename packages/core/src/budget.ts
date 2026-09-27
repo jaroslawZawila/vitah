@@ -7,7 +7,6 @@ import {
   desc,
   eq,
   inArray,
-  lt,
   obraHitoChapters,
   obraHitos,
   projects,
@@ -81,22 +80,6 @@ async function hitoByChapter(projectId: string): Promise<Map<string, string>> {
     .innerJoin(obraHitos, eq(obraHitos.id, obraHitoChapters.hitoId))
     .where(eq(obraHitoChapters.projectId, projectId));
   return new Map(rows.map((r) => [r.chapterCode, r.hitoCode]));
-}
-
-/** The chapters of the revision before `revision`, or null when it is the first. */
-export async function previousChapters(revision: RevisionRow): Promise<LoadedChapter[] | null> {
-  const [previous] = await db
-    .select({ id: budgetRevisions.id })
-    .from(budgetRevisions)
-    .where(
-      and(
-        eq(budgetRevisions.projectId, revision.projectId),
-        lt(budgetRevisions.number, revision.number),
-      ),
-    )
-    .orderBy(desc(budgetRevisions.number))
-    .limit(1);
-  return previous ? loadChapters(previous.id) : null;
 }
 
 function change(current: number, previous: number | undefined): ChapterChange {

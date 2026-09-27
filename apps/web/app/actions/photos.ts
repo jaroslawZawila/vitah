@@ -7,12 +7,11 @@ import {
   CoreError,
   canManageProjectFiles,
   photosService as svc,
-  type Ctx,
   type PhotoError,
   type ProjectPhoto,
 } from "@repo/core";
 import { getSessionContext } from "@repo/auth/context";
-import { revalidatePath } from "next/cache";
+import { mutate } from "./run";
 
 export type PhotosState = { error?: PhotoError; success?: boolean } | null;
 
@@ -32,35 +31,17 @@ export async function getProjectPhotos(
   return { photos, canManage: canManageProjectFiles(ctx.role) };
 }
 
-/** Runs a core mutation; returns `{ error: code }` for expected failures. */
-async function mutate(
-  projectId: string,
-  fn: (ctx: Ctx) => Promise<unknown>,
-): Promise<PhotosState> {
-  const ctx = await getSessionContext();
-  if (!ctx) throw new Error("Unauthorized");
-  try {
-    await fn(ctx);
-  } catch (err) {
-    if (err instanceof CoreError) return { error: err.code as PhotoError };
-    throw err;
-  }
-  // Every tab of the project, so counts and lists stay in step.
-  revalidatePath(`/dashboard/projects/${projectId}`, "layout");
-  return { success: true };
-}
-
 export async function addProjectPhotoAction(
   projectId: string,
   _prevState: PhotosState,
   formData: FormData,
 ): Promise<PhotosState> {
-  return mutate(projectId, (ctx) => svc.addPhoto(ctx, projectId, Object.fromEntries(formData)));
+  return mutate<PhotoError>(projectId, (ctx) => svc.addPhoto(ctx, projectId, Object.fromEntries(formData)));
 }
 
 export async function deleteProjectPhotoAction(
   projectId: string,
   photoId: string,
 ): Promise<PhotosState> {
-  return mutate(projectId, (ctx) => svc.deletePhoto(ctx, projectId, photoId));
+  return mutate<PhotoError>(projectId, (ctx) => svc.deletePhoto(ctx, projectId, photoId));
 }

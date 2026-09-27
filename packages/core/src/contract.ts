@@ -182,10 +182,14 @@ export type BudgetRevisionStatus = "draft" | "accepted" | "superseded";
 /** A chapter's, phase's or line's progress. */
 export type ProgressStatus = "pending" | "active" | "done";
 /**
- * A payment hito: work under way → ready for its acta (chapters at 100 % and
- * checks done) → acta signed → invoiced → paid.
+ * A payment hito's statuses, in order: work under way → ready for its acta
+ * (chapters at 100 % and checks done) → acta signed → invoiced → paid.
  */
-export type HitoStatus = "pending" | "active" | "ready" | "signed" | "invoiced" | "paid";
+export const HITO_STATUSES = ["pending", "active", "ready", "signed", "invoiced", "paid"] as const;
+export type HitoStatus = (typeof HITO_STATUSES)[number];
+
+/** The stages of the process that a standard hito closes (PROCESS.md §2). */
+export const STAGE_HITOS: Partial<Record<ObraStage, string>> = { 4: "H0", 5: "H1", 7: "H9" };
 export type HitoFileKind = "acta" | "invoice";
 
 /** Longest budget chapter or line code ("05", "05.01"); also tags photos. */
@@ -265,6 +269,8 @@ export type Hito = {
   /** % × the budget's total, without VAT. */
   amountCents: number;
   vatCents: number;
+  /** What the client pays: amount + VAT. */
+  totalCents: number;
   scope: string;
   billingMoment: string;
   status: HitoStatus;
@@ -313,6 +319,10 @@ export type ProjectObra = {
   progressPct: number;
   paidCents: number;
   invoicedUnpaidCents: number;
+  /** The rest of the price: neither paid nor invoiced. */
+  toInvoiceCents: number;
+  /** What the hitos' % add up to; 10 000 when the plan is complete. */
+  planPctBp: number;
   term: ObraTerm | null;
   chapters: Omit<BudgetChapter, "lines" | "id" | "previousTotalCents" | "change" | "changeNote">[];
   hitos: Hito[];
@@ -354,6 +364,7 @@ export type ObraError =
   | "invalid_stage"
   | "invalid_date"
   | "duplicate_code"
+  | "unknown_chapter"
   | "budget_exists"
   | "draft_exists"
   | "no_budget"

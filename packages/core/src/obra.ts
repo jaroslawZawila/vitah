@@ -9,7 +9,7 @@ import {
   type ProjectObra,
   type ProjectPhoto,
 } from "./contract";
-import { previousChapters, toBudgetChapters } from "./budget";
+import { toBudgetChapters } from "./budget";
 import {
   asStage,
   clientProject,
@@ -48,6 +48,8 @@ export async function getObra(ctx: Ctx, projectId: string): Promise<ProjectObra>
     loadObra(ctx.tenantId, projectId),
   ]);
   const hitoOf = hitoByChapter(hitos);
+  const paidCents = sumAmounts(hitos, "paid");
+  const invoicedUnpaidCents = sumAmounts(hitos, "invoiced");
 
   return {
     stage: asStage(project.obraStage),
@@ -61,8 +63,10 @@ export async function getObra(ctx: Ctx, projectId: string): Promise<ProjectObra>
     },
     executedCents: progress.executedCents,
     progressPct: progress.progressPct,
-    paidCents: sumAmounts(hitos, "paid"),
-    invoicedUnpaidCents: sumAmounts(hitos, "invoiced"),
+    paidCents,
+    invoicedUnpaidCents,
+    toInvoiceCents: progress.totalCents - paidCents - invoicedUnpaidCents,
+    planPctBp: hitos.reduce((sum, h) => sum + h.pctBp, 0),
     term: termOf(project, progress.totalCents),
     chapters: chapters.map(({ code, name, totalCents, executedCents, progressPct, status }) => ({
       code,
@@ -105,12 +109,8 @@ export async function getChapter(
   if (!revision) fail("no_budget");
   const own = chapters.filter((c) => c.code === code);
   if (own.length === 0) fail("not_found");
-  const [chapter] = toBudgetChapters(
-    own,
-    await previousChapters(revision),
-    progress.totalCents,
-    hitoByChapter(hitos),
-  );
+  // Not compared with the previous revision here: that is the Budget's view.
+  const [chapter] = toBudgetChapters(own, null, progress.totalCents, hitoByChapter(hitos));
   return {
     chapter: chapter!,
     hito: hitos.find((h) => h.chapters.some((c) => c.code === code)) ?? null,

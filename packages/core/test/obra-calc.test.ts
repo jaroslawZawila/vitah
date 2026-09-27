@@ -138,6 +138,7 @@ describe("buildPhases", () => {
     pctBp: 1000,
     amountCents: 0,
     vatCents: 0,
+    totalCents: 0,
     scope: "",
     billingMoment: "",
     status: "pending",

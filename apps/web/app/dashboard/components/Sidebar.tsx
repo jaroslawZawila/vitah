@@ -14,6 +14,9 @@ const NAV_ITEMS = [
 /** Routes under `dashboard/projects/[id]/`, shown nested under "Projects". */
 const PROJECT_TABS = [
   { key: "general", path: "" },
+  { key: "obra", path: "/obra" },
+  { key: "budget", path: "/budget" },
+  { key: "payments", path: "/payments" },
   { key: "documents", path: "/documents" },
   { key: "photos", path: "/photos" },
 ] as const;
@@ -84,7 +87,8 @@ function ProjectTabs({ projectId, pathname }: { projectId: string; pathname: str
     <ul className={styles.subNav} aria-label={t("label")}>
       {PROJECT_TABS.map((tab) => {
         const href = `/dashboard/projects/${projectId}${tab.path}`;
-        const active = pathname === href;
+        // A tab's own pages (e.g. a chapter under Obra) keep it current.
+        const active = pathname === href || (tab.path !== "" && pathname.startsWith(`${href}/`));
         return (
           <li key={tab.key}>
             <Link

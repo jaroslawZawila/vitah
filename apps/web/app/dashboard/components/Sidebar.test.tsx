@@ -49,24 +49,25 @@ describe("Sidebar", () => {
 
   it.each([
     ["/dashboard/projects/p-1", "General"],
+    ["/dashboard/projects/p-1/obra", "Obra"],
+    ["/dashboard/projects/p-1/obra/05", "Obra"],
+    ["/dashboard/projects/p-1/budget", "Presupuesto"],
+    ["/dashboard/projects/p-1/payments", "Pagos"],
+    ["/dashboard/projects/p-1/payments/h-4", "Pagos"],
     ["/dashboard/projects/p-1/documents", "Documentos"],
     ["/dashboard/projects/p-1/photos", "Fotos"],
   ])("opens the project's tabs on %s", (pathname, current) => {
     renderAt(pathname);
 
     const tabs = within(projectTabs()!);
-    expect(tabs.getByRole("link", { name: "General" })).toHaveAttribute(
-      "href",
-      "/dashboard/projects/p-1",
-    );
-    expect(tabs.getByRole("link", { name: "Documentos" })).toHaveAttribute(
-      "href",
-      "/dashboard/projects/p-1/documents",
-    );
-    expect(tabs.getByRole("link", { name: "Fotos" })).toHaveAttribute(
-      "href",
-      "/dashboard/projects/p-1/photos",
-    );
+    expect(tabs.getAllByRole("link").map((link) => [link.textContent, link.getAttribute("href")])).toEqual([
+      ["General", "/dashboard/projects/p-1"],
+      ["Obra", "/dashboard/projects/p-1/obra"],
+      ["Presupuesto", "/dashboard/projects/p-1/budget"],
+      ["Pagos", "/dashboard/projects/p-1/payments"],
+      ["Documentos", "/dashboard/projects/p-1/documents"],
+      ["Fotos", "/dashboard/projects/p-1/photos"],
+    ]);
     expect(tabs.getByRole("link", { current: "page" })).toHaveTextContent(current);
   });
 });

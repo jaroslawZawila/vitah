@@ -3,6 +3,7 @@
 import { useFormatter, useTranslations } from "next-intl";
 import type { PhotoError, PhotoSize, ProjectPhoto } from "@repo/core/contract";
 import FormError from "./FormError";
+import { usePhotoName } from "./usePhotoName";
 import styles from "./photos.module.css";
 
 /** Presentational: the project's photos as a grid of thumbnails; each opens full size. */
@@ -22,6 +23,7 @@ export default function PhotoGrid({
 }) {
   const t = useTranslations("projectDetailPage.photos");
   const format = useFormatter();
+  const photoName = usePhotoName();
 
   return (
     <>
@@ -33,7 +35,7 @@ export default function PhotoGrid({
             // Fixed zone: server and browser must render the same text.
             timeZone: "Europe/Madrid",
           });
-          const name = photo.caption ?? t("untitled", { date });
+          const name = photoName(photo);
           return (
             <li key={photo.id} className={styles.tile}>
               <a

@@ -42,6 +42,7 @@ const STATUS: Record<ObraError, number> = {
   invalid_file_type: 400,
   file_too_large: 413,
   duplicate_code: 409,
+  unknown_chapter: 400,
   budget_exists: 409,
   draft_exists: 409,
   not_draft: 409,
@@ -266,13 +267,15 @@ function toHitos(
     const readyPct = progressOf(own.flatMap((c) => c.lines)).progressPct;
     const dueFrom = row.actaSignedOn ?? row.invoicedOn;
     const hitoAmount = ofBp(totalCents, row.pctBp);
+    const vatCents = ofBp(hitoAmount, vatRateBp);
     return {
       id: row.id,
       code: row.code,
       name: row.name,
       pctBp: row.pctBp,
       amountCents: hitoAmount,
-      vatCents: ofBp(hitoAmount, vatRateBp),
+      vatCents,
+      totalCents: hitoAmount + vatCents,
       scope: row.scope,
       billingMoment: row.billingMoment,
       status: hitoStatus({ ...row, chapterCount: own.length, readyPct, checks: ownChecks }),

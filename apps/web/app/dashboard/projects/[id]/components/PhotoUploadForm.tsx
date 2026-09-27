@@ -17,11 +17,14 @@ export default function PhotoUploadForm({
   pending,
   error,
   onCancel,
+  chapterCode,
 }: {
   action: (formData: FormData) => void;
   pending: boolean;
   error?: PhotoError;
   onCancel: () => void;
+  /** The budget chapter the photo shows, e.g. "05" (from a chapter's page). */
+  chapterCode?: string;
 }) {
   const t = useTranslations("projectDetailPage.photos");
   // Checked here too so an oversized file fails before it is sent.
@@ -42,6 +45,7 @@ export default function PhotoUploadForm({
 
   return (
     <form action={action} className={styles.form}>
+      {chapterCode && <input type="hidden" name="chapterCode" value={chapterCode} />}
       <div className={styles.field}>
         <label htmlFor="photo-file">{t("file")}</label>
         <input

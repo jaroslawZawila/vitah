@@ -110,7 +110,65 @@ describe("updateHito", () => {
   });
 });
 
+describe("updatePlan", () => {
+  it("saves every hito's % and chapters in one go", async () => {
+    const { project, ctx, byCode } = await setup();
+
+    await svc.updatePlan(ctx, project.id, {
+      hitos: [
+        { id: byCode("H3").id, pctBp: 1400, chapterCodes: ["03", "04"] },
+        { id: byCode("H4").id, pctBp: 1400 },
+      ],
+    });
+
+    const hitos = await svc.listHitos(ctx, project.id);
+    const get = (code: string) => hitos.find((h) => h.code === code)!;
+    expect(get("H3")).toMatchObject({ pctBp: 1400, chapters: [{ code: "03" }, { code: "04" }] });
+    expect(get("H2").chapters.map((c) => c.code)).toEqual(["01", "02"]);
+    expect(get("H4")).toMatchObject({ pctBp: 1400, chapters: [{ code: "05" }] });
+  });
+
+  it("only takes chapter codes the budget has", async () => {
+    const { project, ctx, byCode } = await setup();
+    await expect(svc.updatePlan(ctx, project.id, { hitos: [{ id: byCode("H4").id, chapterCodes: ["5"] }] })).rejects.toMatchObject({ code: "unknown_chapter", status: 400 });
+    await expect(svc.updateHito(ctx, project.id, byCode("H4").id, { chapterCodes: ["05", "99"] })).rejects.toMatchObject({ code: "unknown_chapter" });
+    expect((await find(ctx, project.id, "H4")).chapters.map((c) => c.code)).toEqual(["05"]);
+  });
+
+  it("saves nothing when one change is invalid", async () => {
+    const { project, ctx, byCode } = await setup();
+
+    await expect(
+      svc.updatePlan(ctx, project.id, {
+        hitos: [
+          { id: byCode("H3").id, pctBp: 1400 },
+          { id: byCode("H4").id, pctBp: -1 },
+        ],
+      }),
+    ).rejects.toMatchObject({ code: "invalid_input" });
+    await expect(svc.updatePlan(ctx, project.id, { hitos: [{ id: "nope", pctBp: 100 }] })).rejects.toMatchObject({ code: "not_found" });
+    expect((await find(ctx, project.id, "H3")).pctBp).toBe(1500);
+  });
+});
+
+describe("getHito", () => {
+  it("gives one hito of the project", async () => {
+    const { project, ctx, byCode } = await setup();
+    expect(await svc.getHito(ctx, project.id, byCode("H4").id)).toMatchObject({ code: "H4", totalCents: 71_500 });
+    await expect(svc.getHito(ctx, project.id, "nope")).rejects.toMatchObject({ code: "not_found" });
+  });
+});
+
 describe("checks", () => {
+  it("finds a check only under its own hito when one is given", async () => {
+    const { project, ctx, byCode } = await setup();
+    const check = byCode("H4").checks[0]!;
+    await expect(svc.updateCheck(ctx, project.id, check.id, { done: true }, byCode("H5").id)).rejects.toMatchObject({ code: "not_found" });
+    await expect(svc.deleteCheck(ctx, project.id, check.id, byCode("H5").id)).rejects.toMatchObject({ code: "not_found" });
+    await svc.updateCheck(ctx, project.id, check.id, { done: true }, byCode("H4").id);
+    expect((await find(ctx, project.id, "H4")).checks[0]?.done).toBe(true);
+  });
+
   it("adds, ticks and removes checks; a hito is ready once they are done", async () => {
     const { project, ctx, byCode } = await setup();
     await progress(ctx, project.id, { "05": 100 });

@@ -7,12 +7,11 @@ import {
   CoreError,
   canManageProjectFiles,
   documentsService as svc,
-  type Ctx,
   type DocumentError,
   type ProjectDocument,
 } from "@repo/core";
 import { getSessionContext } from "@repo/auth/context";
-import { revalidatePath } from "next/cache";
+import { mutate } from "./run";
 
 export type DocumentsState = { error?: DocumentError; success?: boolean } | null;
 
@@ -32,35 +31,17 @@ export async function getProjectDocuments(
   return { documents, canManage: canManageProjectFiles(ctx.role) };
 }
 
-/** Runs a core mutation; returns `{ error: code }` for expected failures. */
-async function mutate(
-  projectId: string,
-  fn: (ctx: Ctx) => Promise<unknown>,
-): Promise<DocumentsState> {
-  const ctx = await getSessionContext();
-  if (!ctx) throw new Error("Unauthorized");
-  try {
-    await fn(ctx);
-  } catch (err) {
-    if (err instanceof CoreError) return { error: err.code as DocumentError };
-    throw err;
-  }
-  // Every tab of the project, so counts and lists stay in step.
-  revalidatePath(`/dashboard/projects/${projectId}`, "layout");
-  return { success: true };
-}
-
 export async function addProjectDocumentAction(
   projectId: string,
   _prevState: DocumentsState,
   formData: FormData,
 ): Promise<DocumentsState> {
-  return mutate(projectId, (ctx) => svc.addDocument(ctx, projectId, Object.fromEntries(formData)));
+  return mutate<DocumentError>(projectId, (ctx) => svc.addDocument(ctx, projectId, Object.fromEntries(formData)));
 }
 
 export async function deleteProjectDocumentAction(
   projectId: string,
   documentId: string,
 ): Promise<DocumentsState> {
-  return mutate(projectId, (ctx) => svc.deleteDocument(ctx, projectId, documentId));
+  return mutate<DocumentError>(projectId, (ctx) => svc.deleteDocument(ctx, projectId, documentId));
 }

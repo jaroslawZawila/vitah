@@ -1,5 +1,7 @@
 import {
   and,
+  budgetChapters,
+  budgetRevisions,
   db,
   eq,
   inArray,
@@ -92,6 +94,13 @@ export async function listHitos(ctx: Ctx, projectId: string): Promise<Hito[]> {
   return hitos;
 }
 
+/** One hito of the project, priced and with its progress. */
+export async function getHito(ctx: Ctx, projectId: string, hitoId: string): Promise<Hito> {
+  const hito = (await listHitos(ctx, projectId)).find((h) => h.id === hitoId);
+  if (!hito) fail("not_found");
+  return hito;
+}
+
 /** The hito, if it is the project's (checking the project too, in parallel). */
 async function findHito(ctx: Ctx, projectId: string, hitoId: string) {
   const [, hito] = await Promise.all([
@@ -119,17 +128,15 @@ const touch = (hitoId: string, changes: Partial<typeof obraHitos.$inferInsert>) 
 
 // ─── The plan ────────────────────────────────────────────────────────────────
 
-/**
- * Body: any of { name, pctBp, scope, billingMoment, chapterCodes }. Chapters
- * given here move from whichever hito had them.
- */
-export async function updateHito(
-  ctx: Ctx,
-  projectId: string,
-  hitoId: string,
-  input: Record<string, unknown>,
-) {
-  await hitoInProject(ctx, projectId, hitoId);
+type PlanChange = {
+  hitoId: string;
+  changes: Partial<typeof obraHitos.$inferInsert>;
+  /** Null when the chapters don't change. */
+  chapterCodes: string[] | null;
+};
+
+/** Validates one hito's changes: any of { name, pctBp, scope, billingMoment, chapterCodes }. */
+function parseChange(hitoId: string, input: Record<string, unknown>): PlanChange {
   const changes = pickChanges<typeof obraHitos.$inferInsert>(input, {
     name: (v) => requiredText(v, MAX_NAME),
     pctBp: (v) => integer(v, 0, 10_000),
@@ -142,37 +149,101 @@ export async function updateHito(
     const codes = (input.chapterCodes as unknown[]).map((code) => requiredText(code, MAX_CHAPTER_CODE));
     chapterCodes = [...new Set(codes)];
   }
+  return { hitoId, changes, chapterCodes };
+}
 
-  await db.transaction(async (tx) => {
-    if (Object.keys(changes).length > 0) {
-      await tx.update(obraHitos).set(changes).where(eq(obraHitos.id, hitoId));
-    }
-    if (chapterCodes === null) return;
-    // Its old chapters, and these codes from whichever hito had them.
-    await tx
-      .delete(obraHitoChapters)
+/**
+ * Applies validated changes to the project's hitos in one transaction, in
+ * order. Chapters given to a hito move from whichever hito had them.
+ */
+async function applyPlan(ctx: Ctx, projectId: string, plan: PlanChange[]) {
+  const codes = plan.flatMap((p) => p.chapterCodes ?? []);
+  if (codes.length > 0) {
+    // Any revision's chapters: the plan may be set before one is accepted.
+    const known = await db
+      .selectDistinct({ code: budgetChapters.code })
+      .from(budgetChapters)
+      .innerJoin(budgetRevisions, eq(budgetRevisions.id, budgetChapters.revisionId))
       .where(
-        or(
-          eq(obraHitoChapters.hitoId, hitoId),
-          chapterCodes.length > 0
-            ? and(
-                eq(obraHitoChapters.projectId, projectId),
-                inArray(obraHitoChapters.chapterCode, chapterCodes),
-              )
-            : undefined,
+        and(
+          eq(budgetRevisions.projectId, projectId),
+          eq(budgetRevisions.tenantId, ctx.tenantId),
+          inArray(budgetChapters.code, codes),
         ),
       );
-    if (chapterCodes.length === 0) return;
-    await tx.insert(obraHitoChapters).values(
-      chapterCodes.map((chapterCode) => ({
-        hitoId,
-        tenantId: ctx.tenantId,
-        projectId,
-        chapterCode,
-      })),
-    );
+    if (known.length !== new Set(codes).size) fail("unknown_chapter");
+  }
+  await db.transaction(async (tx) => {
+    for (const { hitoId, changes, chapterCodes } of plan) {
+      if (Object.keys(changes).length > 0) {
+        await tx.update(obraHitos).set(changes).where(eq(obraHitos.id, hitoId));
+      }
+      if (chapterCodes === null) continue;
+      // Its old chapters, and these codes from whichever hito had them.
+      await tx
+        .delete(obraHitoChapters)
+        .where(
+          or(
+            eq(obraHitoChapters.hitoId, hitoId),
+            chapterCodes.length > 0
+              ? and(
+                  eq(obraHitoChapters.projectId, projectId),
+                  inArray(obraHitoChapters.chapterCode, chapterCodes),
+                )
+              : undefined,
+          ),
+        );
+      if (chapterCodes.length === 0) continue;
+      await tx.insert(obraHitoChapters).values(
+        chapterCodes.map((chapterCode) => ({ hitoId, tenantId: ctx.tenantId, projectId, chapterCode })),
+      );
+    }
   });
+}
+
+/** Body: any of { name, pctBp, scope, billingMoment, chapterCodes }. */
+export async function updateHito(
+  ctx: Ctx,
+  projectId: string,
+  hitoId: string,
+  input: Record<string, unknown>,
+) {
+  await hitoInProject(ctx, projectId, hitoId);
+  await applyPlan(ctx, projectId, [parseChange(hitoId, input)]);
   return { hitoId };
+}
+
+/**
+ * Several hitos at once, all or nothing (the Payments tab's plan editor).
+ * Body: { hitos: [{ id, name?, pctBp?, scope?, billingMoment?, chapterCodes? }] }
+ */
+export async function updatePlan(ctx: Ctx, projectId: string, input: Record<string, unknown>) {
+  requireEditor(ctx);
+  if (!Array.isArray(input.hitos)) fail("missing_fields");
+  const plan = (input.hitos as unknown[]).map((entry) => {
+    const { id, ...fields } = (entry ?? {}) as Record<string, unknown>;
+    if (typeof id !== "string") fail("invalid_input");
+    return parseChange(id, fields);
+  });
+  const ids = [...new Set(plan.map((p) => p.hitoId))];
+  const [, found] = await Promise.all([
+    requireProject(ctx.tenantId, projectId),
+    ids.length > 0
+      ? db
+          .select({ id: obraHitos.id })
+          .from(obraHitos)
+          .where(
+            and(
+              inArray(obraHitos.id, ids),
+              eq(obraHitos.projectId, projectId),
+              eq(obraHitos.tenantId, ctx.tenantId),
+            ),
+          )
+      : [],
+  ]);
+  if (found.length !== ids.length) fail("not_found");
+  await applyPlan(ctx, projectId, plan);
+  return { updated: plan.length };
 }
 
 // ─── Checks ──────────────────────────────────────────────────────────────────
@@ -198,7 +269,8 @@ export async function addCheck(
   return { checkId: check!.id };
 }
 
-async function checkInProject(ctx: Ctx, projectId: string, checkId: string) {
+/** The check, if it is the project's (and `hitoId`'s, when given). */
+async function checkInProject(ctx: Ctx, projectId: string, checkId: string, hitoId?: string) {
   requireEditor(ctx);
   const [, [check]] = await Promise.all([
     requireProject(ctx.tenantId, projectId),
@@ -211,6 +283,7 @@ async function checkInProject(ctx: Ctx, projectId: string, checkId: string) {
           eq(obraHitoChecks.id, checkId),
           eq(obraHitos.projectId, projectId),
           eq(obraHitos.tenantId, ctx.tenantId),
+          hitoId === undefined ? undefined : eq(obraHitos.id, hitoId),
         ),
       ),
   ]);
@@ -223,8 +296,9 @@ export async function updateCheck(
   projectId: string,
   checkId: string,
   input: Record<string, unknown>,
+  hitoId?: string,
 ) {
-  await checkInProject(ctx, projectId, checkId);
+  await checkInProject(ctx, projectId, checkId, hitoId);
   const changes = pickChanges<typeof obraHitoChecks.$inferInsert>(input, {
     label: (v) => requiredText(v, MAX_CHECK),
     done: (v) => (typeof v === "boolean" ? v : fail("invalid_input")),
@@ -235,8 +309,8 @@ export async function updateCheck(
   return { checkId };
 }
 
-export async function deleteCheck(ctx: Ctx, projectId: string, checkId: string) {
-  await checkInProject(ctx, projectId, checkId);
+export async function deleteCheck(ctx: Ctx, projectId: string, checkId: string, hitoId?: string) {
+  await checkInProject(ctx, projectId, checkId, hitoId);
   await db.delete(obraHitoChecks).where(eq(obraHitoChecks.id, checkId));
   return { checkId };
 }
@@ -391,7 +465,7 @@ export async function registerPayment(
   let amountCents: number;
   if (input.amountCents === undefined || input.amountCents === null) {
     const hito = (await loadObra(ctx.tenantId, projectId)).hitos.find((h) => h.id === hitoId)!;
-    amountCents = hito.amountCents + hito.vatCents;
+    amountCents = hito.totalCents;
   } else {
     amountCents = integer(input.amountCents, 0, 2_000_000_000);
   }
