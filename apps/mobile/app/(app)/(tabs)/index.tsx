@@ -1,4 +1,4 @@
-import Feather from "@expo/vector-icons/Feather";
+import Feather, { type FeatherIconName } from "@react-native-vector-icons/feather";
 import { useRouter } from "expo-router";
 import {
   Alert,
@@ -232,7 +232,7 @@ function LatestUpdate({ weeks }: { weeks: PhotoWeek[] }) {
 
 type Shortcut = {
   label: MessageKey;
-  icon: keyof typeof Feather.glyphMap;
+  icon: FeatherIconName;
   /** A tab, or nothing yet ("Próximamente"). */
   href?: "/documents" | "/profile";
 };

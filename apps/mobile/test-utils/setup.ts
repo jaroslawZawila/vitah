@@ -31,7 +31,7 @@ jest.mock("expo-secure-store", () => {
 });
 
 // The real icon loads its font asynchronously and updates outside act().
-jest.mock("@expo/vector-icons/Feather", () => () => null);
+jest.mock("@react-native-vector-icons/feather", () => () => null);
 
 jest.mock("react-native-safe-area-context", () => {
   const { View } = jest.requireActual("react-native");

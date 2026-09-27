@@ -1,4 +1,4 @@
-import Feather from "@expo/vector-icons/Feather";
+import Feather from "@react-native-vector-icons/feather";
 import Constants from "expo-constants";
 import { useRouter } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";

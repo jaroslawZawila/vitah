@@ -1,4 +1,4 @@
-import Feather from "@expo/vector-icons/Feather";
+import Feather from "@react-native-vector-icons/feather";
 import { useRouter } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { isAwaitingPayment, type Hito } from "@repo/core/contract";

@@ -1,11 +1,11 @@
-import Feather from "@expo/vector-icons/Feather";
+import Feather, { type FeatherIconName } from "@react-native-vector-icons/feather";
 import { Tabs } from "expo-router";
 import { colors } from "../../../constants/theme";
 import { useI18n, type MessageKey } from "../../../lib/i18n";
 
 // The 5-tab bar of doc/mobile-app-design: Inicio · Obra · Fotos · Documentos · Perfil.
 
-const TABS: { name: string; title: MessageKey; icon: keyof typeof Feather.glyphMap }[] = [
+const TABS: { name: string; title: MessageKey; icon: FeatherIconName }[] = [
   { name: "index", title: "tabs.home", icon: "home" },
   { name: "obra", title: "tabs.obra", icon: "layers" },
   { name: "photos", title: "tabs.photos", icon: "image" },

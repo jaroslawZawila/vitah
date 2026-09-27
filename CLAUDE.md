@@ -68,7 +68,10 @@ Every change goes through this, in order. Nothing gets committed until every ste
 ## Tech Stack
 
 - **Next.js 16.2.0** (App Router, Turbopack)
-- **React 19.2.0** / TypeScript 5.9.2
+- **React 19.2.3** / TypeScript 5.9.2 — one React across the monorepo, pinned by root `pnpm.overrides`
+- **Expo SDK 57** / React Native 0.86 (New Architecture only), Expo Router 57, jest-expo. Icons from
+  `@react-native-vector-icons/feather` (not the deprecated `@expo/vector-icons`). `apps/mobile` keeps
+  TypeScript 5.9.2 via `expo.install.exclude`; upgrade with `npx expo install expo@^<sdk> && npx expo install --fix`
 - **NextAuth.js 5.0.0-beta.31** — Credentials provider, JWT sessions, Drizzle adapter
 - **Drizzle ORM 0.35** + **postgres.js** — database layer with multi-tenant schema (works with any PostgreSQL)
 - **next-intl 4.12.0** — i18n (Spanish default, English)

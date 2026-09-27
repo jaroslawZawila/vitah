@@ -1,4 +1,4 @@
-import Feather from "@expo/vector-icons/Feather";
+import Feather, { type FeatherIconName } from "@react-native-vector-icons/feather";
 import { StyleSheet, Switch, Text, View } from "react-native";
 import { colors, type } from "../constants/theme";
 
@@ -11,7 +11,7 @@ export function ToggleRow({
   disabled = false,
   onChange,
 }: {
-  icon?: keyof typeof Feather.glyphMap;
+  icon?: FeatherIconName;
   label: string;
   hint?: string;
   value: boolean;

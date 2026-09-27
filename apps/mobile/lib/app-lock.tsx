@@ -124,7 +124,7 @@ export function useAppLock(): AppLockValue {
 
 const styles = StyleSheet.create({
   lock: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: colors.grafito,
     alignItems: "center",
     justifyContent: "center",

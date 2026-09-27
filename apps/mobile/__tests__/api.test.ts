@@ -1,7 +1,7 @@
 import { api } from "../lib/api";
 
 const fetchMock = jest.fn();
-global.fetch = fetchMock;
+globalThis.fetch = fetchMock;
 
 function respond(status: number, body?: unknown) {
   fetchMock.mockResolvedValueOnce(

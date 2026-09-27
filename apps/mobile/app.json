@@ -25,7 +25,8 @@
         {
           "faceIDPermission": "ViTAH usa Face ID para proteger el acceso a tu proyecto."
         }
-      ]
+      ],
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": true

@@ -1,4 +1,4 @@
-import Feather from "@expo/vector-icons/Feather";
+import Feather from "@react-native-vector-icons/feather";
 import { Redirect, useRouter } from "expo-router";
 import { useState } from "react";
 import {

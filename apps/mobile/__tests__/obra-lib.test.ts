@@ -50,7 +50,7 @@ describe("obra helpers", () => {
 describe("api.getObra and hito files", () => {
   const fetchMock = jest.fn();
   beforeEach(() => {
-    global.fetch = fetchMock;
+    globalThis.fetch = fetchMock;
     fetchMock.mockReset();
     disk.clear();
     jest.mocked(openPdf).mockReset();

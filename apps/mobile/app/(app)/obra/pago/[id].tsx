@@ -1,4 +1,4 @@
-import Feather from "@expo/vector-icons/Feather";
+import Feather from "@react-native-vector-icons/feather";
 import { useLocalSearchParams } from "expo-router";
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import type { HitoFileKind } from "@repo/core/contract";
