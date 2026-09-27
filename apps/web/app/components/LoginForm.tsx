@@ -45,7 +45,11 @@ export function LoginForm() {
         {isPending ? t("submitting") : t("submit")}
       </button>
 
-      {state?.error && <p className={styles.error}>{t("error")}</p>}
+      {state?.error && (
+        <p className={styles.error}>
+          {t(state.error === "too_many_attempts" ? "tooManyAttempts" : "error")}
+        </p>
+      )}
     </form>
   );
 }

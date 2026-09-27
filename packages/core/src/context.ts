@@ -20,3 +20,12 @@ export type Ctx = {
 export function requireAdmin(ctx: Ctx) {
   if (ctx.role !== "admin") throw forbidden();
 }
+
+/** Admins and managers change a project and its data; viewers only read. */
+export function canEdit(role: UserRole) {
+  return role === "admin" || role === "manager";
+}
+
+export function requireEditor(ctx: Ctx) {
+  if (!canEdit(ctx.role)) throw forbidden();
+}

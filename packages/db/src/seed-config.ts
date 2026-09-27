@@ -8,3 +8,15 @@ export function seedConfig() {
     projectRef: "VTH-26-001",
   };
 }
+
+/**
+ * The seeded accounts' password: SEED_ADMIN_PASSWORD, or the documented dev
+ * default only for a database on this machine. Refuses to put the public
+ * default on any other database.
+ */
+export function seedPassword(connectionString: string, env = process.env): string {
+  if (env.SEED_ADMIN_PASSWORD) return env.SEED_ADMIN_PASSWORD;
+  const { hostname } = new URL(connectionString);
+  if (["localhost", "127.0.0.1", "::1", "[::1]"].includes(hostname)) return "vitah2026";
+  throw new Error(`Set SEED_ADMIN_PASSWORD to seed ${hostname}: the default password is public`);
+}

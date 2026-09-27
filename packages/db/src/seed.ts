@@ -4,7 +4,7 @@ import postgres from "postgres";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { and, eq } from "drizzle-orm";
 import * as schema from "./schema";
-import { seedConfig } from "./seed-config";
+import { seedConfig, seedPassword } from "./seed-config";
 
 async function seed() {
   const connectionString = process.env.POSTGRES_URL;
@@ -12,11 +12,11 @@ async function seed() {
     throw new Error("POSTGRES_URL environment variable is not set");
   }
 
+  const password = seedPassword(connectionString);
   const client = postgres(connectionString);
   const db = drizzle(client, { schema });
 
   const { tenantName, tenantSlug, email, projectRef } = seedConfig();
-  const password = process.env.SEED_ADMIN_PASSWORD ?? "vitah2026";
   const name = process.env.SEED_ADMIN_NAME ?? "ViTAH Admin";
 
   // Create or find tenant

@@ -1,6 +1,6 @@
 import { db, eq, projects } from "@repo/db";
 import { toCalendarDate } from "./calendar";
-import type { Ctx } from "./context";
+import { requireEditor, type Ctx } from "./context";
 import {
   OBRA_STAGES,
   type BudgetChapter,
@@ -15,7 +15,6 @@ import {
   clientProject,
   fail,
   loadObra,
-  requireEditor,
   requireProject,
   type ObraProject,
 } from "./obra-data";

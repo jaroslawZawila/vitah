@@ -30,7 +30,7 @@ type FormError = keyof Messages["password"]["errors"];
 export default function PasswordScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { token, signOut } = useAuth();
+  const { token, signOut, replaceToken } = useAuth();
   const { t } = useI18n();
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
@@ -57,11 +57,16 @@ export default function PasswordScreen() {
     const result = await api.changePassword(token, current, next);
     setSaving(false);
     if (result.ok) {
+      if (result.data.token) await replaceToken(result.data.token);
       Alert.alert(t("password.saved"));
       router.back();
     } else if (result.error === "unauthorized") {
       await signOut();
-    } else if (result.error === "wrong_password" || result.error === "weak_password") {
+    } else if (
+      result.error === "wrong_password" ||
+      result.error === "weak_password" ||
+      result.error === "too_many_attempts"
+    ) {
       setError(result.error);
     } else {
       setError("failed");

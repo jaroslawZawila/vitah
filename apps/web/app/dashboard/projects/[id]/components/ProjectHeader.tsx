@@ -12,7 +12,16 @@ function toInputDate(date: Date | null): string {
   return date ? date.toISOString().slice(0, 10) : "";
 }
 
-export default function ProjectHeader({ project }: { project: ProjectDetail }) {
+/** `canEdit`: admins and managers; `canDelete`: admins only (as enforced in core). */
+export default function ProjectHeader({
+  project,
+  canEdit,
+  canDelete,
+}: {
+  project: ProjectDetail;
+  canEdit: boolean;
+  canDelete: boolean;
+}) {
   const t = useTranslations("projectDetailPage.header");
   const format = useFormatter();
   const router = useRouter();
@@ -89,14 +98,16 @@ export default function ProjectHeader({ project }: { project: ProjectDetail }) {
           </p>
         )}
         <div className={styles.editActions}>
-          <button
-            type="button"
-            className={styles.btnDanger}
-            onClick={handleDelete}
-            disabled={isPending}
-          >
-            {t("delete")}
-          </button>
+          {canDelete && (
+            <button
+              type="button"
+              className={styles.btnDanger}
+              onClick={handleDelete}
+              disabled={isPending}
+            >
+              {t("delete")}
+            </button>
+          )}
           <button
             type="button"
             className={styles.btnSmall}
@@ -127,13 +138,15 @@ export default function ProjectHeader({ project }: { project: ProjectDetail }) {
           <div className={styles.headerRef}>{project.ref}</div>
           <div className={styles.headerSub}>{project.address}</div>
         </div>
-        <button
-          type="button"
-          className={styles.btnSmall}
-          onClick={() => setEditing(true)}
-        >
-          {t("edit")}
-        </button>
+        {canEdit && (
+          <button
+            type="button"
+            className={styles.btnSmall}
+            onClick={() => setEditing(true)}
+          >
+            {t("edit")}
+          </button>
+        )}
       </div>
 
       <dl className={styles.headerMeta}>

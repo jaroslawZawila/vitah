@@ -74,7 +74,7 @@ describe("/api/v1/projects/:id/photos", () => {
     expect(file.headers.get("content-disposition")).toBe(
       `inline; filename*=UTF-8''${photoId}.png`,
     );
-    expect(file.headers.get("cache-control")).toBe("private, max-age=31536000, immutable");
+    expect(file.headers.get("cache-control")).toBe("private, max-age=86400, immutable");
     expect(new Uint8Array(await file.arrayBuffer()).slice(0, 8)).toEqual(PNG);
 
     const thumb = await download(request(token, { query: "?size=thumb" }), params(project.id, photoId));

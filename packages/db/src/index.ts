@@ -9,6 +9,7 @@ export {
   STAFF_ROLES,
   isClientUser,
   isStaffUser,
+  staffWithEmail,
   type UserRole,
   type StaffRole,
   projects,
@@ -17,6 +18,7 @@ export {
   projectPhotos,
   clientSettings,
   pushTokens,
+  loginAttempts,
   budgetRevisions,
   budgetChapters,
   budgetLines,
@@ -25,7 +27,7 @@ export {
   obraHitoChecks,
   obraHitoPhotos,
 } from "./schema";
-export { seedConfig } from "./seed-config";
+export { seedConfig, seedPassword } from "./seed-config";
 export type { AnyColumn } from "drizzle-orm";
 export type { PgTable } from "drizzle-orm/pg-core";
 export { eq, ne, gt, lt, and, or, desc, asc, sql, count, sum, inArray, isNull, isNotNull, max, type SQL } from "drizzle-orm";

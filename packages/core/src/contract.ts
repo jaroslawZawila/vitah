@@ -163,6 +163,7 @@ export function isStrongPassword(password: string) {
 export type AccountError =
   | "missing_fields"
   | "wrong_password"
+  | "too_many_attempts"
   | "weak_password"
   | "invalid_settings"
   | "invalid_token"

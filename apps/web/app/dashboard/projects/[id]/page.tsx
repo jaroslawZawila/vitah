@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
-import { auth } from "../../../../auth";
+import { canEdit } from "@repo/core";
+import { getSessionContext } from "@repo/auth/context";
 import { getAssignableClients } from "../../../actions/project-client";
 import { getProject } from "../../../actions/projects";
 import ClientAccessCard from "./components/ClientAccessCard";
@@ -12,21 +13,25 @@ export default async function ProjectDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [project, session] = await Promise.all([getProject(id), auth()]);
+  const [project, ctx] = await Promise.all([getProject(id), getSessionContext()]);
 
   if (!project) {
     redirect("/dashboard/projects");
   }
 
-  const canManageClient = session?.user?.role === "admin";
+  const isAdmin = ctx?.role === "admin";
   // Only needed to pick a client, i.e. when the project has none.
   const assignableClients =
-    canManageClient && !project.client ? await getAssignableClients() : [];
+    isAdmin && !project.client ? await getAssignableClients() : [];
 
   return (
     <>
-      <ProjectHeader project={project} />
-      {canManageClient && (
+      <ProjectHeader
+        project={project}
+        canEdit={!!ctx && canEdit(ctx.role)}
+        canDelete={isAdmin}
+      />
+      {isAdmin && (
         <ClientAccessCard
           projectId={project.id}
           client={project.client}

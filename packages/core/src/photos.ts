@@ -1,5 +1,5 @@
 import { and, db, desc, eq, gt, isNotNull, ne, projectPhotos, projects, users } from "@repo/db";
-import type { Ctx } from "./context";
+import { requireEditor, type Ctx } from "./context";
 import {
   MAX_CAPTION_LENGTH,
   MAX_CHAPTER_CODE,
@@ -10,6 +10,7 @@ import {
   type PhotoType,
   type ProjectPhoto,
 } from "./contract";
+import { clippedText } from "./input";
 import { notifyProjectClient } from "./notifications";
 import type { PhotosByChapter } from "./obra-calc";
 import {
@@ -17,7 +18,6 @@ import {
   openStoredFile,
   projectFolder,
   removeFiles,
-  requireFileManager,
   requireProject,
   storeFiles,
 } from "./project-files";
@@ -36,6 +36,8 @@ const EXTENSIONS: Record<PhotoType, string> = {
 /** The small copy grids show. `px` is its longest side: sharp on a 3× phone's grid tile. */
 const THUMBNAIL = { px: 800, contentType: "image/webp", extension: "webp" } as const;
 
+const MAX_PIXELS = 50_000_000;
+
 /** After a photo push, more photos of the project within this time send none. */
 const PHOTO_PUSH_QUIET_MS = 10 * 60 * 1000;
 
@@ -53,7 +55,9 @@ async function readImage(file: Blob) {
   // load, uploads fail with a server error; nothing else is affected.
   const { default: sharp } = await import("sharp");
   try {
-    const image = sharp(Buffer.from(await file.arrayBuffer()));
+    // A small file can decode to gigabytes (a "decompression bomb"): refuse
+    // anything larger than a 48-megapixel camera's photo.
+    const image = sharp(Buffer.from(await file.arrayBuffer()), { limitInputPixels: MAX_PIXELS });
     const { format } = await image.metadata();
     const contentType = PHOTO_TYPES.find((type) => type === `image/${format}`);
     if (!contentType) return null;
@@ -96,15 +100,11 @@ function toMobilePhoto({ createdAt, ...photo }: PhotoRow): MobilePhoto {
  * or WebP of at most 4 MB; chapterCode the budget chapter it shows.
  */
 export async function addPhoto(ctx: Ctx, projectId: string, input: Record<string, unknown>) {
-  requireFileManager(ctx);
+  requireEditor(ctx);
 
   const { file } = input;
-  const caption =
-    typeof input.caption === "string" ? input.caption.trim().slice(0, MAX_CAPTION_LENGTH) : "";
-  const chapterCode =
-    typeof input.chapterCode === "string"
-      ? input.chapterCode.trim().slice(0, MAX_CHAPTER_CODE)
-      : "";
+  const caption = clippedText(input.caption, MAX_CAPTION_LENGTH);
+  const chapterCode = clippedText(input.chapterCode, MAX_CHAPTER_CODE);
   if (!(file instanceof Blob) || file.size === 0) fail("missing_file");
   if (file.size > MAX_PHOTO_BYTES) fail("file_too_large");
   const [image] = await Promise.all([readImage(file), requireProject(ctx.tenantId, projectId)]);
@@ -176,7 +176,7 @@ export async function listPhotos(
 }
 
 export async function deletePhoto(ctx: Ctx, projectId: string, photoId: string) {
-  requireFileManager(ctx);
+  requireEditor(ctx);
 
   const where = photoInProject(ctx, projectId, photoId);
   const photo = await db.query.projectPhotos.findFirst({

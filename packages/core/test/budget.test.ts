@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { budgetLines, db, eq } from "@repo/db";
+import { budgetLines, budgetRevisions, db, eq } from "@repo/db";
 import {
   createTestProject,
   createTestTenant,
@@ -216,6 +216,35 @@ describe("revisions", () => {
     const budget = await svc.getBudget(ctx, project.id);
     expect(budget.revisions.map((r) => [r.number, r.status])).toEqual([[1, "accepted"], [0, "superseded"]]);
     expect(budget.revision!.chapters[0]!.lines[0]!.executedPct).toBe(80);
+  });
+
+  it("refuses a draft edit that races the draft being accepted", async () => {
+    const { project, ctx } = await setup();
+    const { revisionId, c2 } = await draftBudget(ctx, project.id);
+    const [target] = await db.select().from(budgetLines).where(eq(budgetLines.chapterId, c2));
+    // Another request accepts the draft: it holds the revision's row, not yet committed.
+    let commit!: () => void;
+    let accepted!: () => void;
+    const isAccepted = new Promise<void>((resolve) => (accepted = resolve));
+    const accepting = db.transaction(async (tx) => {
+      await tx
+        .update(budgetRevisions)
+        .set({ status: "accepted" })
+        .where(eq(budgetRevisions.id, revisionId));
+      accepted();
+      await new Promise<void>((resolve) => (commit = resolve));
+    });
+    await isAccepted;
+
+    // The edit's checks still see a draft; its write waits for the lock, then sees the contract.
+    const edit = svc.updateLine(ctx, project.id, target!.id, { description: "Changed" }).catch((e) => e);
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    commit();
+    await accepting;
+
+    expect(await edit).toMatchObject({ code: "not_draft" });
+    const [after] = await db.select().from(budgetLines).where(eq(budgetLines.id, target!.id));
+    expect(after!.description).toBe(target!.description);
   });
 
   it("deletes a draft revision only", async () => {

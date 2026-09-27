@@ -320,3 +320,112 @@ describe("deleteProject", () => {
     expect(await svc.getProject(ctx, project.id)).not.toBeNull();
   });
 });
+
+describe("project roles", () => {
+  const input = { ref: "VTH-1", address: "Calle 1" };
+
+  it("lets managers create and edit, but not delete", async () => {
+    const { ctx } = await setup();
+    const manager: Ctx = { ...ctx, role: "manager" };
+
+    const { id } = await svc.createProject(manager, input);
+    await expect(svc.updateProject(manager, id, { address: "Calle 2" })).resolves.toEqual({
+      projectId: id,
+    });
+    await expect(svc.deleteProject(manager, id)).rejects.toMatchObject({
+      code: "forbidden",
+      status: 403,
+    });
+    expect(await svc.getProject(ctx, id)).not.toBeNull();
+  });
+
+  it("lets viewers only read", async () => {
+    const { tenant, ctx } = await setup();
+    const viewer: Ctx = { ...ctx, role: "viewer" };
+    const project = await createTestProject(tenant.id, { address: "Calle 1" });
+
+    await expect(svc.createProject(viewer, input)).rejects.toMatchObject({
+      code: "forbidden",
+      status: 403,
+    });
+    await expect(
+      svc.updateProject(viewer, project.id, { address: "Hacked" }),
+    ).rejects.toMatchObject({ code: "forbidden" });
+    await expect(svc.deleteProject(viewer, project.id)).rejects.toMatchObject({
+      code: "forbidden",
+    });
+    expect(await svc.getProject(viewer, project.id)).toMatchObject({ address: "Calle 1" });
+  });
+});
+
+describe("project input", () => {
+  it.each(["2026-02-31", "1", "+275760-09-13", "2026-01-01T00:00", "2026-02-31T00:00:00Z", "2026-01-01T25:00:00Z", "01/03/2026"])(
+    "rejects the non-calendar date %s",
+    async (startDate) => {
+      const { ctx } = await setup();
+
+      await expect(
+        svc.createProject(ctx, { ref: "VTH-1", address: "Calle 1", startDate }),
+      ).rejects.toMatchObject({ code: "invalid_date", status: 400 });
+    },
+  );
+
+  it("takes an ISO timestamp as its UTC date (as /api/v1 accepted before)", async () => {
+    const { ctx } = await setup();
+
+    const { id } = await svc.createProject(ctx, {
+      ref: "VTH-1",
+      address: "Calle 1",
+      startDate: "2026-10-01T00:00:00.000Z",
+      completionDate: "2026-12-01T23:30:00+02:00",
+    });
+
+    expect(await svc.getProject(ctx, id)).toMatchObject({
+      startDate: new Date("2026-10-01T00:00:00Z"),
+      completionDate: new Date("2026-12-01T00:00:00Z"),
+    });
+  });
+
+  it("rejects a completion date before the start", async () => {
+    const { ctx } = await setup();
+
+    await expect(
+      svc.createProject(ctx, {
+        ref: "VTH-1",
+        address: "Calle 1",
+        startDate: "2026-05-01",
+        completionDate: "2026-04-30",
+      }),
+    ).rejects.toMatchObject({ code: "dates_out_of_order", status: 400 });
+  });
+
+  it("checks the order against the stored date when only one changes", async () => {
+    const { tenant, ctx } = await setup();
+    const project = await createTestProject(tenant.id, {
+      startDate: new Date("2026-03-01"),
+      completionDate: new Date("2026-11-15"),
+    });
+
+    await expect(
+      svc.updateProject(ctx, project.id, { completionDate: "2026-02-01" }),
+    ).rejects.toMatchObject({ code: "dates_out_of_order" });
+    await expect(
+      svc.updateProject(ctx, project.id, { startDate: "2026-12-01" }),
+    ).rejects.toMatchObject({ code: "dates_out_of_order" });
+    await expect(
+      svc.updateProject(ctx, project.id, { startDate: "2026-12-01", completionDate: "" }),
+    ).resolves.toEqual({ projectId: project.id });
+  });
+
+  it("rejects an overlong ref or address", async () => {
+    const { tenant, ctx } = await setup();
+    const project = await createTestProject(tenant.id);
+
+    await expect(
+      svc.createProject(ctx, { ref: "V".repeat(41), address: "Calle 1" }),
+    ).rejects.toMatchObject({ code: "too_long", status: 400 });
+    await expect(
+      svc.updateProject(ctx, project.id, { address: "a".repeat(301) }),
+    ).rejects.toMatchObject({ code: "too_long" });
+  });
+});

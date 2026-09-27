@@ -68,7 +68,9 @@ export default function SignInScreen() {
     const result = await signIn(email.trim(), password);
     setLoading(false);
     if (result.error) {
-      setError(t("signIn.invalidCredentials"));
+      setError(
+        t(result.error === "too_many_attempts" ? "signIn.tooManyAttempts" : "signIn.invalidCredentials"),
+      );
     }
   }
 

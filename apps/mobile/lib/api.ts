@@ -126,8 +126,12 @@ export const api = {
     return authed<MobileSettings>("/api/mobile/settings", token, "PUT", { notifications });
   },
 
+  /**
+   * Changing the password signs every phone out; `token` (a fresh session for
+   * this one) is missing from servers older than that.
+   */
   changePassword(token: string, currentPassword: string, newPassword: string) {
-    return authed<{ success: true }>("/api/mobile/password", token, "POST", {
+    return authed<{ success: true; token?: string }>("/api/mobile/password", token, "POST", {
       currentPassword,
       newPassword,
     });

@@ -1,17 +1,12 @@
-import { db, users, eq, and, isStaffUser, STAFF_ROLES } from "@repo/db";
-import { hashPassword } from "./accounts";
+import { db, users, and, eq, isStaffUser, STAFF_ROLES } from "@repo/db";
+import { EMAIL_PATTERN, hashPassword, isUniqueViolation } from "./accounts";
 import { requireAdmin, type Ctx, type UserRole } from "./context";
 import { MIN_PASSWORD_LENGTH } from "./contract";
 import { invalid, notFound } from "./errors";
+import { MAX_TEXT, text } from "./input";
 
 // Staff management within the caller's tenant. Admin only. Clients (mobile
 // app users) are managed from their project (./project-client.ts).
-
-function str(value: unknown): string | undefined {
-  if (typeof value !== "string") return undefined;
-  const trimmed = value.trim();
-  return trimmed === "" ? undefined : trimmed;
-}
 
 function role(value: unknown): UserRole | undefined {
   return STAFF_ROLES.includes(value as UserRole) ? (value as UserRole) : undefined;
@@ -37,12 +32,15 @@ export async function listUsers(ctx: Ctx) {
 
 export type UserListItem = Awaited<ReturnType<typeof listUsers>>[number];
 
-/** Body: { email, name, password, role } */
+/**
+ * Body: { email, name, password, role }. The portal login finds staff by
+ * email alone, so a staff email is unique across tenants (any case).
+ */
 export async function createUser(ctx: Ctx, input: Record<string, unknown>) {
   requireAdmin(ctx);
 
-  const email = str(input.email);
-  const name = str(input.name);
+  const email = text(input.email, MAX_TEXT)?.toLowerCase();
+  const name = text(input.name, MAX_TEXT);
   // Passwords are not trimmed
   const password =
     typeof input.password === "string" ? input.password : undefined;
@@ -50,27 +48,28 @@ export async function createUser(ctx: Ctx, input: Record<string, unknown>) {
 
   if (!email || !name || !password || !userRole)
     throw invalid("missing_fields");
+  if (!EMAIL_PATTERN.test(email)) throw invalid("invalid_email");
   if (password.length < MIN_PASSWORD_LENGTH) throw invalid("password_too_short");
 
-  const existing = await db.query.users.findFirst({
-    where: and(eq(users.tenantId, ctx.tenantId), eq(users.email, email)),
-    columns: { id: true },
-  });
-  if (existing) throw invalid("email_exists");
+  try {
+    const [created] = await db
+      .insert(users)
+      .values({
+        tenantId: ctx.tenantId,
+        email,
+        name,
+        passwordHash: await hashPassword(password),
+        role: userRole,
+      })
+      .returning({ id: users.id });
 
-  const [created] = await db
-    .insert(users)
-    .values({
-      tenantId: ctx.tenantId,
-      email,
-      name,
-      passwordHash: await hashPassword(password),
-      role: userRole,
-    })
-    .returning({ id: users.id });
-
-  if (!created) throw new Error("User insert returned no row");
-  return { id: created.id };
+    if (!created) throw new Error("User insert returned no row");
+    return { id: created.id };
+  } catch (error) {
+    // Staff anywhere (users_staff_email_unique), or a client of this tenant.
+    if (isUniqueViolation(error)) throw invalid("email_exists");
+    throw error;
+  }
 }
 
 /** Body: { role?, active? } */

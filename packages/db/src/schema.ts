@@ -1,4 +1,4 @@
-import { eq, ne, relations, sql } from "drizzle-orm";
+import { and, eq, ne, relations, sql } from "drizzle-orm";
 import {
   boolean,
   date,
@@ -75,18 +75,33 @@ export const users = pgTable(
     passwordHash: text("password_hash"),
     role: userRoleEnum("role").default("viewer").notNull(),
     active: boolean("active").default(true).notNull(),
+    // Mobile tokens issued before this are revoked (password changed or reset).
+    passwordChangedAt: timestamp("password_changed_at", { mode: "date" }),
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
   },
   (table) => ({
     tenantEmailUnique: unique("users_tenant_email_unique").on(table.tenantId, table.email),
-    // Mobile login looks clients up by email alone, so client emails must be
-    // unique across tenants.
+    // Logins look users up by email alone (clients on mobile, staff on the
+    // portal), so an email is unique across tenants within each audience.
     clientEmailUnique: uniqueIndex("users_client_email_unique")
       .on(table.email)
       .where(sql`${table.role} = 'client'`),
+    staffEmailUnique: uniqueIndex("users_staff_email_unique")
+      .on(sql`lower(${table.email})`)
+      .where(sql`${table.role} <> 'client'`),
   }),
 );
+
+// --- Login throttling ---
+
+// Failed sign-ins per key (an email or an IP) in the current window; see
+// packages/core/src/throttle.ts. Not tenant data: a key may match no user.
+export const loginAttempts = pgTable("login_attempts", {
+  key: text("key").primaryKey(),
+  failures: integer("failures").default(0).notNull(),
+  windowStart: timestamp("window_start", { mode: "date" }).defaultNow().notNull(),
+});
 
 // --- Client profiles ---
 
@@ -151,6 +166,10 @@ export const pushTokens = pgTable(
 /** SQL filters splitting portal staff from mobile-app clients. */
 export const isClientUser = eq(users.role, "client");
 export const isStaffUser = ne(users.role, "client");
+
+/** The staff member with this (lower-cased) email, in any tenant: matches `users_staff_email_unique`. */
+export const staffWithEmail = (email: string) =>
+  and(sql`lower(${users.email}) = ${email}`, isStaffUser);
 
 // --- NextAuth adapter tables (for future OAuth / DB sessions) ---
 

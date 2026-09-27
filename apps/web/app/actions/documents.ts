@@ -5,7 +5,7 @@
 
 import {
   CoreError,
-  canManageProjectFiles,
+  canEdit,
   documentsService as svc,
   type DocumentError,
   type ProjectDocument,
@@ -28,7 +28,7 @@ export async function getProjectDocuments(
     if (err instanceof CoreError) return [];
     throw err;
   });
-  return { documents, canManage: canManageProjectFiles(ctx.role) };
+  return { documents, canManage: canEdit(ctx.role) };
 }
 
 export async function addProjectDocumentAction(

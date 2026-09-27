@@ -1,4 +1,4 @@
-import { CoreError, canManageProjectFiles, type Ctx, type ObraError } from "@repo/core";
+import { CoreError, canEdit, type Ctx, type ObraError } from "@repo/core";
 import { getSessionContext } from "@repo/auth/context";
 import { revalidatePath } from "next/cache";
 
@@ -16,7 +16,7 @@ export async function read<T>(fn: (ctx: Ctx) => Promise<T>) {
   const ctx = await getSessionContext();
   if (!ctx) return null;
   try {
-    return { data: await fn(ctx), canManage: canManageProjectFiles(ctx.role) };
+    return { data: await fn(ctx), canManage: canEdit(ctx.role) };
   } catch (err) {
     if (err instanceof CoreError) return null;
     throw err;

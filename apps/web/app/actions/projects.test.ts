@@ -120,13 +120,40 @@ describe("project actions", () => {
     });
   });
 
-  it("deletes a project", async () => {
+  it("lets an admin delete a project", async () => {
     const { tenant } = await setup();
+    const admin = await createTestUser(tenant.id, { role: "admin" });
+    signInAs({ tenantId: tenant.id, userId: admin.id, role: "admin" });
     const project = await createTestProject(tenant.id);
 
     await deleteProject(project.id);
 
     expect(await reload(project.id)).toBeUndefined();
     expect(revalidatePath).toHaveBeenCalledWith("/dashboard/projects");
+  });
+
+  it("refuses to delete for a manager", async () => {
+    const { tenant } = await setup();
+    const project = await createTestProject(tenant.id);
+
+    await expect(deleteProject(project.id)).rejects.toMatchObject({ code: "forbidden" });
+    expect(await reload(project.id)).toBeDefined();
+  });
+
+  it("refuses changes from a viewer", async () => {
+    const { tenant } = await setup();
+    const viewer = await createTestUser(tenant.id, { role: "viewer" });
+    signInAs({ tenantId: tenant.id, userId: viewer.id, role: "viewer" });
+    const project = await createTestProject(tenant.id, { address: "Calle 1" });
+
+    expect(await createProject({ ref: "VTH-9", address: "Calle 9" })).toEqual({
+      error: "forbidden",
+    });
+    expect(await updateProject(project.id, { address: "Hacked" })).toEqual({
+      error: "forbidden",
+    });
+    await expect(deleteProject(project.id)).rejects.toMatchObject({ code: "forbidden" });
+    expect((await reload(project.id))?.address).toBe("Calle 1");
+    expect(revalidatePath).not.toHaveBeenCalled();
   });
 });

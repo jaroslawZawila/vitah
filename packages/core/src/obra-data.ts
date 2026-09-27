@@ -57,10 +57,7 @@ export function fail(code: ObraError): never {
   throw new CoreError(code, STATUS[code]);
 }
 
-// Who may edit (admins and managers) and project lookup are the same as for
-// the project's files.
-export { requireFileManager as requireEditor } from "./project-files";
-
+// Project lookup is the same as for the project's files.
 export const requireProject = requireProjectRow;
 export type ObraProject = Awaited<ReturnType<typeof requireProjectRow>>;
 

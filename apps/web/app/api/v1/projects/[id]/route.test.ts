@@ -12,13 +12,16 @@ import { DELETE, GET, PATCH } from "./route";
 // can't load outside Next.js.
 vi.mock("@repo/auth", () => ({ auth: vi.fn() }));
 
-async function staffToken(tenantId: string) {
-  const user = await createTestUser(tenantId, { role: "manager" });
+async function staffToken(
+  tenantId: string,
+  role: "admin" | "manager" | "viewer" = "admin",
+) {
+  const user = await createTestUser(tenantId, { role });
   return createMobileToken({
     sub: user.id,
     email: user.email,
     name: user.name,
-    role: "manager",
+    role,
     tenantId,
   });
 }
@@ -93,6 +96,23 @@ describe("/api/v1/projects/:id", () => {
       expect(res.status).toBe(404);
       expect(await res.json()).toEqual({ error: "not_found" });
     }
+  });
+
+  it("lets a manager edit but not delete, and a viewer only read", async () => {
+    const tenant = await createTestTenant();
+    const project = await createTestProject(tenant.id, { address: "Calle 1" });
+    const manager = await staffToken(tenant.id, "manager");
+    const viewer = await staffToken(tenant.id, "viewer");
+    const patch = { method: "PATCH", body: { address: "Calle 2" } };
+
+    expect((await call(PATCH, project.id, manager, patch)).status).toBe(200);
+    const managerDelete = await call(DELETE, project.id, manager, { method: "DELETE" });
+    expect(managerDelete.status).toBe(403);
+    expect(await managerDelete.json()).toEqual({ error: "forbidden" });
+
+    expect((await call(PATCH, project.id, viewer, { ...patch, body: { address: "X" } })).status).toBe(403);
+    expect((await call(DELETE, project.id, viewer, { method: "DELETE" })).status).toBe(403);
+    expect(await (await call(GET, project.id, viewer)).json()).toMatchObject({ address: "Calle 2" });
   });
 
   it("rejects unauthenticated requests", async () => {

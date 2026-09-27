@@ -48,9 +48,9 @@ export async function recreateTestDatabase(url: string): Promise<void> {
   });
 }
 
-/** Removes all rows. Every table cascades from `tenants`. */
+/** Removes all rows. Every table cascades from `tenants`, but for login throttling. */
 export async function resetDatabase(): Promise<void> {
-  await db.execute(sql`TRUNCATE TABLE tenants CASCADE`);
+  await db.execute(sql`TRUNCATE TABLE tenants, login_attempts CASCADE`);
 }
 
 let counter = 0;

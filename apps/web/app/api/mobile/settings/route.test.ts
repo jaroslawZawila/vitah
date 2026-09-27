@@ -77,7 +77,41 @@ describe("POST /api/mobile/password", () => {
     );
 
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ success: true });
+    const body = await res.json();
+    expect(body).toEqual({ success: true, token: expect.any(String) });
+    // The fresh token keeps this phone signed in.
+    expect((await GET(request(body.token))).status).toBe(200);
+  });
+
+  it("signs out phones holding a token from before the change", async () => {
+    // Signed in a minute ago.
+    vi.useFakeTimers({ toFake: ["Date"], now: Date.now() - 60_000 });
+    const old = await signedInClient();
+    vi.useRealTimers();
+    expect((await GET(request(old))).status).toBe(200);
+
+    const res = await changePassword(
+      request(old, "POST", { currentPassword: "vitah2026", newPassword: "CasaNordica26" }),
+    );
+
+    expect(res.status).toBe(200);
+    // Requests already in flight still pass for a few seconds, then it's refused.
+    expect((await GET(request(old))).status).toBe(200);
+    vi.useFakeTimers({ toFake: ["Date"], now: Date.now() + 31_000 });
+    expect((await GET(request(old))).status).toBe(401);
+    vi.useRealTimers();
+  });
+
+  it("answers 429 after too many wrong current passwords", async () => {
+    const token = await signedInClient();
+    const attempt = (currentPassword: string) =>
+      changePassword(request(token, "POST", { currentPassword, newPassword: "CasaNordica26" }));
+    for (let i = 0; i < 10; i++) expect((await attempt(`guess-${i}`)).status).toBe(400);
+
+    const res = await attempt("vitah2026");
+
+    expect(res.status).toBe(429);
+    expect(await res.json()).toEqual({ error: "too_many_attempts" });
   });
 
   it("answers a wrong current password with 400, not 401", async () => {

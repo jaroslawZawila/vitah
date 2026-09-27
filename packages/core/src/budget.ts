@@ -13,7 +13,7 @@ import {
   sql,
 } from "@repo/db";
 import { isUniqueViolation } from "./accounts";
-import type { Ctx } from "./context";
+import { requireEditor, type Ctx } from "./context";
 import {
   MAX_CHAPTER_CODE,
   type BudgetChapter,
@@ -32,7 +32,6 @@ import {
   nextPosition,
   optionalText,
   pickChanges,
-  requireEditor,
   requireProject,
   requiredText,
   scaled,
@@ -255,9 +254,29 @@ async function linesInProject(ctx: Ctx, projectId: string, ids: string[]) {
   return rows;
 }
 
+/** The draft revision a line is in. */
 async function draftLine(ctx: Ctx, projectId: string, lineId: string) {
   const [line] = await linesInProject(ctx, projectId, [lineId]);
   if (line!.status !== "draft") fail("not_draft");
+  return line!.revisionId;
+}
+
+/**
+ * Runs a write to a draft revision holding the revision's row lock, rechecking
+ * it is still a draft: the checks above read outside it, so without the lock
+ * an edit racing `acceptRevision` could change the just-accepted contract.
+ */
+async function inDraft<T>(revisionId: string, write: (tx: Tx) => Promise<T>): Promise<T> {
+  return db.transaction(async (tx) => {
+    const [revision] = await tx
+      .select({ status: budgetRevisions.status })
+      .from(budgetRevisions)
+      .where(eq(budgetRevisions.id, revisionId))
+      .for("update");
+    if (!revision) fail("not_found");
+    if (revision.status !== "draft") fail("not_draft");
+    return write(tx);
+  });
 }
 
 // ─── Revisions ───────────────────────────────────────────────────────────────
@@ -370,7 +389,9 @@ export async function updateRevision(
   if ("builtAreaM2" in input) changes.builtAreaCm2 = area(input.builtAreaM2);
   if ("usefulAreaM2" in input) changes.usefulAreaCm2 = area(input.usefulAreaM2);
   if (Object.keys(changes).length > 0) {
-    await db.update(budgetRevisions).set(changes).where(eq(budgetRevisions.id, revisionId));
+    await inDraft(revisionId, (tx) =>
+      tx.update(budgetRevisions).set(changes).where(eq(budgetRevisions.id, revisionId)),
+    );
   }
   return { revisionId };
 }
@@ -382,7 +403,7 @@ export async function updateRevision(
 export async function acceptRevision(ctx: Ctx, projectId: string, revisionId: string) {
   await revisionInProject(ctx, projectId, revisionId);
 
-  await db.transaction(async (tx) => {
+  await inDraft(revisionId, async (tx) => {
     const [previous] = await tx
       .update(budgetRevisions)
       .set({ status: "superseded" })
@@ -412,7 +433,7 @@ export async function acceptRevision(ctx: Ctx, projectId: string, revisionId: st
 
 export async function deleteRevision(ctx: Ctx, projectId: string, revisionId: string) {
   await revisionInProject(ctx, projectId, revisionId);
-  await db.delete(budgetRevisions).where(eq(budgetRevisions.id, revisionId));
+  await inDraft(revisionId, (tx) => tx.delete(budgetRevisions).where(eq(budgetRevisions.id, revisionId)));
   return { revisionId };
 }
 
@@ -442,15 +463,17 @@ export async function addChapter(
     changeNote: optionalText(input.changeNote, MAX_NOTE),
   };
   const [chapter] = await withFreeCode(() =>
-    db
-      .insert(budgetChapters)
-      .values({
-        ...values,
-        tenantId: ctx.tenantId,
-        revisionId,
-        position: nextPosition(budgetChapters, budgetChapters.position, eq(budgetChapters.revisionId, revisionId)),
-      })
-      .returning({ id: budgetChapters.id }),
+    inDraft(revisionId, (tx) =>
+      tx
+        .insert(budgetChapters)
+        .values({
+          ...values,
+          tenantId: ctx.tenantId,
+          revisionId,
+          position: nextPosition(budgetChapters, budgetChapters.position, eq(budgetChapters.revisionId, revisionId)),
+        })
+        .returning({ id: budgetChapters.id }),
+    ),
   );
   return { chapterId: chapter!.id };
 }
@@ -462,7 +485,7 @@ export async function updateChapter(
   chapterId: string,
   input: Record<string, unknown>,
 ) {
-  await chapterInProject(ctx, projectId, chapterId);
+  const { revisionId } = await chapterInProject(ctx, projectId, chapterId);
   const changes = pickChanges<typeof budgetChapters.$inferInsert>(input, {
     code: (v) => requiredText(v, MAX_CHAPTER_CODE),
     name: (v) => requiredText(v, MAX_NAME),
@@ -470,15 +493,17 @@ export async function updateChapter(
   });
   if (Object.keys(changes).length > 0) {
     await withFreeCode(() =>
-      db.update(budgetChapters).set(changes).where(eq(budgetChapters.id, chapterId)),
+      inDraft(revisionId, (tx) =>
+        tx.update(budgetChapters).set(changes).where(eq(budgetChapters.id, chapterId)),
+      ),
     );
   }
   return { chapterId };
 }
 
 export async function deleteChapter(ctx: Ctx, projectId: string, chapterId: string) {
-  await chapterInProject(ctx, projectId, chapterId);
-  await db.delete(budgetChapters).where(eq(budgetChapters.id, chapterId));
+  const { revisionId } = await chapterInProject(ctx, projectId, chapterId);
+  await inDraft(revisionId, (tx) => tx.delete(budgetChapters).where(eq(budgetChapters.id, chapterId)));
   return { chapterId };
 }
 
@@ -504,7 +529,7 @@ export async function addLine(
   chapterId: string,
   input: Record<string, unknown>,
 ) {
-  await chapterInProject(ctx, projectId, chapterId);
+  const { revisionId } = await chapterInProject(ctx, projectId, chapterId);
   const fields = lineInput(input);
   const values = {
     code: LINE_PARSERS.code(fields.code),
@@ -513,15 +538,17 @@ export async function addLine(
     quantityMilli: LINE_PARSERS.quantityMilli(fields.quantityMilli),
     unitPriceCents: LINE_PARSERS.unitPriceCents(fields.unitPriceCents),
   };
-  const [line] = await db
-    .insert(budgetLines)
-    .values({
-      ...values,
-      tenantId: ctx.tenantId,
-      chapterId,
-      position: nextPosition(budgetLines, budgetLines.position, eq(budgetLines.chapterId, chapterId)),
-    })
-    .returning({ id: budgetLines.id });
+  const [line] = await inDraft(revisionId, (tx) =>
+    tx
+      .insert(budgetLines)
+      .values({
+        ...values,
+        tenantId: ctx.tenantId,
+        chapterId,
+        position: nextPosition(budgetLines, budgetLines.position, eq(budgetLines.chapterId, chapterId)),
+      })
+      .returning({ id: budgetLines.id }),
+  );
   return { lineId: line!.id };
 }
 
@@ -532,17 +559,17 @@ export async function updateLine(
   lineId: string,
   input: Record<string, unknown>,
 ) {
-  await draftLine(ctx, projectId, lineId);
+  const revisionId = await draftLine(ctx, projectId, lineId);
   const changes = pickChanges<typeof budgetLines.$inferInsert>(lineInput(input), LINE_PARSERS);
   if (Object.keys(changes).length > 0) {
-    await db.update(budgetLines).set(changes).where(eq(budgetLines.id, lineId));
+    await inDraft(revisionId, (tx) => tx.update(budgetLines).set(changes).where(eq(budgetLines.id, lineId)));
   }
   return { lineId };
 }
 
 export async function deleteLine(ctx: Ctx, projectId: string, lineId: string) {
-  await draftLine(ctx, projectId, lineId);
-  await db.delete(budgetLines).where(eq(budgetLines.id, lineId));
+  const revisionId = await draftLine(ctx, projectId, lineId);
+  await inDraft(revisionId, (tx) => tx.delete(budgetLines).where(eq(budgetLines.id, lineId)));
   return { lineId };
 }
 

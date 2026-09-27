@@ -35,14 +35,6 @@ export async function isPdf(file: Blob) {
 export const projectFolder = (tenantId: string, projectId: string) =>
   `tenants/${tenantId}/projects/${projectId}/`;
 
-/** Admins and managers upload and delete; other roles only read. */
-export function canManageProjectFiles(role: Ctx["role"]) {
-  return role === "admin" || role === "manager";
-}
-
-export function requireFileManager(ctx: Ctx) {
-  if (!canManageProjectFiles(ctx.role)) fail("forbidden");
-}
 
 /** The project, if it is in the tenant, with what the obra needs of it. */
 export async function requireProject(tenantId: string, projectId: string) {

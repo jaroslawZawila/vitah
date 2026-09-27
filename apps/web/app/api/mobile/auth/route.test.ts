@@ -74,6 +74,19 @@ describe("POST /api/mobile/auth", () => {
     },
   );
 
+  it("answers 429 after too many failures for the email", async () => {
+    const tenant = await createTestTenant();
+    await createTestUser(tenant.id, { email: "ana@example.com", role: "client", password: "client-pass" });
+    for (let i = 0; i < 10; i++) {
+      expect((await post({ email: "ana@example.com", password: `guess-${i}` })).status).toBe(401);
+    }
+
+    const res = await post({ email: "ana@example.com", password: "client-pass" });
+
+    expect(res.status).toBe(429);
+    expect(await res.json()).toEqual({ error: "too_many_attempts" });
+  });
+
   it("rejects a malformed body", async () => {
     const res = await post("{not json");
 

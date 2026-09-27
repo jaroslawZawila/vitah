@@ -30,10 +30,17 @@ const project: ProjectDetail = {
   updatedAt: new Date("2026-01-01T00:00:00Z"),
 };
 
-function renderHeader(overrides: Partial<ProjectDetail> = {}) {
+function renderHeader(
+  overrides: Partial<ProjectDetail> = {},
+  { canEdit = true, canDelete = true } = {},
+) {
   return render(
     <NextIntlClientProvider locale="es" messages={messages} timeZone="UTC">
-      <ProjectHeader project={{ ...project, ...overrides }} />
+      <ProjectHeader
+        project={{ ...project, ...overrides }}
+        canEdit={canEdit}
+        canDelete={canDelete}
+      />
     </NextIntlClientProvider>,
   );
 }
@@ -124,5 +131,20 @@ describe("ProjectHeader", () => {
     );
 
     expect(deleteProject).not.toHaveBeenCalled();
+  });
+
+  it("offers no edit to a viewer", () => {
+    renderHeader({}, { canEdit: false, canDelete: false });
+
+    expect(screen.queryByRole("button", { name: "Editar" })).not.toBeInTheDocument();
+  });
+
+  it("lets a manager edit but not delete", async () => {
+    renderHeader({}, { canEdit: true, canDelete: false });
+
+    await userEvent.click(screen.getByRole("button", { name: "Editar" }));
+
+    expect(screen.getByRole("button", { name: "Guardar" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Eliminar proyecto" })).not.toBeInTheDocument();
   });
 });

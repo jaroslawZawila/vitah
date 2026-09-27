@@ -1,9 +1,15 @@
 import "./types";
-import NextAuth from "next-auth";
+import NextAuth, { CredentialsSignin } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
-import { verifyCredentials } from "./credentials";
+import { attemptSignIn, clientIp } from "./credentials";
+import { refreshSessionToken } from "./session";
 
 export { AuthError } from "next-auth";
+
+/** Sign-in refused by login throttling (see ./credentials.ts). */
+export class TooManyAttempts extends CredentialsSignin {
+  code = "too_many_attempts";
+}
 
 const result = NextAuth({
   providers: [
@@ -12,16 +18,19 @@ const result = NextAuth({
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
       },
-      async authorize(credentials) {
+      async authorize(credentials, request) {
         const email = credentials?.email as string | undefined;
         const password = credentials?.password as string | undefined;
         if (!email || !password) return null;
 
-        return verifyCredentials(email, password, "portal");
+        const user = await attemptSignIn(email, password, "portal", clientIp(request));
+        if (user === "too_many_attempts") throw new TooManyAttempts();
+        return user;
       },
     }),
   ],
-  session: { strategy: "jwt" },
+  // Signed out after a week without using the portal.
+  session: { strategy: "jwt", maxAge: 7 * 24 * 60 * 60 },
   pages: {
     signIn: "/",
   },
@@ -30,8 +39,10 @@ const result = NextAuth({
       if (user) {
         token.role = user.role;
         token.tenantId = user.tenantId;
+        token.checkedAt = Date.now();
+        return token;
       }
-      return token;
+      return refreshSessionToken(token);
     },
     async session({ session, token }) {
       if (session.user) {

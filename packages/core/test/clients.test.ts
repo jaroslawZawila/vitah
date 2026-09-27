@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
 import { beforeEach, describe, expect, it } from "vitest";
-import { clientProfiles, db, eq, users } from "@repo/db";
+import { clientProfiles, db, eq, pushTokens, users } from "@repo/db";
 import { createTestTenant, createTestUser, resetDatabase } from "@repo/db/testing";
 import { clientsService as svc, type Ctx } from "../src";
 
@@ -56,6 +56,20 @@ describe("createClient", () => {
     });
   });
 
+  it("cuts overlong names and address at 200 characters", async () => {
+    const { ctx } = await setup();
+
+    const { id } = await svc.createClient(ctx, {
+      ...validInput,
+      firstName: "A".repeat(300),
+      address: "C".repeat(300),
+    });
+
+    const profile = await findProfile(id);
+    expect(profile?.firstName).toHaveLength(200);
+    expect(profile?.address).toHaveLength(200);
+  });
+
   it("stores empty optional fields as null", async () => {
     const { ctx } = await setup();
 
@@ -75,6 +89,7 @@ describe("createClient", () => {
     [{ ...validInput, email: "" }, "missing_fields", 400],
     [{ ...validInput, password: "" }, "missing_fields", 400],
     [{ ...validInput, email: "not-an-email" }, "invalid_email", 400],
+    [{ ...validInput, email: `${"a".repeat(200)}@example.com` }, "invalid_email", 400],
     [{ ...validInput, password: "short" }, "password_too_short", 400],
     [{ ...validInput, dateOfBirth: "12/04/1985" }, "invalid_date_of_birth", 400],
     [{ ...validInput, dateOfBirth: "1985-02-31" }, "invalid_date_of_birth", 400],
@@ -162,6 +177,7 @@ describe("setClientPassword", () => {
   it("replaces the client's password", async () => {
     const { ctx } = await setup();
     const { id } = await svc.createClient(ctx, validInput);
+    await db.insert(pushTokens).values({ token: "ExpoPushToken[lost]", userId: id, tenantId: ctx.tenantId });
 
     await expect(svc.setClientPassword(ctx, id, { password: "brand-new-pass" })).resolves.toEqual({
       id,
@@ -169,6 +185,9 @@ describe("setClientPassword", () => {
 
     const user = await findUser(validInput.email);
     expect(await bcrypt.compare("brand-new-pass", user!.passwordHash!)).toBe(true);
+    // Signs the client out of the app on every phone, pushes included.
+    expect(user!.passwordChangedAt).toBeInstanceOf(Date);
+    expect(await db.select().from(pushTokens).where(eq(pushTokens.userId, id))).toEqual([]);
   });
 
   it("rejects a short password", async () => {

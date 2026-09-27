@@ -1,7 +1,9 @@
 import { db, projects, eq, and, desc } from "@repo/db";
-import { requireAdmin, type Ctx } from "./context";
+import { fromCalendarDate, isCalendarDate } from "./calendar";
+import { requireAdmin, requireEditor, type Ctx } from "./context";
 import { invalid, notFound } from "./errors";
-import { clientConflict, requireAssignableClient } from "./project-client";
+import { MAX_TEXT, text } from "./input";
+import { clientConflict, projectInTenant, requireAssignableClient } from "./project-client";
 import { projectFolder } from "./project-files";
 import { deleteFolder } from "./storage";
 
@@ -10,20 +12,33 @@ import { deleteFolder } from "./storage";
 
 // Input parsing: API bodies and form values arrive as unknown / strings.
 
-function str(value: unknown): string | undefined {
-  if (typeof value !== "string") return undefined;
-  const trimmed = value.trim();
-  return trimmed === "" ? undefined : trimmed;
-}
+const ISO_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})$/;
 
-/** `undefined` = not provided, `null` = cleared (empty string or null). */
+const MAX_REF = 40;
+const MAX_ADDRESS = 300;
+
+/**
+ * A YYYY-MM-DD calendar date, stored at UTC midnight. A full ISO timestamp
+ * (which /api/v1 accepted before) counts as its UTC date.
+ * `undefined` = not provided, `null` = cleared (empty string or null).
+ */
 function date(value: unknown): Date | null | undefined {
   if (value === undefined) return undefined;
-  if (value === null || (typeof value === "string" && value.trim() === "")) return null;
+  if (value === null) return null;
   if (typeof value !== "string") throw invalid("invalid_date");
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) throw invalid("invalid_date");
-  return d;
+  const trimmed = value.trim();
+  if (trimmed === "") return null;
+  const parsed = ISO_TIMESTAMP.test(trimmed) ? new Date(trimmed) : null;
+  const raw =
+    parsed && !Number.isNaN(parsed.getTime()) && isCalendarDate(trimmed.slice(0, 10))
+      ? parsed.toISOString().slice(0, 10)
+      : trimmed;
+  if (!isCalendarDate(raw)) throw invalid("invalid_date");
+  return fromCalendarDate(raw);
+}
+
+function checkOrder(start: Date | null | undefined, completion: Date | null | undefined) {
+  if (start && completion && completion < start) throw invalid("dates_out_of_order");
 }
 
 const clientColumns = { columns: { id: true, name: true, email: true } } as const;
@@ -52,12 +67,14 @@ export type ProjectDetail = NonNullable<Awaited<ReturnType<typeof getProject>>>;
  * YYYY-MM-DD. `clientId` (admin only) attaches an existing, free client.
  */
 export async function createProject(ctx: Ctx, input: Record<string, unknown>) {
-  const ref = str(input.ref);
-  const address = str(input.address);
+  requireEditor(ctx);
+  const ref = text(input.ref, MAX_REF);
+  const address = text(input.address, MAX_ADDRESS);
   if (!ref || !address) throw invalid("missing_fields");
   const startDate = date(input.startDate) ?? null;
   const completionDate = date(input.completionDate) ?? null;
-  const clientId = str(input.clientId) ?? null;
+  checkOrder(startDate, completionDate);
+  const clientId = text(input.clientId, MAX_TEXT) ?? null;
   if (clientId) requireAdmin(ctx);
 
   const existing = await db.query.projects.findFirst({
@@ -95,10 +112,11 @@ export async function createProject(ctx: Ctx, input: Record<string, unknown>) {
  * ignored; an empty date clears it.
  */
 export async function updateProject(ctx: Ctx, id: string, input: Record<string, unknown>) {
+  requireEditor(ctx);
   const set: Partial<typeof projects.$inferInsert> = { updatedAt: new Date() };
 
   if (input.address !== undefined) {
-    const address = str(input.address);
+    const address = text(input.address, MAX_ADDRESS);
     if (!address) throw invalid("missing_fields");
     set.address = address;
   }
@@ -107,18 +125,27 @@ export async function updateProject(ctx: Ctx, id: string, input: Record<string, 
   const completionDate = date(input.completionDate);
   if (completionDate !== undefined) set.completionDate = completionDate;
 
-  const updated = await db
-    .update(projects)
-    .set(set)
-    .where(and(eq(projects.id, id), eq(projects.tenantId, ctx.tenantId)))
-    .returning({ id: projects.id });
-  if (updated.length === 0) throw notFound();
+  // Locked, so a concurrent edit of the other date can't slip past the order check.
+  await db.transaction(async (tx) => {
+    const [current] = await tx
+      .select({ startDate: projects.startDate, completionDate: projects.completionDate })
+      .from(projects)
+      .where(projectInTenant(ctx.tenantId, id))
+      .for("update");
+    if (!current) throw notFound();
+    checkOrder(
+      startDate === undefined ? current.startDate : startDate,
+      completionDate === undefined ? current.completionDate : completionDate,
+    );
+    await tx.update(projects).set(set).where(projectInTenant(ctx.tenantId, id));
+  });
 
   return { projectId: id };
 }
 
-/** Deletes the project, its rows (cascade) and its stored files. */
+/** Deletes the project, its rows (cascade) and its stored files. Admin only. */
 export async function deleteProject(ctx: Ctx, id: string) {
+  requireAdmin(ctx);
   const deleted = await db
     .delete(projects)
     .where(and(eq(projects.id, id), eq(projects.tenantId, ctx.tenantId)))

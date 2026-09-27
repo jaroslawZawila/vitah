@@ -5,7 +5,7 @@
 
 import {
   CoreError,
-  canManageProjectFiles,
+  canEdit,
   photosService as svc,
   type PhotoError,
   type ProjectPhoto,
@@ -28,7 +28,7 @@ export async function getProjectPhotos(
     if (err instanceof CoreError) return [];
     throw err;
   });
-  return { photos, canManage: canManageProjectFiles(ctx.role) };
+  return { photos, canManage: canEdit(ctx.role) };
 }
 
 export async function addProjectPhotoAction(

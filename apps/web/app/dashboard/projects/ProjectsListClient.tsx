@@ -16,8 +16,11 @@ type Project = {
 
 export default function ProjectsListClient({
   projects,
+  canCreate,
 }: {
   projects: Project[];
+  /** Admins and managers create projects; viewers only read. */
+  canCreate: boolean;
 }) {
   const t = useTranslations("projectsPage");
   const format = useFormatter();
@@ -33,9 +36,11 @@ export default function ProjectsListClient({
         <span className={styles.count}>
           {t("count", { count: projects.length })}
         </span>
-        <Link href="/dashboard/projects/new" className={styles.newProjectBtn}>
-          + {t("newProject")}
-        </Link>
+        {canCreate && (
+          <Link href="/dashboard/projects/new" className={styles.newProjectBtn}>
+            + {t("newProject")}
+          </Link>
+        )}
       </div>
 
       {projects.length === 0 ? (

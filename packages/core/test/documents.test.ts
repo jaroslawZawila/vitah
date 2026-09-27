@@ -58,6 +58,17 @@ describe("addDocument", () => {
     expect(files.has(row!.pathname)).toBe(true);
   });
 
+  it("cuts an overlong title at 200 characters", async () => {
+    const { project, ctx } = await setup();
+
+    const { documentId } = await upload(ctx, project.id, { title: "T".repeat(500) });
+
+    const row = await db.query.projectDocuments.findFirst({
+      where: eq(projectDocuments.id, documentId),
+    });
+    expect(row?.title).toHaveLength(200);
+  });
+
   it("lets managers upload", async () => {
     const { project, ctx } = await setup();
 

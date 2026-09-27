@@ -1,5 +1,6 @@
 import type { Ctx } from "@repo/core";
 import type { UserRole as AnyUserRole } from "@repo/db";
+import { findActiveStaff } from "./credentials";
 import { auth } from "./index";
 import { verifyMobileToken } from "./mobile";
 
@@ -13,7 +14,9 @@ function staffContext(tenantId: string, userId: string, role: AnyUserRole): Ctx 
 
 /**
  * Resolves the caller for an API request.
- * - `Authorization: Bearer <token>` → mobile JWT (see ./mobile.ts)
+ * - `Authorization: Bearer <token>` → mobile JWT (see ./mobile.ts), checked
+ *   against the database: the user must still be active staff, and their
+ *   current role applies, not the token's
  * - otherwise → NextAuth session cookie (portal)
  * Returns null when the caller is not authenticated.
  */
@@ -22,7 +25,8 @@ export async function getRequestContext(request: Request): Promise<Ctx | null> {
   if (header?.toLowerCase().startsWith("bearer ")) {
     try {
       const payload = await verifyMobileToken(header.slice(7).trim());
-      return staffContext(payload.tenantId, payload.sub, payload.role);
+      const user = await findActiveStaff(payload.sub, payload.tenantId);
+      return user ? staffContext(user.tenantId, user.id, user.role) : null;
     } catch {
       return null;
     }
@@ -30,7 +34,10 @@ export async function getRequestContext(request: Request): Promise<Ctx | null> {
   return getSessionContext();
 }
 
-/** Context from the NextAuth session (server actions, RSC). */
+/**
+ * Context from the NextAuth session (server actions, RSC). The session's role
+ * is current: the `jwt` callback re-reads the user (./session.ts).
+ */
 export async function getSessionContext(): Promise<Ctx | null> {
   const session = await auth();
   const user = session?.user;

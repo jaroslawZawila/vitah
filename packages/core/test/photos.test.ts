@@ -85,6 +85,21 @@ describe("addPhoto", () => {
     expect(meta.orientation).toBeUndefined();
   });
 
+  it("rejects an image too large to decode safely", async () => {
+    const { project, ctx } = await setup();
+    // 10000×6000 = 60 MP of one colour: a tiny PNG that decodes to 240 MB.
+    const bomb = await sharp({
+      create: { width: 10_000, height: 6_000, channels: 3, background: "#000" },
+    })
+      .png()
+      .toBuffer();
+    expect(bomb.length).toBeLessThan(MAX_PHOTO_BYTES);
+
+    await expect(
+      upload(ctx, project.id, { file: new File([new Uint8Array(bomb)], "x.png") }),
+    ).rejects.toMatchObject({ code: "invalid_file_type" });
+  });
+
   it("does not enlarge small photos for the thumbnail", async () => {
     const { project, ctx } = await setup();
 

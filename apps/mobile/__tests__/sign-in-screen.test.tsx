@@ -28,6 +28,17 @@ describe("SignInScreen", () => {
     await waitFor(() => expect(mockAuth.signIn).toHaveBeenCalledWith("ana@example.com", "vitah2026"));
   });
 
+  it("says when sign-in is paused after too many failures", async () => {
+    mockAuth.signIn.mockResolvedValueOnce({ error: "too_many_attempts" } as never);
+    render(<SignInScreen />);
+
+    fireEvent.changeText(screen.getByPlaceholderText("Email"), "ana@example.com");
+    fireEvent.changeText(screen.getByPlaceholderText("Contraseña"), "guess");
+    fireEvent.press(screen.getByRole("button", { name: "Iniciar sesión" }));
+
+    expect(await screen.findByText(/Demasiados intentos fallidos/)).toBeOnTheScreen();
+  });
+
   it("offers biometrics only when biometric access is on", () => {
     render(<SignInScreen />);
 

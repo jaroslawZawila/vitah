@@ -1,9 +1,16 @@
 import { and, asc, clientProfiles, db, eq, isClientUser, users } from "@repo/db";
-import { EMAIL_PATTERN, hashPassword, isUniqueViolation, normalizeEmail } from "./accounts";
+import {
+  EMAIL_PATTERN,
+  hashPassword,
+  isUniqueViolation,
+  normalizeEmail,
+  replacePassword,
+} from "./accounts";
 import { isCalendarDate } from "./calendar";
 import { requireAdmin, type Ctx } from "./context";
 import { MIN_PASSWORD_LENGTH, type ClientError, type ClientListItem } from "./contract";
 import { CoreError } from "./errors";
+import { clippedText, MAX_TEXT } from "./input";
 
 // ─── Clients ──────────────────────────────────────────────────────────────────
 // Homeowners who use the mobile app. Each is a `users` row with role "client"
@@ -28,9 +35,8 @@ function fail(code: ClientError): never {
 
 // Input parsing: API bodies and form values arrive as unknown / strings.
 
-function text(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
-}
+/** Trimmed, and cut at MAX_TEXT characters. */
+const text = (value: unknown) => clippedText(value, MAX_TEXT);
 
 /** Trimmed text, or null when empty. */
 function optional(value: unknown): string | null {
@@ -93,9 +99,10 @@ export async function createClient(ctx: Ctx, input: Record<string, unknown>) {
 
   const firstName = text(input.firstName);
   const surnames = text(input.surnames);
-  const email = normalizeEmail(text(input.email));
+  // Not cut: a shortened email would be someone else's.
+  const email = typeof input.email === "string" ? normalizeEmail(input.email) : "";
   if (!firstName || !surnames || !email || !input.password) fail("missing_fields");
-  if (!EMAIL_PATTERN.test(email)) fail("invalid_email");
+  if (email.length > MAX_TEXT || !EMAIL_PATTERN.test(email)) fail("invalid_email");
 
   const profile = {
     firstName,
@@ -137,12 +144,11 @@ export async function setClientPassword(
 ) {
   requireAdmin(ctx);
 
-  const passwordHash = await hashPassword(password(input.password));
-  const updated = await db
-    .update(users)
-    .set({ passwordHash, updatedAt: new Date() })
-    .where(and(eq(users.id, clientId), eq(users.tenantId, ctx.tenantId), isClientUser))
-    .returning({ id: users.id });
+  // A reset also signs the client out of the app on every phone.
+  const updated = await replacePassword(
+    and(eq(users.id, clientId), eq(users.tenantId, ctx.tenantId), isClientUser),
+    password(input.password),
+  );
   if (updated.length === 0) fail("not_found");
 
   return { id: clientId };

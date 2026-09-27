@@ -24,10 +24,10 @@ const projects = [
   },
 ];
 
-function renderList(list = projects) {
+function renderList(list = projects, canCreate = true) {
   return render(
     <NextIntlClientProvider locale="es" messages={messages} timeZone="UTC">
-      <ProjectsListClient projects={list} />
+      <ProjectsListClient projects={list} canCreate={canCreate} />
     </NextIntlClientProvider>,
   );
 }
@@ -67,5 +67,11 @@ describe("ProjectsListClient", () => {
       "href",
       "/dashboard/projects/new",
     );
+  });
+
+  it("hides the new-project flow from viewers", () => {
+    renderList(projects, false);
+
+    expect(screen.queryByRole("link", { name: "+ Nuevo Proyecto" })).not.toBeInTheDocument();
   });
 });

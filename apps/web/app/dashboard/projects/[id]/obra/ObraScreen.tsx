@@ -33,6 +33,8 @@ export default function ObraScreen({
   const t = useTranslations("obra.page");
   const { state, run } = useObraAction();
   const base = `/dashboard/projects/${projectId}`;
+  // Chapter codes are free text: encoded, the page decodes them.
+  const chapterHref = (code: string) => `${base}/obra/${encodeURIComponent(code)}`;
   const firstActive = obra.chapters.find((c) => c.status === "active") ?? obra.chapters[0];
 
   const setStage = (stage: number) => run(() => setObraStageAction(projectId, stage));
@@ -50,7 +52,7 @@ export default function ObraScreen({
         action={
           canManage &&
           firstActive && (
-            <Link href={`${base}/obra/${firstActive.code}`} className={tabStyles.action}>
+            <Link href={chapterHref(firstActive.code)} className={tabStyles.action}>
               {t("updateProgress")}
             </Link>
           )
@@ -61,7 +63,7 @@ export default function ObraScreen({
       {obra.budget ? (
         <>
           <ObraKpis obra={obra} paymentsHref={`${base}/payments`} />
-          <ChapterTable obra={obra} chapterHref={(code) => `${base}/obra/${code}`} />
+          <ChapterTable obra={obra} chapterHref={chapterHref} />
         </>
       ) : (
         <div className={obraStyles.card}>

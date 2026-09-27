@@ -5,7 +5,10 @@ import { api } from "../lib/api";
 
 const mockBack = jest.fn();
 const mockSignOut = jest.fn();
-jest.mock("../lib/auth", () => ({ useAuth: () => ({ token: "tok", signOut: mockSignOut }) }));
+const mockReplaceToken = jest.fn();
+jest.mock("../lib/auth", () => ({
+  useAuth: () => ({ token: "tok", signOut: mockSignOut, replaceToken: mockReplaceToken }),
+}));
 jest.mock("expo-router", () => ({ useRouter: () => ({ back: mockBack }), Redirect: () => null }));
 jest.mock("../lib/api", () => ({ api: { changePassword: jest.fn() } }));
 
@@ -52,6 +55,30 @@ describe("PasswordScreen", () => {
     await waitFor(() => expect(mockBack).toHaveBeenCalled());
     expect(api.changePassword).toHaveBeenCalledWith("tok", "vitah2026", "CasaNordica26");
     expect(alert).toHaveBeenCalledWith("Contraseña actualizada");
+  });
+
+  it("keeps this phone signed in with the fresh token", async () => {
+    jest
+      .mocked(api.changePassword)
+      .mockResolvedValue({ ok: true, data: { success: true, token: "fresh" } });
+    jest.spyOn(Alert, "alert").mockImplementation(() => {});
+    render(<PasswordScreen />);
+
+    fill("vitah2026", "CasaNordica26");
+    save();
+
+    await waitFor(() => expect(mockBack).toHaveBeenCalled());
+    expect(mockReplaceToken).toHaveBeenCalledWith("fresh");
+  });
+
+  it("says when there were too many wrong attempts", async () => {
+    jest.mocked(api.changePassword).mockResolvedValue({ ok: false, error: "too_many_attempts" });
+    render(<PasswordScreen />);
+
+    fill("nope", "CasaNordica26");
+    save();
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/Demasiados intentos fallidos/);
   });
 
   it("says when the current password is wrong", async () => {

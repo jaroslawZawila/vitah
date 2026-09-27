@@ -1,6 +1,7 @@
-export { requireAdmin, type Ctx, type UserRole } from "./context";
+export { canEdit, requireAdmin, requireEditor, type Ctx, type UserRole } from "./context";
 export { CoreError, notFound, forbidden, invalid } from "./errors";
 export { hashPassword, normalizeEmail } from "./accounts";
+export { clearAttempts, overLimit } from "./throttle";
 export * from "./contract";
 export * as projectsService from "./projects";
 export type { ProjectListItem, ProjectDetail } from "./projects";
@@ -10,7 +11,7 @@ export type { UserListItem } from "./users";
 export * as clientsService from "./clients";
 export * as documentsService from "./documents";
 export * as photosService from "./photos";
-export { canManageProjectFiles, type StoredFile } from "./project-files";
+export type { StoredFile } from "./project-files";
 export * as clientAccountService from "./client-account";
 export * as budgetService from "./budget";
 export * as hitosService from "./hitos";

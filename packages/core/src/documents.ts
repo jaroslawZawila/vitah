@@ -1,12 +1,14 @@
 import { and, db, desc, eq, projectDocuments, projects, users } from "@repo/db";
-import type { Ctx } from "./context";
+import { requireEditor, type Ctx } from "./context";
 import {
   DOCUMENT_CATEGORIES,
+  MAX_CAPTION_LENGTH,
   MAX_DOCUMENT_BYTES,
   type DocumentCategory,
   type MobileDocument,
   type ProjectDocument,
 } from "./contract";
+import { clippedText } from "./input";
 import { notifyProjectClient } from "./notifications";
 import {
   fail,
@@ -14,7 +16,6 @@ import {
   openStoredFile,
   projectFolder,
   removeFiles,
-  requireFileManager,
   requireProject,
   storeFiles,
 } from "./project-files";
@@ -52,10 +53,10 @@ function toMobileDocument({ createdAt, ...doc }: DocumentRow): MobileDocument {
 
 /** Body (multipart form): { title, category, file } — file is a PDF of at most 4 MB. */
 export async function addDocument(ctx: Ctx, projectId: string, input: Record<string, unknown>) {
-  requireFileManager(ctx);
+  requireEditor(ctx);
 
   const { file, category } = input;
-  const title = typeof input.title === "string" ? input.title.trim() : "";
+  const title = clippedText(input.title, MAX_CAPTION_LENGTH);
   if (!(file instanceof Blob) || file.size === 0) fail("missing_file");
   if (!title) fail("missing_fields");
   if (!isCategory(category)) fail("invalid_category");
@@ -105,7 +106,7 @@ export async function listDocuments(ctx: Ctx, projectId: string): Promise<Projec
 }
 
 export async function deleteDocument(ctx: Ctx, projectId: string, documentId: string) {
-  requireFileManager(ctx);
+  requireEditor(ctx);
 
   const where = documentInProject(ctx, projectId, documentId);
   const doc = await db.query.projectDocuments.findFirst({ where, columns: { pathname: true } });

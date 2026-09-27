@@ -11,6 +11,7 @@ async function setup() {
 }
 
 const TOKEN = "ExponentPushToken[abc123]";
+const { MAX_PUSH_TOKENS } = svc;
 
 beforeEach(resetDatabase);
 
@@ -28,6 +29,7 @@ describe("isStrongPassword", () => {
 describe("changePassword", () => {
   it("changes the password when the current one is right", async () => {
     const { tenant, client } = await setup();
+    await svc.registerPushToken(tenant.id, client.id, { token: TOKEN });
 
     await svc.changePassword(tenant.id, client.id, {
       currentPassword: "vitah2026",
@@ -36,6 +38,25 @@ describe("changePassword", () => {
 
     const row = await db.query.users.findFirst({ where: eq(users.id, client.id) });
     expect(await bcrypt.compare("CasaNordica26", row!.passwordHash!)).toBe(true);
+    // Revokes the phones' existing tokens, and their pushes.
+    expect(row!.passwordChangedAt).toBeInstanceOf(Date);
+    expect(await db.select().from(pushTokens)).toEqual([]);
+  });
+
+  it("refuses more guesses after 10 wrong current passwords", async () => {
+    const { tenant, client } = await setup();
+    const attempt = (currentPassword: string) =>
+      svc.changePassword(tenant.id, client.id, { currentPassword, newPassword: "CasaNordica26" });
+    for (let i = 0; i < 10; i++) {
+      await expect(attempt(`guess-${i}`)).rejects.toMatchObject({ code: "wrong_password" });
+    }
+
+    await expect(attempt("vitah2026")).rejects.toMatchObject({
+      code: "too_many_attempts",
+      status: 429,
+    });
+    const row = await db.query.users.findFirst({ where: eq(users.id, client.id) });
+    expect(await bcrypt.compare("vitah2026", row!.passwordHash!)).toBe(true);
   });
 
   it.each([
@@ -152,9 +173,28 @@ describe("push tokens", () => {
   it("rejects anything that isn't an Expo push token", async () => {
     const { tenant, client } = await setup();
 
-    await expect(
-      svc.registerPushToken(tenant.id, client.id, { token: "hello" }),
-    ).rejects.toMatchObject({ code: "invalid_token", status: 400 });
+    for (const token of ["hello", "ExponentPushToken[]", `ExponentPushToken[${"x".repeat(201)}]`]) {
+      await expect(svc.registerPushToken(tenant.id, client.id, { token })).rejects.toMatchObject({
+        code: "invalid_token",
+        status: 400,
+      });
+    }
+  });
+
+  it("keeps a client's most recent phones only", async () => {
+    const { tenant, client } = await setup();
+    const other = await setup();
+    await svc.registerPushToken(other.tenant.id, other.client.id, { token: "ExpoPushToken[other]" });
+    for (let i = 0; i <= MAX_PUSH_TOKENS; i++) {
+      await svc.registerPushToken(tenant.id, client.id, { token: `ExpoPushToken[phone-${i}]` });
+    }
+
+    const mine = await db.select().from(pushTokens).where(eq(pushTokens.userId, client.id));
+    expect(mine).toHaveLength(MAX_PUSH_TOKENS);
+    expect(mine.map((row) => row.token)).not.toContain("ExpoPushToken[phone-0]");
+    expect(
+      await db.select().from(pushTokens).where(eq(pushTokens.userId, other.client.id)),
+    ).toHaveLength(1);
   });
 
   it("removes only the caller's own token", async () => {

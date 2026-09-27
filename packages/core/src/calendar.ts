@@ -7,6 +7,11 @@ export function isCalendarDate(raw: string): boolean {
   return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === raw;
 }
 
+/** YYYY-MM-DD → the timestamp a calendar date is stored as (UTC midnight). */
+export function fromCalendarDate(raw: string): Date {
+  return new Date(`${raw}T00:00:00Z`);
+}
+
 /** A timestamp column holding a calendar date (UTC midnight) → YYYY-MM-DD. */
 export function toCalendarDate(date: Date | null): string | null {
   return date ? date.toISOString().slice(0, 10) : null;

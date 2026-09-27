@@ -1,5 +1,5 @@
 import { SignJWT } from "jose";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { db, eq, tenants, users } from "@repo/db";
 import { createTestTenant, createTestUser, resetDatabase } from "@repo/db/testing";
 import {
@@ -42,7 +42,10 @@ describe("mobile tokens", () => {
       tenantId: "tenant-1",
     };
 
-    expect(await verifyMobileToken(await createMobileToken(payload))).toEqual(payload);
+    expect(await verifyMobileToken(await createMobileToken(payload))).toEqual({
+      ...payload,
+      iat: expect.any(Number),
+    });
   });
 
   it("rejects a token signed with another secret", async () => {
@@ -97,6 +100,43 @@ describe("authenticateMobileRequest", () => {
     await db.update(tenants).set({ active: false }).where(eq(tenants.id, tenant.id));
 
     expect(await authenticateMobileRequest(requestWith(`Bearer ${token}`))).toBeNull();
+  });
+
+  it("rejects a token issued before the password was changed", async () => {
+    vi.useFakeTimers({ toFake: ["Date"], now: Date.now() - 120_000 });
+    const { token, user } = await createClient();
+    vi.useRealTimers();
+    const minuteAgo = new Date(Date.now() - 60_000);
+    await db.update(users).set({ passwordChangedAt: minuteAgo }).where(eq(users.id, user.id));
+
+    expect(await authenticateMobileRequest(requestWith(`Bearer ${token}`))).toBeNull();
+  });
+
+  it("still accepts it for a few seconds after the change (requests in flight)", async () => {
+    vi.useFakeTimers({ toFake: ["Date"], now: Date.now() - 120_000 });
+    const { token, user, payload } = await createClient();
+    vi.useRealTimers();
+    await db.update(users).set({ passwordChangedAt: new Date() }).where(eq(users.id, user.id));
+
+    expect(await authenticateMobileRequest(requestWith(`Bearer ${token}`))).toEqual(payload);
+  });
+
+  it("accepts a token issued after the password was changed", async () => {
+    const { user, payload } = await createClient();
+    await db.update(users).set({ passwordChangedAt: new Date() }).where(eq(users.id, user.id));
+    const token = await createMobileToken(payload);
+
+    expect(await authenticateMobileRequest(requestWith(`Bearer ${token}`))).toEqual(payload);
+  });
+
+  it("rejects a token signed with another algorithm", async () => {
+    const { payload } = await createClient();
+    const hs512 = await new SignJWT({ role: "client", tenantId: payload.tenantId })
+      .setProtectedHeader({ alg: "HS512" })
+      .setSubject(payload.sub)
+      .sign(new TextEncoder().encode(process.env.NEXTAUTH_SECRET));
+
+    expect(await authenticateMobileRequest(requestWith(`Bearer ${hs512}`))).toBeNull();
   });
 
   it("rejects a valid token for a staff user", async () => {

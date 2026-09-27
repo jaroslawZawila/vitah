@@ -12,7 +12,7 @@ import {
   or,
   projectPhotos,
 } from "@repo/db";
-import type { Ctx } from "./context";
+import { requireEditor, type Ctx } from "./context";
 import { MAX_CHAPTER_CODE, MAX_DOCUMENT_BYTES, type Hito, type HitoFileKind } from "./contract";
 import {
   calendarDate,
@@ -23,7 +23,6 @@ import {
   nextPosition,
   optionalText,
   pickChanges,
-  requireEditor,
   requireProject,
   requiredText,
   type HitoRow,

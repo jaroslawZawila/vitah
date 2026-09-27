@@ -8,6 +8,7 @@
     "submit": "Acceder",
     "submitting": "Accediendo…",
     "error": "Credenciales incorrectas. Inténtalo de nuevo.",
+    "tooManyAttempts": "Demasiados intentos fallidos. Espera unos minutos e inténtalo de nuevo.",
     "footer": "© {year} ViTAH. Todos los derechos reservados."
   },
   "dashboard": {
@@ -67,7 +68,10 @@
       "errors": {
         "missing_fields": "La dirección es obligatoria.",
         "invalid_date": "Introduce una fecha válida.",
-        "not_found": "Proyecto no encontrado."
+        "not_found": "Proyecto no encontrado.",
+        "forbidden": "No tienes permiso para cambiar este proyecto.",
+        "dates_out_of_order": "La fecha de finalización no puede ser anterior a la de inicio.",
+        "too_long": "El texto es demasiado largo."
       }
     },
     "clientAccess": {
@@ -199,7 +203,9 @@
       "password_too_short": "La contraseña debe tener al menos 8 caracteres.",
       "cannot_modify_self": "No puedes cambiar tu propio rol ni desactivar tu cuenta.",
       "last_admin": "La organización debe tener al menos un administrador activo.",
-      "generic": "Error al procesar la solicitud."
+      "generic": "Error al procesar la solicitud.",
+      "invalid_email": "Introduce un correo válido.",
+      "too_long": "El nombre o el correo son demasiado largos."
     },
     "success": {
       "created": "Usuario creado correctamente."
@@ -290,7 +296,9 @@
       "generic": "No se ha podido crear el proyecto. Inténtalo de nuevo.",
       "client_not_found": "El cliente ya no está disponible. Elige otro.",
       "client_has_project": "Ese cliente ya está asignado a otro proyecto. Elige otro.",
-      "forbidden": "Solo los administradores pueden asignar clientes."
+      "forbidden": "Solo los administradores pueden asignar clientes.",
+      "dates_out_of_order": "La fecha de finalización no puede ser anterior a la de inicio.",
+      "too_long": "La referencia o la dirección son demasiado largas."
     },
     "client": {
       "intro": "Elige el cliente que verá este proyecto en la app móvil. Puedes asignarlo más tarde desde la página del proyecto.",

@@ -165,4 +165,29 @@ describe("biometric sign-in", () => {
     expect(result.current.biometric).toBe(false);
     expect(store.has("vitah_biometric_session")).toBe(false);
   });
+
+  it("swaps in a fresh token after a password change, in the saved session too", async () => {
+    store.set("vitah_token", "old-token");
+    store.set("vitah_user", JSON.stringify(user));
+    saved();
+    const { result } = renderHook(() => useAuth(), { wrapper });
+    await waitFor(() => expect(result.current.token).toBe("old-token"));
+
+    await act(() => result.current.replaceToken("fresh-token"));
+
+    expect(result.current.token).toBe("fresh-token");
+    expect(store.get("vitah_token")).toBe("fresh-token");
+    expect(JSON.parse(store.get("vitah_biometric_session")!).token).toBe("fresh-token");
+  });
+
+  it("doesn't turn biometric sign-in on when swapping the token", async () => {
+    store.set("vitah_token", "old-token");
+    store.set("vitah_user", JSON.stringify(user));
+    const { result } = renderHook(() => useAuth(), { wrapper });
+    await waitFor(() => expect(result.current.token).toBe("old-token"));
+
+    await act(() => result.current.replaceToken("fresh-token"));
+
+    expect(store.has("vitah_biometric_session")).toBe(false);
+  });
 });

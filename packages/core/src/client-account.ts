@@ -1,6 +1,16 @@
 import bcrypt from "bcryptjs";
-import { and, clientSettings, db, eq, isClientUser, pushTokens, users } from "@repo/db";
-import { hashPassword } from "./accounts";
+import {
+  and,
+  clientSettings,
+  db,
+  desc,
+  eq,
+  inArray,
+  isClientUser,
+  pushTokens,
+  users,
+} from "@repo/db";
+import { replacePassword } from "./accounts";
 import {
   APP_LANGUAGES,
   isStrongPassword,
@@ -9,6 +19,7 @@ import {
   type MobileSettings,
 } from "./contract";
 import { CoreError } from "./errors";
+import { clearAttempts, overLimit } from "./throttle";
 
 // ─── Client account ──────────────────────────────────────────────────────────
 // What a signed-in client manages themselves in the app's Perfil tab: their
@@ -20,6 +31,7 @@ const STATUS: Record<AccountError, number> = {
   missing_fields: 400,
   // Not 401: the app treats 401 as "signed out".
   wrong_password: 400,
+  too_many_attempts: 429,
   weak_password: 400,
   invalid_settings: 400,
   invalid_token: 400,
@@ -33,7 +45,14 @@ function fail(code: AccountError): never {
 const clientUser = (tenantId: string, clientUserId: string) =>
   and(eq(users.id, clientUserId), eq(users.tenantId, tenantId), isClientUser);
 
-/** Body: { currentPassword, newPassword }. The new one must pass `isStrongPassword`. */
+/** Wrong current passwords a client may enter per throttle window. */
+const PASSWORD_ATTEMPTS = 10;
+
+/**
+ * Body: { currentPassword, newPassword }. The new one must pass `isStrongPassword`.
+ * Revokes the client's existing mobile tokens (`passwordChangedAt`): the
+ * caller hands the app a fresh one.
+ */
 export async function changePassword(
   tenantId: string,
   clientUserId: string,
@@ -45,17 +64,18 @@ export async function changePassword(
   }
   if (!isStrongPassword(newPassword)) fail("weak_password");
 
+  const throttle = [{ key: `password:${clientUserId}`, limit: PASSWORD_ATTEMPTS }];
+  if (await overLimit(throttle)) fail("too_many_attempts");
+
   const where = clientUser(tenantId, clientUserId);
   const user = await db.query.users.findFirst({ where, columns: { passwordHash: true } });
   if (!user) fail("not_found");
   if (!user.passwordHash || !(await bcrypt.compare(currentPassword, user.passwordHash))) {
     fail("wrong_password");
   }
+  await clearAttempts(throttle);
 
-  await db
-    .update(users)
-    .set({ passwordHash: await hashPassword(newPassword), updatedAt: new Date() })
-    .where(where);
+  await replacePassword(where, newPassword);
   return { success: true };
 }
 
@@ -132,7 +152,10 @@ export async function updateSettings(
 const isLanguage = (value: unknown): value is AppLanguage =>
   APP_LANGUAGES.includes(value as AppLanguage);
 
-const EXPO_TOKEN = /^Expo(nent)?PushToken\[[^\]]+\]$/;
+const EXPO_TOKEN = /^Expo(nent)?PushToken\[[^\]]{1,200}\]$/;
+
+/** Phones a client may get pushes on; registering another forgets the least recent. */
+export const MAX_PUSH_TOKENS = 10;
 
 /**
  * Body: { token, language? } — the phone's Expo push token and app language
@@ -154,6 +177,13 @@ export async function registerPushToken(
       target: pushTokens.token,
       set: { language, userId: clientUserId, tenantId, updatedAt: new Date() },
     });
+  const stale = db
+    .select({ token: pushTokens.token })
+    .from(pushTokens)
+    .where(eq(pushTokens.userId, clientUserId))
+    .orderBy(desc(pushTokens.updatedAt))
+    .offset(MAX_PUSH_TOKENS);
+  await db.delete(pushTokens).where(inArray(pushTokens.token, stale));
   return { success: true };
 }
 

@@ -8,6 +8,7 @@
     "submit": "Sign in",
     "submitting": "Signing in…",
     "error": "Invalid credentials. Please try again.",
+    "tooManyAttempts": "Too many failed attempts. Wait a few minutes and try again.",
     "footer": "© {year} ViTAH. All rights reserved."
   },
   "dashboard": {
@@ -67,7 +68,10 @@
       "errors": {
         "missing_fields": "Address is required.",
         "invalid_date": "Enter a valid date.",
-        "not_found": "Project not found."
+        "not_found": "Project not found.",
+        "forbidden": "You don't have permission to change this project.",
+        "dates_out_of_order": "The completion date can't be before the start date.",
+        "too_long": "The text is too long."
       }
     },
     "clientAccess": {
@@ -199,7 +203,9 @@
       "password_too_short": "Password must be at least 8 characters.",
       "cannot_modify_self": "You can't change your own role or deactivate your own account.",
       "last_admin": "The organisation must keep at least one active administrator.",
-      "generic": "Error processing the request."
+      "generic": "Error processing the request.",
+      "invalid_email": "Enter a valid email.",
+      "too_long": "The name or email is too long."
     },
     "success": {
       "created": "User created successfully."
@@ -290,7 +296,9 @@
       "generic": "The project couldn't be created. Please try again.",
       "client_not_found": "That client is no longer available. Choose another one.",
       "client_has_project": "That client is already assigned to another project. Choose another one.",
-      "forbidden": "Only admins can assign clients."
+      "forbidden": "Only admins can assign clients.",
+      "dates_out_of_order": "The completion date can't be before the start date.",
+      "too_long": "The reference or address is too long."
     },
     "client": {
       "intro": "Choose the client who will see this project in the mobile app. You can also assign one later from the project page.",

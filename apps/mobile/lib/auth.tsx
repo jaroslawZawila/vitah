@@ -37,6 +37,8 @@ type AuthContextValue = AuthState & {
   /** Saves the current session for biometric sign-in (after the caller checked biometrics). */
   enableBiometrics: () => Promise<void>;
   disableBiometrics: () => Promise<void>;
+  /** Swaps in a fresh token for the same client (after a password change revoked the old one). */
+  replaceToken: (token: string) => Promise<void>;
   signOut: () => Promise<void>;
 };
 
@@ -45,6 +47,10 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 async function readSession(key: string): Promise<Session | null> {
   const json = await SecureStore.getItemAsync(key);
   return json ? (JSON.parse(json) as Session) : null;
+}
+
+function saveBiometricSession(session: Session) {
+  return SecureStore.setItemAsync(BIOMETRIC_KEY, JSON.stringify(session));
 }
 
 async function saveSession({ token, user }: Session) {
@@ -92,7 +98,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const saved = await readSession(BIOMETRIC_KEY).catch(() => null);
       const biometric = saved?.user.id === session.user.id;
       if (biometric) {
-        await SecureStore.setItemAsync(BIOMETRIC_KEY, JSON.stringify(session));
+        await saveBiometricSession(session);
       } else if (saved) {
         await SecureStore.deleteItemAsync(BIOMETRIC_KEY);
       }
@@ -124,7 +130,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const enableBiometrics = useCallback(async () => {
     if (!state.token || !state.user) return;
     const session: Session = { token: state.token, user: state.user };
-    await SecureStore.setItemAsync(BIOMETRIC_KEY, JSON.stringify(session));
+    await saveBiometricSession(session);
     setState((s) => ({ ...s, biometric: true }));
   }, [state.token, state.user]);
 
@@ -132,6 +138,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await SecureStore.deleteItemAsync(BIOMETRIC_KEY).catch(() => {});
     setState((s) => ({ ...s, biometric: false }));
   }, []);
+
+  const replaceToken = useCallback(
+    async (token: string) => {
+      if (!state.user) return;
+      const session: Session = { token, user: state.user };
+      await saveSession(session);
+      // The saved biometric session had the old token, which no longer works.
+      if (state.biometric) await saveBiometricSession(session);
+      setState((s) => ({ ...s, token }));
+    },
+    [state.user, state.biometric],
+  );
 
   const signOut = useCallback(async () => {
     // While the token still works: stop this phone getting the client's pushes.
@@ -156,6 +174,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         signInWithBiometrics,
         enableBiometrics,
         disableBiometrics,
+        replaceToken,
         signOut,
       }}
     >

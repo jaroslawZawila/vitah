@@ -24,12 +24,39 @@ async function respond(handler: () => Promise<unknown>, successStatus: number) {
   }
 }
 
+const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+
+/** Bearer calls authenticate by token (see getRequestContext); all others by cookie. */
+const isBearer = (request: Request) =>
+  request.headers.get("authorization")?.toLowerCase().startsWith("bearer ") ?? false;
+
+/**
+ * CSRF guard for cookie-authenticated changes: a browser always sends
+ * `Origin` on a cross-origin POST/PUT/PATCH/DELETE, so one that isn't this
+ * host is another site riding the staff member's session. Bearer requests
+ * carry no ambient credentials and don't need it.
+ */
+export function isCrossSiteWrite(request: Request) {
+  if (SAFE_METHODS.has(request.method) || isBearer(request)) return false;
+  const origin = request.headers.get("origin");
+  if (!origin) return false;
+  const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
+  try {
+    return new URL(origin).host !== host;
+  } catch {
+    return true;
+  }
+}
+
 /** /api/v1: staff, via Bearer token or session cookie. */
 export async function withContext(
   request: Request,
   handler: (ctx: Ctx) => Promise<unknown>,
   successStatus = 200,
 ) {
+  if (isCrossSiteWrite(request)) {
+    return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  }
   const ctx = await getRequestContext(request);
   if (!ctx) return unauthorized();
   return respond(() => handler(ctx), successStatus);
@@ -67,7 +94,8 @@ export async function readForm(request: Request): Promise<Record<string, unknown
 
 /**
  * Streams a stored file to the caller. Never cached by shared caches;
- * `immutable` files (photos: new id per upload) may stay in the caller's own.
+ * `immutable` files (photos: new id per upload) may stay in the caller's own,
+ * for a day only (the device may be shared).
  */
 export function fileResponse(
   { filename, contentType, sizeBytes, body }: StoredFile,
@@ -78,7 +106,7 @@ export function fileResponse(
       "Content-Type": contentType,
       "Content-Length": String(sizeBytes),
       "Content-Disposition": `inline; filename*=UTF-8''${encodeURIComponent(filename)}`,
-      "Cache-Control": immutable ? "private, max-age=31536000, immutable" : "private, no-store",
+      "Cache-Control": immutable ? "private, max-age=86400, immutable" : "private, no-store",
       "X-Content-Type-Options": "nosniff",
     },
   });

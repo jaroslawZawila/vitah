@@ -1,7 +1,7 @@
 "use server";
 
 import { signIn } from "../../auth";
-import { AuthError } from "@repo/auth";
+import { AuthError, TooManyAttempts } from "@repo/auth";
 
 export async function loginAction(
   _prevState: { error: string } | null,
@@ -15,6 +15,9 @@ export async function loginAction(
     });
     return null;
   } catch (error) {
+    if (error instanceof TooManyAttempts) {
+      return { error: "too_many_attempts" };
+    }
     if (error instanceof AuthError) {
       return { error: "invalid_credentials" };
     }
