@@ -1,6 +1,6 @@
 import type { AppLanguage } from "@repo/core/contract";
+import { isRunningInExpoGo } from "expo";
 import Constants from "expo-constants";
-import * as Notifications from "expo-notifications";
 import { useRouter } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import { useEffect } from "react";
@@ -23,13 +23,24 @@ const PENDING_REMOVAL_KEY = "vitah_push_pending_removal";
 
 type Registration = { token: string; language: AppLanguage };
 
+/**
+ * Null in Expo Go on Android: it has had no push since SDK 53, and from SDK 55
+ * merely loading expo-notifications there throws, taking every screen with it.
+ * Push then reads as "unavailable", as on a build without an EAS project id.
+ */
+const Notifications: typeof import("expo-notifications") | null =
+  Platform.OS === "android" && isRunningInExpoGo()
+    ? null
+    : // eslint-disable-next-line @typescript-eslint/no-require-imports
+      require("expo-notifications");
+
 async function lastRegistration(): Promise<Registration | null> {
   const json = await SecureStore.getItemAsync(REGISTERED_KEY).catch(() => null);
   return json ? (JSON.parse(json) as Registration) : null;
 }
 
 // Show notifications while the app is open too.
-Notifications.setNotificationHandler({
+Notifications?.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowBanner: true,
     shouldShowList: true,
@@ -53,7 +64,7 @@ export async function registerForPush(
 ): Promise<PushStatus> {
   const projectId: string | undefined =
     Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
-  if (!projectId) return "unavailable";
+  if (!projectId || !Notifications) return "unavailable";
 
   if (Platform.OS === "android") {
     await Notifications.setNotificationChannelAsync("default", {
@@ -114,6 +125,7 @@ async function removeOnServer({ authToken, pushToken }: PendingRemoval) {
 
 /** Whether the phone lets ViTAH show notifications. */
 export async function notificationsAllowed() {
+  if (!Notifications) return false;
   const { status } = await Notifications.getPermissionsAsync();
   return status === "granted";
 }
@@ -126,13 +138,16 @@ const SCREENS = { photos: "/photos", documents: "/documents" } as const;
  */
 let handledNotification: string | undefined;
 
+const useLastNotificationResponse =
+  Notifications?.useLastNotificationResponse ?? (() => undefined);
+
 /**
  * After sign-in: registers the phone (asking once, and again when the
  * language changes) and opens the right tab when a notification is tapped.
  */
 export function usePushNotifications(authToken: string | null, language: AppLanguage) {
   const router = useRouter();
-  const response = Notifications.useLastNotificationResponse();
+  const response = useLastNotificationResponse();
 
   useEffect(() => {
     if (authToken) void registerForPush(authToken, language, { ask: true });

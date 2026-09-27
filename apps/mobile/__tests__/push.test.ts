@@ -144,3 +144,39 @@ describe("usePushNotifications", () => {
     expect(mockNavigate).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("in Expo Go on Android", () => {
+  // Android's Expo Go has had no push since SDK 53; from SDK 55 even loading
+  // expo-notifications there throws. The app must still start, without push.
+  function loadPush() {
+    let push!: typeof import("../lib/push");
+    const react = jest.requireActual("react");
+    jest.isolateModules(() => {
+      // The hook must use the same React as renderHook.
+      jest.doMock("react", () => react);
+      jest.doMock("expo", () => ({ isRunningInExpoGo: () => true }));
+      jest.doMock("expo-notifications", () => {
+        throw new Error("expo-notifications: Android Push notifications … removed from Expo Go");
+      });
+      const { Platform } = jest.requireActual("react-native");
+      Object.defineProperty(Platform, "OS", { value: "android", configurable: true });
+      push = jest.requireActual("../lib/push");
+    });
+    return push;
+  }
+
+  afterEach(() => {
+    const { Platform } = jest.requireActual("react-native");
+    Object.defineProperty(Platform, "OS", { value: "ios", configurable: true });
+  });
+
+  it("starts without push instead of crashing", async () => {
+    const push = loadPush();
+
+    expect(await push.registerForPush("tok", "es", { ask: true })).toBe("unavailable");
+    expect(await push.notificationsAllowed()).toBe(false);
+    const { result } = renderHook(() => push.usePushNotifications("tok", "es"));
+    expect(result.current).toBeUndefined();
+    expect(api.registerPushToken).not.toHaveBeenCalled();
+  });
+});
