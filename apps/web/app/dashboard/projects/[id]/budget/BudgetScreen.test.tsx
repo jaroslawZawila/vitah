@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -34,6 +34,16 @@ function renderScreen(props: Partial<Parameters<typeof BudgetScreen>[0]> = {}) {
       <BudgetScreen projectId="p-1" projectRef="VTH-26-001" budget={budget} canManage {...props} />
     </NextIntlClientProvider>,
   );
+}
+
+/**
+ * The open dialog, once it has moved focus into itself. It does so a moment
+ * after opening; typing before that sends the keys to its close button.
+ */
+async function openedDialog(name: string) {
+  const popup = await screen.findByRole("dialog", { name });
+  await waitFor(() => expect(popup).toContainElement(document.activeElement as HTMLElement));
+  return within(popup);
 }
 
 beforeEach(() => {
@@ -89,14 +99,14 @@ describe("BudgetScreen", () => {
     renderScreen({ budget: draft });
 
     await userEvent.click(screen.getByRole("button", { name: "Añadir capítulo" }));
-    const dialog = within(await screen.findByRole("dialog", { name: "Añadir capítulo" }));
+    const dialog = await openedDialog("Añadir capítulo");
     await userEvent.type(dialog.getByLabelText("Código"), "18");
     await userEvent.type(dialog.getByLabelText("Denominación"), "Piscina");
     await userEvent.click(dialog.getByRole("button", { name: "Guardar" }));
     expect(actions.addChapterAction).toHaveBeenCalledWith("p-1", "rev-4", { code: "18", name: "Piscina", changeNote: "" });
 
     await userEvent.click(screen.getByRole("button", { name: "Añadir partida" }));
-    const lineDialog = within(await screen.findByRole("dialog", { name: "Añadir partida" }));
+    const lineDialog = await openedDialog("Añadir partida");
     // The code starts with the chapter's.
     expect(lineDialog.getByLabelText("Código")).toHaveValue("05.");
     await userEvent.type(lineDialog.getByLabelText("Código"), "07");
@@ -119,7 +129,7 @@ describe("BudgetScreen", () => {
 
     expect(screen.getByRole("heading", { name: "Todavía no hay presupuesto" })).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Crear presupuesto" }));
-    const dialog = within(await screen.findByRole("dialog", { name: "Crear presupuesto" }));
+    const dialog = await openedDialog("Crear presupuesto");
     await userEvent.type(dialog.getByLabelText("Número de presupuesto"), "036/2026");
     await userEvent.click(dialog.getByRole("button", { name: "Guardar" }));
     expect(actions.createBudgetAction).toHaveBeenCalledWith("p-1", { reference: "036/2026", number: 0 });

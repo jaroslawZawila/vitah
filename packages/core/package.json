@@ -17,7 +17,7 @@
   "scripts": {
     "check-types": "tsc --noEmit",
     "db:seed": "tsx src/seed/run.ts",
-    "test": "vitest run"
+    "test": "vitest run --configLoader runner"
   },
   "dependencies": {
     "@repo/db": "workspace:*",
