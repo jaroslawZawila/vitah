@@ -65,6 +65,38 @@ describe("DocumentsProvider", () => {
     expect(syncDocuments).toHaveBeenCalledTimes(2);
   });
 
+  it("reloads without showing a sync", async () => {
+    const { result } = renderHook(useDocuments, { wrapper });
+    await waitFor(() => expect(result.current.syncing).toBe(false));
+
+    const plans = { ...contract, id: "d2", title: "Planos" };
+    let finish: (value: { documents: store.LocalDocument[] }) => void = () => {};
+    syncDocuments.mockImplementationOnce(() => new Promise((resolve) => (finish = resolve)));
+    act(() => void result.current.reload());
+    expect(result.current.syncing).toBe(false);
+
+    await act(async () => finish({ documents: [plans, contract] }));
+    expect(result.current.documents).toEqual([plans, contract]);
+  });
+
+  it("syncs again after a sync that was running when a change came", async () => {
+    const { result } = renderHook(useDocuments, { wrapper });
+    await waitFor(() => expect(result.current.syncing).toBe(false));
+
+    const plans = { ...contract, id: "d2", title: "Planos" };
+    let finish: (value: { documents: store.LocalDocument[] }) => void = () => {};
+    syncDocuments.mockImplementationOnce(() => new Promise((resolve) => (finish = resolve)));
+    syncDocuments.mockResolvedValueOnce({ documents: [plans, contract] });
+    act(() => void result.current.sync());
+    act(() => void result.current.reload());
+    expect(syncDocuments).toHaveBeenCalledTimes(2);
+
+    await act(async () => finish({ documents: [contract] }));
+
+    await waitFor(() => expect(result.current.documents).toEqual([plans, contract]));
+    expect(syncDocuments).toHaveBeenCalledTimes(3);
+  });
+
   it("shows the local copies when offline", async () => {
     syncDocuments.mockResolvedValue({ error: "network_error" });
     const { result } = renderHook(useDocuments, { wrapper });

@@ -1,5 +1,6 @@
 import { db, projects, eq, and, desc } from "@repo/db";
 import { fromCalendarDate, isCalendarDate } from "./calendar";
+import { markChanged } from "./changes";
 import { requireAdmin, requireEditor, type Ctx } from "./context";
 import { invalid, notFound } from "./errors";
 import { MAX_TEXT, text } from "./input";
@@ -43,9 +44,18 @@ function checkOrder(start: Date | null | undefined, completion: Date | null | un
 
 const clientColumns = { columns: { id: true, name: true, email: true } } as const;
 
+// The change counters are the app's business (./changes), not staff's.
+const projectColumns = {
+  projectRev: false,
+  obraRev: false,
+  photosRev: false,
+  documentsRev: false,
+} as const;
+
 export async function listProjects(ctx: Ctx) {
   return db.query.projects.findMany({
     where: eq(projects.tenantId, ctx.tenantId),
+    columns: projectColumns,
     with: { client: clientColumns },
     orderBy: [desc(projects.createdAt)],
   });
@@ -54,6 +64,7 @@ export async function listProjects(ctx: Ctx) {
 export async function getProject(ctx: Ctx, id: string) {
   const project = await db.query.projects.findFirst({
     where: and(eq(projects.id, id), eq(projects.tenantId, ctx.tenantId)),
+    columns: projectColumns,
     with: { client: clientColumns },
   });
   return project ?? null;
@@ -139,6 +150,7 @@ export async function updateProject(ctx: Ctx, id: string, input: Record<string, 
     );
     await tx.update(projects).set(set).where(projectInTenant(ctx.tenantId, id));
   });
+  await markChanged(ctx.tenantId, id, ["project"]);
 
   return { projectId: id };
 }

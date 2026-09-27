@@ -16,3 +16,4 @@ export * as clientAccountService from "./client-account";
 export * as budgetService from "./budget";
 export * as hitosService from "./hitos";
 export * as obraService from "./obra";
+export * as changesService from "./changes";

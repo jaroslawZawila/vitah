@@ -1,9 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createTestTenant, createTestUser, resetDatabase } from "@repo/db/testing";
-import { createMobileToken } from "@repo/auth/mobile";
 import { db, eq, projects } from "@repo/db";
 import { files } from "@repo/core/testing";
-import { routeParams, seededObraProject } from "../../../../test/api";
+import { clientToken, routeParams, seededObraProject } from "../../../../test/api";
 import { GET } from "./route";
 import { GET as getFile } from "./hitos/[id]/[kind]/route";
 
@@ -16,10 +15,6 @@ const request = (token?: string) =>
   new Request("http://localhost/api/mobile/obra", {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
-
-async function clientToken(tenantId: string, userId: string, email: string) {
-  return createMobileToken({ sub: userId, email, name: null, role: "client", tenantId });
-}
 
 /** The seeded Castrillón project with a client attached. */
 async function setup() {

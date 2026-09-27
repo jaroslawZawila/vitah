@@ -1,4 +1,5 @@
 import { and, db, desc, eq, projectDocuments, projects, users } from "@repo/db";
+import { markChanged } from "./changes";
 import { requireEditor, type Ctx } from "./context";
 import {
   DOCUMENT_CATEGORIES,
@@ -78,6 +79,7 @@ export async function addDocument(ctx: Ctx, projectId: string, input: Record<str
       uploadedById: ctx.userId,
     }),
   );
+  await markChanged(ctx.tenantId, projectId, ["documents"]);
   await notifyProjectClient(ctx.tenantId, projectId, { kind: "document", title });
 
   return { documentId: id };
@@ -113,6 +115,7 @@ export async function deleteDocument(ctx: Ctx, projectId: string, documentId: st
   if (!doc) fail("not_found");
 
   await removeFiles([doc.pathname], () => db.delete(projectDocuments).where(where));
+  await markChanged(ctx.tenantId, projectId, ["documents"]);
 
   return { documentId };
 }

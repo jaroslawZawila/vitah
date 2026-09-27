@@ -33,6 +33,7 @@ function state(overrides: Partial<ReturnType<typeof usePhotos>> = {}) {
     refreshing: false,
     refresh,
     retry,
+    reload: jest.fn(),
     ...overrides,
   });
 }

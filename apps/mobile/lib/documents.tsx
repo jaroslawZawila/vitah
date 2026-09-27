@@ -20,6 +20,8 @@ type DocumentsState = {
 
 type DocumentsContextValue = DocumentsState & {
   sync: () => Promise<void>;
+  /** Syncs without showing it, e.g. when the server says the documents changed. */
+  reload: () => Promise<void>;
   /** Opens a downloaded document; returns false if it isn't on the phone. */
   open: (doc: LocalDocument) => Promise<boolean>;
 };
@@ -38,11 +40,17 @@ export function DocumentsProvider({ children }: { children: React.ReactNode }) {
     offline: false,
   });
   const running = useRef(false);
+  // A change reported while a sync runs: that sync may have missed it.
+  const again = useRef(false);
 
-  const sync = useCallback(async () => {
-    if (!token || running.current) return;
+  const run = useCallback(async (quiet: boolean): Promise<void> => {
+    if (!token) return;
+    if (running.current) {
+      if (quiet) again.current = true;
+      return;
+    }
     running.current = true;
-    setState((s) => ({ ...s, syncing: true }));
+    if (!quiet) setState((s) => ({ ...s, syncing: true }));
     try {
       const result = await syncDocuments(token);
       if ("documents" in result) {
@@ -57,7 +65,13 @@ export function DocumentsProvider({ children }: { children: React.ReactNode }) {
     } finally {
       running.current = false;
     }
+    if (again.current) {
+      again.current = false;
+      await run(true);
+    }
   }, [token, signOut]);
+  const sync = useCallback(() => run(false), [run]);
+  const reload = useCallback(() => run(true), [run]);
 
   useEffect(() => {
     void readDocuments().then((documents) =>
@@ -82,7 +96,7 @@ export function DocumentsProvider({ children }: { children: React.ReactNode }) {
     return true;
   }, []);
 
-  return <DocumentsContext value={{ ...state, sync, open }}>{children}</DocumentsContext>;
+  return <DocumentsContext value={{ ...state, sync, reload, open }}>{children}</DocumentsContext>;
 }
 
 export function useDocuments(): DocumentsContextValue {

@@ -13,6 +13,7 @@ import {
   sql,
 } from "@repo/db";
 import { isUniqueViolation } from "./accounts";
+import { markChanged } from "./changes";
 import { requireEditor, type Ctx } from "./context";
 import {
   MAX_CHAPTER_CODE,
@@ -43,7 +44,8 @@ import {
 // A project's budget in the FRAMER model: revisions of chapters and lines. A
 // draft is edited freely; accepting it makes it the contract, and from then
 // on staff only record each line's executed %. A change to the contract is a
-// new revision (copied from the newest), accepted in turn.
+// new revision (copied from the newest), accepted in turn. The client's app
+// sees only the contract, so editing a draft doesn't mark the obra changed.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const MAX_NAME = 200;
@@ -297,7 +299,7 @@ export async function createBudget(ctx: Ctx, projectId: string, input: Record<st
   const reference = optionalText(input.reference, MAX_NAME);
   const number = input.number === undefined ? 0 : integer(input.number, 0, 999);
 
-  return db.transaction(async (tx) => {
+  const created = await db.transaction(async (tx) => {
     await lockProject(tx, projectId);
     const existing = await tx.query.budgetRevisions.findFirst({
       where: eq(budgetRevisions.projectId, projectId),
@@ -315,6 +317,9 @@ export async function createBudget(ctx: Ctx, projectId: string, input: Record<st
     if (!hito) await createDefaultHitos(tx, ctx.tenantId, projectId);
     return { revisionId: revision!.id };
   });
+  // The app shows the new hitos.
+  await markChanged(ctx.tenantId, projectId, ["obra"]);
+  return created;
 }
 
 /** A new draft copied from the newest revision, progress included. */
@@ -428,6 +433,7 @@ export async function acceptRevision(ctx: Ctx, projectId: string, revisionId: st
       .set({ status: "accepted", acceptedAt: new Date() })
       .where(eq(budgetRevisions.id, revisionId));
   });
+  await markChanged(ctx.tenantId, projectId, ["obra"]);
   return { revisionId };
 }
 
@@ -616,5 +622,6 @@ export async function setProgress(ctx: Ctx, projectId: string, input: Record<str
       where ${budgetLines.id} = v.id
     `);
   });
+  await markChanged(ctx.tenantId, projectId, ["obra"]);
   return { updated: updates.size };
 }

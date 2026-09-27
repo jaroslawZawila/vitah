@@ -13,6 +13,16 @@ export type MobileProject = {
   completionDate: string | null;
 };
 
+/** The parts of the app that reload on their own when staff change them. */
+export const CHANGE_AREAS = ["project", "obra", "photos", "documents"] as const;
+export type ChangeArea = (typeof CHANGE_AREAS)[number];
+
+/**
+ * GET /api/mobile/changes: a counter per part of the app for the client's
+ * project. The open app polls it and reloads a part when its counter moves.
+ */
+export type MobileChanges = { projectId: string } & Record<ChangeArea, number>;
+
 export type ProjectClientError =
   | "missing_fields"
   | "project_not_found"

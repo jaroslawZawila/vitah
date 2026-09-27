@@ -1,5 +1,6 @@
 import { db, eq, projects } from "@repo/db";
 import { toCalendarDate } from "./calendar";
+import { markChanged } from "./changes";
 import { requireEditor, type Ctx } from "./context";
 import {
   OBRA_STAGES,
@@ -91,6 +92,7 @@ export async function setStage(ctx: Ctx, projectId: string, input: Record<string
     .update(projects)
     .set({ obraStage: stage, updatedAt: new Date() })
     .where(eq(projects.id, projectId));
+  await markChanged(ctx.tenantId, projectId, ["obra"]);
   return { stage };
 }
 

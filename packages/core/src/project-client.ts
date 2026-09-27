@@ -1,8 +1,9 @@
 import { and, asc, db, eq, isClientUser, isNotNull, isNull, projects, users } from "@repo/db";
 import { isUniqueViolation } from "./accounts";
 import { toCalendarDate } from "./calendar";
+import { markChanged } from "./changes";
 import { requireAdmin, type Ctx } from "./context";
-import type { ClientOption, MobileProject, ProjectClientError } from "./contract";
+import { CHANGE_AREAS, type ClientOption, type MobileProject, type ProjectClientError } from "./contract";
 import { CoreError } from "./errors";
 
 // ─── Project client access ────────────────────────────────────────────────────
@@ -139,6 +140,8 @@ export async function assignProjectClient(
   } catch (error) {
     throw clientConflict(error);
   }
+  // A client removed and attached again between two polls still reloads.
+  await markChanged(ctx.tenantId, projectId, CHANGE_AREAS);
 
   return { projectId };
 }

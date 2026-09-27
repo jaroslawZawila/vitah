@@ -5,6 +5,7 @@ import { useAuth } from "../../lib/auth";
 import { DocumentsProvider } from "../../lib/documents";
 import { PUSH_NOTIFICATIONS } from "../../lib/features";
 import { useI18n } from "../../lib/i18n";
+import { LiveUpdates } from "../../lib/live-updates";
 import { usePushNotifications } from "../../lib/push";
 import { PhotosProvider } from "../../lib/use-photos";
 import { ProjectProvider } from "../../lib/use-project";
@@ -33,11 +34,13 @@ export default function AppLayout() {
   return (
     // Above the tabs and the screens pushed over them (a phase, a payment):
     // one copy of the client's data for all, and documents sync on app open
-    // whichever tab is shown.
+    // whichever tab is shown. LiveUpdates reloads what staff change while the
+    // app is open.
     <ProjectProvider>
     <PhotosProvider>
     <DocumentsProvider>
       <ObraProvider>
+        <LiveUpdates />
         <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.grafito } }} />
       </ObraProvider>
     </DocumentsProvider>

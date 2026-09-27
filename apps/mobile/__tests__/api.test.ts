@@ -188,3 +188,21 @@ describe("account endpoints", () => {
     ]);
   });
 });
+
+describe("api.getChanges", () => {
+  it("sends the bearer token and returns the counters", async () => {
+    const changes = { projectId: "p", project: 1, obra: 4, photos: 2, documents: 0 };
+    respond(200, { changes });
+
+    expect(await api.getChanges("tok")).toEqual({ ok: true, data: { changes } });
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toMatch(/\/api\/mobile\/changes$/);
+    expect(init.headers).toEqual({ Authorization: "Bearer tok" });
+  });
+
+  it("maps a server without the endpoint to an error", async () => {
+    respond(404, { error: "not_found" });
+
+    expect((await api.getChanges("tok")).ok).toBe(false);
+  });
+});

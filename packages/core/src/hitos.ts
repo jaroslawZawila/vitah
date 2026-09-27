@@ -12,6 +12,7 @@ import {
   or,
   projectPhotos,
 } from "@repo/db";
+import { markChanged } from "./changes";
 import { requireEditor, type Ctx } from "./context";
 import { MAX_CHAPTER_CODE, MAX_DOCUMENT_BYTES, type Hito, type HitoFileKind } from "./contract";
 import {
@@ -125,6 +126,10 @@ async function hitoInProject(ctx: Ctx, projectId: string, hitoId: string): Promi
 const touch = (hitoId: string, changes: Partial<typeof obraHitos.$inferInsert>) =>
   db.update(obraHitos).set(changes).where(eq(obraHitos.id, hitoId));
 
+/** Every hito change shows in the app's obra (its phases and payments). */
+const obraChanged = (ctx: Ctx, projectId: string) =>
+  markChanged(ctx.tenantId, projectId, ["obra"]);
+
 // ─── The plan ────────────────────────────────────────────────────────────────
 
 type PlanChange = {
@@ -156,6 +161,7 @@ function parseChange(hitoId: string, input: Record<string, unknown>): PlanChange
  * order. Chapters given to a hito move from whichever hito had them.
  */
 async function applyPlan(ctx: Ctx, projectId: string, plan: PlanChange[]) {
+  if (plan.every((p) => Object.keys(p.changes).length === 0 && p.chapterCodes === null)) return;
   const codes = plan.flatMap((p) => p.chapterCodes ?? []);
   if (codes.length > 0) {
     // Any revision's chapters: the plan may be set before one is accepted.
@@ -198,6 +204,7 @@ async function applyPlan(ctx: Ctx, projectId: string, plan: PlanChange[]) {
       );
     }
   });
+  await obraChanged(ctx, projectId);
 }
 
 /** Body: any of { name, pctBp, scope, billingMoment, chapterCodes }. */
@@ -265,6 +272,7 @@ export async function addCheck(
       position: nextPosition(obraHitoChecks, obraHitoChecks.position, eq(obraHitoChecks.hitoId, hitoId)),
     })
     .returning({ id: obraHitoChecks.id });
+  await obraChanged(ctx, projectId);
   return { checkId: check!.id };
 }
 
@@ -304,6 +312,7 @@ export async function updateCheck(
   });
   if (Object.keys(changes).length > 0) {
     await db.update(obraHitoChecks).set(changes).where(eq(obraHitoChecks.id, checkId));
+    await obraChanged(ctx, projectId);
   }
   return { checkId };
 }
@@ -311,6 +320,7 @@ export async function updateCheck(
 export async function deleteCheck(ctx: Ctx, projectId: string, checkId: string, hitoId?: string) {
   await checkInProject(ctx, projectId, checkId, hitoId);
   await db.delete(obraHitoChecks).where(eq(obraHitoChecks.id, checkId));
+  await obraChanged(ctx, projectId);
   return { checkId };
 }
 
@@ -349,6 +359,7 @@ export async function setActaPhotos(
         .values(ids.map((photoId) => ({ hitoId, photoId, tenantId: ctx.tenantId })));
     }
   });
+  await obraChanged(ctx, projectId);
   return { hitoId };
 }
 
@@ -392,6 +403,7 @@ export async function uploadHitoFile(
   await storeFiles([{ pathname, body: file, contentType: "application/pdf" }], () =>
     touch(hitoId, { [columns.pathname]: pathname, [columns.size]: file.size, [columns.date]: date }),
   );
+  await obraChanged(ctx, projectId);
   if (previous) await deleteFile(previous).catch(() => {});
   return { hitoId };
 }
@@ -409,6 +421,7 @@ export async function removeHitoFile(
   await removeFiles([pathname], () =>
     touch(hitoId, { [columns.pathname]: null, [columns.size]: null, [columns.date]: null }),
   );
+  await obraChanged(ctx, projectId);
   return { hitoId };
 }
 
@@ -469,11 +482,13 @@ export async function registerPayment(
     amountCents = integer(input.amountCents, 0, 2_000_000_000);
   }
   await touch(hitoId, { paidOn, paidAmountCents: amountCents });
+  await obraChanged(ctx, projectId);
   return { hitoId };
 }
 
 export async function cancelPayment(ctx: Ctx, projectId: string, hitoId: string) {
   await hitoInProject(ctx, projectId, hitoId);
   await touch(hitoId, { paidOn: null, paidAmountCents: null });
+  await obraChanged(ctx, projectId);
   return { hitoId };
 }

@@ -166,7 +166,7 @@ mockups don't cover, extend the same visual language. Concept B on the canvas wa
 - `proxy.ts` protects all routes except `/`, `/api/auth/*`, `/api/mobile/*`, `/api/v1/*` (these authenticate per request), and static assets
 - User roles: `admin`, `manager`, `viewer` (staff, portal only) and `client` (homeowner, mobile app only) — Postgres enum. Use `isStaffUser` / `isClientUser` / `STAFF_ROLES` from `@repo/db`. `Ctx` is staff-only: client tokens are rejected by `/api/v1`
 - Clients are created on the **Clients** tab (`/dashboard/clients`, admin only): first name, surnames, date of birth, address, phone, email and app password. Personal details live in `client_profiles`; login data stays on `users`. Client emails are unique across tenants. A project has at most one client, picked from the existing clients on the project page ("Client app access" card); removing them only detaches, the account stays
-- Mobile client API: `POST /api/mobile/auth` (clients only, returns a 30d JWT), `GET /api/mobile/project`, `GET /api/mobile/documents` and `GET /api/mobile/documents/:id` (the PDF), `GET /api/mobile/photos` and `GET /api/mobile/photos/:id` (`?size=thumb`), `POST /api/mobile/password`, `GET`/`PUT /api/mobile/settings` (notification toggles), `POST`/`DELETE /api/mobile/push-token` (the phone's Expo push token + app language), `GET /api/mobile/obra` (the Obra tab: stage, progress, phases, payment hitos) and `GET /api/mobile/obra/hitos/:id/:kind` (a hito's signed `acta` or `invoice` PDF) — all `Authorization: Bearer`, via `withMobileClient` in `apps/web/lib/api.ts`. Each request re-checks the client is still active
+- Mobile client API: `POST /api/mobile/auth` (clients only, returns a 30d JWT), `GET /api/mobile/project`, `GET /api/mobile/documents` and `GET /api/mobile/documents/:id` (the PDF), `GET /api/mobile/photos` and `GET /api/mobile/photos/:id` (`?size=thumb`), `POST /api/mobile/password`, `GET`/`PUT /api/mobile/settings` (notification toggles), `POST`/`DELETE /api/mobile/push-token` (the phone's Expo push token + app language), `GET /api/mobile/obra` (the Obra tab: stage, progress, phases, payment hitos), `GET /api/mobile/obra/hitos/:id/:kind` (a hito's signed `acta` or `invoice` PDF) and `GET /api/mobile/changes` (change counters, see "Live updates") — all `Authorization: Bearer`, via `withMobileClient` in `apps/web/lib/api.ts`. Each request re-checks the client is still active
 - Admin-only server actions guarded by `requireAdmin()` check
 
 ### Database
@@ -189,6 +189,16 @@ mockups don't cover, extend the same visual language. Concept B on the canvas wa
   (progress, due dates, penalty, phases) is pure in `obra-calc.ts`, also used by the portal for live figures
 - Portal tabs Obra (chapter control at `obra/[code]`), Presupuesto and Pagos (`payments/[hitoId]`); app tab Obra with
   pushed screens under `app/(app)/obra/`. `pnpm db:seed` gives VTH-26-001 the real Castrillón budget half built
+
+### Live updates (app open)
+
+- While the app is in the foreground it polls `GET /api/mobile/changes` every 30 s (`apps/mobile/lib/live-updates.ts`)
+  and quietly reloads only the parts whose counter moved; it also reloads everything on open and foreground
+- The counters are `projects.project_rev|obra_rev|photos_rev|documents_rev`, bumped by `markChanged()`
+  (`packages/core/src/changes.ts`) **after** each write the client can see, naming only what it wrote. Which
+  counters each app part reads is declared once there (`READS`: the obra also shows the dates and photos). A new
+  core write must call it and get a case in `packages/core/test/changes.test.ts` (a test fails otherwise); budget
+  drafts don't, the app only sees the accepted revision. Mobile-only: staff don't need it, so no `/api/v1` route
 
 ### Project documents
 

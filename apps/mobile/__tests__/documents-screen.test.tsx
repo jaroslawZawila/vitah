@@ -29,6 +29,7 @@ function state(overrides: Partial<ReturnType<typeof useDocuments>> = {}) {
     syncing: false,
     offline: false,
     sync,
+    reload: jest.fn(),
     open,
     ...overrides,
   });

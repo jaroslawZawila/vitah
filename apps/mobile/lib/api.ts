@@ -1,6 +1,7 @@
 import {
   photoSizeQuery,
   type AccountError,
+  type MobileChanges,
   type HitoFileKind,
   type MobileObra,
   type AppLanguage,
@@ -87,6 +88,11 @@ export const api = {
 
   getProject(token: string) {
     return authed<{ project: Project | null }>("/api/mobile/project", token);
+  },
+
+  /** A counter per part of the app; one that moved means reload that part. Null without a project. */
+  getChanges(token: string) {
+    return authed<{ changes: MobileChanges | null }>("/api/mobile/changes", token);
   },
 
   /** The Obra tab: stage, progress, phases and payment hitos; null without a project. */

@@ -232,6 +232,12 @@ export const projects = pgTable(
     clientUserId: text("client_user_id")
       .unique("projects_client_user_unique")
       .references(() => users.id, { onDelete: "set null" }),
+    // Change counters the client's open app polls (packages/core/src/changes.ts):
+    // each goes up after a write to that part of the app.
+    projectRev: integer("project_rev").default(0).notNull(),
+    obraRev: integer("obra_rev").default(0).notNull(),
+    photosRev: integer("photos_rev").default(0).notNull(),
+    documentsRev: integer("documents_rev").default(0).notNull(),
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
   },

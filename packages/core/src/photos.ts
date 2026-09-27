@@ -1,4 +1,5 @@
 import { and, db, desc, eq, gt, isNotNull, ne, projectPhotos, projects, users } from "@repo/db";
+import { markChanged } from "./changes";
 import { requireEditor, type Ctx } from "./context";
 import {
   MAX_CAPTION_LENGTH,
@@ -133,6 +134,7 @@ export async function addPhoto(ctx: Ctx, projectId: string, input: Record<string
         uploadedById: ctx.userId,
       }),
   );
+  await markChanged(ctx.tenantId, projectId, ["photos"]);
   // One push per visit, not per photo: the first photo of a batch tells them.
   const recent = await db.query.projectPhotos.findFirst({
     where: and(
@@ -188,6 +190,7 @@ export async function deletePhoto(ctx: Ctx, projectId: string, photoId: string) 
   const { pathname, thumbSizeBytes } = photo;
   const pathnames = thumbSizeBytes === null ? [pathname] : [pathname, thumbPath(pathname)];
   await removeFiles(pathnames, () => db.delete(projectPhotos).where(where));
+  await markChanged(ctx.tenantId, projectId, ["photos"]);
 
   return { photoId };
 }

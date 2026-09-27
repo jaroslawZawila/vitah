@@ -60,3 +60,35 @@ describe("useClientData", () => {
     await waitFor(() => expect(mockSignOut).toHaveBeenCalled());
   });
 });
+
+describe("useClientData reload", () => {
+  it("loads again without showing a refresh", async () => {
+    load.mockResolvedValueOnce({ ok: true, data: ["a"] });
+    const { result } = renderHook(() => useClientData(load));
+    await waitFor(() => expect(result.current.data).toEqual(["a"]));
+
+    let resolve: (value: Result<string[]>) => void = () => {};
+    load.mockImplementationOnce(() => new Promise((r) => (resolve = r)));
+    act(() => void result.current.reload());
+    expect(result.current.refreshing).toBe(false);
+
+    await act(async () => resolve({ ok: true, data: ["a", "b"] }));
+    expect(result.current.data).toEqual(["a", "b"]);
+  });
+
+  it("keeps the newest answer when loads overlap", async () => {
+    load.mockResolvedValueOnce({ ok: true, data: ["a"] });
+    const { result } = renderHook(() => useClientData(load));
+    await waitFor(() => expect(result.current.data).toEqual(["a"]));
+
+    let slow: (value: Result<string[]>) => void = () => {};
+    load.mockImplementationOnce(() => new Promise((r) => (slow = r)));
+    load.mockResolvedValueOnce({ ok: true, data: ["a", "b"] });
+    act(() => result.current.refresh());
+    await act(async () => void (await result.current.reload()));
+    expect(result.current.data).toEqual(["a", "b"]);
+
+    await act(async () => slow({ ok: true, data: ["a"] }));
+    expect(result.current).toMatchObject({ data: ["a", "b"], refreshing: false });
+  });
+});
