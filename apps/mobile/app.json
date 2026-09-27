@@ -14,7 +14,11 @@
       "adaptiveIcon": {
         "backgroundColor": "#1e1e1e"
       },
-      "package": "app.vitah"
+      "package": "app.vitah",
+      "permissions": [
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.USE_FINGERPRINT"
+      ]
     },
     "plugins": [
       "expo-router",
@@ -30,6 +34,13 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "19436f4d-bc1c-4362-a4ad-c48623fbbfe4"
+      }
+    },
+    "owner": "jaroslaw.zawila"
   }
 }
