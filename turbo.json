@@ -14,7 +14,8 @@
     },
     "db:seed": {
       "cache": false,
-      "env": ["POSTGRES_URL", "SEED_TENANT_NAME", "SEED_ADMIN_EMAIL", "SEED_ADMIN_PASSWORD"]
+      "dependsOn": ["^db:seed"],
+      "env": ["POSTGRES_URL", "SEED_TENANT_NAME", "SEED_ADMIN_EMAIL", "SEED_ADMIN_PASSWORD", "BLOB_READ_WRITE_TOKEN"]
     },
     "db:generate": {
       "cache": false,

@@ -10,6 +10,7 @@ import {
 import { notifyProjectClient } from "./notifications";
 import {
   fail,
+  isPdf,
   openStoredFile,
   projectFolder,
   removeFiles,
@@ -33,11 +34,6 @@ function documentInProject(ctx: Ctx, projectId: string, documentId: string) {
 
 function isCategory(value: unknown): value is DocumentCategory {
   return DOCUMENT_CATEGORIES.includes(value as DocumentCategory);
-}
-
-/** Checks the file's magic bytes; the browser-supplied type can't be trusted. */
-async function isPdf(file: Blob) {
-  return (await file.slice(0, 5).text()) === "%PDF-";
 }
 
 const mobileColumns = {

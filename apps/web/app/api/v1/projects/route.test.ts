@@ -72,6 +72,7 @@ describe("GET /api/v1/projects", () => {
         address: "Calle 1",
         startDate: "2026-03-01T00:00:00.000Z",
         completionDate: null,
+        obraStage: 1,
         clientUserId: client.id,
         client: { id: client.id, name: "Ana", email: client.email },
         createdAt: expect.any(String),

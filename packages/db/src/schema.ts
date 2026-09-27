@@ -5,6 +5,7 @@ import {
   integer,
   pgEnum,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   unique,
@@ -31,6 +32,14 @@ export const documentCategoryEnum = pgEnum("document_category", [
   "other",
 ]);
 export type StaffRole = Exclude<UserRole, "client">;
+
+// A budget revision is drafted, then accepted by the client (it becomes the
+// contract), and superseded when a later revision is accepted.
+export const budgetRevisionStatusEnum = pgEnum("budget_revision_status", [
+  "draft",
+  "accepted",
+  "superseded",
+]);
 export const STAFF_ROLES = userRoleEnum.enumValues.filter(
   (role): role is StaffRole => role !== "client",
 );
@@ -197,6 +206,9 @@ export const projects = pgTable(
     address: text("address").notNull(),
     startDate: timestamp("start_date", { mode: "date" }),
     completionDate: timestamp("completion_date", { mode: "date" }),
+    // Stage of the construction process, 1–8 (features/construction_process/
+    // PROCESS.md §2): set by staff on the project's Obra page.
+    obraStage: integer("obra_stage").default(1).notNull(),
     // Homeowner with mobile app access. At most one project per client.
     clientUserId: text("client_user_id")
       .unique("projects_client_user_unique")
@@ -263,6 +275,9 @@ export const projectPhotos = pgTable(
     pathname: text("pathname").unique().notNull(),
     contentType: text("content_type").notNull(),
     sizeBytes: integer("size_bytes").notNull(),
+    // Budget chapter the photo shows (e.g. "05"), if any: the photo then also
+    // appears on that chapter and on its phase in the app.
+    chapterCode: text("chapter_code"),
     // Size of the small copy for grids, stored next to the photo as
     // "<id>.thumb.webp". Null for photos uploaded before thumbnails existed.
     thumbSizeBytes: integer("thumb_size_bytes"),
@@ -274,6 +289,220 @@ export const projectPhotos = pgTable(
   },
   (table) => ({
     projectIdx: index("project_photos_project_idx").on(table.projectId),
+  }),
+);
+
+// --- Obra: budget ---
+// A project's budget (PEC) in the FRAMER model: revisions → chapters → lines
+// (partidas). Money is in euro cents, quantities in thousandths. The accepted
+// revision drives the works; staff record each line's executed %.
+
+export const budgetRevisions = pgTable(
+  "budget_revisions",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    // "Rev.3" → 3.
+    number: integer("number").notNull(),
+    status: budgetRevisionStatusEnum("status").default("draft").notNull(),
+    // The budget's own number, e.g. "036/2026".
+    reference: text("reference"),
+    // VAT in basis points: 10 % (autopromoción) = 1000.
+    vatRateBp: integer("vat_rate_bp").default(1000).notNull(),
+    // Surfaces in hundredths of m² (253,45 m² → 25345).
+    builtAreaCm2: integer("built_area_cm2"),
+    usefulAreaCm2: integer("useful_area_cm2"),
+    // "Gastos no incluidos en el PEC", one per line.
+    exclusions: text("exclusions"),
+    acceptedAt: timestamp("accepted_at", { mode: "date" }),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date" })
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => ({
+    projectNumberUnique: unique("budget_revisions_project_number_unique").on(
+      table.projectId,
+      table.number,
+    ),
+  }),
+);
+
+export const budgetChapters = pgTable(
+  "budget_chapters",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    revisionId: text("revision_id")
+      .notNull()
+      .references(() => budgetRevisions.id, { onDelete: "cascade" }),
+    // "05". Chapters keep their code across revisions.
+    code: text("code").notNull(),
+    name: text("name").notNull(),
+    position: integer("position").notNull(),
+    // Why the chapter changed against the previous revision.
+    changeNote: text("change_note"),
+  },
+  (table) => ({
+    revisionCodeUnique: unique("budget_chapters_revision_code_unique").on(
+      table.revisionId,
+      table.code,
+    ),
+  }),
+);
+
+export const budgetLines = pgTable(
+  "budget_lines",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    chapterId: text("chapter_id")
+      .notNull()
+      .references(() => budgetChapters.id, { onDelete: "cascade" }),
+    // "05.01".
+    code: text("code").notNull(),
+    description: text("description").notNull(),
+    // m², m³, ml, ud, pa, lote…
+    unit: text("unit").notNull(),
+    quantityMilli: integer("quantity_milli").notNull(),
+    unitPriceCents: integer("unit_price_cents").notNull(),
+    // Share of the line built so far, 0–100.
+    executedPct: integer("executed_pct").default(0).notNull(),
+    position: integer("position").notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date" })
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => ({
+    chapterIdx: index("budget_lines_chapter_idx").on(table.chapterId),
+  }),
+);
+
+// --- Obra: payment milestones (hitos H0–H9) ---
+// Per project, not per revision: amounts are % × the accepted revision's total.
+
+export const obraHitos = pgTable(
+  "obra_hitos",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    // "H4".
+    code: text("code").notNull(),
+    name: text("name").notNull(),
+    // Share of the price in basis points: 13 % = 1300.
+    pctBp: integer("pct_bp").notNull(),
+    // "Alcance / contenido" and "Momento de facturación".
+    scope: text("scope").notNull(),
+    billingMoment: text("billing_moment").notNull(),
+    position: integer("position").notNull(),
+    // The signed acta fotográfica de conformidad (PDF, private Blob store).
+    actaSignedOn: date("acta_signed_on", { mode: "string" }),
+    actaPathname: text("acta_pathname"),
+    actaSizeBytes: integer("acta_size_bytes"),
+    // The invoice (PDF).
+    invoicedOn: date("invoiced_on", { mode: "string" }),
+    invoicePathname: text("invoice_pathname"),
+    invoiceSizeBytes: integer("invoice_size_bytes"),
+    paidOn: date("paid_on", { mode: "string" }),
+    paidAmountCents: integer("paid_amount_cents"),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date" })
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => ({
+    projectCodeUnique: unique("obra_hitos_project_code_unique").on(table.projectId, table.code),
+  }),
+);
+
+// The budget chapters a hito closes, by chapter code (so it holds across
+// revisions). A chapter belongs to at most one hito.
+export const obraHitoChapters = pgTable(
+  "obra_hito_chapters",
+  {
+    hitoId: text("hito_id")
+      .notNull()
+      .references(() => obraHitos.id, { onDelete: "cascade" }),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    chapterCode: text("chapter_code").notNull(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.hitoId, table.chapterCode] }),
+    projectChapterUnique: unique("obra_hito_chapters_project_chapter_unique").on(
+      table.projectId,
+      table.chapterCode,
+    ),
+  }),
+);
+
+// What else must be done before a hito's acta: tests, handover documents…
+export const obraHitoChecks = pgTable(
+  "obra_hito_checks",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    hitoId: text("hito_id")
+      .notNull()
+      .references(() => obraHitos.id, { onDelete: "cascade" }),
+    label: text("label").notNull(),
+    done: boolean("done").default(false).notNull(),
+    position: integer("position").notNull(),
+  },
+  (table) => ({
+    hitoIdx: index("obra_hito_checks_hito_idx").on(table.hitoId),
+  }),
+);
+
+// Project photos picked for a hito's acta fotográfica.
+export const obraHitoPhotos = pgTable(
+  "obra_hito_photos",
+  {
+    hitoId: text("hito_id")
+      .notNull()
+      .references(() => obraHitos.id, { onDelete: "cascade" }),
+    photoId: text("photo_id")
+      .notNull()
+      .references(() => projectPhotos.id, { onDelete: "cascade" }),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.hitoId, table.photoId] }),
   }),
 );
 

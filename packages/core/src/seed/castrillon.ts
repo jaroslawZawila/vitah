@@ -1,0 +1,237 @@
+// Presupuesto 036/2026 Rev.3 (FRAMER, El Llordal, Castrillón): the real budget in
+// features/construction_process/PreFRAMER_Castrillon_Asturias.pdf, section 3. Seeds the
+// local dev project and serves as a realistic fixture in tests.
+
+import type { NewBudgetLine } from "../contract";
+
+export type SeedChapter = { code: string; name: string; changeNote?: string; lines: NewBudgetLine[] };
+
+export const CASTRILLON_BUDGET = {
+  reference: "036/2026",
+  number: 3,
+  builtAreaM2: 253.45,
+  usefulAreaM2: 208.25,
+  exclusions: [
+    "Estudio geotécnico definitivo, obligatorio para validar la cimentación en el terreno real.",
+    "Control de calidad: ensayos adicionales bajo especificación de la DF.",
+    "Honorarios de proyecto y dirección de obra: arquitecto y arquitecto técnico (~8 % PEM).",
+    "IVA 10 % (autopromoción) y licencia de obra (ICIO) del Ayuntamiento de Castrillón.",
+    "Urbanización completa de la parcela de 3.262 m² (el cap. 15 cubre solo el entorno de la vivienda).",
+    "Piscina rectangular: partida separada a petición.",
+    "Edificación auxiliar: no incluida en este presupuesto.",
+    "Conexiones a redes de suministro exteriores si requieren obra civil adicional.",
+    "Mobiliario, cocina amueblada y electrodomésticos.",
+  ].join("\n"),
+  chapters: [
+    {
+      code: "01",
+      name: "Actuaciones Previas y Movimiento de Tierras",
+      changeNote: "BC3 real: 265 m³ de vaciado a menos de 2 m. Rev.2 asumía 1.800 m³ a −3 m sin datos reales.",
+      lines: [
+        { code: "01.01", description: "Desbroce y limpieza superficial del terreno, medios mecánicos", unit: "m²", quantity: 265, unitPriceCents: 350 },
+        { code: "01.02", description: "Excavación mecánica en vaciado a cota −1,50 m en terreno compacto — BC3 real: 265 m³", unit: "m³", quantity: 265, unitPriceCents: 1000 },
+        { code: "01.03", description: "Carga y transporte de tierras a vertedero autorizado, distancia ≤15 km", unit: "m³", quantity: 265, unitPriceCents: 550 },
+        { code: "01.04", description: "Excavación zanjas instalaciones y anclajes de losa — BC3: 219,76 m³", unit: "m³", quantity: 219.76, unitPriceCents: 800 },
+        { code: "01.05", description: "Excavación zanjas saneamiento — BC3: 25,28 m³", unit: "m³", quantity: 25.28, unitPriceCents: 1500 },
+        { code: "01.06", description: "Extendido y compactación arena c/aporte — BC3: 87 m³", unit: "m³", quantity: 87, unitPriceCents: 1400 },
+        { code: "01.07", description: "Extendido y compactación grava c/aporte — BC3: 9 m³", unit: "m³", quantity: 9, unitPriceCents: 1400 },
+        { code: "01.08", description: "Topografía, replanteo y levantamiento taquimétrico previo a cimentación", unit: "pa", quantity: 1, unitPriceCents: 150000 },
+        { code: "01.09", description: "Medios auxiliares, señalización de obra y vallado perimetral de seguridad", unit: "pa", quantity: 1, unitPriceCents: 248372 },
+      ],
+    },
+    {
+      code: "02",
+      name: "Red de Saneamiento y Drenajes",
+      lines: [
+        { code: "02.01", description: "Acometida general PVC corrugado reforzado SN8 D=315 mm con arqueta de pie de bajante", unit: "ml", quantity: 10, unitPriceCents: 5200 },
+        { code: "02.02", description: "Colector red fecales PVC Serie B insonorizado SN4 D=160 mm, con solera de hormigón", unit: "ml", quantity: 45, unitPriceCents: 3600 },
+        { code: "02.03", description: "Colector red pluviales PVC SN4 D=200 mm, enterrado — cubre perimetral edificio y acceso parcela", unit: "ml", quantity: 38, unitPriceCents: 4200 },
+        { code: "02.04", description: "Pozo de registro prefabricado HM D=100 cm, h=3,15 m, con marco y tapa fundición", unit: "ud", quantity: 3, unitPriceCents: 62000 },
+        { code: "02.05", description: "Tubería drenaje perimetral PVC corrugado D=160 mm con geotextil PP y grava filtrante 20/40 mm", unit: "ml", quantity: 42, unitPriceCents: 4200 },
+        { code: "02.06", description: "Arqueta de registro metálica 50×50 cm con marco y tapa antideslizante", unit: "ud", quantity: 8, unitPriceCents: 16000 },
+        { code: "02.07", description: "Canaleta hormigón polímero con rejilla fundición dúctil C250, ancho 150 mm", unit: "ml", quantity: 6, unitPriceCents: 14333 },
+      ],
+    },
+    {
+      code: "03",
+      name: "Cimentación y Protección Radón — DB-HS 6",
+      lines: [
+        { code: "03.01", description: "Hormigón de limpieza HM-20/P/20/IIa, e=10 cm, vertido y extendido manual", unit: "m²", quantity: 253.45, unitPriceCents: 800 },
+        { code: "03.02", description: "Encachado de piedra caliza 40/80 mm, e=15 cm, extendido y compactado", unit: "m²", quantity: 253.45, unitPriceCents: 1100 },
+        { code: "03.03", description: "Losa cimentación HA-25/B/30/IIa, e=25 cm, c=65 kg acero B500S/m³, acabado fratasado", unit: "m²", quantity: 253.45, unitPriceCents: 8200 },
+        { code: "03.04", description: "Solera HA-25/B/20/IIa, e=15 cm, pulido mecánico con cuarzo natural", unit: "m²", quantity: 253.45, unitPriceCents: 3000 },
+        { code: "03.05", description: "Impermeabilización bicapa: lámina oxiasfalto LO-40/FP + betún modificado Polytaber Combi 40 armada", unit: "m²", quantity: 253.45, unitPriceCents: 1700 },
+        { code: "03.06", description: "Cámara sanitaria ventilada con membrana HDPE + tubería dren Ø100 mm anti-radón DB-HS 6", unit: "m²", quantity: 253.45, unitPriceCents: 700 },
+        { code: "03.07", description: "Ventilación perimetral anti-radón: rejillas polietileno, conductos DN100 y radon-sumidero", unit: "pa", quantity: 1, unitPriceCents: 206955 },
+      ],
+    },
+    {
+      code: "04",
+      name: "Estructura Steel Frame e Ingeniería BIM",
+      lines: [
+        { code: "04.01", description: "Ingeniería BIM: Gemelo Digital 3D, cálculo estructural CTE DB-SE-A, Eurocódigo 3 perfiles conformados en frío", unit: "pa", quantity: 1, unitPriceCents: 850000 },
+        { code: "04.02", description: "Fabricación CNC paneles muros estructurales S350GD/Magnelis ZM310 (275 gr/m²) conf. EN10346", unit: "m²", quantity: 243.6, unitPriceCents: 14200 },
+        { code: "04.03", description: "Montaje estructura Steel Frame en obra: medios de elevación, fijación y mano de obra especializada", unit: "m²", quantity: 243.6, unitPriceCents: 3500 },
+        { code: "04.04", description: "Tornillería estructural Wurth LSF autoperforante, placas de anclaje y rigidizadores", unit: "pa", quantity: 1, unitPriceCents: 248000 },
+        { code: "04.05", description: "Forjado cubierta Thermochip TFbcY 12-80-12 (U=0,42 W/m²K), instalado sobre estructura", unit: "m²", quantity: 243.6, unitPriceCents: 4800 },
+        { code: "04.06", description: "Perfiles de arriostramiento diagonales S275 JR y placas base de nivelación", unit: "pa", quantity: 1, unitPriceCents: 60485 },
+      ],
+    },
+    {
+      code: "05",
+      name: "Envolvente Térmica — Paneles Thermochip",
+      changeNote: "Precio de mercado: fachada 88 → 98 €/m², cubierta 103 → 110 €/m².",
+      lines: [
+        { code: "05.01", description: "Panel Thermochip TFbcY 12-60-12 en cerramiento vertical fachada (U=0,72 W/m²K), instalado", unit: "m²", quantity: 300.96, unitPriceCents: 9800 },
+        { code: "05.02", description: "Panel Thermochip TFbcY 12-85-12 en cubierta (U=0,36 W/m²K), instalado sobre estructura", unit: "m²", quantity: 303.6, unitPriceCents: 11000 },
+        { code: "05.03", description: "Barrera de vapor líquida Blowerproof continua 0,50 kg/m² en juntas y perímetros", unit: "m²", quantity: 604.56, unitPriceCents: 920 },
+        { code: "05.04", description: "Trasdosados autoportantes 85mm/400 con lana de roca ISOVER estándar 40mm en estancias", unit: "m²", quantity: 195, unitPriceCents: 5200 },
+        { code: "05.05", description: "Trasdosados húmedos 85mm/400 con ISOVER Marine H1 hidrófugo en baños/cocina", unit: "m²", quantity: 45, unitPriceCents: 5800 },
+        { code: "05.06", description: "Cintas Tyvek, adhesivos, remates perimetrales y prueba de estanqueidad provisional", unit: "pa", quantity: 1, unitPriceCents: 510236 },
+      ],
+    },
+    {
+      code: "06",
+      name: "Fachada — Mortero Monocapa Proyectado + Pintura Acrílica Exterior",
+      changeNote: "Mortero 22 → 25 €/m²; vierteaguas 413 → 2.850 € (12–15 huecos en el BC3).",
+      lines: [
+        { code: "06.01", description: "Imprimación fijadora sobre panel Thermochip, aplicada a rodillo", unit: "m²", quantity: 300.96, unitPriceCents: 550 },
+        { code: "06.02", description: "Mortero monocapa proyectado Weber.pral Finish, e=10-15 mm, con malla fibra vidrio antiálcalis 160 g/m², maestras y rincones PVC, acabado raspado", unit: "m²", quantity: 300.96, unitPriceCents: 2500 },
+        { code: "06.03", description: "Pintura acrílica elastomérica impermeabilizante exterior, 2 manos + imprimación sobre mortero curado", unit: "m²", quantity: 300.96, unitPriceCents: 1100 },
+        { code: "06.04", description: "Vierteaguas aluminio lacado, perfiles de arranque, remates de coronación y alfeizares en todos los huecos", unit: "pa", quantity: 1, unitPriceCents: 285000 },
+      ],
+    },
+    {
+      code: "07",
+      name: "Cubiertas y Recogida de Aguas Pluviales",
+      changeNote: "Remates 1.628 → 4.200 €: 3 chimeneas, limahoyas, cumbrera y aleros, 303 m².",
+      lines: [
+        { code: "07.01", description: "Teja cerámica árabe de primera calidad, colocada con mortero sobre rastreles — MC confirma", unit: "m²", quantity: 303.6, unitPriceCents: 4500 },
+        { code: "07.02", description: "Rastreles de madera de pino tratado en autoclave 45×45 mm, fijados a tablero", unit: "m²", quantity: 303.6, unitPriceCents: 850 },
+        { code: "07.03", description: "Lámina impermeable transpirable Tyvek HomeWrap, fijada bajo rastreles", unit: "m²", quantity: 303.6, unitPriceCents: 680 },
+        { code: "07.04", description: "Canalones vistos aluminio lacado sección cuadrada D=300 mm con soportes y piezas de esquina", unit: "ml", quantity: 42, unitPriceCents: 3800 },
+        { code: "07.05", description: "Bajantes de aluminio lacado 70×100 mm con abrazaderas y codos", unit: "ml", quantity: 28, unitPriceCents: 3250 },
+        { code: "07.06", description: "Remates cumbrera, limahoyas, aleros en aluminio prelacado + 3 chimeneas y laterales", unit: "pa", quantity: 1, unitPriceCents: 420000 },
+      ],
+    },
+    {
+      code: "08",
+      name: "Tabiquería, Aislamientos y Falsos Techos",
+      lines: [
+        { code: "08.01", description: "Tabique autoportante doble 139mm/400: 2×Pladur N 12,5mm + lana roca ISOVER estándar 65mm", unit: "m²", quantity: 185, unitPriceCents: 9500 },
+        { code: "08.02", description: "Tabique húmedo 139mm/400: 2×Pladur H1 12,5mm + lana roca Marine H1 65mm baños/cocina", unit: "m²", quantity: 52, unitPriceCents: 10800 },
+        { code: "08.03", description: "Falso techo Placo Prima F-530 BA 12,5mm + lana mineral ISOVER 40mm, perfilería suspendida", unit: "m²", quantity: 165, unitPriceCents: 2300 },
+        { code: "08.04", description: "Falso techo húmedo GlasRoc X 12,5mm + lana mineral hidrófuga 40mm en baños", unit: "m²", quantity: 32, unitPriceCents: 2700 },
+        { code: "08.05", description: "Formación frente chimenea/TV con doble placa Pladur y refuerzo de perfil metálico", unit: "pa", quantity: 1, unitPriceCents: 68022 },
+      ],
+    },
+    {
+      code: "09",
+      name: "Revestimientos Interiores, Pavimentos y Pintura",
+      lines: [
+        { code: "09.01", description: "Solado gres porcelánico gran formato imitación madera Clase 1 (120×20 cm), adhesivo C2TES1 y rejuntado Kerajoint", unit: "m²", quantity: 165, unitPriceCents: 6500 },
+        { code: "09.02", description: "Alicatado Porcelanosa (colección a confirmar por el promotor) en zonas húmedas, C2TES1 y perfil esquina acero inox", unit: "m²", quantity: 68, unitPriceCents: 9500 },
+        { code: "09.03", description: "Recrecido con mortero autonivelante CT-C5-F2, e=5 cm, sobre losa, con malla antifisuración", unit: "m²", quantity: 208.25, unitPriceCents: 950 },
+        { code: "09.04", description: "Pintura de grafeno Graphenstone o equiv. (blanca, 2 manos), plastecido e imprimación en paramentos y techos", unit: "m²", quantity: 556.53, unitPriceCents: 280 },
+        { code: "09.05", description: "Rodapié gres porcelánico a juego (10×60 cm) en zonas con pavimento", unit: "ml", quantity: 110, unitPriceCents: 1200 },
+        { code: "09.06", description: "Platos de ducha de obra + impermeabilización Weber.sys Aqua + conexión desagüe y encuentros", unit: "pa", quantity: 1, unitPriceCents: 45834 },
+      ],
+    },
+    {
+      code: "10",
+      name: "Carpintería Exterior y Acristalamientos",
+      lines: [
+        { code: "10.01", description: "Ventanas PVC Antracita 5 cámaras, triple vidrio 4/12/4/12/4 argón + BE (Uh=0,8 W/m²K), Clase 4/E-1200/C5 — lote completo vivienda", unit: "lote", quantity: 1, unitPriceCents: 2085000 },
+        { code: "10.02", description: "Puerta entrada acorazada PVC antracita, 6 puntos de anclaje, triple vidrio, clasificación RC2", unit: "ud", quantity: 1, unitPriceCents: 248000 },
+        { code: "10.03", description: "Persianas térmicas aluminio con rotura de puente térmico, motorizadas — lote completo", unit: "lote", quantity: 1, unitPriceCents: 285000 },
+        { code: "10.04", description: "Sellado perimetral estanqueidad Blowerproof Brush en todos los encuentros carpintería-fachada", unit: "pa", quantity: 1, unitPriceCents: 35500 },
+      ],
+    },
+    {
+      code: "11",
+      name: "Carpintería Interior y Protecciones",
+      lines: [
+        { code: "11.01", description: "Puertas de paso macizas de haya vaporizada lacadas blanco mate, 40 mm de canto — calidad contrastada con tablero macizo", unit: "ud", quantity: 9, unitPriceCents: 82000 },
+        { code: "11.02", description: "Herrajes completos de acero inoxidable: manivelas, pernios, topes y escudos por puerta", unit: "ud", quantity: 9, unitPriceCents: 11000 },
+        { code: "11.03", description: "Armarios empotrados con frente lacado, interior forrado melamina blanca y cajonería soft-close completa — 2 dormitorios (dormitorio principal con vestidor)", unit: "pa", quantity: 1, unitPriceCents: 480000 },
+        { code: "11.04", description: "Puerta corredera 92 cm con armazón oculto en tabiquería y cierre amortiguado", unit: "ud", quantity: 1, unitPriceCents: 68000 },
+        { code: "11.05", description: "Puerta de paso vestidor/despacho lacada blanco mate, 72 cm", unit: "ud", quantity: 1, unitPriceCents: 42000 },
+        { code: "11.06", description: "Medios auxiliares, transporte a obra, colocación, ajustes y retapados de carpintería interior", unit: "pa", quantity: 1, unitPriceCents: 223000 },
+      ],
+    },
+    {
+      code: "12",
+      name: "Fontanería y Aparatos Sanitarios",
+      lines: [
+        { code: "12.01", description: "Acometida PE100 DN32 PN16 desde red municipal + contador DN13 + llaves de paso generales y válvulas de retención", unit: "ud", quantity: 1, unitPriceCents: 78000 },
+        { code: "12.02", description: "Descalcificador de resinas en acometida — MC especifica expresamente por dureza del agua", unit: "ud", quantity: 1, unitPriceCents: 68000 },
+        { code: "12.03", description: "Red distribución agua fría y caliente Uponor PERT-AL-PERT Ø16-20 mm con colectores independientes inox DN32 por estancia", unit: "pa", quantity: 1, unitPriceCents: 320000 },
+        { code: "12.04", description: "Inodoro suspendido Roca Hall Rimless + cisterna empotrada Geberit Sigma 8 o Viega Prevista Dry + pulsador cromo", unit: "ud", quantity: 3, unitPriceCents: 128000 },
+        { code: "12.05", description: "Lavabo Roca Hall o equiv. premium + mueble suspendido lacado y encimera mineral — 3 baños completos", unit: "ud", quantity: 3, unitPriceCents: 62000 },
+        { code: "12.06", description: "Grifería monomando ATAI o equiv. premium, acabado cromo o negro mate — lote completo 3 baños + cocina + ducha", unit: "lote", quantity: 1, unitPriceCents: 240000 },
+        { code: "12.07", description: "Platos de ducha extraplanos cerámicos + canaleta Guru Evolux 30 mm con sifón y válvula de vaciado", unit: "ud", quantity: 2, unitPriceCents: 68000 },
+        { code: "12.08", description: "Grifo exterior jardín + boca de riego empotrada + conexión AFS + prueba de estanqueidad de toda la red + ayudas", unit: "pa", quantity: 1, unitPriceCents: 338000 },
+      ],
+    },
+    {
+      code: "13",
+      name: "Electricidad, Iluminación y Telecomunicaciones",
+      lines: [
+        { code: "13.01", description: "Cuadro general protección Legrand 48 elementos, CGP 250A, diferenciales superinmunizados clase A", unit: "ud", quantity: 1, unitPriceCents: 185000 },
+        { code: "13.02", description: "Electrificación elevada 9,2 kW: cableado BT libre halógenos Ø1,5-6 mm², canalizaciones corrugadas, circuitos completos", unit: "pa", quantity: 1, unitPriceCents: 568000 },
+        { code: "13.03", description: "Mecanismos Niessen Arco (Simon) en toda la vivienda: interruptores, conmutadores, bases Schuko — lote completo", unit: "lote", quantity: 1, unitPriceCents: 312000 },
+        { code: "13.04", description: "Preinstalación solar fotovoltaica: tubo corrugado DN50, caja conexión exterior IP65 y reserva en cuadro", unit: "pa", quantity: 1, unitPriceCents: 98000 },
+        { code: "13.05", description: "Punto recarga VE monofásico 7,4 kW (32A) con circuito independiente y protecciones", unit: "ud", quantity: 1, unitPriceCents: 78000 },
+        { code: "13.06", description: "Portero videoeléctrico con monitor interior color, placa exterior antivandálica y apertura eléctrica", unit: "ud", quantity: 1, unitPriceCents: 62000 },
+        { code: "13.07", description: "Toma de tierra: pica acero cobrizado + conductor desnudo 35 mm² + arqueta de comprobación, conf. REBT", unit: "pa", quantity: 1, unitPriceCents: 52000 },
+        { code: "13.08", description: "Red telecomunicaciones: RTR 50×60 cm, 5×RJ45 Cat.6, 3×TV/FM+SAT, cableado y canalizaciones", unit: "pa", quantity: 1, unitPriceCents: 135260 },
+      ],
+    },
+    {
+      code: "14",
+      name: "Climatización — Aerotermia Mitsubishi Ecodan + ACS + VMC",
+      lines: [
+        { code: "14.01", description: "Bomba de calor Mitsubishi Electric Ecodan R32 A+++ a 35°C, unidad exterior + hidráulica interior, control WT-MD200", unit: "ud", quantity: 1, unitPriceCents: 785000 },
+        { code: "14.02", description: "Acumulador ACS 200 L inox + vaso expansión 18 L + grupo seguridad + válvulas de corte", unit: "ud", quantity: 1, unitPriceCents: 168000 },
+        { code: "14.03", description: "Suelo radiante Uponor AQUA PLUS PEX-a Ø16 mm + colector inox DN32 10 vías + actuadores termoeléctricos", unit: "m²", quantity: 208.25, unitPriceCents: 2400 },
+        { code: "14.04", description: "Distribución hidráulica del sistema: tuberías multicapa, aislamiento, bomba circulación y manómetro", unit: "pa", quantity: 1, unitPriceCents: 248000 },
+        { code: "14.05", description: "VMC doble flujo recuperador HCC2 PLA 50-200 m³/h + bypass verano + filtro F7 HEPA + sondas CO₂", unit: "ud", quantity: 1, unitPriceCents: 385000 },
+        { code: "14.06", description: "Red VMC: conductos DN125/75, codos, silenciadores acústicos, bocas impulsión/extracción con rejilla regulable", unit: "pa", quantity: 1, unitPriceCents: 298000 },
+        { code: "14.07", description: "Termostatos digitales programables WiFi por estancia (6 unidades)", unit: "ud", quantity: 6, unitPriceCents: 10500 },
+        { code: "14.08", description: "Puesta en marcha, equilibrado hidráulico/aéreo, ajuste VMC y verificación completa del sistema", unit: "pa", quantity: 1, unitPriceCents: 63765 },
+      ],
+    },
+    {
+      code: "15",
+      name: "Urbanización, Varios y Limpieza Final",
+      lines: [
+        { code: "15.01", description: "Pavimento acceso vehicular HA-25 semipulido árido al descubierto, e=15 cm, sobre zahorra compactada", unit: "m²", quantity: 60, unitPriceCents: 4800 },
+        { code: "15.02", description: "Remates perimetrales de vivienda + conexión saneamiento exterior y acometidas definitivas", unit: "pa", quantity: 1, unitPriceCents: 215000 },
+        { code: "15.03", description: "Ayudas de albañilería a todas las instalaciones: rozas, huecos, tacos, remonte y sellado de pasos", unit: "pa", quantity: 1, unitPriceCents: 280000 },
+        { code: "15.04", description: "Extintor polvo ABC 6 kg + soporte mural + señalización fotoluminiscente de emergencia", unit: "pa", quantity: 1, unitPriceCents: 28000 },
+        { code: "15.05", description: "Buzón normalizado con cerradura + señalización número vivienda en acero inoxidable", unit: "pa", quantity: 1, unitPriceCents: 18000 },
+        { code: "15.06", description: "Retirada de medios auxiliares, andamios y vallado de obra", unit: "pa", quantity: 1, unitPriceCents: 109202 },
+        { code: "15.07", description: "Limpieza final de obra, clasificación y gestión de residuos de construcción (RCD) a planta autorizada", unit: "pa", quantity: 1, unitPriceCents: 80000 },
+      ],
+    },
+    {
+      code: "17",
+      name: "Partida Alzada de Remates y Coordinación Final de Obra",
+      changeNote: "5 % del PEC base (426.861,95 €), a justificar.",
+      lines: [
+        { code: "17.01", description: "Partida alzada a justificar para remates finales de obra, nivelación y ajuste de elementos ejecutados, coordinación entre oficios, comprobación de encuentros entre partidas, adaptación de soluciones constructivas a la realidad de la obra, pequeñas modificaciones necesarias para la correcta terminación de los trabajos, regularización de superficies, repasos, sellados, remates de albañilería, carpintería, revestimientos e instalaciones, así como cuantos medios auxiliares, mano de obra y materiales sean necesarios para la perfecta terminación de la actuación y entrega de la obra completamente terminada y en correcto estado de funcionamiento.", unit: "pa", quantity: 1, unitPriceCents: 2134310 },
+      ],
+    },
+    {
+      code: "16",
+      name: "Seguridad y Salud + Control de Calidad + Gestión RCD",
+      changeNote: "Obligatorio (RD 1627/1997 y RD 105/2008). Estaba en el BC3, faltaba en Rev.2.",
+      lines: [
+        { code: "16.01", description: "Elaboración y aprobación del Plan de Seguridad y Salud — RD 1627/1997, art. 7", unit: "pa", quantity: 1, unitPriceCents: 220000 },
+        { code: "16.02", description: "Coordinador de Seguridad y Salud en fase de ejecución", unit: "pa", quantity: 1, unitPriceCents: 210000 },
+        { code: "16.03", description: "Control de calidad: ensayos hormigón HA-25, acero B500S, impermeabilización, prueba Blower Door", unit: "pa", quantity: 1, unitPriceCents: 240000 },
+        { code: "16.04", description: "Gestión y transporte de residuos RCD a planta autorizada — RD 105/2008 — BC3 Cap.20", unit: "pa", quantity: 1, unitPriceCents: 200000 },
+      ],
+    },
+  ] satisfies SeedChapter[],
+};

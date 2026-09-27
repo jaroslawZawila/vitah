@@ -26,6 +26,11 @@ export function fail(code: DocumentError | PhotoError): never {
   throw new CoreError(code, STATUS[code]);
 }
 
+/** Whether the file really is a PDF: the browser-supplied type can't be trusted. */
+export async function isPdf(file: Blob) {
+  return (await file.slice(0, 5).text()) === "%PDF-";
+}
+
 /** Where a project's files live; everything under it belongs to the project. */
 export const projectFolder = (tenantId: string, projectId: string) =>
   `tenants/${tenantId}/projects/${projectId}/`;
@@ -39,12 +44,14 @@ export function requireFileManager(ctx: Ctx) {
   if (!canManageProjectFiles(ctx.role)) fail("forbidden");
 }
 
+/** The project, if it is in the tenant, with what the obra needs of it. */
 export async function requireProject(tenantId: string, projectId: string) {
   const project = await db.query.projects.findFirst({
     where: projectInTenant(tenantId, projectId),
-    columns: { id: true },
+    columns: { id: true, obraStage: true, startDate: true, completionDate: true },
   });
   if (!project) fail("project_not_found");
+  return project;
 }
 
 type NewFile = { pathname: string; body: Blob; contentType: string };

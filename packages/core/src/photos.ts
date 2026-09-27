@@ -1,7 +1,8 @@
-import { and, db, desc, eq, gt, ne, projectPhotos, projects, users } from "@repo/db";
+import { and, db, desc, eq, gt, isNotNull, ne, projectPhotos, projects, users } from "@repo/db";
 import type { Ctx } from "./context";
 import {
   MAX_CAPTION_LENGTH,
+  MAX_CHAPTER_CODE,
   MAX_PHOTO_BYTES,
   PHOTO_TYPES,
   type MobilePhoto,
@@ -10,6 +11,7 @@ import {
   type ProjectPhoto,
 } from "./contract";
 import { notifyProjectClient } from "./notifications";
+import type { PhotosByChapter } from "./obra-calc";
 import {
   fail,
   openStoredFile,
@@ -89,13 +91,20 @@ function toMobilePhoto({ createdAt, ...photo }: PhotoRow): MobilePhoto {
   return { ...photo, uploadedAt: createdAt.toISOString() };
 }
 
-/** Body (multipart form): { file, caption? } — file is a JPEG, PNG or WebP of at most 4 MB. */
+/**
+ * Body (multipart form): { file, caption?, chapterCode? } — file is a JPEG, PNG
+ * or WebP of at most 4 MB; chapterCode the budget chapter it shows.
+ */
 export async function addPhoto(ctx: Ctx, projectId: string, input: Record<string, unknown>) {
   requireFileManager(ctx);
 
   const { file } = input;
   const caption =
     typeof input.caption === "string" ? input.caption.trim().slice(0, MAX_CAPTION_LENGTH) : "";
+  const chapterCode =
+    typeof input.chapterCode === "string"
+      ? input.chapterCode.trim().slice(0, MAX_CHAPTER_CODE)
+      : "";
   if (!(file instanceof Blob) || file.size === 0) fail("missing_file");
   if (file.size > MAX_PHOTO_BYTES) fail("file_too_large");
   const [image] = await Promise.all([readImage(file), requireProject(ctx.tenantId, projectId)]);
@@ -116,6 +125,7 @@ export async function addPhoto(ctx: Ctx, projectId: string, input: Record<string
         tenantId: ctx.tenantId,
         projectId,
         caption: caption || null,
+        chapterCode: chapterCode || null,
         pathname,
         contentType,
         sizeBytes: file.size,
@@ -137,7 +147,12 @@ export async function addPhoto(ctx: Ctx, projectId: string, input: Record<string
   return { photoId: id };
 }
 
-export async function listPhotos(ctx: Ctx, projectId: string): Promise<ProjectPhoto[]> {
+/** The project's photos, newest first; only one budget chapter's with `chapterCode`. */
+export async function listPhotos(
+  ctx: Ctx,
+  projectId: string,
+  { chapterCode }: { chapterCode?: string } = {},
+): Promise<ProjectPhoto[]> {
   const [, rows] = await Promise.all([
     requireProject(ctx.tenantId, projectId),
     db
@@ -145,7 +160,11 @@ export async function listPhotos(ctx: Ctx, projectId: string): Promise<ProjectPh
       .from(projectPhotos)
       .leftJoin(users, eq(users.id, projectPhotos.uploadedById))
       .where(
-        and(eq(projectPhotos.projectId, projectId), eq(projectPhotos.tenantId, ctx.tenantId)),
+        and(
+          eq(projectPhotos.projectId, projectId),
+          eq(projectPhotos.tenantId, ctx.tenantId),
+          chapterCode === undefined ? undefined : eq(projectPhotos.chapterCode, chapterCode),
+        ),
       )
       .orderBy(desc(projectPhotos.createdAt)),
   ]);
@@ -255,4 +274,32 @@ export async function openClientPhoto(
     .innerJoin(projects, clientProject(tenantId, clientUserId))
     .where(eq(projectPhotos.id, photoId));
   return openFile(photo, size);
+}
+
+/** A project's photos tagged with a budget chapter, by chapter (for the obra). */
+export async function photosByChapter(
+  tenantId: string,
+  projectId: string,
+): Promise<PhotosByChapter> {
+  const rows = await db
+    .select({
+      id: projectPhotos.id,
+      chapterCode: projectPhotos.chapterCode,
+      createdAt: projectPhotos.createdAt,
+    })
+    .from(projectPhotos)
+    .where(
+      and(
+        eq(projectPhotos.projectId, projectId),
+        eq(projectPhotos.tenantId, tenantId),
+        isNotNull(projectPhotos.chapterCode),
+      ),
+    );
+  const byChapter: PhotosByChapter = new Map();
+  for (const { id, chapterCode, createdAt } of rows) {
+    const list = byChapter.get(chapterCode!) ?? [];
+    list.push({ id, createdAt: createdAt.getTime() });
+    byChapter.set(chapterCode!, list);
+  }
+  return byChapter;
 }

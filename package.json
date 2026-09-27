@@ -13,7 +13,7 @@
     "db:push": "turbo run db:push --filter=@repo/db",
     "db:generate": "turbo run db:generate --filter=@repo/db",
     "db:migrate": "turbo run db:migrate --filter=@repo/db",
-    "db:seed": "turbo run db:seed --filter=@repo/db",
+    "db:seed": "turbo run db:seed --filter=@repo/core",
     "db:studio": "turbo run db:studio --filter=@repo/db",
     "db:setup": "docker compose up -d && sleep 2 && pnpm db:push && pnpm db:seed"
   },

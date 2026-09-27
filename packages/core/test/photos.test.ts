@@ -113,6 +113,18 @@ describe("addPhoto", () => {
     expect(row?.pathname).toMatch(new RegExp(`/${photoId}\\.${extension}$`));
   });
 
+  it("tags the photo with the budget chapter it shows", async () => {
+    const { project, ctx } = await setup();
+
+    const { photoId } = await upload(ctx, project.id, { chapterCode: " 05 " });
+    await upload(ctx, project.id);
+
+    const row = await db.query.projectPhotos.findFirst({ where: eq(projectPhotos.id, photoId) });
+    expect(row?.chapterCode).toBe("05");
+    const tagged = await svc.listPhotos(ctx, project.id, { chapterCode: "05" });
+    expect(tagged.map((p) => p.id)).toEqual([photoId]);
+  });
+
   it("stores a blank caption as none", async () => {
     const { project, ctx } = await setup();
 

@@ -12,3 +12,6 @@ export * as documentsService from "./documents";
 export * as photosService from "./photos";
 export { canManageProjectFiles, type StoredFile } from "./project-files";
 export * as clientAccountService from "./client-account";
+export * as budgetService from "./budget";
+export * as hitosService from "./hitos";
+export * as obraService from "./obra";

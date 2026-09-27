@@ -17,6 +17,16 @@ export {
   projectPhotos,
   clientSettings,
   pushTokens,
+  budgetRevisions,
+  budgetChapters,
+  budgetLines,
+  obraHitos,
+  obraHitoChapters,
+  obraHitoChecks,
+  obraHitoPhotos,
 } from "./schema";
-export { eq, ne, gt, and, desc, asc, sql, count, sum, inArray, isNull, isNotNull, type SQL } from "drizzle-orm";
+export { seedConfig } from "./seed-config";
+export type { AnyColumn } from "drizzle-orm";
+export type { PgTable } from "drizzle-orm/pg-core";
+export { eq, ne, gt, lt, and, or, desc, asc, sql, count, sum, inArray, isNull, isNotNull, max, type SQL } from "drizzle-orm";
 

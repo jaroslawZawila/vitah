@@ -167,3 +167,213 @@ export type AccountError =
   | "invalid_settings"
   | "invalid_token"
   | "not_found";
+
+// ─── Obra: budget, progress and payment hitos ────────────────────────────────
+// features/construction_process/PROCESS.md. Money is in euro cents; `…Pct` are
+// whole percents; `…Bp` are basis points (13 % = 1300). Dates are YYYY-MM-DD.
+
+/** Stages of the construction process, 1–8 (PROCESS.md §2). */
+export const OBRA_STAGES = [1, 2, 3, 4, 5, 6, 7, 8] as const;
+export type ObraStage = (typeof OBRA_STAGES)[number];
+/** Stage 6: the works themselves, from the acta de inicio. */
+export const EXECUTION_STAGE: ObraStage = 6;
+
+export type BudgetRevisionStatus = "draft" | "accepted" | "superseded";
+/** A chapter's, phase's or line's progress. */
+export type ProgressStatus = "pending" | "active" | "done";
+/**
+ * A payment hito: work under way → ready for its acta (chapters at 100 % and
+ * checks done) → acta signed → invoiced → paid.
+ */
+export type HitoStatus = "pending" | "active" | "ready" | "signed" | "invoiced" | "paid";
+export type HitoFileKind = "acta" | "invoice";
+
+/** Longest budget chapter or line code ("05", "05.01"); also tags photos. */
+export const MAX_CHAPTER_CODE = 20;
+
+/** A budget line (partida) as entered: `quantity` has up to 3 decimals. */
+export type NewBudgetLine = {
+  code: string;
+  description: string;
+  unit: string;
+  quantity: number;
+  unitPriceCents: number;
+};
+
+export type BudgetLine = NewBudgetLine & {
+  id: string;
+  amountCents: number;
+  executedPct: number;
+};
+
+/** How a chapter changed against the previous revision (★ up, ✦ new). */
+export type ChapterChange = "up" | "down" | "new" | null;
+
+export type BudgetChapter = {
+  id: string;
+  code: string;
+  name: string;
+  changeNote: string | null;
+  totalCents: number;
+  executedCents: number;
+  progressPct: number;
+  status: ProgressStatus;
+  /** Share of the revision's total, in basis points. */
+  shareBp: number;
+  /** The same chapter's total in the previous revision; null when it is new. */
+  previousTotalCents: number | null;
+  change: ChapterChange;
+  /** The hito that closes this chapter, if any. */
+  hitoCode: string | null;
+  lines: BudgetLine[];
+};
+
+export type BudgetRevisionSummary = {
+  id: string;
+  number: number;
+  status: BudgetRevisionStatus;
+  totalCents: number;
+  /** ISO timestamp. */
+  acceptedAt: string | null;
+};
+
+export type BudgetRevision = BudgetRevisionSummary & {
+  reference: string | null;
+  vatRateBp: number;
+  vatCents: number;
+  builtAreaM2: number | null;
+  usefulAreaM2: number | null;
+  exclusions: string[];
+  /** The revision before this one, to compare with. */
+  previous: { number: number; totalCents: number } | null;
+  /** Chapters of the previous revision that this one dropped. */
+  removedChapters: { code: string; name: string; totalCents: number }[];
+  chapters: BudgetChapter[];
+};
+
+/** GET /api/v1/projects/:id/budget: all revisions and one of them in full. */
+export type ProjectBudget = {
+  revisions: BudgetRevisionSummary[];
+  revision: BudgetRevision | null;
+};
+
+export type Hito = {
+  id: string;
+  code: string;
+  name: string;
+  pctBp: number;
+  /** % × the budget's total, without VAT. */
+  amountCents: number;
+  vatCents: number;
+  scope: string;
+  billingMoment: string;
+  status: HitoStatus;
+  /** How far its chapters are, weighted by their amounts. */
+  readyPct: number;
+  chapters: { code: string; name: string; totalCents: number; progressPct: number }[];
+  checks: { id: string; label: string; done: boolean }[];
+  /** Photos of the acta fotográfica. */
+  photoIds: string[];
+  /** Set while the signed acta (PDF) is uploaded. */
+  actaSignedOn: string | null;
+  /** Set while the invoice (PDF) is uploaded. */
+  invoicedOn: string | null;
+  /** 5 business days after the acta (or the invoice, without one). */
+  dueOn: string | null;
+  paidOn: string | null;
+  paidAmountCents: number | null;
+};
+
+/** The works' calendar: from the project's start date to its completion date. */
+export type ObraTerm = {
+  startDate: string;
+  completionDate: string;
+  /** Week of the works today (1…); 0 before they start. */
+  week: number;
+  totalWeeks: number;
+  /** Days past the completion date. */
+  lateDays: number;
+  /** Contract penalty for the delay so far (cl. 4ª). */
+  penaltyCents: number;
+};
+
+/** GET /api/v1/projects/:id/obra: the Obra page. */
+export type ProjectObra = {
+  stage: ObraStage;
+  /** The accepted revision, or null before one is accepted. */
+  budget: {
+    revisionId: string;
+    number: number;
+    reference: string | null;
+    totalCents: number;
+    vatRateBp: number;
+    acceptedAt: string | null;
+  } | null;
+  executedCents: number;
+  progressPct: number;
+  paidCents: number;
+  invoicedUnpaidCents: number;
+  term: ObraTerm | null;
+  chapters: Omit<BudgetChapter, "lines" | "id" | "previousTotalCents" | "change" | "changeNote">[];
+  hitos: Hito[];
+};
+
+/** A phase of the app's Obra tab: the pre-construction steps, then one per hito. */
+export type MobilePhase = {
+  /** "pre", or the hito's code. */
+  key: string;
+  /** The hito's name; null for "pre" (the app names it). */
+  name: string | null;
+  status: ProgressStatus;
+  progressPct: number;
+  finishedOn: string | null;
+  hitoId: string | null;
+  chapters: { code: string; name: string; totalCents: number; progressPct: number }[];
+  checks: { label: string; done: boolean }[];
+  /** Newest photos of its chapters (up to 3), and how many there are. */
+  photoIds: string[];
+  photoCount: number;
+};
+
+/** GET /api/mobile/obra. */
+export type MobileObra = {
+  stage: ObraStage;
+  progressPct: number;
+  totalCents: number;
+  vatRateBp: number;
+  paidCents: number;
+  term: Pick<ObraTerm, "startDate" | "completionDate" | "week" | "totalWeeks" | "lateDays"> | null;
+  phases: MobilePhase[];
+  hitos: Hito[];
+};
+
+/** Error codes of the obra services (`{ error: code }` in the API). */
+export type ObraError =
+  | "missing_fields"
+  | "invalid_input"
+  | "invalid_stage"
+  | "invalid_date"
+  | "duplicate_code"
+  | "budget_exists"
+  | "draft_exists"
+  | "no_budget"
+  | "not_draft"
+  | "not_accepted"
+  | "missing_file"
+  | "invalid_file_type"
+  | "file_too_large"
+  | "project_not_found"
+  | "not_found"
+  | "forbidden";
+
+/**
+ * A line's amount: quantity (in thousandths, as stored) × unit price, rounded
+ * to the cent. Budget totals in SQL (core budget.ts) round the same way.
+ */
+export function amountCents(quantityMilli: number, unitPriceCents: number): number {
+  return Math.round((quantityMilli * unitPriceCents) / 1000);
+}
+
+/** A line's amount from a quantity as entered (up to 3 decimals). */
+export const lineAmountCents = (quantity: number, unitPriceCents: number) =>
+  amountCents(Math.round(quantity * 1000), unitPriceCents);

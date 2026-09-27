@@ -4,6 +4,7 @@ import postgres from "postgres";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { and, eq } from "drizzle-orm";
 import * as schema from "./schema";
+import { seedConfig } from "./seed-config";
 
 async function seed() {
   const connectionString = process.env.POSTGRES_URL;
@@ -14,9 +15,7 @@ async function seed() {
   const client = postgres(connectionString);
   const db = drizzle(client, { schema });
 
-  const tenantName = process.env.SEED_TENANT_NAME ?? "ViTAH Santander";
-  const tenantSlug = tenantName.toLowerCase().replace(/\s+/g, "-");
-  const email = process.env.SEED_ADMIN_EMAIL ?? "admin@vitah.es";
+  const { tenantName, tenantSlug, email, projectRef } = seedConfig();
   const password = process.env.SEED_ADMIN_PASSWORD ?? "vitah2026";
   const name = process.env.SEED_ADMIN_NAME ?? "ViTAH Admin";
 
@@ -65,7 +64,6 @@ async function seed() {
 
   // --- Seed a project ---
 
-  const projectRef = "VTH-26-001";
   const [project] = await db
     .insert(schema.projects)
     .values({

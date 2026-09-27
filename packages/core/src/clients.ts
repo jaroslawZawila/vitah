@@ -1,5 +1,6 @@
 import { and, asc, clientProfiles, db, eq, isClientUser, users } from "@repo/db";
 import { EMAIL_PATTERN, hashPassword, isUniqueViolation, normalizeEmail } from "./accounts";
+import { isCalendarDate } from "./calendar";
 import { requireAdmin, type Ctx } from "./context";
 import { MIN_PASSWORD_LENGTH, type ClientError, type ClientListItem } from "./contract";
 import { CoreError } from "./errors";
@@ -36,19 +37,13 @@ function optional(value: unknown): string | null {
   return text(value) || null;
 }
 
-const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const PHONE_PATTERN = /^\+?[0-9][0-9 ()-]{5,19}$/;
 
 /** YYYY-MM-DD that is a real calendar date, not in the future. */
 function dateOfBirth(value: unknown): string | null {
   const raw = optional(value);
   if (raw === null) return null;
-  const parsed = new Date(`${raw}T00:00:00Z`);
-  const valid =
-    DATE_PATTERN.test(raw) &&
-    !Number.isNaN(parsed.getTime()) &&
-    parsed.toISOString().slice(0, 10) === raw && // rejects 2026-02-31
-    parsed.getTime() <= Date.now();
+  const valid = isCalendarDate(raw) && Date.parse(`${raw}T00:00:00Z`) <= Date.now();
   if (!valid) fail("invalid_date_of_birth");
   return raw;
 }

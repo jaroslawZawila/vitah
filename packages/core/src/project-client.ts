@@ -1,5 +1,6 @@
 import { and, asc, db, eq, isClientUser, isNotNull, isNull, projects, users } from "@repo/db";
 import { isUniqueViolation } from "./accounts";
+import { toCalendarDate } from "./calendar";
 import { requireAdmin, type Ctx } from "./context";
 import type { ClientOption, MobileProject, ProjectClientError } from "./contract";
 import { CoreError } from "./errors";
@@ -29,12 +30,13 @@ function text(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function toCalendarDate(date: Date | null): string | null {
-  return date ? date.toISOString().slice(0, 10) : null;
-}
-
 export function projectInTenant(tenantId: string, projectId: string) {
   return and(eq(projects.id, projectId), eq(projects.tenantId, tenantId));
+}
+
+/** The project attached to a mobile-app client. */
+export function clientProjectWhere(tenantId: string, clientUserId: string) {
+  return and(eq(projects.tenantId, tenantId), eq(projects.clientUserId, clientUserId));
 }
 
 /**
@@ -46,7 +48,7 @@ export async function getClientProject(
   clientUserId: string,
 ): Promise<MobileProject | null> {
   const project = await db.query.projects.findFirst({
-    where: and(eq(projects.tenantId, tenantId), eq(projects.clientUserId, clientUserId)),
+    where: clientProjectWhere(tenantId, clientUserId),
     columns: { id: true, ref: true, address: true, startDate: true, completionDate: true },
   });
   if (!project) return null;
@@ -60,7 +62,7 @@ export async function getClientProject(
   };
 }
 
-type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+export type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 /**
  * Throws `client_not_found` unless `clientId` is an active client of the

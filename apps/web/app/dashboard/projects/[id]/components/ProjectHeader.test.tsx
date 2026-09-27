@@ -23,6 +23,7 @@ const project: ProjectDetail = {
   address: "Calle Mayor 1, Santander",
   startDate: new Date("2026-03-01T00:00:00Z"),
   completionDate: null,
+  obraStage: 1,
   clientUserId: null,
   client: null,
   createdAt: new Date("2026-01-01T00:00:00Z"),
