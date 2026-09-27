@@ -20,6 +20,9 @@
     ],
     "setupFiles": [
       "./test-utils/setup.ts"
+    ],
+    "setupFilesAfterEnv": [
+      "./test-utils/setup-after-env.ts"
     ]
   },
   "dependencies": {

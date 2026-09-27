@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# PreToolUse hook: block `git commit` unless tests, type checks and lint are green.
+# PreToolUse hook: block `git commit` unless tests, type checks and lint are green
+# and the portal's production build (`next build`) succeeds.
 # Exit 2 blocks the tool call and feeds stderr back to Claude.
 set -uo pipefail
 
@@ -16,6 +17,16 @@ if ! "${pnpm[@]}" exec turbo run test check-types lint --output-logs=errors-only
   {
     echo "Commit blocked: tests, type checks or lint are failing. Fix them, then commit again."
     echo "(DB tests need Postgres: pnpm db:up)"
+    tail -n 80 "$log"
+  } >&2
+  rm -f "$log"
+  exit 2
+fi
+# `next build` catches what tsc and lint don't (e.g. a type re-export from a "use server" file).
+# Turbo caches it, so an unchanged portal doesn't rebuild. Env comes from apps/web/.env.local.
+if ! "${pnpm[@]}" exec turbo run build --filter=web --output-logs=errors-only >"$log" 2>&1; then
+  {
+    echo "Commit blocked: the portal's production build (next build) fails. Fix it, then commit again."
     tail -n 80 "$log"
   } >&2
   rm -f "$log"

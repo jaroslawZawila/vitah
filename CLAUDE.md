@@ -60,9 +60,10 @@ Every change goes through this, in order. Nothing gets committed until every ste
    `/api/v1` routes (Vitest), and mobile (jest-expo). Cover the happy path, errors and tenant isolation.
 3. **Review and simplify.** Run `/simplify` on the diff, then `/code-review`, and fix what they find.
    Re-run the tests afterwards.
-4. **Green, then commit.** `pnpm test`, `pnpm exec turbo check-types` and `pnpm exec turbo lint` must all
-   pass (DB tests need `pnpm db:up`). A Claude Code hook (`.claude/hooks/commit-gate.sh`) runs all
-   three on every `git commit` and blocks the commit if any of them fail. Never bypass it or skip failing tests.
+4. **Green, then commit.** `pnpm test`, `pnpm exec turbo check-types`, `pnpm exec turbo lint` and the
+   portal build (`pnpm exec turbo build --filter=web`) must all pass (DB tests need `pnpm db:up`). A Claude
+   Code hook (`.claude/hooks/commit-gate.sh`) runs all four on every `git commit` and blocks the commit if
+   any of them fail. Never bypass it or skip failing tests.
 
 ## Tech Stack
 
