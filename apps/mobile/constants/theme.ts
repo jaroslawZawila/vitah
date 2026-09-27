@@ -29,6 +29,8 @@ export const type = {
   /** List rows and card text (15). */
   row: { fontSize: 15, fontWeight: "400", color: colors.blancoCalido },
   subhead: { fontSize: 15, fontWeight: "400", color: colors.muted },
+  /** Secondary lines under a row (13, muted). */
+  meta: { fontSize: 13, fontWeight: "400", lineHeight: 19, color: colors.muted },
   label: {
     fontSize: 11,
     fontWeight: "500",

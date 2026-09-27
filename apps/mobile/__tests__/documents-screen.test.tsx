@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 import { Alert } from "react-native";
-import DocumentsScreen from "../app/(app)/documents";
+import DocumentsScreen from "../app/(app)/(tabs)/documents";
 import type { LocalDocument } from "../lib/document-store";
 import { useDocuments } from "../lib/documents";
 

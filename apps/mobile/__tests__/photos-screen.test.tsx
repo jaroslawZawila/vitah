@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react-native";
 import { Image } from "expo-image";
 import type { MobilePhoto } from "@repo/core/contract";
-import PhotosScreen from "../app/(app)/photos";
+import PhotosScreen from "../app/(app)/(tabs)/photos";
 import { groupByWeek } from "../lib/photo-weeks";
 import { usePhotos } from "../lib/use-photos";
 
@@ -28,6 +28,7 @@ function state(overrides: Partial<ReturnType<typeof usePhotos>> = {}) {
   jest.mocked(usePhotos).mockReturnValue({
     photos,
     weeks: groupByWeek(photos ?? []),
+    byId: new Map((photos ?? []).map((p) => [p.id, p])),
     error: false,
     refreshing: false,
     refresh,

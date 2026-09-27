@@ -5,10 +5,12 @@ import { api } from "../lib/api";
 import { AuthProvider, useAuth } from "../lib/auth";
 import { Image } from "expo-image";
 import { clearDocuments } from "../lib/document-store";
+import { clearHitoFiles } from "../lib/hito-files";
 import { secureStore } from "../test-utils/secure-store";
 
 jest.mock("../lib/api", () => ({ api: { signIn: jest.fn(), getProject: jest.fn() } }));
 jest.mock("../lib/document-store", () => ({ clearDocuments: jest.fn() }));
+jest.mock("../lib/hito-files", () => ({ clearHitoFiles: jest.fn() }));
 jest.mock("expo-image", () => ({
   Image: { clearDiskCache: jest.fn(async () => true), clearMemoryCache: jest.fn(async () => true) },
 }));
@@ -83,6 +85,7 @@ describe("AuthProvider", () => {
     expect(result.current.token).toBeNull();
     expect(store.size).toBe(0);
     expect(clearDocuments).toHaveBeenCalled();
+    expect(clearHitoFiles).toHaveBeenCalled();
     // Cached site photos go too.
     expect(Image.clearDiskCache).toHaveBeenCalled();
     expect(Image.clearMemoryCache).toHaveBeenCalled();

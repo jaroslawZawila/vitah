@@ -4,13 +4,13 @@ import { useRouter } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { AppLanguage } from "@repo/core/contract";
-import { NotificationSettings } from "../../components/notification-settings";
-import { ToggleRow, styles as rowStyles } from "../../components/toggle-row";
-import { colors, spacing, type } from "../../constants/theme";
-import { useAppLock } from "../../lib/app-lock";
-import { useAuth } from "../../lib/auth";
-import { PUSH_NOTIFICATIONS } from "../../lib/features";
-import { useI18n } from "../../lib/i18n";
+import { NotificationSettings } from "../../../components/notification-settings";
+import { ToggleRow, styles as rowStyles } from "../../../components/toggle-row";
+import { colors, spacing, type } from "../../../constants/theme";
+import { useAppLock } from "../../../lib/app-lock";
+import { useAuth } from "../../../lib/auth";
+import { PUSH_NOTIFICATIONS } from "../../../lib/features";
+import { useI18n } from "../../../lib/i18n";
 
 // Tab "Perfil" — doc/mobile-app-design/A-Settings.dc.html. Help and privacy
 // links are left out until those pages exist; notifications until push is

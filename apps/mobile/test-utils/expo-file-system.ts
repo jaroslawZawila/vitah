@@ -12,7 +12,7 @@ const join = (parent: string | Directory, name?: string) => {
   return name ? `${base.replace(/\/$/, "")}/${name}` : base;
 };
 
-export const Paths = { document: "file:///documents-dir" };
+export const Paths = { document: "file:///documents-dir", cache: "file:///cache-dir" };
 
 export class File {
   readonly uri: string;

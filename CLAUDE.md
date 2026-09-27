@@ -162,14 +162,29 @@ mockups don't cover, extend the same visual language. Concept B on the canvas wa
 - `proxy.ts` protects all routes except `/`, `/api/auth/*`, `/api/mobile/*`, `/api/v1/*` (these authenticate per request), and static assets
 - User roles: `admin`, `manager`, `viewer` (staff, portal only) and `client` (homeowner, mobile app only) — Postgres enum. Use `isStaffUser` / `isClientUser` / `STAFF_ROLES` from `@repo/db`. `Ctx` is staff-only: client tokens are rejected by `/api/v1`
 - Clients are created on the **Clients** tab (`/dashboard/clients`, admin only): first name, surnames, date of birth, address, phone, email and app password. Personal details live in `client_profiles`; login data stays on `users`. Client emails are unique across tenants. A project has at most one client, picked from the existing clients on the project page ("Client app access" card); removing them only detaches, the account stays
-- Mobile client API: `POST /api/mobile/auth` (clients only, returns a 30d JWT), `GET /api/mobile/project`, `GET /api/mobile/documents` and `GET /api/mobile/documents/:id` (the PDF), `GET /api/mobile/photos` and `GET /api/mobile/photos/:id` (`?size=thumb`), `POST /api/mobile/password`, `GET`/`PUT /api/mobile/settings` (notification toggles) and `POST`/`DELETE /api/mobile/push-token` (the phone's Expo push token + app language) — all `Authorization: Bearer`, via `withMobileClient` in `apps/web/lib/api.ts`. Each request re-checks the client is still active
+- Mobile client API: `POST /api/mobile/auth` (clients only, returns a 30d JWT), `GET /api/mobile/project`, `GET /api/mobile/documents` and `GET /api/mobile/documents/:id` (the PDF), `GET /api/mobile/photos` and `GET /api/mobile/photos/:id` (`?size=thumb`), `POST /api/mobile/password`, `GET`/`PUT /api/mobile/settings` (notification toggles), `POST`/`DELETE /api/mobile/push-token` (the phone's Expo push token + app language), `GET /api/mobile/obra` (the Obra tab: stage, progress, phases, payment hitos) and `GET /api/mobile/obra/hitos/:id/:kind` (a hito's signed `acta` or `invoice` PDF) — all `Authorization: Bearer`, via `withMobileClient` in `apps/web/lib/api.ts`. Each request re-checks the client is still active
 - Admin-only server actions guarded by `requireAdmin()` check
 
 ### Database
 
 - **Driver:** `postgres` (postgres.js) — works with any PostgreSQL (local Docker, Vercel Postgres, AWS RDS, etc.)
-- Schema in `packages/db/src/schema.ts` — tables: `tenants`, `users`, `client_profiles`, `client_settings`, `push_tokens`, `accounts`, `sessions`, `verification_tokens`, `projects`, `project_documents`, `project_photos`. A project is deliberately minimal — exactly what the mobile app shows: `ref`, `address`, `start_date`, `completion_date`, plus `client_user_id` linking it to its mobile app client
+- Schema in `packages/db/src/schema.ts` — tables: `tenants`, `users`, `client_profiles`, `client_settings`, `push_tokens`, `accounts`, `sessions`, `verification_tokens`, `projects`, `project_documents`, `project_photos`, and the obra's `budget_revisions`, `budget_chapters`, `budget_lines`, `obra_hitos`, `obra_hito_chapters`, `obra_hito_checks`, `obra_hito_photos`. A project is deliberately minimal — exactly what the mobile app shows: `ref`, `address`, `start_date`, `completion_date`, plus `client_user_id` linking it to its mobile app client
 - Prod migrations are additive SQL files in `packages/db/sql/`, applied by hand (no plain `db:push` on prod)
+
+### Obra (construction process)
+
+- The process is `features/construction_process/PROCESS.md`: 8 stages (`projects.obra_stage`, set by staff), a
+  budget in the FRAMER model, and payment hitos H0–H9. Designs: `doc/mobile-app-design/A-Progress|A-Fase|A-Obra-Pagos|A-Hito`
+  and `doc/platform-design/P-*`
+- Budget (`packages/core/src/budget.ts`): revisions → chapters → lines (partidas), money in cents, quantities in
+  thousandths. A draft is edited freely; accepting it makes it the contract. Staff then record each line's executed %;
+  a change is a new revision (copied, compared with the previous). Only the accepted revision drives prices and progress
+- Hitos (`hitos.ts`): every project starts with the standard plan (`obra-template.ts`); staff set each hito's % and the
+  chapter codes it closes. The acta is signed on paper; staff upload it and the invoice (PDFs), then record the payment
+- `obra.ts` builds the portal's Obra page and the app's phases (pre-construction + one per hito); the arithmetic
+  (progress, due dates, penalty, phases) is pure in `obra-calc.ts`, also used by the portal for live figures
+- Portal tabs Obra (chapter control at `obra/[code]`), Presupuesto and Pagos (`payments/[hitoId]`); app tab Obra with
+  pushed screens under `app/(app)/obra/`. `pnpm db:seed` gives VTH-26-001 the real Castrillón budget half built
 
 ### Project documents
 

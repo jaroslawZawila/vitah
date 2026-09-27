@@ -7,6 +7,7 @@ import { secureStore } from "../test-utils/secure-store";
 
 jest.mock("../lib/api", () => ({ api: {} }));
 jest.mock("../lib/document-store", () => ({ clearDocuments: jest.fn() }));
+jest.mock("../lib/hito-files", () => ({ clearHitoFiles: jest.fn() }));
 jest.mock("../lib/push", () => ({
   unregisterPush: jest.fn(async () => {}),
   retryPendingRemoval: jest.fn(async () => {}),

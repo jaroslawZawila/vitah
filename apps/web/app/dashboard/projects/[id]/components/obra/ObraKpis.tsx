@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import type { ProjectObra } from "@repo/core/contract";
+import { isAwaitingPayment, type ProjectObra } from "@repo/core/contract";
 import { useObraFormat } from "./format";
 import Kpi from "./Kpi";
 import styles from "./obra.module.css";
@@ -64,7 +64,7 @@ export default function ObraKpis({ obra, paymentsHref }: { obra: ProjectObra; pa
         hints={
           next
             ? [
-                next.status === "signed" || next.status === "invoiced"
+                isAwaitingPayment(next.status)
                   ? `${tStatus(next.status)} · ${f.money(next.amountCents)}`
                   : t("ready", { pct: next.readyPct, amount: f.money(next.amountCents) }),
               ]

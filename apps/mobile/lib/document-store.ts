@@ -1,6 +1,7 @@
 import { Directory, File, Paths } from "expo-file-system";
 import type { MobileDocument } from "@repo/core/contract";
 import { api } from "./api";
+import { downloadWithToken } from "./download";
 
 // Offline copies of the client's documents: each PDF plus a manifest (the last
 // list from the server and which documents were opened) in the app's private
@@ -55,14 +56,8 @@ export async function readDocuments(): Promise<LocalDocument[]> {
 async function download(token: string, doc: MobileDocument) {
   const file = documentFile(doc.id);
   if (file.exists) return;
-  try {
-    await File.downloadFileAsync(api.documentUrl(doc.id), file, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-  } catch {
-    // Retried on the next sync; never keep a partial file.
-    if (file.exists) file.delete();
-  }
+  // Retried on the next sync; `downloadWithToken` leaves no partial file.
+  await downloadWithToken(api.documentUrl(doc.id), file, token).catch(() => {});
 }
 
 /**

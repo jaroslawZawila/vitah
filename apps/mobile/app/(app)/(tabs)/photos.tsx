@@ -12,13 +12,13 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { AppLanguage, MobilePhoto } from "@repo/core/contract";
-import { Button } from "../../components/button";
-import { PhotoImage } from "../../components/photo-image";
-import { colors, spacing, type } from "../../constants/theme";
-import { formatShortDate } from "../../lib/format";
-import { useI18n, type Translate } from "../../lib/i18n";
-import type { PhotoWeek } from "../../lib/photo-weeks";
-import { usePhotos } from "../../lib/use-photos";
+import { Button } from "../../../components/button";
+import { PhotoImage } from "../../../components/photo-image";
+import { colors, spacing, type } from "../../../constants/theme";
+import { formatShortDate } from "../../../lib/format";
+import { useI18n, type Translate } from "../../../lib/i18n";
+import type { PhotoWeek } from "../../../lib/photo-weeks";
+import { usePhotos } from "../../../lib/use-photos";
 
 // Tab "Fotos" — doc/mobile-app-design/A-Gallery.dc.html: photos grouped by
 // week, the newest of each week large, the rest in a three-column grid.

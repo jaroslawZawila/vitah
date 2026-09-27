@@ -1,6 +1,8 @@
 import {
   photoSizeQuery,
   type AccountError,
+  type HitoFileKind,
+  type MobileObra,
   type AppLanguage,
   type MobileDocument,
   type MobilePhoto,
@@ -85,6 +87,16 @@ export const api = {
 
   getProject(token: string) {
     return authed<{ project: Project | null }>("/api/mobile/project", token);
+  },
+
+  /** The Obra tab: stage, progress, phases and payment hitos; null without a project. */
+  getObra(token: string) {
+    return authed<{ obra: MobileObra | null }>("/api/mobile/obra", token);
+  },
+
+  /** A hito's signed acta or invoice (PDF); fetch it with the same Bearer token. */
+  hitoFileUrl(hitoId: string, kind: HitoFileKind) {
+    return `${API_BASE}/api/mobile/obra/hitos/${encodeURIComponent(hitoId)}/${kind}`;
   },
 
   listDocuments(token: string) {

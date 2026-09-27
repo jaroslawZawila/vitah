@@ -180,8 +180,8 @@ describe("buildPhases", () => {
       ["H3", "active", 40],
       ["H4", "pending", 0],
     ]);
-    expect(phases[0]).toMatchObject({ name: null, hitoId: null, finishedOn: "2026-04-20" });
-    expect(phases[1]).toMatchObject({ name: "Hito H2", hitoId: "id-H2", finishedOn: "2026-07-20" });
+    expect(phases[0]).toMatchObject({ name: null, hitoIds: ["id-H0", "id-H1"], finishedOn: "2026-04-20" });
+    expect(phases[1]).toMatchObject({ name: "Hito H2", hitoIds: ["id-H2"], finishedOn: "2026-07-20" });
   });
 
   it("gives each phase its chapters, checks and newest photos", () => {
@@ -189,7 +189,7 @@ describe("buildPhases", () => {
 
     expect(h3).toMatchObject({
       chapters: [chapter("04", 40)],
-      checks: [{ label: "Prueba", done: false }],
+      checks: [{ id: "c", label: "Prueba", done: false }],
       photoIds: ["p3", "p1"],
       photoCount: 2,
     });

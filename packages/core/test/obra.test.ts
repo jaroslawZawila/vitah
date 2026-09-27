@@ -140,6 +140,7 @@ describe("getClientObra", () => {
       ["H9", "active", 11],
     ]);
     expect(obra.phases[3]).toMatchObject({ name: "Envolvente estanca", photoCount: 1 });
+    expect(obra.currentPhaseKey).toBe("H4");
     expect(obra.hitos).toHaveLength(10);
   });
 

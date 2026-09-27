@@ -1,9 +1,11 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 import { Alert, ScrollView } from "react-native";
-import HomeScreen, { greetingKey } from "../app/(app)/index";
+import HomeScreen, { greetingKey } from "../app/(app)/(tabs)/index";
 import { api, type Project } from "../lib/api";
 import { PhotosProvider } from "../lib/use-photos";
+import { ObraProvider } from "../lib/use-obra";
 import { ProjectProvider } from "../lib/use-project";
+import { obra } from "../test-utils/obra-fixture";
 
 const mockSignOut = jest.fn();
 const mockNavigate = jest.fn();
@@ -13,12 +15,18 @@ jest.mock("../lib/auth", () => ({
   useAuth: () => ({ token: "tok", user: mockUser, signOut: mockSignOut }),
 }));
 jest.mock("../lib/api", () => ({
-  api: { getProject: jest.fn(), listPhotos: jest.fn(), photoUrl: (id: string) => `/photos/${id}` },
+  api: {
+    getProject: jest.fn(),
+    listPhotos: jest.fn(),
+    getObra: jest.fn(),
+    photoUrl: (id: string) => `/photos/${id}`,
+  },
 }));
 jest.mock("expo-router", () => ({ useRouter: () => ({ navigate: mockNavigate }) }));
 
 const getProject = jest.mocked(api.getProject);
 const listPhotos = jest.mocked(api.listPhotos);
+const getObra = jest.mocked(api.getObra);
 
 const project: Project = {
   id: "p1",
@@ -40,6 +48,7 @@ beforeEach(() => {
   mockUser = { name: "Ana García" };
   getProject.mockResolvedValue({ ok: true, data: { project } });
   listPhotos.mockResolvedValue({ ok: true, data: { photos: [] } });
+  getObra.mockResolvedValue({ ok: true, data: { obra: null } });
   // 25 Sept 2026, 16:00 in Madrid.
   jest.useFakeTimers({ now: new Date("2026-09-25T14:00:00Z"), doNotFake: ["nextTick", "setImmediate"] });
 });
@@ -50,7 +59,9 @@ afterEach(() => jest.useRealTimers());
 const Home = () => (
   <ProjectProvider>
     <PhotosProvider>
-      <HomeScreen />
+      <ObraProvider>
+        <HomeScreen />
+      </ObraProvider>
     </PhotosProvider>
   </ProjectProvider>
 );
@@ -73,6 +84,17 @@ describe("HomeScreen", () => {
     // 25 Sept 2026 → 15 Jan 2027.
     expect(await screen.findByText("112")).toBeOnTheScreen();
     expect(screen.getByText("días para la entrega")).toBeOnTheScreen();
+  });
+
+  it("shows the construction progress and opens the Obra tab", async () => {
+    getObra.mockResolvedValue({ ok: true, data: { obra } });
+    render(<Home />);
+
+    expect(await screen.findByText("52%")).toBeOnTheScreen();
+    expect(screen.getByText("112")).toBeOnTheScreen();
+    expect(screen.getByText("Fase 3 de 4 · Envolvente estanca")).toBeOnTheScreen();
+    fireEvent.press(screen.getByRole("link", { name: "Ver avance detallado" }));
+    expect(mockNavigate).toHaveBeenCalledWith("/obra");
   });
 
   it("leaves out the countdown once the date has passed or isn't set", async () => {

@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react-native";
-import ProfileScreen from "../app/(app)/profile";
+import ProfileScreen from "../app/(app)/(tabs)/profile";
 import { I18nProvider } from "../lib/i18n";
 import { secureStore } from "../test-utils/secure-store";
 

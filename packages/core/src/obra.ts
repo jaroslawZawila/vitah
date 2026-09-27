@@ -137,6 +137,7 @@ export async function getClientObra(
   ]);
   // The client sees the calendar, not the contract penalty.
   const { penaltyCents: _, ...term } = termOf(project, progress.totalCents) ?? {};
+  const phases = hitos.length > 0 ? buildPhases(stage, hitos, photos) : [];
 
   return {
     stage,
@@ -145,7 +146,8 @@ export async function getClientObra(
     vatRateBp,
     paidCents: sumAmounts(hitos, "paid"),
     term: "startDate" in term ? term : null,
-    phases: hitos.length > 0 ? buildPhases(stage, hitos, photos) : [],
+    phases,
+    currentPhaseKey: phases.find((p) => p.status !== "done")?.key ?? null,
     hitos,
   };
 }

@@ -13,12 +13,12 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { DocumentCategory } from "@repo/core/contract";
-import { Button } from "../../components/button";
-import { colors, radius, spacing, type } from "../../constants/theme";
-import type { LocalDocument } from "../../lib/document-store";
-import { useDocuments } from "../../lib/documents";
-import { formatFileSize, formatShortDate } from "../../lib/format";
-import { useI18n } from "../../lib/i18n";
+import { Button } from "../../../components/button";
+import { colors, radius, spacing, type } from "../../../constants/theme";
+import type { LocalDocument } from "../../../lib/document-store";
+import { useDocuments } from "../../../lib/documents";
+import { formatFileSize, formatShortDate } from "../../../lib/format";
+import { useI18n } from "../../../lib/i18n";
 
 export default function DocumentsScreen() {
   const insets = useSafeAreaInsets();

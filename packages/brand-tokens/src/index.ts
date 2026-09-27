@@ -30,6 +30,10 @@ export const colors = {
   destructive: "#d98080",
   // Least prominent text, e.g. the version footer.
   faint: "#6a6a64",
+  // The phase under way on the Obra tab: its card's border.
+  currentBorder: "#3f4533",
+  // Ring of an upcoming step (Obra phases, payment timeline).
+  markerTodo: "#4a4a45",
 
   // Status
   statusOrange: "#c4632a",

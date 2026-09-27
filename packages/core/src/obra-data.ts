@@ -212,7 +212,11 @@ export type HitoRow = typeof obraHitos.$inferSelect;
 
 function groupBy<T>(rows: T[], key: (row: T) => string): Map<string, T[]> {
   const groups = new Map<string, T[]>();
-  for (const row of rows) groups.set(key(row), [...(groups.get(key(row)) ?? []), row]);
+  for (const row of rows) {
+    const group = groups.get(key(row));
+    if (group) group.push(row);
+    else groups.set(key(row), [row]);
+  }
   return groups;
 }
 

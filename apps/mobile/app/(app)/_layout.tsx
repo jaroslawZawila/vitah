@@ -1,5 +1,4 @@
-import Feather from "@expo/vector-icons/Feather";
-import { Redirect, Tabs } from "expo-router";
+import { Redirect, Stack } from "expo-router";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { colors } from "../../constants/theme";
 import { useAuth } from "../../lib/auth";
@@ -9,10 +8,14 @@ import { useI18n } from "../../lib/i18n";
 import { usePushNotifications } from "../../lib/push";
 import { PhotosProvider } from "../../lib/use-photos";
 import { ProjectProvider } from "../../lib/use-project";
+import { ObraProvider } from "../../lib/use-obra";
+
+// The tabs are always the screen under a pushed one (a phase, a payment).
+export const unstable_settings = { initialRouteName: "(tabs)" };
 
 export default function AppLayout() {
   const { token, isLoading } = useAuth();
-  const { t, language } = useI18n();
+  const { language } = useI18n();
   usePushNotifications(PUSH_NOTIFICATIONS ? token : null, language);
 
   if (isLoading) {
@@ -28,57 +31,15 @@ export default function AppLayout() {
   }
 
   return (
-    // Above the tabs: one copy of the client's data for every tab, and
-    // documents sync on app open whichever tab is shown.
+    // Above the tabs and the screens pushed over them (a phase, a payment):
+    // one copy of the client's data for all, and documents sync on app open
+    // whichever tab is shown.
     <ProjectProvider>
     <PhotosProvider>
     <DocumentsProvider>
-      <Tabs
-        screenOptions={{
-          headerStyle: { backgroundColor: colors.grafito },
-          headerTintColor: colors.blancoCalido,
-          headerTitleStyle: { fontWeight: "300" },
-          headerShadowVisible: false,
-          sceneStyle: { backgroundColor: colors.grafito },
-          tabBarStyle: { backgroundColor: colors.tabBar, borderTopColor: colors.divider },
-          tabBarActiveTintColor: colors.blancoCalido,
-          tabBarInactiveTintColor: colors.inactive,
-          tabBarLabelStyle: { fontSize: 10 },
-        }}
-      >
-        <Tabs.Screen
-          name="index"
-          options={{
-            title: t("tabs.home"),
-            headerShown: false,
-            tabBarIcon: ({ color }) => <Feather name="home" size={22} color={color} />,
-          }}
-        />
-        <Tabs.Screen
-          name="photos"
-          options={{
-            title: t("tabs.photos"),
-            headerShown: false,
-            tabBarIcon: ({ color }) => <Feather name="image" size={22} color={color} />,
-          }}
-        />
-        <Tabs.Screen
-          name="documents"
-          options={{
-            title: t("tabs.documents"),
-            headerShown: false,
-            tabBarIcon: ({ color }) => <Feather name="file-text" size={22} color={color} />,
-          }}
-        />
-        <Tabs.Screen
-          name="profile"
-          options={{
-            title: t("tabs.profile"),
-            headerShown: false,
-            tabBarIcon: ({ color }) => <Feather name="user" size={22} color={color} />,
-          }}
-        />
-      </Tabs>
+      <ObraProvider>
+        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.grafito } }} />
+      </ObraProvider>
     </DocumentsProvider>
     </PhotosProvider>
     </ProjectProvider>

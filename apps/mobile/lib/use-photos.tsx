@@ -11,6 +11,8 @@ type PhotosValue = Omit<ReturnType<typeof useClientData>, "data"> & {
   photos: MobilePhoto[] | undefined;
   /** The photos grouped by week, newest week first. */
   weeks: PhotoWeek[];
+  /** Each photo by its id, e.g. to show a phase's or an acta's photos. */
+  byId: Map<string, MobilePhoto>;
 };
 
 const PhotosContext = createContext<PhotosValue | null>(null);
@@ -20,7 +22,8 @@ export function PhotosProvider({ children }: { children: React.ReactNode }) {
   const { data, ...state } = useClientData(listPhotos);
   const photos = data?.photos;
   const weeks = useMemo(() => groupByWeek(photos ?? []), [photos]);
-  const value = useMemo(() => ({ ...state, photos, weeks }), [state, photos, weeks]);
+  const byId = useMemo(() => new Map((photos ?? []).map((p) => [p.id, p])), [photos]);
+  const value = useMemo(() => ({ ...state, photos, weeks, byId }), [state, photos, weeks, byId]);
   return <PhotosContext value={value}>{children}</PhotosContext>;
 }
 

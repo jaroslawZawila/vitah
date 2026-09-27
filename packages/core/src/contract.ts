@@ -188,6 +188,9 @@ export type ProgressStatus = "pending" | "active" | "done";
 export const HITO_STATUSES = ["pending", "active", "ready", "signed", "invoiced", "paid"] as const;
 export type HitoStatus = (typeof HITO_STATUSES)[number];
 
+/** A hito the client owes: its acta is signed or its invoice issued, not yet paid. */
+export const isAwaitingPayment = (status: HitoStatus) => status === "signed" || status === "invoiced";
+
 /** The stages of the process that a standard hito closes (PROCESS.md §2). */
 export const STAGE_HITOS: Partial<Record<ObraStage, string>> = { 4: "H0", 5: "H1", 7: "H9" };
 export type HitoFileKind = "acta" | "invoice";
@@ -337,9 +340,10 @@ export type MobilePhase = {
   status: ProgressStatus;
   progressPct: number;
   finishedOn: string | null;
-  hitoId: string | null;
+  /** The hitos it stands for: its own, or for "pre" the ones before the works. */
+  hitoIds: string[];
   chapters: { code: string; name: string; totalCents: number; progressPct: number }[];
-  checks: { label: string; done: boolean }[];
+  checks: { id: string; label: string; done: boolean }[];
   /** Newest photos of its chapters (up to 3), and how many there are. */
   photoIds: string[];
   photoCount: number;
@@ -354,6 +358,8 @@ export type MobileObra = {
   paidCents: number;
   term: Pick<ObraTerm, "startDate" | "completionDate" | "week" | "totalWeeks" | "lateDays"> | null;
   phases: MobilePhase[];
+  /** The phase under way: the first one not done; null once all are. */
+  currentPhaseKey: string | null;
   hitos: Hito[];
 };
 
