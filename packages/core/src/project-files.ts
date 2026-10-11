@@ -12,6 +12,8 @@ import { deleteFile, putFile, readFile } from "./storage";
 // ─────────────────────────────────────────────────────────────────────────────
 
 const STATUS: Record<DocumentError | PhotoError, number> = {
+  budget_document: 409,
+  generation_running: 409,
   missing_fields: 400,
   missing_file: 400,
   invalid_category: 400,

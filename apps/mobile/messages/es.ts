@@ -158,6 +158,7 @@ export const es = {
       plans: "Planos",
       certificates: "Certificados",
       other: "Otros",
+      budget: "Presupuesto",
     },
     new: "NUEVO",
     newLabel: ", nuevo",

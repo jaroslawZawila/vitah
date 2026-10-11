@@ -68,7 +68,7 @@ export type MobileSession = {
   user: { id: string; email: string; name: string | null; tenantId: string };
 };
 
-export const DOCUMENT_CATEGORIES = ["contract", "plans", "certificates", "other"] as const;
+export const DOCUMENT_CATEGORIES = ["contract", "plans", "certificates", "other", "budget"] as const;
 export type DocumentCategory = (typeof DOCUMENT_CATEGORIES)[number];
 
 /**
@@ -87,11 +87,42 @@ export type MobileDocument = {
   uploadedAt: string;
 };
 
+/** The documents a budget is generated from (TECH_DESIGN §6.3). */
+export const BUDGET_INPUTS = ["plans", "basic", "execution", "measurements"] as const;
+export type BudgetInput = (typeof BUDGET_INPUTS)[number];
+
+/** Largest file uploaded straight to the store from the browser (budget inputs). */
+export const MAX_DIRECT_UPLOAD_BYTES = 100 * 1024 * 1024;
+
+/** File types a budget input may have: extension → stored MIME type. */
+export const BUDGET_INPUT_EXTENSIONS: Record<string, string> = {
+  pdf: "application/pdf",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  png: "image/png",
+  webp: "image/webp",
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  // FIEBDC-3 measurements; there is no registered type.
+  bc3: "application/octet-stream",
+};
+
 /** A project document as listed in the portal and by /api/v1. */
-export type ProjectDocument = MobileDocument & { uploadedBy: string | null };
+export type ProjectDocument = MobileDocument & {
+  uploadedBy: string | null;
+  visibleToClient: boolean;
+  contentType: string;
+  /** The uploaded file's name, when it isn't a PDF named after the title. */
+  filename: string | null;
+  /** Set on a document a budget was generated from. */
+  budgetInput: BudgetInput | null;
+  /** Set on the PDFs of an issued budget revision. */
+  budgetPdf: BudgetPdfKind | null;
+};
 
 /** Error codes of the documents service (`{ error: code }` in the API). */
 export type DocumentError =
+  | "budget_document"
+  | "generation_running"
   | "missing_fields"
   | "missing_file"
   | "invalid_category"
@@ -189,7 +220,7 @@ export type ObraStage = (typeof OBRA_STAGES)[number];
 /** Stage 6: the works themselves, from the acta de inicio. */
 export const EXECUTION_STAGE: ObraStage = 6;
 
-export type BudgetRevisionStatus = "draft" | "accepted" | "superseded";
+export type BudgetRevisionStatus = "draft" | "issued" | "accepted" | "rejected" | "superseded";
 /** A chapter's, phase's or line's progress. */
 export type ProgressStatus = "pending" | "active" | "done";
 /**
@@ -209,6 +240,29 @@ export type HitoFileKind = "acta" | "invoice";
 /** Longest budget chapter or line code ("05", "05.01"); also tags photos. */
 export const MAX_CHAPTER_CODE = 20;
 
+// ─── Budget in the FRAMER model (features/budget/TECH_DESIGN.md) ─────────────
+// Twenty fixed chapters (01–20, 20 = Imprevistos, computed) and, below them,
+// options priced apart (OP1, OP2… with lines OP.01, OP.02…).
+
+export const BUDGET_MODEL = "framer20";
+export const BUDGET_CHAPTER_CODES = Array.from({ length: 20 }, (_, i) => String(i + 1).padStart(2, "0"));
+/** Chapter 20: a share of chapters 01–19, held as one computed line. */
+export const CONTINGENCY_CHAPTER = "20";
+export const CONTINGENCY_LINE = "20.01";
+
+export const OPTION_KINDS = ["extra", "alternative", "deduction"] as const;
+export type OptionKind = (typeof OPTION_KINDS)[number];
+
+/** Where a line came from; `computed` is chapter 20's line, never edited by hand. */
+export const LINE_SOURCES = ["base", "estimated", "manual", "computed"] as const;
+export type LineSource = (typeof LINE_SOURCES)[number];
+
+export const BUDGET_PDF_KINDS = ["general", "detailed"] as const;
+export type BudgetPdfKind = (typeof BUDGET_PDF_KINDS)[number];
+
+export const BUDGET_QUALITIES = ["framer", "project"] as const;
+export type BudgetQuality = (typeof BUDGET_QUALITIES)[number];
+
 /** A budget line (partida) as entered: `quantity` has up to 3 decimals. */
 export type NewBudgetLine = {
   code: string;
@@ -222,6 +276,75 @@ export type BudgetLine = NewBudgetLine & {
   id: string;
   amountCents: number;
   executedPct: number;
+  source: LineSource;
+  baseCode: string | null;
+  note: string | null;
+  /** The same line in every revision (its code may change). */
+  lineageId: string;
+};
+
+/** A price base entry (Base de precios FRAMER 2026). */
+export type PriceBaseItem = { code: string; description: string; unit: string; unitPriceCents: number };
+
+/** What the PDFs print besides numbers. */
+export type BudgetTexts = {
+  cover: {
+    promoter: string;
+    site: string;
+    cadastral: string;
+    surfaces: string;
+    program: string;
+    basis: string;
+    scope: string;
+    system: string;
+  };
+  justification: { intro: string; blocks: { title: string; text: string }[] };
+  measurementCriterion: string;
+  /** "Observaciones técnicas y puntos a cerrar": the AI's inconsistencies and assumptions. */
+  annex: { id: string; kind: (typeof ANNEX_KINDS)[number]; title: string; text: string }[];
+  exclusions: string[];
+  /** "Este presupuesto sí incluye…". */
+  includes: string;
+};
+
+export type BudgetConditions = {
+  validityDays: number;
+  term: string;
+  penalty: string;
+  signingPlace: string;
+};
+
+/** An item of the "Antes de emitir" checklist (core budget-review.ts). */
+/** "D. Fulano, en calidad de autopromotor…" → "D. Fulano" (the contract adds the capacity itself). */
+export const promoterName = (promoter: string) => promoter.split(/,\s*en calidad de/i)[0]!.trim();
+
+/** "OP.01–OP.04": the codes an option's (or chapter's) lines span. */
+export const codeRange = (lines: { code: string }[]) =>
+  lines.length === 0 ? "—" : lines.length === 1 ? lines[0]!.code : `${lines[0]!.code}–${lines[lines.length - 1]!.code}`;
+
+/** Annex items of a budget's texts (`BudgetTexts.annex[].kind`). */
+export const ANNEX_KINDS = ["inconsistency", "assumption", "note"] as const;
+
+/** How each kind of review item is ticked off (`BudgetCheck.key`). */
+export const checkKey = {
+  annex: (id: string) => `annex:${id}`,
+  line: (lineageId: string) => `line:${lineageId}`,
+  ratio: (code: string) => `ratio:${code}`,
+};
+
+export type BudgetCheck = {
+  key: string;
+  kind: "inconsistency" | "assumption" | "estimated" | "ratio";
+  title: string;
+  detail: string;
+  /** The chapter or line code it points at. */
+  ref: string | null;
+  /** The chapter to open for it, if any. */
+  chapterCode: string | null;
+  done: boolean;
+  /** `ratio` checks: the chapter's €/m² built against the tenant's average (cents). */
+  perM2Cents?: number;
+  averageCents?: number;
 };
 
 /** How a chapter changed against the previous revision (★ up, ✦ new). */
@@ -232,6 +355,8 @@ export type BudgetChapter = {
   code: string;
   name: string;
   changeNote: string | null;
+  /** Printed under the chapter's title in the PDFs ("Sustituye a…"). */
+  pdfNote: string | null;
   totalCents: number;
   executedCents: number;
   progressPct: number;
@@ -244,18 +369,41 @@ export type BudgetChapter = {
   /** The hito that closes this chapter, if any. */
   hitoCode: string | null;
   lines: BudgetLine[];
+  /** Chapter 20 of the FRAMER model: its one line follows the others. */
+  computed: boolean;
+  /** Lines staff wrote (the computed one isn't). */
+  lineCount: number;
+  /** €/m² built, in cents; null without a built area. */
+  perM2Cents: number | null;
+};
+
+/** An option: priced apart from the PEC, chosen (or not) by the client on acceptance. */
+export type BudgetOption = Omit<BudgetChapter, "shareBp"> & {
+  optionKind: OptionKind;
+  /** Alternatives: the line they replace. */
+  replacesLine: string | null;
+  /** Set once the revision is accepted. */
+  chosen: boolean | null;
 };
 
 export type BudgetRevisionSummary = {
   id: string;
   number: number;
   status: BudgetRevisionStatus;
+  /** The PEC: chapters only (01–20), never options. */
   totalCents: number;
   /** ISO timestamp. */
   acceptedAt: string | null;
+  issuedOn: string | null;
 };
 
 export type BudgetRevision = BudgetRevisionSummary & {
+  /** The chapters' lines, the computed one aside. */
+  lineCount: number;
+  /** The PEC per m² built, in cents. */
+  perM2Cents: number | null;
+  /** Options that add to the PEC and that subtract from it. */
+  optionTotals: Record<"adding" | "subtracting", { count: number; cents: number }>;
   reference: string | null;
   vatRateBp: number;
   vatCents: number;
@@ -267,12 +415,83 @@ export type BudgetRevision = BudgetRevisionSummary & {
   /** Chapters of the previous revision that this one dropped. */
   removedChapters: { code: string; name: string; totalCents: number }[];
   chapters: BudgetChapter[];
+  /** "framer20", or null for a budget entered before the FRAMER model (free chapters). */
+  model: string | null;
+  options: BudgetOption[];
+  /** PEC + the options the client chose (accepted revisions); the PEC otherwise. */
+  contractTotalCents: number;
+  contingencyBp: number;
+  quality: BudgetQuality | null;
+  texts: BudgetTexts;
+  conditions: BudgetConditions;
+  changeReason: string | null;
+  validUntil: string | null;
+  acceptedOn: string | null;
+  acceptedBy: string | null;
+  rejectedOn: string | null;
+  /** The PDFs stored when it was issued (document ids). */
+  pdfs: Record<BudgetPdfKind, string | null>;
+  checks: BudgetCheck[];
+  /** The tenant's average €/m² built per chapter code (cents), from its other budgets. */
+  ratios: Record<string, number>;
+  /** Lines added, removed or changed against the previous revision. */
+  lineChanges: BudgetLineChange[];
+};
+
+/** A line that changed against the previous revision (the computed 20.01 aside). */
+export type BudgetLineChange = {
+  code: string;
+  description: string;
+  kind: "added" | "removed" | "changed";
+  before: { quantity: number; unitPriceCents: number; amountCents: number } | null;
+  after: { quantity: number; unitPriceCents: number; amountCents: number } | null;
+};
+
+export type BudgetGenerationStatus = "queued" | "running" | "succeeded" | "failed" | "cancelled";
+/** A run still working: at most one per project. */
+export const ACTIVE_GENERATION_STATUSES: BudgetGenerationStatus[] = ["queued", "running"];
+
+/** A progress line of an AI run; the portal words it from `code` and `params`. */
+export type BudgetGenerationLogEntry = {
+  at: string;
+  step: number;
+  kind: "info" | "done" | "error";
+  code: string;
+  params?: Record<string, string | number>;
+};
+
+/** What the AI read from the project, for the progress screen. */
+export type BudgetFacts = {
+  promoter: string;
+  site: string;
+  architect: string;
+  typology: string;
+  builtAreaM2: number;
+  usefulAreaM2: number;
+  windows: number;
+  bathrooms: number;
+  bedrooms: number;
+  inconsistencies: string[];
+};
+
+export type BudgetGeneration = {
+  id: string;
+  status: BudgetGenerationStatus;
+  /** 0–5. */
+  step: number;
+  log: BudgetGenerationLogEntry[];
+  error: string | null;
+  revisionId: string | null;
+  facts: BudgetFacts | null;
+  createdAt: string;
 };
 
 /** GET /api/v1/projects/:id/budget: all revisions and one of them in full. */
 export type ProjectBudget = {
   revisions: BudgetRevisionSummary[];
   revision: BudgetRevision | null;
+  /** The newest AI run, if any. */
+  generation: BudgetGeneration | null;
 };
 
 export type Hito = {
@@ -338,7 +557,10 @@ export type ProjectObra = {
   /** What the hitos' % add up to; 10 000 when the plan is complete. */
   planPctBp: number;
   term: ObraTerm | null;
-  chapters: Omit<BudgetChapter, "lines" | "id" | "previousTotalCents" | "change" | "changeNote">[];
+  chapters: Omit<
+    BudgetChapter,
+    "lines" | "id" | "previousTotalCents" | "change" | "changeNote" | "pdfNote" | "computed" | "lineCount" | "perM2Cents"
+  >[];
   hitos: Hito[];
 };
 
@@ -376,6 +598,13 @@ export type MobileObra = {
 
 /** Error codes of the obra services (`{ error: code }` in the API). */
 export type ObraError =
+  | "fixed_chapters"
+  | "not_issued"
+  | "change_reason_required"
+  | "generation_running"
+  | "ai_limit_reached"
+  | "too_many_pages"
+  | "no_documents"
   | "missing_fields"
   | "invalid_input"
   | "invalid_stage"

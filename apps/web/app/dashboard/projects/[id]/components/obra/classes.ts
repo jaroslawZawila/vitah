@@ -16,6 +16,10 @@ export const codeChip =
 export const checkRow = "flex min-h-11 items-center gap-2.5 border-b text-[13.5px] last:border-b-0";
 export const checkLabel = "flex min-h-11 min-w-0 flex-1 items-center gap-2.5";
 
+/** A filter chip in a row of them (pass `aria-pressed`). */
+export const chip =
+  "min-h-8 rounded-full border bg-card px-3 text-[13px] font-semibold text-muted-foreground pointer-coarse:min-h-11 aria-pressed:border-foreground aria-pressed:bg-foreground aria-pressed:text-background";
+
 /** A link in running text. */
 export const textLink = "font-medium text-info hover:underline";
 

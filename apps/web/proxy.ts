@@ -7,6 +7,7 @@ export default auth(() => {
 
 export const config = {
   matcher: [
-    "/((?!api/auth|api/mobile|api/v1|_next/static|_next/image|_vercel|favicon\\.ico).*)",
+    // .well-known/workflow: the Workflow SDK's own routes (the budget's AI run).
+    "/((?!api/auth|api/mobile|api/v1|_next/static|_next/image|_vercel|\\.well-known/workflow/|favicon\\.ico).*)",
   ],
 };

@@ -9,6 +9,9 @@ import {
 } from "@repo/db/testing";
 import { db, eq, projects } from "@repo/db";
 import {
+  budgetGenerationsService,
+  budgetIssueService,
+  budgetOptionsService,
   budgetService,
   changesService as svc,
   CHANGE_AREAS,
@@ -22,6 +25,7 @@ import {
   type Ctx,
 } from "../src";
 import { files, testImage } from "../src/testing";
+import { framerDraft } from "./budget-fixture";
 
 vi.mock("../src/storage", () => import("../src/testing"));
 
@@ -34,20 +38,7 @@ async function setup() {
   const client = await createTestUser(tenant.id, { role: "client" });
   const project = await createTestProject(tenant.id, { clientUserId: client.id });
   const ctx: Ctx = { tenantId: tenant.id, userId: user.id, role: "admin" };
-  const { revisionId } = await budgetService.createBudget(ctx, project.id, {});
-  for (const code of ["01", "02"]) {
-    const { chapterId } = await budgetService.addChapter(ctx, project.id, revisionId, {
-      code,
-      name: `Capítulo ${code}`,
-    });
-    await budgetService.addLine(ctx, project.id, chapterId, {
-      code: `${code}.01`,
-      description: "Partida",
-      unit: "pa",
-      quantity: 1,
-      unitPriceCents: 100_000,
-    });
-  }
+  const { revisionId } = await framerDraft(ctx, project.id, ["01", "02"]);
   await budgetService.acceptRevision(ctx, project.id, revisionId);
   const hitos = await hitosService.listHitos(ctx, project.id);
   const hito = hitos.find((h) => h.code === "H2")!;
@@ -139,6 +130,32 @@ const cases: Case[] = [
     },
   ],
   [
+    "setDocumentVisibility",
+    ["documents"],
+    async ({ ctx, project, tenant }) => {
+      const doc = await createTestDocument(tenant.id, project.id);
+      return () => documentsService.setDocumentVisibility(ctx, project.id, doc.id, { visibleToClient: false });
+    },
+  ],
+  [
+    "issueRevision",
+    ["documents"],
+    async ({ ctx, project }) => {
+      const { revisionId } = await budgetService.createRevision(ctx, project.id);
+      await budgetService.updateRevision(ctx, project.id, revisionId, { changeReason: "Mediciones reales" });
+      return () => budgetIssueService.issueRevision(ctx, project.id, revisionId);
+    },
+  ],
+  [
+    "issueRevision kept from the client",
+    [],
+    async ({ ctx, project }) => {
+      const { revisionId } = await budgetService.createRevision(ctx, project.id);
+      return () =>
+        budgetIssueService.issueRevision(ctx, project.id, revisionId, { changeReason: "Ajuste", shareWithClient: false });
+    },
+  ],
+  [
     "acceptRevision",
     ["obra"],
     async ({ ctx, project }) => {
@@ -160,13 +177,21 @@ const cases: Case[] = [
     [],
     async ({ ctx, project }) => {
       const { revisionId } = await budgetService.createRevision(ctx, project.id);
+      const { revision } = await budgetService.getBudget(ctx, project.id, revisionId);
+      const chapterId = revision!.chapters.find((c) => c.code === "03")!.id;
       return async () => {
-        const { chapterId } = await budgetService.addChapter(ctx, project.id, revisionId, {
-          code: "03",
-          name: "Nuevo",
+        const { lineId } = await budgetService.addLine(ctx, project.id, chapterId, {
+          code: "03.01",
+          description: "Nueva",
+          unit: "ud",
+          quantity: 2,
+          unitPriceCents: 1_000,
         });
         await budgetService.updateRevision(ctx, project.id, revisionId, { reference: "040/2026" });
-        await budgetService.deleteChapter(ctx, project.id, chapterId);
+        const { optionId } = await budgetOptionsService.addOption(ctx, project.id, revisionId, { name: "Piscina" });
+        await budgetOptionsService.optionFromLine(ctx, project.id, lineId, { kind: "deduction" });
+        await budgetOptionsService.deleteOption(ctx, project.id, optionId);
+        await budgetService.deleteLine(ctx, project.id, lineId);
       };
     },
   ],
@@ -292,7 +317,31 @@ describe("writes the client sees", () => {
     "addLine",
     "updateLine",
     "deleteLine",
+    // Options, issuing to the client and rejection: the app sees the
+    // contract only (issued PDFs reach it as documents, checked above).
+    "addOption",
+    "updateOption",
+    "deleteOption",
+    "optionFromLine",
+    "rejectRevision",
+    "revisionPdf",
+    // Staff-only: the budget's inputs and its AI runs.
+    "budgetInputUpload",
+    "authorizeBudgetInputUpload",
+    "registerBudgetInput",
+    "markBudgetInput",
+    "budgetInputs",
+    "setClaudeFileId",
+    "startGeneration",
+    "setWorkflowRun",
+    "cancelGeneration",
+    "insertFramerRevision",
+    "withFreeCode",
+    "revisionView",
+    "lineChanges",
     // Helpers, not writes.
+    "requirePdf",
+    "newPdfDocument",
     "projectInTenant",
     "clientProjectWhere",
     "requireAssignableClient",
@@ -309,6 +358,9 @@ describe("writes the client sees", () => {
       photosService,
       documentsService,
       budgetService,
+      budgetOptionsService,
+      budgetIssueService,
+      budgetGenerationsService,
       hitosService,
     ];
     const covered = new Set([...cases.map(([name]) => name), "createBudget"]);

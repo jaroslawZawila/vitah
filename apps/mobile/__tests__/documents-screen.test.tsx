@@ -63,6 +63,17 @@ describe("DocumentsScreen", () => {
     expect(screen.getByText("Contrato de obra")).toBeOnTheScreen();
   });
 
+  it("files the issued budget's PDF under Presupuesto", () => {
+    const budget = doc({ id: "d3", title: "Presupuesto 041/2026 · Rev.0", category: "budget" });
+    state({ documents: [contract, budget] });
+    render(<DocumentsScreen />);
+
+    fireEvent.press(screen.getByRole("button", { name: "Presupuesto" }));
+
+    expect(screen.queryByText("Contrato de obra")).toBeNull();
+    expect(screen.getByText("Presupuesto 041/2026 · Rev.0")).toBeOnTheScreen();
+  });
+
   it("drops a filter whose last document was removed", () => {
     const { rerender } = render(<DocumentsScreen />);
     fireEvent.press(screen.getByRole("button", { name: "Planos" }));

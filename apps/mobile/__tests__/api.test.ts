@@ -93,7 +93,8 @@ describe("api.listDocuments", () => {
 
     expect(await api.listDocuments("tok")).toEqual({ ok: true, data: { documents } });
     const [url, init] = fetchMock.mock.calls[0];
-    expect(url).toMatch(/\/api\/mobile\/documents$/);
+    // It names the categories it knows, so newer ones arrive as "other".
+    expect(url).toMatch(/\/api\/mobile\/documents\?categories=contract,plans,certificates,other,budget$/);
     expect(init.headers).toEqual({ Authorization: "Bearer tok" });
   });
 

@@ -10,6 +10,7 @@ import DocumentsScreen from "./DocumentsScreen";
 vi.mock("../../../../actions/documents", () => ({
   addProjectDocumentAction: vi.fn(),
   deleteProjectDocumentAction: vi.fn(),
+  setDocumentVisibilityAction: vi.fn(),
 }));
 const actions = await import("../../../../actions/documents");
 
@@ -20,6 +21,28 @@ const contract: ProjectDocument = {
   sizeBytes: 3.1 * 1024 * 1024,
   uploadedAt: "2026-09-22T10:00:00.000Z",
   uploadedBy: "Laura",
+  visibleToClient: true,
+  contentType: "application/pdf",
+  filename: null,
+  budgetInput: null,
+  budgetPdf: null,
+};
+const measurements: ProjectDocument = {
+  ...contract,
+  id: "doc-2",
+  title: "Mediciones",
+  category: "budget",
+  contentType: "application/octet-stream",
+  filename: "mediciones.bc3",
+  visibleToClient: false,
+  budgetInput: "measurements",
+};
+const budgetPdf: ProjectDocument = {
+  ...contract,
+  id: "doc-3",
+  title: "Presupuesto 041/2026 · Rev.0 · general",
+  category: "budget",
+  budgetPdf: "general",
 };
 
 function renderScreen(props: Partial<Parameters<typeof DocumentsScreen>[0]> = {}) {
@@ -52,6 +75,7 @@ const pdf = (size = 10) =>
 beforeEach(() => {
   vi.mocked(actions.addProjectDocumentAction).mockReset();
   vi.mocked(actions.deleteProjectDocumentAction).mockReset();
+  vi.mocked(actions.setDocumentVisibilityAction).mockReset();
 });
 
 describe("DocumentsScreen", () => {
@@ -60,11 +84,65 @@ describe("DocumentsScreen", () => {
 
     expect(screen.getByRole("heading", { name: "Documentos" })).toBeInTheDocument();
     expect(screen.getByText("VTH-26-001")).toBeInTheDocument();
-    expect(screen.getByText("1 documento")).toBeInTheDocument();
+    expect(screen.getByText("1 documento · 1 en la app del cliente")).toBeInTheDocument();
     const link = screen.getByRole("link", { name: "Contrato de obra" });
     expect(link).toHaveAttribute("href", "/api/v1/projects/project-1/documents/doc-1");
     const row = link.closest("li")!;
     expect(within(row).getByText(/Contrato · 22 sept 2026 · 3,1 MB · Laura/)).toBeInTheDocument();
+  });
+
+  it("puts the budget's documents first, with their type and origin", () => {
+    renderScreen({ documents: [contract, measurements, budgetPdf] });
+
+    expect(screen.getByText("3 documentos · 2 en la app del cliente")).toBeInTheDocument();
+    const [budget, other] = screen.getAllByRole("region");
+    expect(within(budget!).getByRole("heading", { name: "Presupuesto" })).toBeInTheDocument();
+    expect(within(budget!).getAllByRole("link").map((l) => l.textContent)).toEqual(["Mediciones", budgetPdf.title]);
+    expect(within(budget!).getByText("BC3")).toBeInTheDocument();
+    expect(within(budget!).getByText("Documentación del proyecto")).toBeInTheDocument();
+    expect(within(budget!).getByText("PDF del presupuesto")).toBeInTheDocument();
+    expect(within(other!).getByRole("heading", { name: "Otros documentos" })).toBeInTheDocument();
+    expect(within(other!).getByRole("link", { name: "Contrato de obra" })).toBeInTheDocument();
+  });
+
+  it("never offers to delete an issued budget's PDF", () => {
+    renderScreen({ documents: [budgetPdf, measurements] });
+
+    expect(screen.queryByRole("button", { name: `Eliminar ${budgetPdf.title}` })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Eliminar Mediciones" })).toBeInTheDocument();
+  });
+
+  it("switches whether the client sees a document in the app", async () => {
+    vi.mocked(actions.setDocumentVisibilityAction).mockResolvedValue({ success: true });
+    const plans = { ...measurements, title: "Planos", contentType: "application/pdf", filename: "planos.pdf", budgetInput: "plans" as const };
+    renderScreen({ documents: [contract, plans] });
+
+    const hidden = screen.getByRole("button", { name: "Visible en la app del cliente: Planos" });
+    expect(hidden).toHaveAttribute("aria-pressed", "false");
+    expect(hidden).toHaveTextContent("Solo equipo");
+    await userEvent.click(hidden);
+    await userEvent.click(screen.getByRole("button", { name: "Visible en la app del cliente: Contrato de obra" }));
+
+    await waitFor(() => expect(actions.setDocumentVisibilityAction).toHaveBeenCalledTimes(2));
+    expect(vi.mocked(actions.setDocumentVisibilityAction).mock.calls).toEqual([
+      ["project-1", "doc-2", true],
+      ["project-1", "doc-1", false],
+    ]);
+  });
+
+  it("offers no switch for a file the app can't open", () => {
+    const bigPlans = { ...measurements, id: "doc-4", title: "Planos", contentType: "application/pdf", sizeBytes: 40 * 1024 * 1024 };
+    renderScreen({ documents: [measurements, bigPlans] });
+
+    expect(screen.queryByRole("button", { name: /Visible en la app/ })).not.toBeInTheDocument();
+    expect(screen.getAllByText("Solo equipo")).toHaveLength(2);
+  });
+
+  it("shows read-only users which documents are staff only", () => {
+    renderScreen({ documents: [measurements], canManage: false });
+
+    expect(screen.queryByRole("button", { name: /Visible en la app/ })).not.toBeInTheDocument();
+    expect(screen.getByText("Solo equipo")).toBeInTheDocument();
   });
 
   it("shows an empty state", () => {

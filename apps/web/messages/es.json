@@ -116,7 +116,8 @@
         "contract": "Contrato",
         "plans": "Planos",
         "certificates": "Certificados",
-        "other": "Otros"
+        "other": "Otros",
+        "budget": "Presupuesto"
       },
       "errors": {
         "missing_fields": "Escribe un título.",
@@ -126,8 +127,22 @@
         "file_too_large": "El archivo supera el máximo de 4 MB.",
         "project_not_found": "Proyecto no encontrado.",
         "not_found": "Documento no encontrado.",
-        "forbidden": "Solo administradores y gestores pueden gestionar documentos."
-      }
+        "forbidden": "Solo administradores y gestores pueden gestionar documentos.",
+        "budget_document": "Este documento es del presupuesto: no se puede borrar.",
+        "generation_running": "La IA está leyendo este documento: espera a que termine o cancélala."
+      },
+      "visibleCount": "{count, plural, =0 {ninguno en la app del cliente} one {# en la app del cliente} other {# en la app del cliente}}",
+      "groups": {
+        "budget": "Presupuesto",
+        "other": "Otros documentos"
+      },
+      "origins": {
+        "budgetPdf": "PDF del presupuesto",
+        "budgetInput": "Documentación del proyecto"
+      },
+      "visibleLabel": "Visible en la app del cliente: {title}",
+      "visible": "En la app",
+      "hidden": "Solo equipo"
     },
     "close": "Cerrar",
     "photos": {
@@ -419,96 +434,10 @@
       "noPhotos": "Aún no hay fotos de este capítulo."
     },
     "budget": {
-      "title": "Presupuesto",
-      "summary": "Nº {reference} · Ejecución por contrata (PEC) · precio cerrado · válido 90 días desde su emisión",
-      "noReference": "sin número",
-      "export": "Exportar PDF",
-      "newRevision": "Nueva revisión",
-      "accept": "Aceptar revisión",
-      "confirmAccept": "¿Aceptar la Rev.{number}? Pasa a ser el contrato: sus partidas quedan fijas y el avance se registra sobre ella.",
-      "deleteDraft": "Eliminar borrador",
-      "confirmDeleteDraft": "¿Eliminar el borrador Rev.{number}?",
-      "editDetails": "Editar datos",
-      "revisions": "Revisiones",
-      "revision": "Rev.{number} · {total} · {status}",
-      "revisionStatus": {
-        "draft": "borrador",
-        "accepted": "aceptada",
-        "superseded": "superada"
-      },
-      "total": "Total PEC (sin IVA)",
-      "vsPrevious": "{delta} respecto a Rev.{number}",
-      "withVat": "Con IVA {rate}",
-      "vat": "IVA {amount}",
-      "surfaces": "Superficies",
-      "built": "{m2} m² construidos",
-      "useful": "{m2} m² útiles",
-      "notSet": "Sin datos",
-      "ratios": "Ratios",
-      "perBuilt": "{amount}/m²c",
-      "perUseful": "{amount}/m² útil",
-      "changes": "Cambios respecto a Rev.{number}",
-      "changesWhy": "Justificación",
-      "before": "Rev.{number}",
-      "after": "Rev.{number}",
-      "delta": "Variación",
-      "removed": "Eliminado",
-      "noChanges": "Los capítulos no cambian respecto a la revisión anterior.",
-      "detail": "Presupuesto detallado",
-      "detailSummary": "{chapters} capítulos · {lines} partidas · solo lo ve el equipo; el cliente ve el resumen por capítulos",
-      "lineCount": "{count, plural, one {# partida} other {# partidas}}",
-      "codeCol": "Código",
-      "descriptionCol": "Descripción de la unidad de obra",
-      "unitCol": "Ud.",
-      "qtyCol": "Cant.",
-      "priceCol": "P.U. (€)",
-      "amountCol": "Importe (€)",
-      "addLine": "Añadir partida",
-      "addChapter": "Añadir capítulo",
-      "editChapter": "Editar capítulo",
-      "deleteChapter": "Eliminar capítulo",
-      "confirmDeleteChapter": "¿Eliminar el capítulo {code} y sus partidas?",
-      "subtotal": "Subtotal Cap. {code} · {amount}",
-      "grandTotal": "TOTAL PEC (sin IVA) — Revisión {number}",
-      "editLine": "Editar {code}",
-      "deleteLine": "Eliminar {code}",
-      "confirmDeleteLine": "¿Eliminar la partida {code}?",
-      "qtyLabel": "Cantidad de {code}",
-      "priceLabel": "Precio unitario de {code}",
-      "flags": {
-        "up": "★ revisado al alza",
-        "down": "▼ revisado a la baja",
-        "new": "✦ nuevo"
-      },
-      "plan": "§4 Plan de pagos",
-      "planLink": "Hitos H0–H9 →",
-      "planHint": "Importes recalculados con cada revisión aceptada",
-      "exclusions": "§5 Gastos no incluidos",
-      "exclusionsCount": "{count, plural, =0 {Ninguna exclusión} one {# exclusión} other {# exclusiones}}",
-      "guarantees": "§6–§8 Garantías, documentación y contrato",
-      "guaranteesText": "LOE 1 · 3 · 10 años",
-      "guaranteesHint": "La documentación a entregar es la lista de control del hito H9",
-      "emptyTitle": "Todavía no hay presupuesto",
-      "emptyText": "Crea la primera revisión siguiendo el modelo de presupuesto: capítulos y partidas. Cuando el cliente la acepte, se convierte en el contrato.",
-      "create": "Crear presupuesto",
       "form": {
-        "reference": "Número de presupuesto",
-        "number": "Empezar en la revisión",
-        "numberHint": "0 para un presupuesto nuevo; otro número si ya existe en papel.",
-        "code": "Código",
-        "name": "Denominación",
-        "changeNote": "Justificación del cambio",
-        "description": "Descripción",
-        "unit": "Unidad",
-        "quantity": "Cantidad",
-        "unitPrice": "Precio unitario (€)",
-        "vat": "IVA (%)",
-        "built": "m² construidos",
-        "useful": "m² útiles",
-        "exclusions": "Gastos no incluidos (uno por línea)",
+        "cancel": "Cancelar",
         "save": "Guardar",
-        "saving": "Guardando…",
-        "cancel": "Cancelar"
+        "saving": "Guardando…"
       }
     },
     "payments": {
@@ -628,7 +557,559 @@
       "project_not_found": "Proyecto no encontrado.",
       "not_found": "No se ha encontrado.",
       "forbidden": "Solo administradores y gestores pueden hacer cambios.",
-      "unknown_chapter": "Ese capítulo no está en el presupuesto."
+      "unknown_chapter": "Ese capítulo no está en el presupuesto.",
+      "fixed_chapters": "El presupuesto tiene sus 20 capítulos fijos; esto no se puede cambiar.",
+      "not_issued": "Esa revisión no está emitida.",
+      "change_reason_required": "Escribe el motivo de la revisión antes de emitirla.",
+      "generation_running": "La IA ya está preparando un borrador.",
+      "ai_limit_reached": "Se ha alcanzado el límite mensual de uso de la IA.",
+      "too_many_pages": "Los documentos son demasiado largos para la IA.",
+      "no_documents": "Sube al menos un documento del proyecto."
+    }
+  },
+  "budget": {
+    "title": "Presupuesto",
+    "statusPill": "Rev.{number} · {status}",
+    "status": {
+      "draft": "Borrador",
+      "issued": "Emitida",
+      "accepted": "Aceptada",
+      "rejected": "Rechazada",
+      "superseded": "Sustituida"
+    },
+    "summaryReference": "N.º {reference}",
+    "summaryBuilt": "{m2} m² construidos",
+    "saving": "Guardando…",
+    "saved": "Guardado",
+    "pdfGeneral": "PDF general",
+    "pdfDetailed": "PDF detallado",
+    "steps": {
+      "label": "Estado del presupuesto",
+      "documents": "Documentación",
+      "documentsMeta": "{count, plural, =0 {sin documentos} one {# documento} other {# documentos}}",
+      "draft": "Borrador",
+      "draftMeta": "Rev.{number} · revisar y editar",
+      "issued": "Emitido",
+      "issuedMeta": "enviado al cliente",
+      "issuedOn": "emitido el {date}",
+      "accepted": "Aceptado",
+      "acceptedMeta": "es el contrato"
+    },
+    "viewingOld": "Estás viendo la Rev.{number} ({status}).",
+    "viewLatest": "Ver la última",
+    "tabs": {
+      "label": "Secciones del presupuesto",
+      "summary": "Resumen",
+      "lines": "Partidas",
+      "options": "Opciones",
+      "texts": "Justificación técnica",
+      "conditions": "Condiciones",
+      "revisions": "Revisiones"
+    },
+    "deleteDraft": "Eliminar borrador",
+    "confirmDeleteDraft": "¿Eliminar el borrador Rev.{number}? Se pierden sus cambios.",
+    "issueButton": "Emitir al cliente",
+    "issueRevision": "Emitir Rev.{number}",
+    "issuedBanner": "Emitida el {issued} · válida hasta el {valid}.",
+    "issuedBannerPdfs": "Sus PDF están en Documentos.",
+    "reject": "Rechazado",
+    "confirmReject": "¿Marcar la Rev.{number} como rechazada por el cliente?",
+    "newRevision": "Crear Rev.{number}",
+    "newRevisionChanges": "Crear Rev.{number} con cambios",
+    "acceptButton": "Registrar aceptación",
+    "acceptedBanner": "Aceptada el {date}: es el contrato.",
+    "acceptedBy": "Aceptada por {by}.",
+    "rejectedBanner": "El cliente la rechazó el {date}. Crea una revisión nueva con sus cambios.",
+    "form": {
+      "name": "Nombre",
+      "intro": "Texto de presentación (sale en el PDF)",
+      "code": "Código",
+      "description": "Descripción de la unidad de obra",
+      "unit": "Unidad",
+      "quantity": "Cantidad",
+      "unitPrice": "Precio unitario (€)",
+      "negativeHint": "Con signo menos, resta (una deducción).",
+      "note": "Nota"
+    },
+    "review": {
+      "eyebrow": "Antes de emitir",
+      "title": "Revisa lo que ha señalado la IA",
+      "progress": "{done} de {total} revisados",
+      "none": "Nada pendiente: no hay avisos de la IA.",
+      "counts": {
+        "inconsistency": "{count, plural, one {# incoherencia} other {# incoherencias}}",
+        "assumption": "{count, plural, one {# supuesto} other {# supuestos}}",
+        "estimated": "{count, plural, one {# partida estimada} other {# partidas estimadas}}",
+        "ratio": "{count, plural, one {# capítulo fuera de media} other {# capítulos fuera de media}}"
+      },
+      "kinds": {
+        "inconsistency": "Incoherencia",
+        "assumption": "Supuesto",
+        "estimated": "Estimada",
+        "ratio": "Fuera de media"
+      },
+      "ratioDetail": "{perM2}/m² construido frente a una media de {average}/m² en vuestros presupuestos.",
+      "go": "Ver {ref}",
+      "mark": "Marcar revisado",
+      "done": "Revisado",
+      "all": "Ver los {count} puntos →"
+    },
+    "kpis": {
+      "pec": "PEC sin IVA",
+      "pecHint": "20 capítulos · {count, plural, one {# partida} other {# partidas}}",
+      "withVat": "Con IVA {rate}",
+      "vat": "IVA {amount}",
+      "perBuilt": "€/m² construido",
+      "noArea": "Sin superficie",
+      "perBuiltHint": "Media de la empresa {average} · {delta}",
+      "contract": "Precio del contrato",
+      "contractHint": "PEC más las opciones elegidas",
+      "options": "Opciones",
+      "optionsValue": "{count, plural, =0 {Ninguna} one {# opción} other {# opciones}}",
+      "optionsHint": "{plus} que suman · {minus} que restan"
+    },
+    "chapters": {
+      "title": "Resumen por capítulos",
+      "hint": "Lo que verá el cliente en el PDF general. Pulsa un capítulo para editar sus partidas.",
+      "code": "Cap.",
+      "name": "Denominación",
+      "lines": "Partidas",
+      "amount": "Importe",
+      "share": "% PEC",
+      "perM2": "€/m²c",
+      "flags": "Avisos",
+      "contingencyHint": "· se calcula solo sobre 01–19",
+      "contingencyLabel": "Porcentaje de imprevistos",
+      "estimated": "{count, plural, one {# estimada} other {# estimadas}}",
+      "offAverage": "fuera de media",
+      "up": "★ al alza",
+      "down": "▼ a la baja",
+      "total": "TOTAL PEC (sin IVA) · Rev.{number}",
+      "vatNote": "Los precios unitarios ya incluyen gastos generales y beneficio industrial. IVA {rate}: {vat} · Total con IVA: {total}."
+    },
+    "options": {
+      "summaryTitle": "Partidas opcionales",
+      "summaryHint": "· debajo de los 20 capítulos, fuera del PEC",
+      "edit": "Editar opciones →",
+      "none": "Todavía no hay opciones.",
+      "kinds": {
+        "extra": "Adicional",
+        "alternative": "Alternativa",
+        "deduction": "⚑ Deducción"
+      },
+      "chosen": "Elegida",
+      "declined": "No elegida",
+      "intro": "Las opciones van debajo de los 20 capítulos, con numeración propia OP.01, OP.02… No forman parte del PEC: salen en los dos PDF como «Partida opcional» y el cliente elige cuáles quiere al aceptar. Una opción puede sumar (una piscina) o restar (una alternativa o una partida que ejecuta la Propiedad).",
+      "adding": "{count, plural, one {# que suma} other {# que suman}} · {amount}",
+      "subtracting": "{count, plural, one {# que resta} other {# que restan}} · {amount}",
+      "fromBase": "Opción desde la base de precios",
+      "empty": "Opción vacía",
+      "range": "Partida opcional · {range}",
+      "name": "Nombre de la opción",
+      "replaces": "Sustituye a la partida {code}",
+      "kind": "Tipo",
+      "introLabel": "Texto de presentación",
+      "introHint": "sale encima de la tabla en el PDF",
+      "editLine": "Editar texto y nota",
+      "deleteLine": "Borrar partida",
+      "addLine": "Partida",
+      "delete": "Borrar opción",
+      "freeLine": "Partida nueva",
+      "total": "Total {name} · {amount} · no incluida en el PEC",
+      "pec": "PEC · 20 capítulos",
+      "pecHint": "las opciones no lo cambian",
+      "withAdding": "Con todas las que suman",
+      "withSubtracting": "Con todas las que restan",
+      "confirmDelete": "¿Borrar la opción «{name}» y sus partidas?"
+    },
+    "picker": {
+      "title": "Base de precios FRAMER 2026",
+      "hint": "P.U. con gastos generales y beneficio",
+      "search": "Buscar en la base de precios",
+      "scope": "Dónde buscar",
+      "inChapter": "Capítulo {code}",
+      "all": "Toda la base",
+      "noResults": "Nada coincide con la búsqueda.",
+      "add": "Añadir",
+      "addLabel": "Añadir {code}",
+      "freeHint": "Queda marcada como «estimada»"
+    },
+    "lines": {
+      "code": "Código",
+      "description": "Descripción",
+      "unit": "Ud.",
+      "quantity": "Cantidad",
+      "price": "P.U. €",
+      "amount": "Importe €",
+      "estimated": "Estimada · fuera de la base",
+      "quantityLabel": "Cantidad de {code}",
+      "priceLabel": "Precio unitario de {code}",
+      "menu": "Más acciones de {code}",
+      "edit": "Editar texto y nota",
+      "duplicate": "Duplicar",
+      "deduction": "⚑ Ofrecer como deducción (crea una opción OP)",
+      "alternative": "Crear una alternativa (opción OP)",
+      "move": "Mover a otro capítulo",
+      "delete": "Borrar partida",
+      "confirmDelete": "¿Borrar la partida {code}?",
+      "chapters": "20 capítulos",
+      "options": "Opciones · fuera del PEC",
+      "name": "Nombre del capítulo",
+      "stats": "{count, plural, one {# partida} other {# partidas}} · {share} del PEC",
+      "perM2": "{amount}/m²c",
+      "average": "(vuestra media {amount}/m²c)",
+      "note": "Nota del capítulo",
+      "noteHint": "sale en los PDF, debajo del título del capítulo",
+      "filter": "Filtrar partidas",
+      "filters": {
+        "all": "Todas · {count}",
+        "estimated": "Estimadas · {count}",
+        "noted": "Con nota · {count}"
+      },
+      "add": "Añadir partida",
+      "addFree": "Partida nueva fuera de la base",
+      "computed": "El capítulo 20 es el {pct} de los capítulos 01–19 y se recalcula solo. Cambia el porcentaje en el Resumen.",
+      "saveHint": "Cambia la cantidad o el precio y se guarda solo.",
+      "subtotal": "Subtotal capítulo {code} · {amount}",
+      "editTitle": "Editar {code}",
+      "moveTitle": "Mover {code} a otro capítulo",
+      "moveTo": "Capítulo de destino",
+      "moveSubmit": "Mover",
+      "cancel": "Cancelar"
+    },
+    "texts": {
+      "intro": "Los textos de la portada, la justificación técnica, el criterio de medición y el anexo de observaciones. Los ha escrito la IA con los documentos del proyecto; corrige lo que haga falta. Salen igual en los dos PDF.",
+      "cover": "Portada",
+      "coverHint": "La tabla de la primera página del PDF",
+      "coverFields": {
+        "promoter": "Promotor",
+        "site": "Emplazamiento",
+        "cadastral": "Referencia catastral y parcela",
+        "surfaces": "Superficies",
+        "program": "Programa",
+        "basis": "Base del presupuesto",
+        "scope": "Alcance",
+        "system": "Sistema constructivo"
+      },
+      "missing": "No aparece en la documentación",
+      "justification": "Justificación técnica de la adaptación al sistema Steel Frame",
+      "justificationIntro": "Introducción de la justificación",
+      "blockTitle": "Título del apartado",
+      "blockText": "Texto de «{title}»",
+      "up": "Subir «{title}»",
+      "down": "Bajar «{title}»",
+      "remove": "Quitar «{title}»",
+      "newBlock": "Nuevo apartado",
+      "addBlock": "Añadir apartado",
+      "criterion": "Criterio de medición adoptado",
+      "criterionHint": "Sin estado de mediciones, la IA explica aquí que ha medido sobre los planos y que las mediciones son estimativas.",
+      "annex": "Anexo · Observaciones técnicas y puntos a cerrar con la Dirección Facultativa",
+      "annexHint": "Las incoherencias y los supuestos de la IA. Salen al final de los dos PDF.",
+      "annexNone": "Sin observaciones.",
+      "annexKind": "Tipo de observación",
+      "annexKinds": {
+        "inconsistency": "Incoherencia",
+        "assumption": "Supuesto",
+        "note": "Observación"
+      },
+      "reviewed": "✓ Revisada",
+      "annexTitle": "Título",
+      "annexText": "Texto de «{title}»",
+      "newAnnex": "Nueva observación",
+      "addAnnex": "Añadir observación",
+      "inputs": "Documentos que ha leído la IA",
+      "noInputs": "Este presupuesto no tiene documentos de origen.",
+      "inputKinds": {
+        "plans": "Planos",
+        "basic": "Proyecto básico",
+        "execution": "Proyecto de ejecución",
+        "measurements": "Mediciones"
+      }
+    },
+    "conditions": {
+      "planEyebrow": "Después de las opciones, en los dos PDF",
+      "plan": "Plan de pagos por hitos H0–H9",
+      "planOk": "Suma {pct} ✓",
+      "planOff": "Suma {pct}: debe ser 100 %",
+      "editPlan": "Editar el plan",
+      "planHint": "Cada hito es su porcentaje del precio: el PEC más las opciones que elija el cliente. El plan es el de la obra (pestaña Pagos).",
+      "hito": "Hito",
+      "name": "Denominación",
+      "amount": "Importe",
+      "when": "Se factura",
+      "total": "Total",
+      "paymentTerm": "pago a 5 días hábiles desde el acta",
+      "bothPdfs": "Los dos PDF",
+      "exclusions": "Gastos no incluidos en el presupuesto",
+      "exclusion": "Exclusión {n}",
+      "removeExclusion": "Quitar la exclusión {n}",
+      "newExclusion": "Nueva exclusión.",
+      "addExclusion": "Añadir",
+      "includes": "Este presupuesto sí incluye",
+      "fixedEyebrow": "Textos fijos de la empresa",
+      "fixed": "Garantías, documentación y contrato",
+      "fixedItems": {
+        "guarantees": "Garantías legales · LOE 38/1999",
+        "documents": "Documentación técnica a entregar con la vivienda",
+        "contract": "Contrato de obra · condiciones generales · 16 cláusulas"
+      },
+      "fixedHints": {
+        "guarantees": "1 año acabados · 3 años habitabilidad · 10 años estructura · 2 años equipos",
+        "documents": "CFO, Libro del Edificio, Gemelo Digital BIM, Blower Door, certificado energético…",
+        "contract": "Se rellena con los datos de la obra: promotor, parcela, precio, plazo, hitos"
+      },
+      "detailedOnly": "Solo el detallado",
+      "fixedNote": "Iguales en todos los presupuestos. Aquí solo los datos de esta obra:",
+      "terms": {
+        "validityDays": "Validez de la oferta (días)",
+        "term": "Plazo de ejecución",
+        "penalty": "Penalización por retraso",
+        "signingPlace": "Lugar de firma"
+      }
+    },
+    "revisions": {
+      "history": "Historial",
+      "issuedOn": "Emitida el {date}",
+      "draft": "En borrador",
+      "acceptedOn": "aceptada el {date}",
+      "general": "PDF general",
+      "detailed": "PDF detallado",
+      "view": "Ver",
+      "aiDraft": "Borrador generado por la IA",
+      "aiDraftMeta": "{date} · a partir de los documentos del proyecto",
+      "frozenNote": "Lo emitido no se cambia nunca. Cada revisión es una copia de la anterior con sus cambios y su motivo.",
+      "compare": "Rev.{number} frente a Rev.{previous}",
+      "reason": "Motivo de la revisión",
+      "reasonHint": "obligatorio para emitir · sale en el «Resumen de revisiones» de los PDF",
+      "chapters": "Capítulos y opciones que cambian",
+      "code": "Cap.",
+      "difference": "Diferencia",
+      "revised": "★ revisado",
+      "new": "✦ nuevo",
+      "totalPec": "Total PEC",
+      "hideUnchanged": "Ocultar los que no cambian",
+      "showUnchanged": "Mostrar los {count} que no cambian",
+      "lines": "Partidas que cambian",
+      "line": "Partida",
+      "whatChanged": "Qué ha cambiado",
+      "beforeAfter": "Antes → ahora",
+      "amount": "Importe",
+      "added": "✦ nueva",
+      "removed": "quitada",
+      "firstTitle": "Primera revisión",
+      "first": "Es la primera revisión: no hay otra con la que compararla."
+    },
+    "issue": {
+      "title": "Emitir la Rev.{number} al cliente",
+      "pec": "PEC sin IVA",
+      "withVat": "Con IVA",
+      "contents": "Contenido",
+      "contentsValue": "20 cap. · {lines} part. · {options} opc.",
+      "openChecks": "{count, plural, one {Queda # aviso de la IA sin revisar.} other {Quedan # avisos de la IA sin revisar.}}",
+      "openChecksHint": "Puedes emitir igual; conviene revisarlos antes.",
+      "review": "Revisarlos",
+      "issuedOn": "Fecha de emisión",
+      "validUntil": "Válido hasta",
+      "validHint": "{days} días, de Condiciones",
+      "reason": "Qué cambia en esta revisión",
+      "firstIssue": "Primera emisión",
+      "reasonHint": "A partir de la Rev.1 es obligatorio. Va al «Resumen de revisiones» del PDF.",
+      "pdfs": "Se guardan en Documentos del proyecto",
+      "general": {
+        "title": "PDF general",
+        "hint": "portada, justificación, resumen por capítulos, opciones, plan de pagos y condiciones"
+      },
+      "detailed": {
+        "title": "PDF detallado",
+        "hint": "todo lo anterior, las partidas de los 20 capítulos y de las opciones, y el contrato de obra"
+      },
+      "inApp": "En la app del cliente",
+      "staffOnly": "Solo equipo",
+      "preview": "Ver",
+      "share": "Compartir el PDF general en la app del cliente",
+      "shareHint": "{name} lo verá en Documentos y recibirá un aviso. Puedes cambiar quién ve cada documento desde Documentos.",
+      "shareNoClient": "El proyecto aún no tiene cliente en la app; lo verá cuando lo tenga.",
+      "freezeNote": "Al emitir, la Rev.{number} queda bloqueada: es lo que se ha enviado. Si el cliente pide cambios, crearás la Rev.{next} a partir de ella.",
+      "cancel": "Cancelar",
+      "issuing": "Emitiendo…",
+      "submit": "Emitir Rev.{number}"
+    },
+    "accept": {
+      "title": "Registrar la aceptación de la Rev.{number}",
+      "acceptedOn": "Fecha de aceptación",
+      "acceptedBy": "Aceptado por",
+      "options": "¿Qué opciones ha elegido el cliente?",
+      "kinds": {
+        "extra": "Adicional",
+        "alternative": "Alternativa",
+        "deduction": "⚑ Deducción"
+      },
+      "pec": "PEC Rev.{number} · 20 capítulos",
+      "chosenOptions": "Opciones elegidas",
+      "contract": "Precio del contrato (sin IVA)",
+      "withVat": "Con IVA {rate}",
+      "signed": "Presupuesto firmado",
+      "signedHint": "PDF, opcional · se guarda en Documentos",
+      "signedTitle": "Presupuesto {reference} · Rev.{number} · firmado",
+      "effect": "Al aceptar, la Rev.{number} se convierte en el contrato.",
+      "effectHint": "Las opciones elegidas entran en el contrato como partidas OP, debajo de los 20 capítulos; las demás quedan descartadas. Con eso se alimentan la Obra, los Pagos (H0 = {first}) y las fases de la app del cliente.",
+      "cancel": "Cancelar",
+      "accepting": "Guardando…",
+      "submit": "Aceptar como contrato"
+    },
+    "start": {
+      "summary": "Todavía no hay presupuesto. El primero lo prepara la IA con la documentación del proyecto; después lo revisas y lo editas.",
+      "generatingSummary": "La IA está preparando el primer borrador.",
+      "eyebrow": "Primer borrador · con IA",
+      "title": "Sube la documentación del proyecto",
+      "intro": "Basta con un documento; con los cuatro la IA mide con más precisión. Los lee, adapta el proyecto al sistema FRAMER Steel Frame y monta el borrador con los 20 capítulos y la Base de precios FRAMER 2026.",
+      "failed": "La IA no pudo terminar el borrador.",
+      "kinds": {
+        "plans": {
+          "title": "Planos",
+          "hint": "Plantas, alzados, secciones, estructura e instalaciones · PDF o fotos"
+        },
+        "basic": {
+          "title": "Proyecto básico",
+          "hint": "Memoria, cuadro de superficies, normativa"
+        },
+        "execution": {
+          "title": "Proyecto de ejecución",
+          "hint": "Memoria constructiva, pliego, instalaciones"
+        },
+        "measurements": {
+          "title": "Mediciones",
+          "hint": "Estado de mediciones · PDF, Excel o BC3"
+        }
+      },
+      "ready": "Listo",
+      "optional": "Opcional",
+      "remove": "Quitar",
+      "uploading": "Subiendo… {pct} %",
+      "drop": "Arrastra el archivo aquí · {types}",
+      "upload": "Subir archivo",
+      "choose": "Elegir de Documentos",
+      "reference": "N.º de presupuesto",
+      "quality": "Calidades",
+      "qualities": {
+        "framer": "Memoria de calidades FRAMER estándar",
+        "project": "Respetar las calidades del proyecto"
+      },
+      "vat": "IVA",
+      "vats": {
+        "reduced": "10 % · autopromoción de vivienda habitual",
+        "general": "21 %"
+      },
+      "starting": "Empezando…",
+      "generate": "Generar el borrador",
+      "needOne": "Sube al menos un documento.",
+      "time": "Tarda unos 5 minutos. Puedes salir de la página: el borrador aparecerá aquí.",
+      "noMeasurements": "Sin mediciones, la IA mide sobre los planos acotados: las mediciones serán estimativas y se explicará en el «Criterio de medición».",
+      "next": "Qué pasa después",
+      "steps": {
+        "read": {
+          "title": "Lee el proyecto.",
+          "text": "Datos, superficies, recuentos, mediciones e incoherencias entre documentos."
+        },
+        "lines": {
+          "title": "Monta las partidas",
+          "text": "de los capítulos 01–19 con la Base de precios. Lo que no está en la base queda marcado como «estimado»."
+        },
+        "contingency": {
+          "title": "Calcula los imprevistos",
+          "text": "(capítulo 20 = 5 % de 01–19) y aplica el plan de pagos H0–H9."
+        },
+        "review": {
+          "title": "Tú lo revisas.",
+          "text": "El resultado es el borrador Rev.0, con una lista de puntos que comprobar antes de enviarlo."
+        }
+      },
+      "privacy": "Los documentos se guardan también en Documentos del proyecto, marcados «solo equipo»: el cliente no los ve.",
+      "errors": {
+        "invalid_file_type": "Ese tipo de archivo no vale aquí: sube un PDF, una imagen, un Excel (.xlsx) o un BC3.",
+        "file_too_large": "El archivo supera el máximo de 100 MB.",
+        "missing_file": "No llegó el archivo. Vuelve a subirlo.",
+        "invalid_category": "Elige qué documento es.",
+        "upload_failed": "No se pudo subir el archivo. Vuelve a intentarlo.",
+        "budget_document": "Este documento es del presupuesto: no se puede quitar.",
+        "not_found": "Ese documento ya no está en el proyecto.",
+        "forbidden": "No tienes permiso para cambiar los documentos.",
+        "missing_fields": "Faltan datos del archivo.",
+        "generation_running": "La IA está leyendo este documento: espera a que termine o cancélala."
+      }
+    },
+    "generation": {
+      "step": "Paso {step} de {total}",
+      "title": "Generando el borrador",
+      "pct": "{pct} %",
+      "jobs": {
+        "read": {
+          "title": "Documentos leídos",
+          "done": "{files, plural, one {# documento} other {# documentos}} listos para la IA",
+          "todo": "Preparando los documentos…"
+        },
+        "analysed": {
+          "title": "Proyecto analizado",
+          "done": "{builtArea} m² construidos · {inconsistencies, plural, one {# incoherencia} other {# incoherencias}}",
+          "todo": "Lectura del proyecto y de los planos"
+        },
+        "group0": {
+          "title": "Capítulos 01–05",
+          "done": "{lines, plural, one {# partida} other {# partidas}}",
+          "todo": "Movimiento de tierras, cimentación, estructura, albañilería y cubierta"
+        },
+        "group1": {
+          "title": "Capítulos 06–10",
+          "done": "{lines, plural, one {# partida} other {# partidas}}",
+          "todo": "Envolvente, revestimientos, solados, urbanización y carpintería"
+        },
+        "group2": {
+          "title": "Capítulos 11–15",
+          "done": "{lines, plural, one {# partida} other {# partidas}}",
+          "todo": "Instalaciones"
+        },
+        "group3": {
+          "title": "Capítulos 16–19 e imprevistos",
+          "done": "{lines, plural, one {# partida} other {# partidas}}",
+          "todo": "Pinturas, calidad, seguridad, residuos · capítulo 20 = 5 %"
+        }
+      },
+      "leave": "Puedes cerrar esta página. El borrador aparecerá aquí cuando termine.",
+      "cancel": "Cancelar",
+      "facts": "Lo que la IA ya ha leído",
+      "factsPending": "Aparecerá cuando termine de leer el proyecto.",
+      "factLabels": {
+        "promoter": "Promotor",
+        "site": "Emplazamiento",
+        "architect": "Arquitecto",
+        "typology": "Tipología",
+        "surfaces": "Superficies",
+        "counts": "Recuento"
+      },
+      "surfacesValue": "{built} m²c · {useful} m²u",
+      "countsValue": "{windows} ventanas · {bathrooms} baños · {bedrooms} dormitorios",
+      "inconsistencies": "Incoherencias encontradas",
+      "inconsistenciesHint": "Las verás todas en el borrador, con cómo se han presupuestado.",
+      "errors": {
+        "refused": "La IA no aceptó la petición. Revisa los documentos y vuelve a intentarlo.",
+        "truncated": "La respuesta de la IA quedó cortada. Vuelve a intentarlo con menos páginas.",
+        "invalid_output": "La respuesta de la IA no tenía el formato esperado. Vuelve a intentarlo.",
+        "too_many_pages": "Los documentos son demasiado largos para una sola lectura (máximo 600 páginas). Sube menos páginas o separa planos y memoria.",
+        "bad_request": "La IA rechazó los documentos. Comprueba que los PDF se abren bien.",
+        "no_documents": "No hay documentos del proyecto para leer.",
+        "missing_file": "Falta el archivo de uno de los documentos. Vuelve a subirlo.",
+        "budget_exists": "Mientras tanto se creó un presupuesto para este proyecto.",
+        "unexpected": "Algo falló al generar el borrador. Vuelve a intentarlo; si se repite, avisa a soporte."
+      }
+    },
+    "pdf": {
+      "back": "Volver al presupuesto",
+      "kind": "Tipo de PDF",
+      "general": "PDF general",
+      "detailed": "PDF detallado",
+      "draftHint": "Borrador: lleva la marca «BORRADOR» hasta que se emite",
+      "issuedHint": "Lo que se envió al cliente",
+      "download": "Descargar PDF"
     }
   }
 }

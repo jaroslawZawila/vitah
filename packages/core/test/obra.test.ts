@@ -7,7 +7,12 @@ import {
   resetDatabase,
 } from "@repo/db/testing";
 import { budgetService, hitosService, obraService as svc, type Ctx } from "../src";
+import { framerDraft } from "./budget-fixture";
+
+/** The seed's overall progress (seed-obra.ts PROGRESS), weighted by amount. */
+const PROGRESS_PCT = 33;
 import { seedObra } from "../src/seed/seed-obra";
+import { BUDGET_CHAPTER_CODES } from "../src/contract";
 import { files } from "../src/testing";
 
 vi.mock("../src/storage", () => import("../src/testing"));
@@ -47,21 +52,21 @@ describe("getObra", () => {
     });
   });
 
-  it("summarises the real Castrillón budget half built", async () => {
+  it("summarises the real Caviedes budget part built", async () => {
     const { project, ctx } = await setup();
     await seedObra(ctx, project.id);
 
     const obra = await svc.getObra(ctx, project.id);
 
     expect(obra.stage).toBe(6);
-    expect(obra.budget).toMatchObject({ number: 3, reference: "036/2026", totalCents: 44_820_503 });
-    expect(obra.chapters.map((c) => c.code)).toEqual([
-      "01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12", "13", "14", "15", "17", "16",
-    ]);
-    expect(obra.chapters.find((c) => c.code === "05")).toMatchObject({ progressPct: 80, hitoCode: "H4", status: "active" });
-    expect(obra.progressPct).toBe(52);
-    expect(obra.paidCents).toBe(2_241_025 + 3_137_435 + 5_378_460);
-    expect(obra.invoicedUnpaidCents).toBe(6_723_075);
+    // 519.948,64 € as printed in PreFRAMER_Caviedes_Valdadiga_V1.pdf.
+    expect(obra.budget).toMatchObject({ number: 0, reference: "004/2026", totalCents: 51_994_864 });
+    expect(obra.chapters.map((c) => c.code)).toEqual(BUDGET_CHAPTER_CODES);
+    expect(obra.chapters.find((c) => c.code === "05")).toMatchObject({ progressPct: 72, hitoCode: "H4", status: "active" });
+    expect(obra.progressPct).toBe(PROGRESS_PCT);
+    // H0–H2 (5 %, 7 %, 12 %) paid and H3 (14 %) invoiced: 25.997,43, 36.396,40, 62.393,84 and 72.792,81 €.
+    expect(obra.paidCents).toBe(2_599_743 + 3_639_640 + 6_239_384);
+    expect(obra.invoicedUnpaidCents).toBe(7_279_281);
     expect(obra.hitos.find((h) => h.code === "H3")).toMatchObject({ status: "invoiced", dueOn: "2026-10-01" });
   });
 });
@@ -92,8 +97,8 @@ describe("getChapter", () => {
 
     const detail = await svc.getChapter(ctx, project.id, "05");
 
-    expect(detail.chapter).toMatchObject({ code: "05", name: "Envolvente Térmica — Paneles Thermochip", totalCents: 8_630_439 });
-    expect(detail.chapter.lines).toHaveLength(6);
+    expect(detail.chapter).toMatchObject({ code: "05", name: "Cubierta inclinada y recogida de aguas pluviales", totalCents: 5_535_590 });
+    expect(detail.chapter.lines).toHaveLength(9);
     expect(detail.hito).toMatchObject({ code: "H4" });
     expect(detail.photos.map((p) => p.id)).toEqual([photo.id]);
   });
@@ -123,8 +128,8 @@ describe("getClientObra", () => {
 
     expect(obra).toMatchObject({
       stage: 6,
-      progressPct: 52,
-      totalCents: 44_820_503,
+      progressPct: PROGRESS_PCT,
+      totalCents: 51_994_864,
       vatRateBp: 1000,
       term: { week: 21, totalWeeks: 40, lateDays: 0 },
     });
@@ -132,23 +137,21 @@ describe("getClientObra", () => {
       ["pre", "done", 100],
       ["H2", "done", 100],
       ["H3", "done", 100],
-      ["H4", "active", 69],
-      ["H5", "active", 15],
-      ["H6", "active", 10],
+      ["H4", "active", 30],
+      ["H5", "pending", 0],
+      ["H6", "pending", 0],
       ["H7", "pending", 0],
       ["H8", "pending", 0],
-      ["H9", "active", 11],
+      ["H9", "active", 9],
     ]);
-    expect(obra.phases[3]).toMatchObject({ name: "Envolvente estanca", photoCount: 1 });
+    expect(obra.phases[3]).toMatchObject({ name: "Envolvente estanca: Thermochip, cubierta y carpintería exterior", photoCount: 1 });
     expect(obra.currentPhaseKey).toBe("H4");
     expect(obra.hitos).toHaveLength(10);
   });
 
   it("shows nothing of a budget that is still a draft", async () => {
     const { tenant, client, project, ctx } = await setup();
-    const { revisionId } = await budgetService.createBudget(ctx, project.id, {});
-    const { chapterId } = await budgetService.addChapter(ctx, project.id, revisionId, { code: "01", name: "X" });
-    await budgetService.addLine(ctx, project.id, chapterId, { code: "01.01", description: "X", unit: "pa", quantity: 1, unitPriceCents: 100_000 });
+    await framerDraft(ctx, project.id, ["01"]);
 
     const obra = (await svc.getClientObra(tenant.id, client.id))!;
     expect(obra).toMatchObject({ totalCents: 0, progressPct: 0 });
@@ -176,15 +179,19 @@ describe("getClientObra", () => {
 });
 
 describe("seedObra", () => {
-  it("loads the whole Castrillón budget", async () => {
+  it("loads the whole Caviedes budget, the pool offered but not chosen", async () => {
     const { project, ctx } = await setup();
     await seedObra(ctx, project.id);
 
     const { revision } = await budgetService.getBudget(ctx, project.id);
-    expect(revision!.chapters.flatMap((c) => c.lines)).toHaveLength(102);
-    expect(revision!.chapters.find((c) => c.code === "17")?.change).toBeNull();
+    // 145 lines in 01–19, and chapter 20's: 5 % of 495.189,18 € = 24.759,46 €.
+    expect(revision!.chapters.flatMap((c) => c.lines)).toHaveLength(146);
+    expect(revision!.chapters.find((c) => c.code === "20")).toMatchObject({ totalCents: 2_475_946 });
+    expect(revision!.options).toMatchObject([{ code: "OP1", totalCents: 4_597_500, chosen: false }]);
+    expect(revision!.options[0]!.lines.map((l) => l.code)).toEqual(Array.from({ length: 11 }, (_, i) => `OP.${String(i + 1).padStart(2, "0")}`));
+    expect(revision!.contractTotalCents).toBe(51_994_864);
     expect((await hitosService.listHitos(ctx, project.id)).map((h) => h.status)).toEqual([
-      "paid", "paid", "paid", "invoiced", "active", "active", "active", "pending", "pending", "active",
+      "paid", "paid", "paid", "invoiced", "active", "pending", "pending", "pending", "pending", "active",
     ]);
   });
 });

@@ -13,6 +13,7 @@ import type { ProjectDocument } from "@repo/core/contract";
 import {
   addProjectDocumentAction,
   deleteProjectDocumentAction,
+  setDocumentVisibilityAction,
   type DocumentsState,
 } from "../../../../actions/documents";
 import DocumentList from "../components/DocumentList";
@@ -22,7 +23,7 @@ import { EmptyFolder } from "../components/illustrations";
 import Modal from "../components/Modal";
 import TabHeader from "../components/TabHeader";
 
-/** PDFs shared with the project's client in the mobile app. */
+/** The project's documents; staff choose which ones the client sees in the app. */
 export default function DocumentsScreen({
   projectId,
   projectRef,
@@ -39,6 +40,19 @@ export default function DocumentsScreen({
   const [deleteState, setDeleteState] = useState<DocumentsState>(null);
   const [deleting, startDelete] = useTransition();
 
+  function handleVisibility(document: ProjectDocument, visible: boolean) {
+    startDelete(async () => {
+      setDeleteState(await setDocumentVisibilityAction(projectId, document.id, visible));
+    });
+  }
+
+  // The budget's documents (what the AI read, the PDFs of each issued revision) first.
+  const groups = [
+    { key: "budget", documents: documents.filter((d) => d.budgetInput || d.budgetPdf) },
+    { key: "other", documents: documents.filter((d) => !d.budgetInput && !d.budgetPdf) },
+  ].filter((g) => g.documents.length > 0);
+  const visible = documents.filter((d) => d.visibleToClient).length;
+
   function handleDelete(document: ProjectDocument) {
     if (!confirm(t("confirmDelete", { title: document.title }))) return;
     startDelete(async () => {
@@ -51,7 +65,11 @@ export default function DocumentsScreen({
       <TabHeader
         projectRef={projectRef}
         title={t("title")}
-        summary={t("count", { count: documents.length })}
+        summary={
+          documents.length > 0
+            ? `${t("count", { count: documents.length })} · ${t("visibleCount", { count: visible })}`
+            : t("count", { count: 0 })
+        }
         action={
           canManage && (
             <Button type="button" onClick={() => setUploadOpen(true)}>
@@ -65,18 +83,25 @@ export default function DocumentsScreen({
       {documents.length === 0 ? (
         <EmptyState illustration={<EmptyFolder />} title={t("emptyTitle")} text={t("emptyText")} />
       ) : (
-        <section
-          className={cn(cardVariants({ size: "list" }), "py-2")}
-          aria-label={t("title")}
-        >
-          <DocumentList
-            documents={documents}
-            fileUrl={(document) => `/api/v1/projects/${projectId}/documents/${document.id}`}
-            onDelete={canManage ? handleDelete : undefined}
-            deleting={deleting}
-            error={deleteState?.error}
-          />
-        </section>
+        groups.map((group) => (
+          <section
+            key={group.key}
+            className={cn(cardVariants({ size: "list" }), "py-2")}
+            aria-labelledby={`documents-${group.key}`}
+          >
+            <h2 id={`documents-${group.key}`} className="border-b pt-2 pb-2.5 text-[19px]">
+              {t(`groups.${group.key}`)}
+            </h2>
+            <DocumentList
+              documents={group.documents}
+              fileUrl={(document) => `/api/v1/projects/${projectId}/documents/${document.id}`}
+              onDelete={canManage ? handleDelete : undefined}
+              onToggleVisibility={canManage ? handleVisibility : undefined}
+              deleting={deleting}
+              error={deleteState?.error}
+            />
+          </section>
+        ))
       )}
 
       {canManage && (

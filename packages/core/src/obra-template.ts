@@ -2,7 +2,7 @@
 // Every project starts with FRAMER's standard plan: §4 of the budget model
 // (presupuesto 036/2026 Rev.3, Castrillón). Staff adjust the % and scope, and
 // which budget chapters each hito closes, per project (PROCESS.md §4, §8.3).
-// The chapter codes follow the Castrillón chapter numbering.
+// The chapter codes are the FRAMER model's fixed chapters 01–20 (budget-template.ts).
 // ─────────────────────────────────────────────────────────────────────────────
 
 type HitoTemplate = {
@@ -51,11 +51,11 @@ export const HITO_TEMPLATE: HitoTemplate[] = [
   },
   {
     code: "H2",
-    name: "Cimentación",
+    name: "Movimiento de tierras y cimentación",
     pctBp: 1200,
     scope: "Losa HA-25 de 25 cm, cámara sanitaria anti-radón DB-HS 6 y saneamiento bajo rasante.",
     billingMoment: "Finalización de la losa y el saneamiento",
-    chapterCodes: ["01", "02", "03"],
+    chapterCodes: ["01", "02"],
     checks: [],
   },
   {
@@ -64,7 +64,7 @@ export const HITO_TEMPLATE: HitoTemplate[] = [
     pctBp: 1500,
     scope: "Montaje completo del esqueleto S350GD / Magnelis: muros estructurales, forjados y cubierta CNC.",
     billingMoment: "Estructura levantada",
-    chapterCodes: ["04"],
+    chapterCodes: ["03"],
     checks: [],
   },
   {
@@ -74,7 +74,7 @@ export const HITO_TEMPLATE: HitoTemplate[] = [
     scope:
       "Thermochip en fachada y cubierta, carpintería PVC de triple vidrio con persianas. Prueba de estanqueidad provisional.",
     billingMoment: "Vivienda cerrada al agua y al aire",
-    chapterCodes: ["05", "07", "10"],
+    chapterCodes: ["05", "06", "10"],
     checks: ["Prueba de estanqueidad provisional"],
   },
   {
@@ -83,7 +83,7 @@ export const HITO_TEMPLATE: HitoTemplate[] = [
     pctBp: 1000,
     scope: "Red Uponor PEX-a, descalcificador, sanitarios Roca Hall y grifería. Prueba de estanqueidad de toda la red.",
     billingMoment: "Red de fontanería probada",
-    chapterCodes: ["12"],
+    chapterCodes: ["11"],
     checks: ["Prueba de estanqueidad de toda la red"],
   },
   {
@@ -93,7 +93,7 @@ export const HITO_TEMPLATE: HitoTemplate[] = [
     scope:
       "Mecanismos Niessen Arco, cuadro Legrand de 48 elementos, preinstalación fotovoltaica, punto de recarga VE y red de telecomunicaciones Cat.6.",
     billingMoment: "Cuadro eléctrico y circuitos completos",
-    chapterCodes: ["13"],
+    chapterCodes: ["13", "14", "15"],
     checks: [],
   },
   {
@@ -102,7 +102,7 @@ export const HITO_TEMPLATE: HitoTemplate[] = [
     pctBp: 800,
     scope: "Aerotermia Mitsubishi Ecodan R32 A+++, suelo radiante Uponor, acumulador ACS de 200 L y VMC HCC2 PLA F7.",
     billingMoment: "Sistemas climáticos probados",
-    chapterCodes: ["14"],
+    chapterCodes: ["12"],
     checks: ["Puesta en marcha y equilibrado de los sistemas"],
   },
   {
@@ -112,7 +112,7 @@ export const HITO_TEMPLATE: HitoTemplate[] = [
     scope:
       "Pladur Q3, solados Porcelanosa, alicatados, carpintería de haya maciza, mortero Weber.pral Finish y pintura acrílica.",
     billingMoment: "Acabados exteriores e interiores completos",
-    chapterCodes: ["06", "08", "09", "11"],
+    chapterCodes: ["04", "07", "08", "09", "16"],
     checks: [],
   },
   {
@@ -121,7 +121,7 @@ export const HITO_TEMPLATE: HitoTemplate[] = [
     pctBp: 300,
     scope: "Llaves, CFO visado, Libro del Edificio, Blower Door y Certificado de Eficiencia Energética.",
     billingMoment: "Contra entrega de llaves y CFO",
-    chapterCodes: ["15", "16", "17"],
+    chapterCodes: ["17", "18", "19", "20"],
     checks: HANDOVER_DOCUMENTS,
   },
 ];

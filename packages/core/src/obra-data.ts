@@ -19,6 +19,7 @@ import { isCalendarDate } from "./calendar";
 import {
   amountCents,
   type BudgetLine,
+  type OptionKind,
   type Hito,
   type ObraError,
   type ObraStage,
@@ -34,6 +35,13 @@ import { clientProjectWhere } from "./project-client";
 // ─────────────────────────────────────────────────────────────────────────────
 
 const STATUS: Record<ObraError, number> = {
+  fixed_chapters: 409,
+  not_issued: 409,
+  change_reason_required: 400,
+  generation_running: 409,
+  ai_limit_reached: 429,
+  too_many_pages: 400,
+  no_documents: 400,
   missing_fields: 400,
   invalid_input: 400,
   invalid_stage: 400,
@@ -130,6 +138,10 @@ export function pickChanges<T>(
 }
 
 /** The next free `position` among the rows `where` selects, computed in the insert. */
+/** The sum of the selected lines' amounts, each rounded as `amountCents` does. */
+export const linesTotalSql = () =>
+  sql<string>`coalesce(sum(round(${budgetLines.quantityMilli}::numeric * ${budgetLines.unitPriceCents} / 1000)), 0)`;
+
 export function nextPosition(table: PgTable, position: AnyColumn, where: SQL | undefined) {
   return sql<number>`(select coalesce(max(${position}), -1) + 1 from ${table} where ${where})`;
 }
@@ -149,26 +161,38 @@ function toBudgetLine(row: LineRow): BudgetLine {
     unitPriceCents: row.unitPriceCents,
     amountCents: amountCents(row.quantityMilli, row.unitPriceCents),
     executedPct: row.executedPct,
+    source: row.source,
+    lineageId: row.lineageId,
+    baseCode: row.baseCode,
+    note: row.note,
   };
 }
 
-/** A chapter with its lines and their progress. */
+/** A chapter (or option) with its lines and their progress. */
 export type LoadedChapter = {
   id: string;
   code: string;
   name: string;
   changeNote: string | null;
+  pdfNote: string | null;
+  kind: "chapter" | "option";
+  optionKind: OptionKind | null;
+  replacesLine: string | null;
+  chosen: boolean | null;
   lines: BudgetLine[];
 } & Progress;
 
-/** A revision's chapters in order, each with its lines and progress. */
+/** What the contract includes: the chapters, and the options the client chose. */
+export const inContract = (c: LoadedChapter) => c.kind === "chapter" || c.chosen === true;
+
+/** A revision's chapters, then its options, in order, each with its lines and progress. */
 export async function loadChapters(revisionId: string): Promise<LoadedChapter[]> {
   const rows = await db
     .select({ chapter: budgetChapters, line: budgetLines })
     .from(budgetChapters)
     .leftJoin(budgetLines, eq(budgetLines.chapterId, budgetChapters.id))
     .where(eq(budgetChapters.revisionId, revisionId))
-    .orderBy(asc(budgetChapters.position), asc(budgetLines.position));
+    .orderBy(asc(budgetChapters.kind), asc(budgetChapters.position), asc(budgetLines.position));
 
   const chapters = new Map<string, { row: typeof budgetChapters.$inferSelect; lines: BudgetLine[] }>();
   for (const { chapter, line } of rows) {
@@ -181,6 +205,11 @@ export async function loadChapters(revisionId: string): Promise<LoadedChapter[]>
     code: row.code,
     name: row.name,
     changeNote: row.changeNote,
+    pdfNote: row.pdfNote,
+    kind: row.kind,
+    optionKind: row.optionKind,
+    replacesLine: row.replacesLine,
+    chosen: row.chosen,
     lines,
     ...progressOf(lines),
   }));
@@ -199,7 +228,9 @@ export async function loadBudget(tenantId: string, projectId: string) {
         eq(budgetRevisions.status, "accepted"),
       ),
     })) ?? null;
-  const chapters = revision ? await loadChapters(revision.id) : [];
+  // The works follow the contract: chapters plus the options the client chose.
+  // A FRAMER budget has all twenty chapters; those without lines aren't built.
+  const chapters = revision ? (await loadChapters(revision.id)).filter((c) => inContract(c) && c.lines.length > 0) : [];
   return { revision, chapters, progress: progressOf(chapters.flatMap((c) => c.lines)) };
 }
 

@@ -160,6 +160,7 @@ export const en: Messages = {
       plans: "Plans",
       certificates: "Certificates",
       other: "Other",
+      budget: "Budget",
     },
     new: "NEW",
     newLabel: ", new",

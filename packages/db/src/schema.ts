@@ -1,8 +1,10 @@
 import { and, eq, ne, relations, sql } from "drizzle-orm";
 import {
+  bigint,
   boolean,
   date,
   integer,
+  jsonb,
   pgEnum,
   pgTable,
   primaryKey,
@@ -30,15 +32,20 @@ export const documentCategoryEnum = pgEnum("document_category", [
   "plans",
   "certificates",
   "other",
+  // The budget's input documents and its PDFs (features/budget/TECH_DESIGN.md §3.4).
+  "budget",
 ]);
 export type StaffRole = Exclude<UserRole, "client">;
 
-// A budget revision is drafted, then accepted by the client (it becomes the
-// contract), and superseded when a later revision is accepted.
+// A budget revision is drafted, issued to the client (frozen, with its PDFs),
+// then accepted (it becomes the contract) or rejected; it is superseded when a
+// later revision is accepted.
 export const budgetRevisionStatusEnum = pgEnum("budget_revision_status", [
   "draft",
   "accepted",
   "superseded",
+  "issued",
+  "rejected",
 ]);
 export const STAFF_ROLES = userRoleEnum.enumValues.filter(
   (role): role is StaffRole => role !== "client",
@@ -53,6 +60,10 @@ export const tenants = pgTable("tenants", {
   name: text("name").notNull(),
   slug: text("slug").unique().notNull(),
   active: boolean("active").default(true).notNull(),
+  // Monthly spend cap for AI calls, in US cents (Claude bills in USD); null = no limit.
+  aiMonthlyLimitCents: integer("ai_monthly_limit_cents"),
+  // The company's letterhead on budget PDFs: { name, tagline, address, phone }.
+  letterhead: jsonb("letterhead"),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 });
@@ -269,6 +280,21 @@ export const projectDocuments = pgTable(
     category: documentCategoryEnum("category").notNull(),
     pathname: text("pathname").unique().notNull(),
     sizeBytes: integer("size_bytes").notNull(),
+    // Whether the project's client sees it in the app. Budget inputs and the
+    // detailed budget PDF are staff-only by default.
+    visibleToClient: boolean("visible_to_client").default(true).notNull(),
+    contentType: text("content_type").default("application/pdf").notNull(),
+    // The uploaded file's own name (budget inputs can be BC3 or spreadsheets).
+    filename: text("filename"),
+    // Set on the documents a budget was generated from: plans | basic | execution | measurements.
+    budgetInput: text("budget_input").$type<"plans" | "basic" | "execution" | "measurements">(),
+    // Set on the PDFs of an issued budget revision: general | detailed.
+    budgetRevisionId: text("budget_revision_id").references(() => budgetRevisions.id, {
+      onDelete: "set null",
+    }),
+    budgetPdf: text("budget_pdf").$type<"general" | "detailed">(),
+    // The file's id in Claude's Files API, reused across generations.
+    claudeFileId: text("claude_file_id"),
     uploadedById: text("uploaded_by_id").references(() => users.id, {
       onDelete: "set null",
     }),
@@ -346,6 +372,28 @@ export const budgetRevisions = pgTable(
     usefulAreaCm2: integer("useful_area_cm2"),
     // "Gastos no incluidos en el PEC", one per line.
     exclusions: text("exclusions"),
+    // "framer20": the FRAMER model (fixed chapters 01–20 + options). Null for
+    // budgets entered before it, whose chapters are free.
+    model: text("model"),
+    // Chapter 20 (Imprevistos) as a share of chapters 01–19: 5 % = 500.
+    contingencyBp: integer("contingency_bp").default(500).notNull(),
+    // The AI's quality reference: framer | project.
+    quality: text("quality").$type<"framer" | "project">(),
+    // What the PDFs print besides numbers (BudgetTexts in core's contract).
+    texts: jsonb("texts"),
+    // Validity, term, penalty, signing place (BudgetConditions).
+    conditions: jsonb("conditions"),
+    // The pre-issue checklist: { done: string[] } (core budget-review.ts).
+    review: jsonb("review"),
+    // "Motivo de la revisión": required to issue Rev.1 and later.
+    changeReason: text("change_reason"),
+    issuedOn: date("issued_on", { mode: "string" }),
+    validUntil: date("valid_until", { mode: "string" }),
+    acceptedOn: date("accepted_on", { mode: "string" }),
+    acceptedBy: text("accepted_by"),
+    rejectedOn: date("rejected_on", { mode: "string" }),
+    // The AI run that drafted it (Rev.0).
+    generationId: text("generation_id"),
     acceptedAt: timestamp("accepted_at", { mode: "date" }),
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { mode: "date" })
@@ -379,6 +427,16 @@ export const budgetChapters = pgTable(
     position: integer("position").notNull(),
     // Why the chapter changed against the previous revision.
     changeNote: text("change_note"),
+    // chapter (01–20) | option (OP1, OP2…: priced apart, below the PEC).
+    kind: text("kind").$type<"chapter" | "option">().default("chapter").notNull(),
+    // Printed under the title in the PDFs: a chapter's "Sustituye a…" note, an option's presentation.
+    pdfNote: text("pdf_note"),
+    // Options only: extra | alternative | deduction.
+    optionKind: text("option_kind").$type<"extra" | "alternative" | "deduction">(),
+    // Alternatives: the line code they replace ("10.02").
+    replacesLine: text("replaces_line"),
+    // Options: whether the client chose it, set when the revision is accepted.
+    chosen: boolean("chosen"),
   },
   (table) => ({
     revisionCodeUnique: unique("budget_chapters_revision_code_unique").on(
@@ -409,6 +467,17 @@ export const budgetLines = pgTable(
     unitPriceCents: integer("unit_price_cents").notNull(),
     // Share of the line built so far, 0–100.
     executedPct: integer("executed_pct").default(0).notNull(),
+    // base (from the price base) | estimated (AI, not in the base) | manual | computed (20.01).
+    source: text("source").$type<"base" | "estimated" | "manual" | "computed">().default("manual").notNull(),
+    // The price base code it came from ("03.14").
+    baseCode: text("base_code"),
+    // The AI's or staff's note on the measurement or price.
+    note: text("note"),
+    // The same line across revisions: copied with it into each new revision,
+    // so changes and progress follow the line even when its code changes.
+    lineageId: text("lineage_id")
+      .notNull()
+      .$defaultFn(() => crypto.randomUUID()),
     position: integer("position").notNull(),
     updatedAt: timestamp("updated_at", { mode: "date" })
       .defaultNow()
@@ -528,6 +597,79 @@ export const obraHitoPhotos = pgTable(
   },
   (table) => ({
     pk: primaryKey({ columns: [table.hitoId, table.photoId] }),
+  }),
+);
+
+// --- Budget: AI generation ---
+
+// One run of the AI that drafts a project's first budget from its documents
+// (core budget-ai/pipeline.ts, run as a Vercel Workflow).
+export const budgetGenerations = pgTable(
+  "budget_generations",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    // queued | running | succeeded | failed | cancelled
+    status: text("status").$type<"queued" | "running" | "succeeded" | "failed" | "cancelled">().notNull(),
+    // 0–5, for the progress bar.
+    step: integer("step").default(0).notNull(),
+    // [{ at, step, kind: info | done | error, text }]
+    log: jsonb("log").default([]).notNull(),
+    // { reference, quality, vatRateBp }
+    options: jsonb("options").notNull(),
+    documentIds: text("document_ids").array().notNull(),
+    // Step 1's result: the project as the AI read it.
+    extracted: jsonb("extracted"),
+    // The pipeline's working data: the inputs as sent to Claude and steps 2–5's
+    // results by group, so a retried step picks up where it was.
+    state: jsonb("state").default({}).notNull(),
+    revisionId: text("revision_id").references(() => budgetRevisions.id, { onDelete: "set null" }),
+    workflowRunId: text("workflow_run_id"),
+    error: text("error"),
+    createdById: text("created_by_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date" })
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => ({
+    projectIdx: index("budget_generations_project_idx").on(table.projectId),
+  }),
+);
+
+// One Claude API call: tokens and cost, for spend tracking per tenant.
+export const aiUsage = pgTable(
+  "ai_usage",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
+    projectId: text("project_id").references(() => projects.id, { onDelete: "set null" }),
+    generationId: text("generation_id").references(() => budgetGenerations.id, { onDelete: "set null" }),
+    // budget.extract | budget.group.0 …
+    purpose: text("purpose").notNull(),
+    model: text("model").notNull(),
+    inputTokens: integer("input_tokens").notNull(),
+    outputTokens: integer("output_tokens").notNull(),
+    cacheReadTokens: integer("cache_read_tokens").default(0).notNull(),
+    cacheWriteTokens: integer("cache_write_tokens").default(0).notNull(),
+    costMicroUsd: bigint("cost_micro_usd", { mode: "number" }).notNull(),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => ({
+    tenantCreatedIdx: index("ai_usage_tenant_created_idx").on(table.tenantId, table.createdAt),
   }),
 );
 

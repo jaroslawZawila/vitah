@@ -12,7 +12,9 @@
     "./storage": "./src/storage.ts",
     "./throttle": "./src/throttle.ts",
     "./testing": "./src/testing.ts",
-    "./seed": "./src/seed/seed-obra.ts"
+    "./seed": "./src/seed/seed-obra.ts",
+    "./budget-pipeline": "./src/budget-ai/pipeline.ts",
+    "./claude": "./src/budget-ai/claude.ts"
   },
   "scripts": {
     "check-types": "tsc --noEmit",
@@ -20,15 +22,21 @@
     "test": "vitest run --configLoader runner"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.133.0",
+    "@react-pdf/renderer": "^4.9.0",
     "@repo/db": "workspace:*",
     "@vercel/blob": "^2.8.0",
     "bcryptjs": "^2.4.3",
-    "sharp": "^0.35.4"
+    "exceljs": "^4.4.0",
+    "react": "^19.2.3",
+    "sharp": "^0.35.4",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@repo/typescript-config": "workspace:*",
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^22.15.3",
+    "@types/react": "19.2.18",
     "@vitest/coverage-v8": "^5.0.1",
     "tsx": "^4.19.0",
     "typescript": "5.9.2",

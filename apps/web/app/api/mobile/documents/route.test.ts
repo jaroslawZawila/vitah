@@ -1,12 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  createTestDocument,
   createTestProject,
   createTestTenant,
   createTestUser,
   resetDatabase,
 } from "@repo/db/testing";
 import { createMobileToken } from "@repo/auth/mobile";
-import { db, eq, users } from "@repo/db";
+import { db, eq, projects, users } from "@repo/db";
 import { documentsService, type Ctx } from "@repo/core";
 import { files } from "@repo/core/testing";
 import { GET as list } from "./route";
@@ -19,8 +20,8 @@ vi.mock("@repo/core/storage", () => import("@repo/core/testing"));
 
 const pdf = () => new File(["%PDF-1.7\ncontrato"], "c.pdf", { type: "application/pdf" });
 
-function request(token?: string) {
-  return new Request("http://localhost/api/mobile/documents", {
+function request(token?: string, query = "") {
+  return new Request(`http://localhost/api/mobile/documents${query}`, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
 }
@@ -71,6 +72,17 @@ describe("GET /api/mobile/documents", () => {
         },
       ],
     });
+  });
+
+  it("lists the budget's PDF as other for app builds that don't know the category", async () => {
+    const { client, token } = await setup();
+    const [project] = await db.select({ id: projects.id }).from(projects).where(eq(projects.clientUserId, client.id));
+    await createTestDocument(client.tenantId!, project!.id, { title: "Presupuesto", category: "budget" });
+
+    const old = (await (await list(request(token))).json()).documents;
+    expect(old.find((d: { title: string }) => d.title === "Presupuesto")).toMatchObject({ category: "other" });
+    const current = (await (await list(request(token, "?categories=contract,plans,certificates,other,budget"))).json()).documents;
+    expect(current.find((d: { title: string }) => d.title === "Presupuesto")).toMatchObject({ category: "budget" });
   });
 
   it("requires a valid token", async () => {

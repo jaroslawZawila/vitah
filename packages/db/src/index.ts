@@ -26,9 +26,11 @@ export {
   obraHitoChapters,
   obraHitoChecks,
   obraHitoPhotos,
+  budgetGenerations,
+  aiUsage,
 } from "./schema";
 export { seedConfig, seedPassword } from "./seed-config";
 export type { AnyColumn } from "drizzle-orm";
 export type { PgTable } from "drizzle-orm/pg-core";
-export { eq, ne, gt, lt, and, or, desc, asc, sql, count, sum, inArray, isNull, isNotNull, max, type SQL } from "drizzle-orm";
+export { eq, ne, gt, gte, lt, lte, and, or, desc, asc, sql, count, sum, inArray, isNull, isNotNull, max, type SQL } from "drizzle-orm";
 

@@ -1,4 +1,4 @@
-import { del, get, list, put } from "@vercel/blob";
+import { BlobNotFoundError, del, get, head, list, put } from "@vercel/blob";
 
 // File storage for project documents: a private Vercel Blob store. Files have
 // no public URL; they are only read back through our authenticated API.
@@ -13,6 +13,17 @@ export async function putFile(pathname: string, body: Blob, contentType: string)
 export async function readFile(pathname: string): Promise<ReadableStream<Uint8Array> | null> {
   const result = await get(pathname, { access: "private" });
   return result?.statusCode === 200 ? result.stream : null;
+}
+
+/** The file's size and type, or null if it doesn't exist (e.g. a direct upload that never landed). */
+export async function fileInfo(pathname: string): Promise<{ size: number; contentType: string } | null> {
+  try {
+    const blob = await head(pathname);
+    return { size: blob.size, contentType: blob.contentType };
+  } catch (error) {
+    if (error instanceof BlobNotFoundError) return null;
+    throw error;
+  }
 }
 
 export async function deleteFile(pathname: string) {

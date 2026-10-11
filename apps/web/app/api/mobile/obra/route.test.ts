@@ -16,7 +16,7 @@ const request = (token?: string) =>
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
 
-/** The seeded Castrillón project with a client attached. */
+/** The seeded Caviedes project with a client attached. */
 async function setup() {
   const { tenant, project } = await seededObraProject();
   const client = await createTestUser(tenant.id, { role: "client" });
@@ -37,7 +37,7 @@ describe("GET /api/mobile/obra", () => {
 
     expect(res.status).toBe(200);
     const { obra } = await res.json();
-    expect(obra).toMatchObject({ stage: 6, progressPct: 52 });
+    expect(obra).toMatchObject({ stage: 6, progressPct: 33 });
     expect(obra.phases.map((p: { key: string }) => p.key)).toEqual(["pre", "H2", "H3", "H4", "H5", "H6", "H7", "H8", "H9"]);
     expect(obra.hitos).toHaveLength(10);
   });

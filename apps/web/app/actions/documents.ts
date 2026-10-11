@@ -39,6 +39,49 @@ export async function addProjectDocumentAction(
   return mutate<DocumentError>(projectId, (ctx) => svc.addDocument(ctx, projectId, Object.fromEntries(formData)));
 }
 
+/** Shows a document in the client's app or hides it. */
+export async function setDocumentVisibilityAction(
+  projectId: string,
+  documentId: string,
+  visibleToClient: boolean,
+): Promise<DocumentsState> {
+  return mutate<DocumentError>(projectId, (ctx) =>
+    svc.setDocumentVisibility(ctx, projectId, documentId, { visibleToClient }),
+  );
+}
+
+/** Where the browser may upload a budget input (then registered below). */
+export async function budgetInputUploadAction(
+  projectId: string,
+  filename: string,
+): Promise<{ pathname?: string; error?: DocumentError }> {
+  const ctx = await getSessionContext();
+  if (!ctx) throw new Error("Unauthorized");
+  try {
+    return { pathname: (await svc.budgetInputUpload(ctx, projectId, filename)).pathname };
+  } catch (err) {
+    if (err instanceof CoreError) return { error: err.code as DocumentError };
+    throw err;
+  }
+}
+
+/** Uses a document already on the project as one of the budget's inputs. */
+export async function markBudgetInputAction(
+  projectId: string,
+  documentId: string,
+  budgetInput: string,
+): Promise<DocumentsState> {
+  return mutate<DocumentError>(projectId, (ctx) => svc.markBudgetInput(ctx, projectId, documentId, { budgetInput }));
+}
+
+/** Records a budget input the browser uploaded straight to the store. */
+export async function registerBudgetInputAction(
+  projectId: string,
+  input: Record<string, unknown>,
+): Promise<DocumentsState> {
+  return mutate<DocumentError>(projectId, (ctx) => svc.registerBudgetInput(ctx, projectId, input));
+}
+
 export async function deleteProjectDocumentAction(
   projectId: string,
   documentId: string,

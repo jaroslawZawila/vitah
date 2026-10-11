@@ -84,6 +84,13 @@ export async function readJson(request: Request): Promise<Record<string, unknown
   throw new CoreError("invalid_body", 400);
 }
 
+/** A JSON object body, or {} when there is none (for bodies that became optional). */
+export async function readOptionalJson(request: Request): Promise<Record<string, unknown>> {
+  const text = await request.text();
+  if (!text.trim()) return {};
+  return readJson(new Request(request.url, { method: "POST", body: text }));
+}
+
 export async function readForm(request: Request): Promise<Record<string, unknown>> {
   try {
     return Object.fromEntries(await request.formData());

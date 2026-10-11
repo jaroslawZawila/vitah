@@ -1,4 +1,5 @@
 import createNextIntlPlugin from "next-intl/plugin";
+import { withWorkflow } from "workflow/next";
 
 const withNextIntl = createNextIntlPlugin("./i18n/request.ts");
 
@@ -28,7 +29,7 @@ const SECURITY_HEADERS = [
 ];
 
 /** @type {import('next').NextConfig} */
-const nextConfig = {
+export const nextConfig = {
   poweredByHeader: false,
   async headers() {
     return [{ source: "/((?!api/).*)", headers: SECURITY_HEADERS }];
@@ -38,6 +39,8 @@ const nextConfig = {
     "/dashboard/projects/*/photos": LIBVIPS,
     // POST /api/v1/projects/:id/photos
     "/api/v1/projects/*/photos": LIBVIPS,
+    // The budget's AI run scales photos of plans (workflows/generate-budget.ts).
+    "/.well-known/workflow/**": LIBVIPS,
   },
   experimental: {
     // Document uploads (PDF ≤ 4 MB, see MAX_DOCUMENT_BYTES) go through a
@@ -46,4 +49,5 @@ const nextConfig = {
   },
 };
 
-export default withNextIntl(nextConfig);
+// withWorkflow: the budget is drafted by a durable workflow (workflows/).
+export default withWorkflow(withNextIntl(nextConfig));

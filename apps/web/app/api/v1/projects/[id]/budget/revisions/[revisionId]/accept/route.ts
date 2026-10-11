@@ -1,11 +1,14 @@
 import { budgetService } from "@repo/core";
-import { withContext } from "../../../../../../../../../lib/api";
+import { readOptionalJson, withContext } from "../../../../../../../../../lib/api";
 
-// POST: the draft becomes the accepted revision (the contract).
+// POST { acceptedOn?, acceptedBy?, chosenOptionIds? } (all optional): the
+// issued revision (or a draft, as before issuing existed) becomes the contract.
 
 type Params = { params: Promise<{ id: string; revisionId: string }> };
 
 export async function POST(request: Request, { params }: Params) {
   const { id, revisionId } = await params;
-  return withContext(request, (ctx) => budgetService.acceptRevision(ctx, id, revisionId));
+  return withContext(request, async (ctx) =>
+    budgetService.acceptRevision(ctx, id, revisionId, await readOptionalJson(request)),
+  );
 }

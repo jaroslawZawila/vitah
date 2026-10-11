@@ -59,8 +59,8 @@ describe("reading the obra", () => {
 
     const result = await getProjectObra(project.id);
 
-    expect(result).toMatchObject({ canManage: false, obra: { stage: 6, progressPct: 52 } });
-    expect(result!.obra.chapters).toHaveLength(17);
+    expect(result).toMatchObject({ canManage: false, obra: { stage: 6, progressPct: 33 } });
+    expect(result!.obra.chapters.map((c) => c.code)).toEqual(Array.from({ length: 20 }, (_, i) => String(i + 1).padStart(2, "0")));
   });
 
   it("gives a chapter, and a hito with the project's photos to pick from", async () => {

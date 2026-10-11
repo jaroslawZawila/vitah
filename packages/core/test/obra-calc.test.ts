@@ -55,6 +55,18 @@ describe("progressOf", () => {
     expect(almost).toMatchObject({ progressPct: 99, status: "active" });
   });
 
+  it("doesn't wait on a chosen deduction: the owner's works aren't built, the credit follows the rest", () => {
+    const lines = (pct: number) => [
+      { amountCents: 10_000, executedPct: pct },
+      { amountCents: -2_000, executedPct: 0 },
+    ];
+    expect(progressOf(lines(0))).toEqual({ totalCents: 8_000, executedCents: 0, progressPct: 0, status: "pending" });
+    expect(progressOf(lines(50))).toEqual({ totalCents: 8_000, executedCents: 4_000, progressPct: 50, status: "active" });
+    expect(progressOf(lines(100))).toEqual({ totalCents: 8_000, executedCents: 8_000, progressPct: 100, status: "done" });
+    // A deduction's own chapter has nothing to build.
+    expect(progressOf([{ amountCents: -2_000, executedPct: 0 }])).toMatchObject({ executedCents: -2_000, status: "done" });
+  });
+
   it("is pending with no progress or no lines", () => {
     expect(progressOf([{ amountCents: 100, executedPct: 0 }]).status).toBe("pending");
     expect(progressOf([])).toEqual({ totalCents: 0, executedCents: 0, progressPct: 0, status: "pending" });

@@ -7,7 +7,14 @@ import {
   createTestUser,
   resetDatabase,
 } from "@repo/db/testing";
-import { MAX_DOCUMENT_BYTES, documentsService as svc, projectsService, type Ctx } from "../src";
+import {
+  MAX_DOCUMENT_BYTES,
+  budgetGenerationsService,
+  budgetService,
+  documentsService as svc,
+  projectsService,
+  type Ctx,
+} from "../src";
 import { files } from "../src/testing";
 
 vi.mock("../src/storage", () => import("../src/testing"));
@@ -146,6 +153,11 @@ describe("listDocuments", () => {
         sizeBytes: 1024,
         uploadedAt: "2026-02-01T10:00:00.000Z",
         uploadedBy: "Admin",
+        visibleToClient: true,
+        contentType: "application/pdf",
+        filename: null,
+        budgetInput: null,
+        budgetPdf: null,
       },
       {
         id: older.id,
@@ -154,6 +166,11 @@ describe("listDocuments", () => {
         sizeBytes: 2048,
         uploadedAt: "2026-01-01T10:00:00.000Z",
         uploadedBy: null,
+        visibleToClient: true,
+        contentType: "application/pdf",
+        filename: null,
+        budgetInput: null,
+        budgetPdf: null,
       },
     ]);
   });
@@ -258,6 +275,15 @@ describe("client documents", () => {
     ]);
   });
 
+  it("lists a category the app doesn't know as other, unless it asks for it", async () => {
+    const { tenant, client, project } = await setup();
+    await createTestDocument(tenant.id, project.id, { title: "Presupuesto", category: "budget" });
+
+    expect((await svc.listClientDocuments(tenant.id, client.id))[0]).toMatchObject({ title: "Presupuesto", category: "other" });
+    const current = await svc.listClientDocuments(tenant.id, client.id, ["contract", "plans", "certificates", "other", "budget"]);
+    expect(current[0]).toMatchObject({ category: "budget" });
+  });
+
   it("lists nothing for a client without a project", async () => {
     const { tenant, client, project, ctx } = await setup();
     await upload(ctx, project.id);
@@ -295,6 +321,116 @@ describe("client documents", () => {
         status: 404,
       });
     }
+  });
+});
+
+describe("visibility", () => {
+  it("hides a document from the client's app and shows it again", async () => {
+    const { tenant, client, project, ctx } = await setup();
+    const doc = await createTestDocument(tenant.id, project.id);
+    files.set(doc.pathname, pdf());
+
+    await svc.setDocumentVisibility(ctx, project.id, doc.id, { visibleToClient: false });
+    expect(await svc.listClientDocuments(tenant.id, client.id)).toEqual([]);
+    await expect(svc.openClientDocument(tenant.id, client.id, doc.id)).rejects.toMatchObject({ code: "not_found" });
+    // Staff still see and open it.
+    expect((await svc.listDocuments(ctx, project.id))[0]).toMatchObject({ id: doc.id, visibleToClient: false });
+
+    await svc.setDocumentVisibility(ctx, project.id, doc.id, { visibleToClient: true });
+    expect((await svc.listClientDocuments(tenant.id, client.id)).map((d) => d.id)).toEqual([doc.id]);
+  });
+
+  it("only shows the app PDFs it can download", async () => {
+    const { tenant, project, ctx } = await setup();
+    const sheet = await createTestDocument(tenant.id, project.id, { visibleToClient: false, contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    const plans = await createTestDocument(tenant.id, project.id, { visibleToClient: false, sizeBytes: MAX_DOCUMENT_BYTES + 1 });
+
+    await expect(svc.setDocumentVisibility(ctx, project.id, sheet.id, { visibleToClient: true })).rejects.toMatchObject({ code: "invalid_file_type" });
+    await expect(svc.setDocumentVisibility(ctx, project.id, plans.id, { visibleToClient: true })).rejects.toMatchObject({ code: "file_too_large" });
+    // Hiding is always allowed.
+    await svc.setDocumentVisibility(ctx, project.id, plans.id, { visibleToClient: false });
+  });
+
+  it("is for editors of the document's own tenant", async () => {
+    const { tenant, project, ctx } = await setup();
+    const doc = await createTestDocument(tenant.id, project.id);
+    const other = await setup();
+
+    await expect(svc.setDocumentVisibility({ ...ctx, role: "viewer" }, project.id, doc.id, { visibleToClient: false })).rejects.toMatchObject({ code: "forbidden" });
+    await expect(svc.setDocumentVisibility(other.ctx, project.id, doc.id, { visibleToClient: false })).rejects.toMatchObject({ code: "project_not_found" });
+    await expect(svc.setDocumentVisibility(other.ctx, other.project.id, doc.id, { visibleToClient: false })).rejects.toMatchObject({ code: "not_found" });
+    await expect(svc.setDocumentVisibility(ctx, project.id, doc.id, {})).rejects.toMatchObject({ code: "missing_fields" });
+  });
+});
+
+describe("budget inputs", () => {
+  /** Asks for a pathname, "uploads" to it and registers the file. */
+  async function uploadInput(ctx: Ctx, projectId: string, filename: string, content: string, budgetInput = "plans") {
+    const { pathname } = await svc.budgetInputUpload(ctx, projectId, filename);
+    files.set(pathname, new Blob([content]));
+    return { pathname, ...(await svc.registerBudgetInput(ctx, projectId, { pathname, budgetInput, filename })) };
+  }
+
+  it("registers files the browser uploaded, staff-only", async () => {
+    const { tenant, client, project, ctx } = await setup();
+
+    const plans = await uploadInput(ctx, project.id, "Planos Arboleda.pdf", "%PDF-1.7 planos");
+    const bc3 = await uploadInput(ctx, project.id, "mediciones.BC3", "~V|ANSI|", "measurements");
+
+    const docs = await svc.listDocuments(ctx, project.id);
+    expect(docs.find((d) => d.id === plans.documentId)).toMatchObject({
+      title: "Planos Arboleda",
+      category: "budget",
+      budgetInput: "plans",
+      visibleToClient: false,
+      contentType: "application/pdf",
+    });
+    expect(docs.find((d) => d.id === bc3.documentId)).toMatchObject({ budgetInput: "measurements", filename: "mediciones.BC3" });
+    expect(await svc.listClientDocuments(tenant.id, client.id)).toEqual([]);
+    expect(plans.pathname).toMatch(new RegExp(`^tenants/${tenant.id}/projects/${project.id}/inputs/.+\\.pdf$`));
+  });
+
+  it("only takes allowed types, real PDFs and files under the project's own inputs", async () => {
+    const { project, ctx } = await setup();
+    const other = await setup();
+
+    await expect(svc.budgetInputUpload(ctx, project.id, "virus.exe")).rejects.toMatchObject({ code: "invalid_file_type" });
+    await expect(uploadInput(ctx, project.id, "planos.pdf", "not a pdf")).rejects.toMatchObject({ code: "invalid_file_type" });
+    const { pathname } = await svc.budgetInputUpload(ctx, project.id, "planos.pdf");
+    // Never uploaded.
+    await expect(svc.registerBudgetInput(ctx, project.id, { pathname, budgetInput: "plans", filename: "planos.pdf" })).rejects.toMatchObject({ code: "missing_file" });
+    // Another project's upload.
+    files.set(pathname, new Blob(["%PDF-1.7"]));
+    await expect(svc.registerBudgetInput(other.ctx, other.project.id, { pathname, budgetInput: "plans", filename: "planos.pdf" })).rejects.toMatchObject({ code: "not_found" });
+    await expect(svc.registerBudgetInput(ctx, project.id, { pathname, budgetInput: "fotos", filename: "planos.pdf" })).rejects.toMatchObject({ code: "invalid_category" });
+    await expect(svc.budgetInputUpload({ ...ctx, role: "viewer" }, project.id, "planos.pdf")).rejects.toMatchObject({ code: "forbidden" });
+  });
+
+  it("takes a document already on the project as an input, keeping its visibility", async () => {
+    const { tenant, project, ctx } = await setup();
+    const doc = await createTestDocument(tenant.id, project.id, { title: "Planos visados", category: "plans" });
+    const other = await setup();
+
+    await svc.markBudgetInput(ctx, project.id, doc.id, { budgetInput: "plans" });
+
+    expect((await svc.listDocuments(ctx, project.id))[0]).toMatchObject({ budgetInput: "plans", visibleToClient: true, category: "plans" });
+    await expect(svc.markBudgetInput(ctx, project.id, doc.id, { budgetInput: "x" })).rejects.toMatchObject({ code: "invalid_category" });
+    await expect(svc.markBudgetInput(other.ctx, other.project.id, doc.id, { budgetInput: "plans" })).rejects.toMatchObject({ code: "not_found" });
+  });
+
+  it("can be swapped until the AI reads them or the project has a budget", async () => {
+    const { project, ctx } = await setup();
+    const first = await uploadInput(ctx, project.id, "planos.pdf", "%PDF-1.7 a");
+    await svc.deleteDocument(ctx, project.id, first.documentId);
+    expect(files.has(first.pathname)).toBe(false);
+
+    const second = await uploadInput(ctx, project.id, "planos.pdf", "%PDF-1.7 b");
+    const { generationId } = await budgetGenerationsService.startGeneration(ctx, project.id, { documentIds: [second.documentId] });
+    // Not while the AI reads it.
+    await expect(svc.deleteDocument(ctx, project.id, second.documentId)).rejects.toMatchObject({ code: "generation_running" });
+    await budgetGenerationsService.cancelGeneration(ctx, project.id, generationId);
+    await budgetService.createBudget(ctx, project.id, {});
+    await expect(svc.deleteDocument(ctx, project.id, second.documentId)).rejects.toMatchObject({ code: "budget_document", status: 409 });
   });
 });
 

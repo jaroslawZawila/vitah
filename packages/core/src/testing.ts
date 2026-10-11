@@ -12,6 +12,11 @@ export async function readFile(pathname: string) {
   return files.get(pathname)?.stream() ?? null;
 }
 
+export async function fileInfo(pathname: string) {
+  const file = files.get(pathname);
+  return file ? { size: file.size, contentType: file.type || "application/octet-stream" } : null;
+}
+
 export async function deleteFile(pathname: string) {
   files.delete(pathname);
 }

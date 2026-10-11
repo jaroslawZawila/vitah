@@ -1,14 +1,16 @@
 import type { Ctx } from "../context";
 import * as budget from "../budget";
+import * as options from "../budget-options";
 import * as hitos from "../hitos";
 import * as obra from "../obra";
-import { CASTRILLON_BUDGET } from "./castrillon";
+import { CAVIEDES_BUDGET } from "./caviedes";
 
 // ─── Demo obra ───────────────────────────────────────────────────────────────
-// Loads the real Castrillón budget (Rev.3) into a project and records a
-// snapshot half way through the works: foundation and structure built, the
-// envelope under way, H0–H2 paid and H3 invoiced. Used by `pnpm db:seed` for
-// the local dev project, and by tests as a realistic fixture.
+// Loads the real Caviedes budget (004/2026, the FRAMER model: twenty chapters
+// and the pool as an option) into a project as the accepted contract, then
+// records a snapshot part way through the works: foundation and structure
+// built, the envelope under way, H0–H2 paid and H3 invoiced. Used by
+// `pnpm db:seed` for the local dev project, and by tests as a realistic fixture.
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Executed % by line code; a chapter code applies to all its lines. */
@@ -16,34 +18,55 @@ const PROGRESS: Record<string, number> = {
   "01": 100,
   "02": 100,
   "03": 100,
-  "04": 100,
   "05.01": 100,
   "05.02": 100,
   "05.03": 60,
-  "05.04": 20,
-  "05.06": 15,
-  "07": 60,
-  "10": 40,
-  "12": 15,
-  "13": 10,
-  "16": 50,
+  "06.01": 80,
+  "06.02": 80,
+  "06.03": 40,
+  "10.01": 50,
+  "18": 50,
+  "19": 30,
 };
 
 const pdf = (text: string) => new File([`%PDF-1.4\n% ${text}\n`], `${text}.pdf`, { type: "application/pdf" });
+
+/** The Caviedes budget as an accepted Rev.0 (the pool offered, not chosen). */
+export async function seedBudget(ctx: Ctx, projectId: string, { accept = true } = {}) {
+  const { reference, builtAreaM2, usefulAreaM2, chapters, texts, conditions } = CAVIEDES_BUDGET;
+  const { revisionId } = await budget.createBudget(ctx, projectId, { reference });
+  await budget.updateRevision(ctx, projectId, revisionId, {
+    builtAreaM2,
+    usefulAreaM2,
+    texts: { ...texts, annex: texts.annex.map((item, i) => ({ ...item, id: `n${i + 1}` })) },
+    conditions,
+  });
+  const { revision } = await budget.getBudget(ctx, projectId, revisionId);
+  const chapterIds = new Map(revision!.chapters.map((c) => [c.code, c.id]));
+  for (const chapter of chapters) {
+    const chapterId = chapterIds.get(chapter.code)!;
+    await budget.updateChapter(ctx, projectId, chapterId, { name: chapter.name, pdfNote: chapter.note ?? null });
+    for (const line of chapter.lines) await budget.addLine(ctx, projectId, chapterId, { ...line, source: "base" });
+  }
+  for (const option of CAVIEDES_BUDGET.options) {
+    const intro = [option.intro, option.footnote].filter(Boolean).join("\n\n");
+    const { optionId } = await options.addOption(ctx, projectId, revisionId, { name: option.name, optionKind: option.optionKind, intro });
+    for (const { code: _, ...line } of option.lines) await budget.addLine(ctx, projectId, optionId, line);
+  }
+  const plan = await hitos.listHitos(ctx, projectId);
+  await hitos.updatePlan(ctx, projectId, {
+    hitos: CAVIEDES_BUDGET.hitos.map(({ code, ...values }) => ({ id: plan.find((h) => h.code === code)!.id, ...values })),
+  });
+  if (accept) await budget.acceptRevision(ctx, projectId, revisionId, { acceptedOn: "2026-01-15", acceptedBy: "D. Fernando Barcenilla" });
+  return { revisionId };
+}
 
 /**
  * `files: false` leaves out the acta and invoice PDFs (H2 is then only paid,
  * H3 ready for its acta), for when no Blob store is configured.
  */
 export async function seedObra(ctx: Ctx, projectId: string, { files = true } = {}) {
-  const { reference, number, builtAreaM2, usefulAreaM2, exclusions, chapters } = CASTRILLON_BUDGET;
-  const { revisionId } = await budget.createBudget(ctx, projectId, { reference, number });
-  await budget.updateRevision(ctx, projectId, revisionId, { builtAreaM2, usefulAreaM2, exclusions });
-  for (const { lines, ...chapter } of chapters) {
-    const { chapterId } = await budget.addChapter(ctx, projectId, revisionId, chapter);
-    for (const line of lines) await budget.addLine(ctx, projectId, chapterId, line);
-  }
-  await budget.acceptRevision(ctx, projectId, revisionId);
+  const { revisionId } = await seedBudget(ctx, projectId);
 
   const { revision } = await budget.getBudget(ctx, projectId, revisionId);
   const lines = revision!.chapters.flatMap((c) =>

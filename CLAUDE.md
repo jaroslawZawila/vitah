@@ -174,7 +174,7 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
 ### Database
 
 - **Driver:** `postgres` (postgres.js) — works with any PostgreSQL (local Docker, Vercel Postgres, AWS RDS, etc.)
-- Schema in `packages/db/src/schema.ts` — tables: `tenants`, `users`, `client_profiles`, `client_settings`, `push_tokens`, `accounts`, `sessions`, `verification_tokens`, `projects`, `project_documents`, `project_photos`, and the obra's `budget_revisions`, `budget_chapters`, `budget_lines`, `obra_hitos`, `obra_hito_chapters`, `obra_hito_checks`, `obra_hito_photos`. A project is deliberately minimal — exactly what the mobile app shows: `ref`, `address`, `start_date`, `completion_date`, plus `client_user_id` linking it to its mobile app client
+- Schema in `packages/db/src/schema.ts` — tables: `tenants`, `users`, `client_profiles`, `client_settings`, `push_tokens`, `accounts`, `sessions`, `verification_tokens`, `projects`, `project_documents`, `project_photos`, and the obra's `budget_revisions`, `budget_chapters`, `budget_lines`, `obra_hitos`, `obra_hito_chapters`, `obra_hito_checks`, `obra_hito_photos`, plus `budget_generations` (AI runs) and `ai_usage` (one row per Claude call, with its cost). A project is deliberately minimal — exactly what the mobile app shows: `ref`, `address`, `start_date`, `completion_date`, plus `client_user_id` linking it to its mobile app client
 - Prod migrations are additive SQL files in `packages/db/sql/`, applied by hand (no plain `db:push` on prod)
 
 ### Obra (construction process)
@@ -183,14 +183,41 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
   budget in the FRAMER model, and payment hitos H0–H9. Designs: `doc/mobile-app-design/A-Progress|A-Fase|A-Obra-Pagos|A-Hito`
   and `doc/platform-design/P-*`
 - Budget (`packages/core/src/budget.ts`): revisions → chapters → lines (partidas), money in cents, quantities in
-  thousandths. A draft is edited freely; accepting it makes it the contract. Staff then record each line's executed %;
-  a change is a new revision (copied, compared with the previous). Only the accepted revision drives prices and progress
+  thousandths. Staff then record each line's executed %; a change is a new revision (copied, compared with the
+  previous). Only the accepted revision drives prices and progress. The budget itself is under "Budget" below
 - Hitos (`hitos.ts`): every project starts with the standard plan (`obra-template.ts`); staff set each hito's % and the
   chapter codes it closes. The acta is signed on paper; staff upload it and the invoice (PDFs), then record the payment
 - `obra.ts` builds the portal's Obra page and the app's phases (pre-construction + one per hito); the arithmetic
   (progress, due dates, penalty, phases) is pure in `obra-calc.ts`, also used by the portal for live figures
 - Portal tabs Obra (chapter control at `obra/[code]`), Presupuesto and Pagos (`payments/[hitoId]`); app tab Obra with
-  pushed screens under `app/(app)/obra/`. `pnpm db:seed` gives VTH-26-001 the real Castrillón budget half built
+  pushed screens under `app/(app)/obra/`. `pnpm db:seed` gives VTH-26-001 the real Caviedes budget (`seed/caviedes.ts`), its obra half built
+
+### Budget (Presupuesto)
+
+- Spec: `features/budget/TECH_DESIGN.md` (decisions in §17); PDF template and AI prompts in the same folder
+- Model `framer20`: always the 20 fixed chapters 01–20 (`budget-template.ts`); chapter 20 is one computed line,
+  `contingency_bp` × chapters 01–19, kept in sync by `syncDraft` (`budget-draft.ts`) inside every draft write.
+  Options live below as `budget_chapters` with `kind = 'option'` (codes OP1, OP2…, lines numbered OP.01… across
+  all options, renumbered automatically); they may subtract (deductions, alternatives). Lines can come from the fixed
+  FRAMER 2026 price base (`price-base-data.ts`, searched with `searchPriceBase`) or be "estimated"
+- Status: draft → issued (frozen; both PDFs stored as project documents) → accepted or rejected; an older revision is
+  superseded when a later one is accepted. One draft at a time; from Rev.1 issuing needs a `changeReason`.
+  Accepting records the options the client chose: contract price = PEC + chosen options, and that is what the obra,
+  hitos H0–H9 and the app use (`inContract` in `obra-data.ts`). Accepting a draft directly still works (v1)
+- PDFs (`budget-pdf/`, `@react-pdf/renderer`, DejaVu Sans embedded): general and detailed, rendered by
+  `budget-issue.ts`; a draft's are rendered on the fly with a "BORRADOR" watermark. The general one is shared with the
+  client by default; the detailed one stays staff-only. Issued PDFs can't be deleted
+- First draft by AI (`budget-ai/`): up to four inputs (plans, basic project, execution project, measurements as
+  PDF/XLSX/BC3), uploaded straight from the browser to the private Blob store (`documents/uploads`, ≤ 100 MB) and
+  registered as staff-only project documents. A durable Vercel Workflow (`apps/web/workflows/generate-budget.ts`,
+  started by `lib/budget-generation.ts`) runs: read the project (`claude-opus-5-5`, Files API), then chapters in four
+  groups (`claude-sonnet-5-5`), then saves Rev.0. The portal polls the run's log. `tenants.ai_monthly_limit_cents`
+  caps spend (null = no limit). Tests mock `budget-ai/claude` — never call the real API in tests
+- Review checks (`budget-review.ts`): the AI's inconsistencies and assumptions, estimated lines and chapters off the
+  tenant's own €/m² averages; staff tick them off before issuing
+- Portal: Budget tab pages under `dashboard/projects/[id]/budget/` (summary, lines, options, texts, conditions,
+  revisions, pdf; `?revision=` shows an older one); `BudgetScreen` / `BudgetStartScreen` are the containers, views in
+  `components/budget/`. Web-only: the app only sees the general PDF (Documentos) and the contract via the obra
 
 ### Live updates (app open)
 
@@ -205,12 +232,14 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
 ### Project documents
 
 - PDFs (≤ 4 MB, `MAX_DOCUMENT_BYTES`) shared with a project's client. Admins/managers upload and delete on the project page; all staff can download. Service: `packages/core/src/documents.ts`
+- `visible_to_client` decides whether the app shows a document (staff switch it on the Documents tab); budget inputs
+  start staff-only. Budget documents (`budget_input`, `budget_pdf`) are grouped first; issued PDFs can't be deleted
 - Files live in a **private Vercel Blob store** (`packages/core/src/storage.ts`) and are only ever streamed through our API after an auth check — no public or presigned URLs. Uploads go through our functions, hence the 4 MB cap (Vercel's 4.5 MB body limit)
 - The mobile app keeps offline copies (`apps/mobile/lib/document-store.ts`), syncs on app open / foreground / pull-to-refresh, and wipes them on sign-out
 - Uploading a photo or document pushes a notification to the project's client (`packages/core/src/notifications.ts`, via Expo's push service), if their Perfil toggle is on; a failed push never fails the upload. Push needs an EAS project id (`npx eas init`) and, on Android, a development/store build
 - Tests swap storage for an in-memory one: `vi.mock("@repo/core/storage", () => import("@repo/core/testing"))`
 - Drizzle Kit for migrations: `pnpm db:generate`, `pnpm db:migrate`, `pnpm db:push`
-- Seed script: `pnpm db:seed` creates the tenant, the admin user, project VTH-26-001 and its mobile app client
+- Seed script: `pnpm db:seed` creates the tenant, the admin user, project VTH-26-001 (with the Caviedes budget, accepted, and its obra half built) and its mobile app client
 - Local dev: Docker Compose with PostgreSQL 16 (`docker-compose.yml` at root)
 - Vercel: `POSTGRES_URL` injected automatically from linked Vercel Postgres store
 
@@ -307,10 +336,12 @@ Each app needs `.env.local` (not committed):
 NEXTAUTH_SECRET=<generated-secret>
 POSTGRES_URL=postgres://vitah:vitah_dev@localhost:4432/vitah   # local Docker default
 BLOB_READ_WRITE_TOKEN=<token of a private Blob store>           # apps/web only, for documents
+ANTHROPIC_API_KEY=<key>                                         # apps/web only, for the AI budget draft
 ```
 
 On Vercel, `POSTGRES_URL` is injected automatically from the linked Vercel Postgres store, and Blob
-credentials from the connected private Blob store.
+credentials from the connected private Blob store. `ANTHROPIC_API_KEY` is set by hand; Vercel Workflow runs the
+budget AI (no extra config beyond `withWorkflow` in `next.config.js`).
 
 ## Brand Reference
 

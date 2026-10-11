@@ -3,6 +3,8 @@
 import { useFormatter, useLocale } from "next-intl";
 
 /** Money, shares and calendar dates as the obra screens show them. */
+const MB = 1024 * 1024;
+
 export function useObraFormat() {
   const format = useFormatter();
   const locale = useLocale();
@@ -30,6 +32,17 @@ export function useObraFormat() {
     parse: (text: string) => parseDecimal(text, locale),
     /** A typed amount in hundredths (see `parseHundredths`). */
     hundredths: (text: string) => parseHundredths(text, locale),
+    /** The same, allowing a leading minus (an option's deduction). */
+    signedHundredths: (text: string) => {
+      const negative = /^\s*[−-]/.test(text);
+      const value = parseHundredths(text.replace(/^\s*[−-]/, ""), locale);
+      return negative ? -value : value;
+    },
+    /** A file's size: "340 KB", "3,1 MB". */
+    fileSize: (bytes: number) =>
+      bytes < MB
+        ? format.number(Math.max(1, Math.round(bytes / 1024)), { style: "unit", unit: "kilobyte" })
+        : format.number(bytes / MB, { style: "unit", unit: "megabyte", maximumFractionDigits: 1 }),
     /** A number with 2 decimals, e.g. "253,45" (amounts in forms). */
     decimal: (value: number) =>
       format.number(value, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),

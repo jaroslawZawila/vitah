@@ -116,7 +116,8 @@
         "contract": "Contract",
         "plans": "Plans",
         "certificates": "Certificates",
-        "other": "Other"
+        "other": "Other",
+        "budget": "Budget"
       },
       "errors": {
         "missing_fields": "Enter a title.",
@@ -126,8 +127,22 @@
         "file_too_large": "The file is larger than the 4 MB limit.",
         "project_not_found": "Project not found.",
         "not_found": "Document not found.",
-        "forbidden": "Only admins and managers can manage documents."
-      }
+        "forbidden": "Only admins and managers can manage documents.",
+        "budget_document": "This document belongs to the budget and can't be deleted.",
+        "generation_running": "The AI is reading this document: wait for it to finish or cancel it."
+      },
+      "visibleCount": "{count, plural, =0 {none in the client's app} one {# in the client's app} other {# in the client's app}}",
+      "groups": {
+        "budget": "Budget",
+        "other": "Other documents"
+      },
+      "origins": {
+        "budgetPdf": "Budget PDF",
+        "budgetInput": "Project documentation"
+      },
+      "visibleLabel": "Visible in the client's app: {title}",
+      "visible": "In the app",
+      "hidden": "Staff only"
     },
     "close": "Close",
     "photos": {
@@ -419,96 +434,10 @@
       "noPhotos": "No photos of this chapter yet."
     },
     "budget": {
-      "title": "Budget",
-      "summary": "No. {reference} · contract price (PEC) · fixed price · valid 90 days from issue",
-      "noReference": "no number",
-      "export": "Export PDF",
-      "newRevision": "New revision",
-      "accept": "Accept revision",
-      "confirmAccept": "Accept Rev.{number}? It becomes the contract: its lines are fixed and progress is recorded on it.",
-      "deleteDraft": "Delete draft",
-      "confirmDeleteDraft": "Delete draft Rev.{number}?",
-      "editDetails": "Edit details",
-      "revisions": "Revisions",
-      "revision": "Rev.{number} · {total} · {status}",
-      "revisionStatus": {
-        "draft": "draft",
-        "accepted": "accepted",
-        "superseded": "superseded"
-      },
-      "total": "Total price (ex VAT)",
-      "vsPrevious": "{delta} vs Rev.{number}",
-      "withVat": "With VAT {rate}",
-      "vat": "VAT {amount}",
-      "surfaces": "Areas",
-      "built": "{m2} m² built",
-      "useful": "{m2} m² usable",
-      "notSet": "Not set",
-      "ratios": "Ratios",
-      "perBuilt": "{amount}/m² built",
-      "perUseful": "{amount}/m² usable",
-      "changes": "Changes vs Rev.{number}",
-      "changesWhy": "Reason",
-      "before": "Rev.{number}",
-      "after": "Rev.{number}",
-      "delta": "Change",
-      "removed": "Removed",
-      "noChanges": "No chapter changed since the previous revision.",
-      "detail": "Detailed budget",
-      "detailSummary": "{chapters} chapters · {lines} lines · staff only; the client sees the chapter summary",
-      "lineCount": "{count, plural, one {# line} other {# lines}}",
-      "codeCol": "Code",
-      "descriptionCol": "Description of the work unit",
-      "unitCol": "Unit",
-      "qtyCol": "Qty",
-      "priceCol": "Unit price (€)",
-      "amountCol": "Amount (€)",
-      "addLine": "Add line",
-      "addChapter": "Add chapter",
-      "editChapter": "Edit chapter",
-      "deleteChapter": "Delete chapter",
-      "confirmDeleteChapter": "Delete chapter {code} and its lines?",
-      "subtotal": "Chapter {code} subtotal · {amount}",
-      "grandTotal": "TOTAL PRICE (ex VAT) — Revision {number}",
-      "editLine": "Edit {code}",
-      "deleteLine": "Delete {code}",
-      "confirmDeleteLine": "Delete line {code}?",
-      "qtyLabel": "Quantity of {code}",
-      "priceLabel": "Unit price of {code}",
-      "flags": {
-        "up": "★ revised up",
-        "down": "▼ revised down",
-        "new": "✦ new"
-      },
-      "plan": "§4 Payment plan",
-      "planLink": "Milestones H0–H9 →",
-      "planHint": "Amounts follow each accepted revision",
-      "exclusions": "§5 Not included",
-      "exclusionsCount": "{count, plural, =0 {No exclusions} one {# exclusion} other {# exclusions}}",
-      "guarantees": "§6–§8 Warranties, documents and contract",
-      "guaranteesText": "LOE 1 · 3 · 10 years",
-      "guaranteesHint": "The handover documents are milestone H9's checklist",
-      "emptyTitle": "No budget yet",
-      "emptyText": "Create the first revision following the budget model: chapters and lines. Once the client accepts it, it becomes the contract.",
-      "create": "Create budget",
       "form": {
-        "reference": "Budget number",
-        "number": "Start at revision",
-        "numberHint": "0 for a new budget; another number if it already exists on paper.",
-        "code": "Code",
-        "name": "Name",
-        "changeNote": "Reason for the change",
-        "description": "Description",
-        "unit": "Unit",
-        "quantity": "Quantity",
-        "unitPrice": "Unit price (€)",
-        "vat": "VAT (%)",
-        "built": "m² built",
-        "useful": "m² usable",
-        "exclusions": "Not included (one per line)",
+        "cancel": "Cancel",
         "save": "Save",
-        "saving": "Saving…",
-        "cancel": "Cancel"
+        "saving": "Saving…"
       }
     },
     "payments": {
@@ -628,7 +557,559 @@
       "project_not_found": "Project not found.",
       "not_found": "Not found.",
       "forbidden": "Only admins and managers can make changes.",
-      "unknown_chapter": "That chapter isn't in the budget."
+      "unknown_chapter": "That chapter isn't in the budget.",
+      "fixed_chapters": "The budget has its 20 fixed chapters; this can't be changed.",
+      "not_issued": "That revision hasn't been issued.",
+      "change_reason_required": "Write the reason for the revision before issuing it.",
+      "generation_running": "The AI is already preparing a draft.",
+      "ai_limit_reached": "The monthly AI usage limit has been reached.",
+      "too_many_pages": "The documents are too long for the AI.",
+      "no_documents": "Upload at least one project document."
+    }
+  },
+  "budget": {
+    "title": "Budget",
+    "statusPill": "Rev.{number} · {status}",
+    "status": {
+      "draft": "Draft",
+      "issued": "Issued",
+      "accepted": "Accepted",
+      "rejected": "Rejected",
+      "superseded": "Superseded"
+    },
+    "summaryReference": "No. {reference}",
+    "summaryBuilt": "{m2} m² built",
+    "saving": "Saving…",
+    "saved": "Saved",
+    "pdfGeneral": "General PDF",
+    "pdfDetailed": "Detailed PDF",
+    "steps": {
+      "label": "Budget status",
+      "documents": "Documents",
+      "documentsMeta": "{count, plural, =0 {no documents} one {# document} other {# documents}}",
+      "draft": "Draft",
+      "draftMeta": "Rev.{number} · review and edit",
+      "issued": "Issued",
+      "issuedMeta": "sent to the client",
+      "issuedOn": "issued on {date}",
+      "accepted": "Accepted",
+      "acceptedMeta": "is the contract"
+    },
+    "viewingOld": "You are viewing Rev.{number} ({status}).",
+    "viewLatest": "View the latest",
+    "tabs": {
+      "label": "Budget sections",
+      "summary": "Summary",
+      "lines": "Line items",
+      "options": "Options",
+      "texts": "Technical justification",
+      "conditions": "Terms",
+      "revisions": "Revisions"
+    },
+    "deleteDraft": "Delete draft",
+    "confirmDeleteDraft": "Delete draft Rev.{number}? Its changes will be lost.",
+    "issueButton": "Issue to client",
+    "issueRevision": "Issue Rev.{number}",
+    "issuedBanner": "Issued on {issued} · valid until {valid}.",
+    "issuedBannerPdfs": "Its PDFs are in Documents.",
+    "reject": "Rejected",
+    "confirmReject": "Mark Rev.{number} as rejected by the client?",
+    "newRevision": "Create Rev.{number}",
+    "newRevisionChanges": "Create Rev.{number} with changes",
+    "acceptButton": "Record acceptance",
+    "acceptedBanner": "Accepted on {date}: it is the contract.",
+    "acceptedBy": "Accepted by {by}.",
+    "rejectedBanner": "The client rejected it on {date}. Create a new revision with their changes.",
+    "form": {
+      "name": "Name",
+      "intro": "Introduction text (appears in the PDF)",
+      "code": "Code",
+      "description": "Description of the work unit",
+      "unit": "Unit",
+      "quantity": "Quantity",
+      "unitPrice": "Unit price (€)",
+      "negativeHint": "With a minus sign, it subtracts (a deduction).",
+      "note": "Note"
+    },
+    "review": {
+      "eyebrow": "Before issuing",
+      "title": "Review what the AI has flagged",
+      "progress": "{done} of {total} reviewed",
+      "none": "Nothing pending: there are no AI warnings.",
+      "counts": {
+        "inconsistency": "{count, plural, one {# inconsistency} other {# inconsistencies}}",
+        "assumption": "{count, plural, one {# assumption} other {# assumptions}}",
+        "estimated": "{count, plural, one {# estimated line item} other {# estimated line items}}",
+        "ratio": "{count, plural, one {# chapter off the average} other {# chapters off the average}}"
+      },
+      "kinds": {
+        "inconsistency": "Inconsistency",
+        "assumption": "Assumption",
+        "estimated": "Estimated",
+        "ratio": "Off average"
+      },
+      "ratioDetail": "{perM2}/m² built against an average of {average}/m² in your budgets.",
+      "go": "View {ref}",
+      "mark": "Mark as reviewed",
+      "done": "Reviewed",
+      "all": "View all {count} items →"
+    },
+    "kpis": {
+      "pec": "PEC (ex VAT)",
+      "pecHint": "20 chapters · {count, plural, one {# line item} other {# line items}}",
+      "withVat": "With VAT {rate}",
+      "vat": "VAT {amount}",
+      "perBuilt": "€/m² built",
+      "noArea": "No floor area",
+      "perBuiltHint": "Company average {average} · {delta}",
+      "contract": "Contract price",
+      "contractHint": "PEC plus the chosen options",
+      "options": "Options",
+      "optionsValue": "{count, plural, =0 {None} one {# option} other {# options}}",
+      "optionsHint": "{plus} adding · {minus} subtracting"
+    },
+    "chapters": {
+      "title": "Summary by chapter",
+      "hint": "What the client will see in the general PDF. Click a chapter to edit its line items.",
+      "code": "Ch.",
+      "name": "Name",
+      "lines": "Line items",
+      "amount": "Amount",
+      "share": "% PEC",
+      "perM2": "€/m² built",
+      "flags": "Warnings",
+      "contingencyHint": "· calculated only on 01–19",
+      "contingencyLabel": "Contingency percentage",
+      "estimated": "{count, plural, one {# estimated} other {# estimated}}",
+      "offAverage": "off average",
+      "up": "★ above",
+      "down": "▼ below",
+      "total": "TOTAL PEC (ex VAT) · Rev.{number}",
+      "vatNote": "Unit prices already include overheads and industrial profit. VAT {rate}: {vat} · Total with VAT: {total}."
+    },
+    "options": {
+      "summaryTitle": "Optional line items",
+      "summaryHint": "· below the 20 chapters, outside the PEC",
+      "edit": "Edit options →",
+      "none": "There are no options yet.",
+      "kinds": {
+        "extra": "Extra",
+        "alternative": "Alternative",
+        "deduction": "⚑ Deduction"
+      },
+      "chosen": "Chosen",
+      "declined": "Not chosen",
+      "intro": "Options go below the 20 chapters, with their own numbering OP.01, OP.02… They are not part of the PEC: they appear in both PDFs as “Optional line item” and the client chooses which ones they want when accepting. An option can add (a swimming pool) or subtract (an alternative, or a line item carried out by the owner).",
+      "adding": "{count, plural, one {# adding} other {# adding}} · {amount}",
+      "subtracting": "{count, plural, one {# subtracting} other {# subtracting}} · {amount}",
+      "fromBase": "Option from the price base",
+      "empty": "Empty option",
+      "range": "Optional line item · {range}",
+      "name": "Option name",
+      "replaces": "Replaces line item {code}",
+      "kind": "Type",
+      "introLabel": "Introduction text",
+      "introHint": "appears above the table in the PDF",
+      "editLine": "Edit text and note",
+      "deleteLine": "Delete line item",
+      "addLine": "Line item",
+      "delete": "Delete option",
+      "freeLine": "New line item",
+      "total": "Total {name} · {amount} · not included in the PEC",
+      "pec": "PEC · 20 chapters",
+      "pecHint": "options do not change it",
+      "withAdding": "With all the ones that add",
+      "withSubtracting": "With all the ones that subtract",
+      "confirmDelete": "Delete the option “{name}” and its line items?"
+    },
+    "picker": {
+      "title": "FRAMER 2026 price base",
+      "hint": "Unit prices with overheads and profit",
+      "search": "Search the price base",
+      "scope": "Where to search",
+      "inChapter": "Chapter {code}",
+      "all": "Whole base",
+      "noResults": "Nothing matches the search.",
+      "add": "Add",
+      "addLabel": "Add {code}",
+      "freeHint": "It will be marked as “estimated”"
+    },
+    "lines": {
+      "code": "Code",
+      "description": "Description",
+      "unit": "Unit",
+      "quantity": "Quantity",
+      "price": "Unit price €",
+      "amount": "Amount €",
+      "estimated": "Estimated · outside the base",
+      "quantityLabel": "Quantity of {code}",
+      "priceLabel": "Unit price of {code}",
+      "menu": "More actions for {code}",
+      "edit": "Edit text and note",
+      "duplicate": "Duplicate",
+      "deduction": "⚑ Offer as a deduction (creates an OP option)",
+      "alternative": "Create an alternative (OP option)",
+      "move": "Move to another chapter",
+      "delete": "Delete line item",
+      "confirmDelete": "Delete line item {code}?",
+      "chapters": "20 chapters",
+      "options": "Options · outside the PEC",
+      "name": "Chapter name",
+      "stats": "{count, plural, one {# line item} other {# line items}} · {share} of the PEC",
+      "perM2": "{amount}/m² built",
+      "average": "(your average {amount}/m² built)",
+      "note": "Chapter note",
+      "noteHint": "appears in the PDFs, under the chapter title",
+      "filter": "Filter line items",
+      "filters": {
+        "all": "All · {count}",
+        "estimated": "Estimated · {count}",
+        "noted": "With note · {count}"
+      },
+      "add": "Add line item",
+      "addFree": "New line item outside the base",
+      "computed": "Chapter 20 is {pct} of chapters 01–19 and is recalculated automatically. Change the percentage in the Summary.",
+      "saveHint": "Change the quantity or the price and it saves automatically.",
+      "subtotal": "Chapter {code} subtotal · {amount}",
+      "editTitle": "Edit {code}",
+      "moveTitle": "Move {code} to another chapter",
+      "moveTo": "Destination chapter",
+      "moveSubmit": "Move",
+      "cancel": "Cancel"
+    },
+    "texts": {
+      "intro": "The cover texts, the technical justification, the measurement criterion and the observations annex. The AI wrote them from the project documents; correct whatever is needed. They appear identically in both PDFs.",
+      "cover": "Cover",
+      "coverHint": "The table on the first page of the PDF",
+      "coverFields": {
+        "promoter": "Developer",
+        "site": "Site",
+        "cadastral": "Cadastral reference and plot",
+        "surfaces": "Floor areas",
+        "program": "Programme",
+        "basis": "Basis of the budget",
+        "scope": "Scope",
+        "system": "Construction system"
+      },
+      "missing": "Not found in the documentation",
+      "justification": "Technical justification for adapting to the Steel Frame system",
+      "justificationIntro": "Justification introduction",
+      "blockTitle": "Section title",
+      "blockText": "Text of “{title}”",
+      "up": "Move “{title}” up",
+      "down": "Move “{title}” down",
+      "remove": "Remove “{title}”",
+      "newBlock": "New section",
+      "addBlock": "Add section",
+      "criterion": "Measurement criterion adopted",
+      "criterionHint": "Without a bill of quantities, the AI explains here that it measured from the plans and that the measurements are estimates.",
+      "annex": "Annex · Technical observations and points to close with the site management (Dirección Facultativa)",
+      "annexHint": "The AI's inconsistencies and assumptions. They appear at the end of both PDFs.",
+      "annexNone": "No observations.",
+      "annexKind": "Type of observation",
+      "annexKinds": {
+        "inconsistency": "Inconsistency",
+        "assumption": "Assumption",
+        "note": "Observation"
+      },
+      "reviewed": "✓ Reviewed",
+      "annexTitle": "Title",
+      "annexText": "Text of “{title}”",
+      "newAnnex": "New observation",
+      "addAnnex": "Add observation",
+      "inputs": "Documents the AI has read",
+      "noInputs": "This budget has no source documents.",
+      "inputKinds": {
+        "plans": "Plans",
+        "basic": "Basic design",
+        "execution": "Execution design",
+        "measurements": "Measurements"
+      }
+    },
+    "conditions": {
+      "planEyebrow": "After the options, in both PDFs",
+      "plan": "Payment plan by milestones H0–H9",
+      "planOk": "Totals {pct} ✓",
+      "planOff": "Totals {pct}: must be 100 %",
+      "editPlan": "Edit the plan",
+      "planHint": "Each milestone is its percentage of the price: the PEC plus the options the client chooses. The plan is the one for the works (Payments tab).",
+      "hito": "Milestone",
+      "name": "Name",
+      "amount": "Amount",
+      "when": "Invoiced",
+      "total": "Total",
+      "paymentTerm": "payment within 5 working days of the certificate",
+      "bothPdfs": "Both PDFs",
+      "exclusions": "Costs not included in the budget",
+      "exclusion": "Exclusion {n}",
+      "removeExclusion": "Remove exclusion {n}",
+      "newExclusion": "New exclusion.",
+      "addExclusion": "Add",
+      "includes": "This budget does include",
+      "fixedEyebrow": "Standard company texts",
+      "fixed": "Guarantees, documentation and contract",
+      "fixedItems": {
+        "guarantees": "Legal guarantees · LOE 38/1999",
+        "documents": "Technical documentation to hand over with the home",
+        "contract": "Works contract · general conditions · 16 clauses"
+      },
+      "fixedHints": {
+        "guarantees": "1 year finishes · 3 years habitability · 10 years structure · 2 years equipment",
+        "documents": "CFO, Building Book, BIM Digital Twin, Blower Door, energy certificate…",
+        "contract": "Filled in with the project's details: developer, plot, price, term, milestones"
+      },
+      "detailedOnly": "Detailed only",
+      "fixedNote": "Identical in every budget. Only this project's details here:",
+      "terms": {
+        "validityDays": "Offer validity (days)",
+        "term": "Execution period",
+        "penalty": "Penalty for delay",
+        "signingPlace": "Place of signing"
+      }
+    },
+    "revisions": {
+      "history": "History",
+      "issuedOn": "Issued on {date}",
+      "draft": "In draft",
+      "acceptedOn": "accepted on {date}",
+      "general": "General PDF",
+      "detailed": "Detailed PDF",
+      "view": "View",
+      "aiDraft": "Draft generated by the AI",
+      "aiDraftMeta": "{date} · from the project documents",
+      "frozenNote": "What has been issued is never changed. Each revision is a copy of the previous one with its changes and their reason.",
+      "compare": "Rev.{number} compared with Rev.{previous}",
+      "reason": "Reason for the revision",
+      "reasonHint": "required to issue · appears in the “revision summary” of the PDFs",
+      "chapters": "Chapters and options that change",
+      "code": "Ch.",
+      "difference": "Difference",
+      "revised": "★ revised",
+      "new": "✦ new",
+      "totalPec": "Total PEC",
+      "hideUnchanged": "Hide those that do not change",
+      "showUnchanged": "Show the {count} that do not change",
+      "lines": "Line items that change",
+      "line": "Line item",
+      "whatChanged": "What has changed",
+      "beforeAfter": "Before → now",
+      "amount": "Amount",
+      "added": "✦ new",
+      "removed": "removed",
+      "firstTitle": "First revision",
+      "first": "This is the first revision: there is nothing to compare it with."
+    },
+    "issue": {
+      "title": "Issue Rev.{number} to the client",
+      "pec": "PEC (ex VAT)",
+      "withVat": "With VAT",
+      "contents": "Contents",
+      "contentsValue": "20 ch. · {lines} items · {options} opt.",
+      "openChecks": "{count, plural, one {# AI warning is still unreviewed.} other {# AI warnings are still unreviewed.}}",
+      "openChecksHint": "You can issue anyway; it is best to review them first.",
+      "review": "Review them",
+      "issuedOn": "Issue date",
+      "validUntil": "Valid until",
+      "validHint": "{days} days, from Terms",
+      "reason": "What changes in this revision",
+      "firstIssue": "First issue",
+      "reasonHint": "Required from Rev.1. It goes into the PDF's “revision summary”.",
+      "pdfs": "Saved in the project's Documents",
+      "general": {
+        "title": "General PDF",
+        "hint": "cover, justification, summary by chapter, options, payment plan and terms"
+      },
+      "detailed": {
+        "title": "Detailed PDF",
+        "hint": "everything above, the line items of the 20 chapters and of the options, and the works contract"
+      },
+      "inApp": "In the client's app",
+      "staffOnly": "Team only",
+      "preview": "View",
+      "share": "Share the general PDF in the client's app",
+      "shareHint": "{name} will see it in Documents and will receive a notification. You can change who sees each document from Documents.",
+      "shareNoClient": "The project does not have a client in the app yet; they will see it once it does.",
+      "freezeNote": "When issued, Rev.{number} is locked: it is what has been sent. If the client asks for changes, you will create Rev.{next} from it.",
+      "cancel": "Cancel",
+      "issuing": "Issuing…",
+      "submit": "Issue Rev.{number}"
+    },
+    "accept": {
+      "title": "Record the acceptance of Rev.{number}",
+      "acceptedOn": "Acceptance date",
+      "acceptedBy": "Accepted by",
+      "options": "Which options has the client chosen?",
+      "kinds": {
+        "extra": "Extra",
+        "alternative": "Alternative",
+        "deduction": "⚑ Deduction"
+      },
+      "pec": "PEC Rev.{number} · 20 chapters",
+      "chosenOptions": "Chosen options",
+      "contract": "Contract price (ex VAT)",
+      "withVat": "With VAT {rate}",
+      "signed": "Signed budget",
+      "signedHint": "PDF, optional · saved in Documents",
+      "signedTitle": "Budget {reference} · Rev.{number} · signed",
+      "effect": "On acceptance, Rev.{number} becomes the contract.",
+      "effectHint": "The chosen options enter the contract as OP line items, below the 20 chapters; the others are discarded. This feeds the Works, the Payments (H0 = {first}) and the phases of the client's app.",
+      "cancel": "Cancel",
+      "accepting": "Saving…",
+      "submit": "Accept as contract"
+    },
+    "start": {
+      "summary": "There is no budget yet. The AI prepares the first one from the project documentation; then you review and edit it.",
+      "generatingSummary": "The AI is preparing the first draft.",
+      "eyebrow": "First draft · with AI",
+      "title": "Upload the project documentation",
+      "intro": "One document is enough; with all four the AI measures more accurately. It reads them, adapts the project to the FRAMER Steel Frame system and builds the draft with the 20 chapters and the FRAMER 2026 price base.",
+      "failed": "The AI could not finish the draft.",
+      "kinds": {
+        "plans": {
+          "title": "Plans",
+          "hint": "Floor plans, elevations, sections, structure and services · PDF or photos"
+        },
+        "basic": {
+          "title": "Basic design",
+          "hint": "Report, floor area schedule, regulations"
+        },
+        "execution": {
+          "title": "Execution design",
+          "hint": "Construction report, specification, services"
+        },
+        "measurements": {
+          "title": "Measurements",
+          "hint": "Bill of quantities · PDF, Excel or BC3"
+        }
+      },
+      "ready": "Ready",
+      "optional": "Optional",
+      "remove": "Remove",
+      "uploading": "Uploading… {pct} %",
+      "drop": "Drag the file here · {types}",
+      "upload": "Upload file",
+      "choose": "Choose from Documents",
+      "reference": "Budget no.",
+      "quality": "Quality specification",
+      "qualities": {
+        "framer": "FRAMER standard quality specification",
+        "project": "Respect the project's qualities"
+      },
+      "vat": "VAT",
+      "vats": {
+        "reduced": "10 % · self-build of a main home",
+        "general": "21 %"
+      },
+      "starting": "Starting…",
+      "generate": "Generate the draft",
+      "needOne": "Upload at least one document.",
+      "time": "It takes about 5 minutes. You can leave the page: the draft will appear here.",
+      "noMeasurements": "Without measurements, the AI measures from the dimensioned plans: the measurements will be estimates and this will be explained in the “measurement criterion”.",
+      "next": "What happens next",
+      "steps": {
+        "read": {
+          "title": "It reads the project.",
+          "text": "Data, floor areas, counts, measurements and inconsistencies between documents."
+        },
+        "lines": {
+          "title": "It builds the line items",
+          "text": "of chapters 01–19 from the price base. Anything not in the base is marked as “estimated”."
+        },
+        "contingency": {
+          "title": "It calculates the contingency",
+          "text": "(chapter 20 = 5 % of 01–19) and applies the H0–H9 payment plan."
+        },
+        "review": {
+          "title": "You review it.",
+          "text": "The result is draft Rev.0, with a list of points to check before sending it."
+        }
+      },
+      "privacy": "The documents are also saved in the project's Documents, marked “team only”: the client does not see them.",
+      "errors": {
+        "invalid_file_type": "That file type isn't accepted here: upload a PDF, an image, an Excel file (.xlsx) or a BC3.",
+        "file_too_large": "The file is larger than 100 MB.",
+        "missing_file": "The file didn't arrive. Upload it again.",
+        "invalid_category": "Choose which document it is.",
+        "upload_failed": "The file couldn't be uploaded. Try again.",
+        "budget_document": "This document belongs to the budget and can't be removed.",
+        "not_found": "That document is no longer on the project.",
+        "forbidden": "You aren't allowed to change the documents.",
+        "missing_fields": "Some of the file's details are missing.",
+        "generation_running": "The AI is reading this document: wait for it to finish or cancel it."
+      }
+    },
+    "generation": {
+      "step": "Step {step} of {total}",
+      "title": "Generating the draft",
+      "pct": "{pct} %",
+      "jobs": {
+        "read": {
+          "title": "Documents read",
+          "done": "{files, plural, one {# document} other {# documents}} ready for the AI",
+          "todo": "Preparing the documents…"
+        },
+        "analysed": {
+          "title": "Project analysed",
+          "done": "{builtArea} m² built · {inconsistencies, plural, one {# inconsistency} other {# inconsistencies}}",
+          "todo": "Reading the project and the plans"
+        },
+        "group0": {
+          "title": "Chapters 01–05",
+          "done": "{lines, plural, one {# line item} other {# line items}}",
+          "todo": "Earthworks, foundations, structure, masonry and roof"
+        },
+        "group1": {
+          "title": "Chapters 06–10",
+          "done": "{lines, plural, one {# line item} other {# line items}}",
+          "todo": "Envelope, wall finishes, flooring, external works and joinery"
+        },
+        "group2": {
+          "title": "Chapters 11–15",
+          "done": "{lines, plural, one {# line item} other {# line items}}",
+          "todo": "Services"
+        },
+        "group3": {
+          "title": "Chapters 16–19 and contingency",
+          "done": "{lines, plural, one {# line item} other {# line items}}",
+          "todo": "Painting, quality, safety, waste · chapter 20 = 5 %"
+        }
+      },
+      "leave": "You can close this page. The draft will appear here when it finishes.",
+      "cancel": "Cancel",
+      "facts": "What the AI has already read",
+      "factsPending": "It will appear once it has finished reading the project.",
+      "factLabels": {
+        "promoter": "Developer",
+        "site": "Site",
+        "architect": "Architect",
+        "typology": "Typology",
+        "surfaces": "Floor areas",
+        "counts": "Count"
+      },
+      "surfacesValue": "{built} m² built · {useful} m² usable",
+      "countsValue": "{windows} windows · {bathrooms} bathrooms · {bedrooms} bedrooms",
+      "inconsistencies": "Inconsistencies found",
+      "inconsistenciesHint": "You will see them all in the draft, with how they have been budgeted.",
+      "errors": {
+        "refused": "The AI did not accept the request. Check the documents and try again.",
+        "truncated": "The AI's response was cut off. Try again with fewer pages.",
+        "invalid_output": "The AI's response was not in the expected format. Try again.",
+        "too_many_pages": "The documents are too long for a single read (maximum 600 pages). Upload fewer pages or separate the plans from the report.",
+        "bad_request": "The AI rejected the documents. Check that the PDFs open correctly.",
+        "no_documents": "There are no project documents to read.",
+        "missing_file": "The file for one of the documents is missing. Upload it again.",
+        "budget_exists": "A budget was created for this project in the meantime.",
+        "unexpected": "Something went wrong generating the draft. Try again; if it happens again, contact support."
+      }
+    },
+    "pdf": {
+      "back": "Back to the budget",
+      "kind": "PDF type",
+      "general": "General PDF",
+      "detailed": "Detailed PDF",
+      "draftHint": "Draft: it carries the “BORRADOR” (draft) mark until it is issued",
+      "issuedHint": "What was sent to the client",
+      "download": "Download PDF"
     }
   }
 }

@@ -1,8 +1,9 @@
 import { documentsService } from "@repo/core";
-import { fileResponse, withContext } from "../../../../../../../lib/api";
+import { fileResponse, readJson, withContext } from "../../../../../../../lib/api";
 
 // ─── /api/v1/projects/:id/documents/:documentId ───────────────────────────────
-// GET    → the PDF itself (application/pdf)
+// GET    → the file itself (a PDF, or a budget input's BC3/spreadsheet)
+// PATCH  { visibleToClient } → whether the client sees it in the app
 // DELETE → 204
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -12,6 +13,13 @@ export async function GET(request: Request, { params }: Params) {
   const { id, documentId } = await params;
   return withContext(request, async (ctx) =>
     fileResponse(await documentsService.openDocument(ctx, id, documentId)),
+  );
+}
+
+export async function PATCH(request: Request, { params }: Params) {
+  const { id, documentId } = await params;
+  return withContext(request, async (ctx) =>
+    documentsService.setDocumentVisibility(ctx, id, documentId, await readJson(request)),
   );
 }
 

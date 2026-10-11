@@ -24,6 +24,9 @@ describe("proxy matcher", () => {
     // Vercel Speed Insights: its script and beacon must work signed out, e.g. on the login page.
     "/_vercel/speed-insights/script.js",
     "/_vercel/speed-insights/vitals",
+    // The Workflow SDK's queue calls its own routes (the budget's AI run).
+    "/.well-known/workflow/v1/flow",
+    "/.well-known/workflow/v1/step",
   ])("skips %s", (url) => {
     expect(matches(url)).toBe(false);
   });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import config from "./next.config.js";
+import { nextConfig as config } from "./next.config.js";
 
 describe("security headers", () => {
   it("are sent on every page and forbid framing", async () => {

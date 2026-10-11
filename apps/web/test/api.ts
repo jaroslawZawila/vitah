@@ -35,7 +35,7 @@ export const routeParams = <T extends Record<string, string>>(params: T) => ({
   params: Promise.resolve(params),
 });
 
-/** A project with the real Castrillón budget half built (@repo/core/seed). Mock storage first. */
+/** A project with the real Caviedes budget accepted and its obra half built (@repo/core/seed). Mock storage first. */
 export async function seededObraProject() {
   const tenant = await createTestTenant();
   const admin = await createTestUser(tenant.id, { role: "admin" });

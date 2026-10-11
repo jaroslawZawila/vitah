@@ -34,6 +34,9 @@ export function todayInSpain(now = new Date()): string {
   return now.toLocaleDateString("en-CA", { timeZone: "Europe/Madrid" });
 }
 
+/** `date` plus `days` calendar days. */
+export const addDays = (date: string, days: number) => toDate(toTime(date) + days * DAY_MS);
+
 /** `date` plus `days` Monday–Friday days (bank holidays are not known). */
 export function addBusinessDays(date: string, days: number): string {
   let time = toTime(date);
@@ -52,6 +55,10 @@ export const shareBp = (part: number, whole: number) =>
 /** `bp` basis points of `cents`, rounded to the cent. */
 export const ofBp = (cents: number, bp: number) => Math.round((cents * bp) / 10_000);
 
+/** Cents per m² of an area stored in cm² (hundredths of m²); null without an area. */
+export const perM2Cents = (cents: number, areaCm2: number | null) =>
+  areaCm2 ? Math.round((cents * 100) / areaCm2) : null;
+
 export type Progress = {
   totalCents: number;
   executedCents: number;
@@ -64,18 +71,29 @@ export type Progress = {
  * reads 100 once every line is done (and 0 only with nothing done).
  */
 export function progressOf(lines: { amountCents: number; executedPct: number }[]): Progress {
-  let totalCents = 0;
-  let executedCents = 0;
-  for (const line of lines) {
-    totalCents += line.amountCents;
-    executedCents += Math.round((line.amountCents * line.executedPct) / 100);
+  // A negative line (a chosen deduction: works the owner does) isn't built:
+  // the progress is that of the works, and the deduction is applied to the
+  // money executed in step with them.
+  const works = lines.filter((line) => line.amountCents >= 0);
+  let worksCents = 0;
+  let worksExecutedCents = 0;
+  for (const line of works) {
+    worksCents += line.amountCents;
+    worksExecutedCents += Math.round((line.amountCents * line.executedPct) / 100);
   }
-  const done = lines.length > 0 && lines.every((line) => line.executedPct === 100);
-  const started = lines.some((line) => line.executedPct > 0);
-  const rounded = totalCents > 0 ? Math.round((executedCents * 100) / totalCents) : 0;
+  const deductedCents = lines.reduce((sum, line) => sum + Math.min(0, line.amountCents), 0);
+  const share = worksCents > 0 ? worksExecutedCents / worksCents : works.length > 0 ? 0 : 1;
+  const done = lines.length > 0 && works.every((line) => line.executedPct === 100);
+  const started = works.some((line) => line.executedPct > 0);
+  const rounded = Math.round(share * 100);
   const progressPct = done ? 100 : started ? Math.min(99, Math.max(1, rounded)) : 0;
   const status: ProgressStatus = done ? "done" : started ? "active" : "pending";
-  return { totalCents, executedCents, progressPct, status };
+  return {
+    totalCents: worksCents + deductedCents,
+    executedCents: worksExecutedCents + Math.round(deductedCents * share),
+    progressPct,
+    status,
+  };
 }
 
 /** Where the works stand against their dates, and the delay penalty so far. */

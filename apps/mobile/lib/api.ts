@@ -1,4 +1,5 @@
 import {
+  DOCUMENT_CATEGORIES,
   photoSizeQuery,
   type AccountError,
   type MobileChanges,
@@ -105,8 +106,9 @@ export const api = {
     return `${API_BASE}/api/mobile/obra/hitos/${encodeURIComponent(hitoId)}/${kind}`;
   },
 
+  /** The categories it knows go along, so newer ones arrive as "other" until the app learns them. */
   listDocuments(token: string) {
-    return authed<{ documents: MobileDocument[] }>("/api/mobile/documents", token);
+    return authed<{ documents: MobileDocument[] }>(`/api/mobile/documents?categories=${DOCUMENT_CATEGORIES.join(",")}`, token);
   },
 
   /** The PDF itself; fetch it with the same Bearer token. */

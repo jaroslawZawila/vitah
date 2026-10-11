@@ -1,5 +1,5 @@
 // `pnpm db:seed` (after @repo/db's seed): gives the local dev project VTH-26-001
-// the real Castrillón budget half built (./seed-obra). Skips a project that
+// the real Caviedes budget (004/2026) part built (./seed-obra). Skips a project that
 // already has a budget. Acta and invoice PDFs need a Blob store
 // (BLOB_READ_WRITE_TOKEN); without one they're left out.
 
@@ -37,7 +37,7 @@ async function run() {
   }
   const ctx = { tenantId: tenant.id, userId: admin.id, role: "admin" } as const;
   await seedObra(ctx, project.id, { files: Boolean(process.env.BLOB_READ_WRITE_TOKEN) });
-  console.log(`Seeded the obra of ${projectRef} (budget 036/2026 Rev.3)`);
+  console.log(`Seeded the obra of ${projectRef} (budget 004/2026)`);
 }
 
 run()

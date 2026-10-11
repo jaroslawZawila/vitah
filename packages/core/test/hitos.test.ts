@@ -7,6 +7,7 @@ import {
   resetDatabase,
 } from "@repo/db/testing";
 import { budgetService, hitosService as svc, MAX_DOCUMENT_BYTES, type Ctx, type Hito } from "../src";
+import { framerDraft } from "./budget-fixture";
 import { files } from "../src/testing";
 
 vi.mock("../src/storage", () => import("../src/testing"));
@@ -20,17 +21,9 @@ async function setup(role: Ctx["role"] = "manager") {
   const client = await createTestUser(tenant.id, { role: "client" });
   const project = await createTestProject(tenant.id, { clientUserId: client.id });
   const ctx: Ctx = { tenantId: tenant.id, userId: user.id, role };
-  const { revisionId } = await budgetService.createBudget(ctx, project.id, {});
-  for (const code of ["01", "02", "03", "04", "05"]) {
-    const { chapterId } = await budgetService.addChapter(ctx, project.id, revisionId, { code, name: `Capítulo ${code}` });
-    await budgetService.addLine(ctx, project.id, chapterId, {
-      code: `${code}.01`,
-      description: "Partida",
-      unit: "pa",
-      quantity: 1,
-      unitPriceCents: 100_000,
-    });
-  }
+  const { revisionId } = await framerDraft(ctx, project.id, ["01", "02", "03", "04", "05"]);
+  // No contingency, so the hitos share exactly 5.000 €.
+  await budgetService.updateRevision(ctx, project.id, revisionId, { contingencyPct: 0 });
   await budgetService.acceptRevision(ctx, project.id, revisionId);
   const hitos = await svc.listHitos(ctx, project.id);
   const byCode = (code: string) => hitos.find((h) => h.code === code)!;
@@ -63,8 +56,8 @@ describe("listHitos", () => {
 
   it("maps the standard chapters and checks", async () => {
     const { byCode } = await setup();
-    // The budget has 01–05; the template's other chapters are mapped but absent.
-    expect(byCode("H2").chapters.map((c) => c.code)).toEqual(["01", "02", "03"]);
+    // Only chapters with lines show: the template maps 06 and 10 to H4 too.
+    expect(byCode("H2").chapters.map((c) => c.code)).toEqual(["01", "02"]);
     expect(byCode("H4").chapters.map((c) => c.code)).toEqual(["05"]);
     expect(byCode("H4").checks.map((c) => c.label)).toEqual(["Prueba de estanqueidad provisional"]);
     expect(byCode("H9").checks).toHaveLength(9);
@@ -73,10 +66,10 @@ describe("listHitos", () => {
   it("follows the chapters' progress", async () => {
     const { project, ctx } = await setup();
 
-    await progress(ctx, project.id, { "01": 100, "02": 100, "03": 40 });
+    await progress(ctx, project.id, { "01": 100, "02": 60 });
     expect(await find(ctx, project.id, "H2")).toMatchObject({ status: "active", readyPct: 80 });
 
-    await progress(ctx, project.id, { "03": 100 });
+    await progress(ctx, project.id, { "02": 100 });
     expect(await find(ctx, project.id, "H2")).toMatchObject({ status: "ready", readyPct: 100 });
   });
 });
