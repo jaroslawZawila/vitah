@@ -75,9 +75,8 @@ Every change goes through this, in order. Nothing gets committed until every ste
 - **NextAuth.js 5.0.0-beta.31** — Credentials provider, JWT sessions, Drizzle adapter
 - **Drizzle ORM 0.35** + **postgres.js** — database layer with multi-tenant schema (works with any PostgreSQL)
 - **next-intl 4.12.0** — i18n (Spanish default, English)
-- **Tailwind CSS 4.3.0** + **shadcn/ui** — utility-first CSS with component library
-- **CSS Modules** — used alongside Tailwind for complex layout styles
-- **Geist fonts** — loaded locally (woff), used as Calibri substitute
+- **Tailwind CSS 4.3.0** + **shadcn/ui** (Base UI primitives, `base-nova` style) — the portal's only styling; no CSS Modules
+- **Fonts** (`next/font/google`): Figtree (body), Barlow Condensed (headings, KPI figures), JetBrains Mono (numbers)
 
 ## Key Conventions
 
@@ -116,19 +115,22 @@ mockups don't cover, extend the same visual language. Concept B on the canvas wa
 `apps/web` must always be mobile-friendly:
 - Design mobile layout first, enhance for desktop with `min-width` media queries
 - Test at 320px, 480px, 768px, 1024px breakpoints
-- Touch targets minimum 44px
+- The grafito sidebar is a sticky column from `lg`; below that it becomes a top bar whose sections and
+  project tabs scroll sideways
+- Touch targets minimum 44px (`Button`, `Input` and `NativeSelect` grow to 44px on `pointer-coarse`)
 - No horizontal scroll at any viewport width
 - Use `clamp()` for fluid typography where appropriate
 
 ### ViTAH Brand Identity
 
-**Color palette** (CSS custom properties in `globals.css`):
+**Color palette** (brand colours, Tailwind `bg-verde-oliva` etc. from `@repo/tailwind-config`):
 - `--grafito: #1e1e1e` — primary dark background
 - `--verde-oliva: #6b7a4a` — accent (buttons, interactive elements)
 - `--verde-oliva-hover: #7d8e58` — hover state
 - `--blanco-calido: #e8e7e2` — text on dark, light surfaces
 - `--verde-oscuro: #37505a` — secondary accent
-- `--error: #c75050` — error states
+
+In the portal, use the theme tokens (below), not these raw colours: verde oliva is `primary`, grafito is `rail`.
 
 **Design style:** "Minimalista de Lujo" — generous whitespace, no decorative effects, no shadows on logo, subtle transitions.
 
@@ -229,10 +231,26 @@ mockups don't cover, extend the same visual language. Concept B on the canvas wa
   - Components land in `apps/web/components/ui/`
   - Uses `class-variance-authority`, `clsx`, `tailwind-merge`
   - Utility: `cn()` from `@/lib/utils` for conditional class merging
-- **CSS Modules** — still used for complex layout styles (`.module.css`)
-- Global brand tokens in `globals.css` via CSS custom properties
-- Dark theme by default (`color-scheme: dark`)
-- Semantic variable names: `--background`, `--foreground`, `--muted`, `--input-bg`, `--input-border`
+  - The components are themed to the portal look — restyle them there, not per screen. Variants added:
+    `Badge` `good` / `yel` / `warn` / `destructive` / `info` / `outline` (status pills); `Button` `outline` is the
+    secondary button, `secondary` the dark-ink one, `ghost-destructive` a quiet delete
+  - Portal-specific primitives in the same folder: `Card` / `cardVariants({ size })` (use `cardVariants` on a
+    `form` or `section`), and `field.tsx` (`Field`, `FieldDescription`, `FormActions`, `FormMessage`). Translated
+    action errors go through `app/dashboard/components/FormError.tsx`
+  - The shadcn CLI needs `pnpm` on PATH and may write `import { cn } from "cn"` and add a `cn` npm package —
+    fix the import to `@/lib/utils` and drop the dependency
+- **No CSS Modules, no hex colours or inline colour styles in components.** Style with Tailwind classes and
+  the theme tokens in `globals.css`, so dark mode keeps working. Inline `style` only for computed values
+  (a progress width, a grid template)
+- **Portal look** ("carril grafito"): grafito sidebar rail beside a warm-grey workspace of white cards (14px radius,
+  1px border, soft `shadow-card`, 18px padding); h1/h2 in Barlow Condensed (styled globally in `globals.css`);
+  uppercase `eyebrow` labels; `num` (mono, tabular) for money, quantities and %; tables with uppercase muted
+  headings and a heavy rule over totals; status shown as soft pills. Light by default, dark when the system is
+  (`prefers-color-scheme`); `.dark` forces dark on a subtree (the login page is always grafito)
+- **Tokens** (Tailwind names): shadcn's `background`, `foreground`, `card`, `primary` (verde oliva), `muted-foreground`,
+  `border`, `destructive` (= `bad`), plus `raise` (inset surfaces, inputs, row hover), `brand-soft`/`brand-ink`,
+  status pairs `good`/`good-soft`, `yel`, `warn`, `bad`, `info` (each with `-soft`), `rail`/`rail-foreground`/
+  `rail-muted`/`rail-accent`, and `shadow-card`
 
 ### File structure patterns
 
@@ -244,11 +262,11 @@ apps/web/
   i18n/request.ts                  # next-intl config
   messages/{locale}.json           # Translation strings
   lib/utils.ts                     # cn() utility for Tailwind class merging
-  components/ui/                   # shadcn/ui components
+  components/ui/                   # shadcn/ui components, themed to the portal look
   app/
     page.tsx                       # Login page (Server Component)
     layout.tsx                     # Root layout with NextIntlClientProvider
-    globals.css                    # Tailwind imports, shadcn theme, brand tokens
+    globals.css                    # Tailwind imports, theme tokens (light + dark), base typography
     actions/auth.ts                # Server actions for login
     actions/users.ts               # Server actions for user management (admin)
     components/LoginForm.tsx       # Client Component with useActionState

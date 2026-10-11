@@ -7,6 +7,9 @@ import Link from "next/link";
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import type { BudgetChapter, BudgetLine, ProjectBudget } from "@repo/core/contract";
+import { Button } from "@/components/ui/button";
+import { cardVariants } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 import {
   acceptRevisionAction,
   addChapterAction,
@@ -22,16 +25,16 @@ import {
 } from "../../../../actions/budget";
 import type { ObraState } from "../../../../actions/run";
 import EmptyState from "../components/EmptyState";
-import FormError from "../components/FormError";
+import FormError from "../../../components/FormError";
 import { SleepingCamera } from "../components/illustrations";
 import Modal from "../components/Modal";
 import BudgetChanges from "../components/obra/BudgetChanges";
 import BudgetChapters from "../components/obra/BudgetChapters";
 import BudgetKpis from "../components/obra/BudgetKpis";
+import { cardHead, muted } from "../components/obra/classes";
 import FieldsForm, { type Field } from "../components/obra/FieldsForm";
 import { useObraFormat } from "../components/obra/format";
 import Kpi from "../components/obra/Kpi";
-import styles from "../components/obra/obra.module.css";
 import { useObraAction } from "../components/obra/useObraAction";
 import TabHeader from "../components/TabHeader";
 
@@ -79,43 +82,42 @@ export default function BudgetScreen({
   const lineCount = revision?.chapters.reduce((sum, c) => sum + c.lines.length, 0) ?? 0;
 
   const actions = canManage && revision && (
-    <span className={`${styles.buttons} ${styles.noPrint}`}>
-      <button type="button" className={styles.button} onClick={() => window.print()}>
+    <span className="flex flex-wrap gap-2 print:hidden">
+      <Button type="button" variant="outline" onClick={() => window.print()}>
         {t("export")}
-      </button>
+      </Button>
       {revision.status === "draft" ? (
         <>
-          <button type="button" className={styles.button} onClick={() => openDialog({ kind: "revision" })}>
+          <Button type="button" variant="outline" onClick={() => openDialog({ kind: "revision" })}>
             {t("editDetails")}
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
-            className={styles.buttonDanger}
+            variant="destructive"
             onClick={() => confirmThen(t("confirmDeleteDraft", { number: revision.number }), () => deleteRevisionAction(projectId, revision.id))}
           >
             {t("deleteDraft")}
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
-            className={styles.buttonPrimary}
             disabled={pending}
             onClick={() => confirmThen(t("confirmAccept", { number: revision.number }), () => acceptRevisionAction(projectId, revision.id))}
           >
             {t("accept")}
-          </button>
+          </Button>
         </>
       ) : (
         !budget.revisions.some((r) => r.status === "draft") && (
-          <button type="button" className={styles.buttonPrimary} disabled={pending} onClick={() => run(() => createRevisionAction(projectId))}>
+          <Button type="button" disabled={pending} onClick={() => run(() => createRevisionAction(projectId))}>
             {t("newRevision")}
-          </button>
+          </Button>
         )
       )}
     </span>
   );
 
   return (
-    <div className={styles.stack}>
+    <div className="flex flex-col gap-5">
       <TabHeader
         projectRef={projectRef}
         title={t("title")}
@@ -125,19 +127,21 @@ export default function BudgetScreen({
       {!dialog && <FormError namespace="obra.errors" error={state?.error} />}
 
       {!revision ? (
-        <div className={styles.card}>
-          <EmptyState illustration={<SleepingCamera />} title={t("emptyTitle")} text={t("emptyText")} />
-          {canManage && (
-            <p className={styles.center}>
-              <button type="button" className={styles.buttonPrimary} onClick={() => openDialog({ kind: "create" })}>
+        <EmptyState
+          illustration={<SleepingCamera />}
+          title={t("emptyTitle")}
+          text={t("emptyText")}
+          action={
+            canManage && (
+              <Button type="button" onClick={() => openDialog({ kind: "create" })}>
                 {t("create")}
-              </button>
-            </p>
-          )}
-        </div>
+              </Button>
+            )
+          }
+        />
       ) : (
         <>
-          <nav aria-label={t("revisions")} className={styles.revisions}>
+          <nav aria-label={t("revisions")} className="flex flex-wrap items-center gap-1.5">
             {budget.revisions
               .slice()
               .reverse()
@@ -146,7 +150,10 @@ export default function BudgetScreen({
                   key={r.id}
                   href={`${base}/budget?revision=${r.id}`}
                   aria-current={r.id === revision.id ? "true" : undefined}
-                  className={r.id === revision.id ? styles.revisionCurrent : styles.revision}
+                  className={cn(
+                    "inline-flex min-h-8 items-center rounded-full border bg-card px-[11px] py-1 text-[12.5px] text-muted-foreground transition-colors hover:text-foreground pointer-coarse:min-h-11",
+                    r.id === revision.id && "border-foreground bg-foreground font-semibold text-background hover:text-background",
+                  )}
                 >
                   {t("revision", { number: r.number, total: f.money(r.totalCents), status: t(`revisionStatus.${r.status}`) })}
                 </Link>
@@ -156,10 +163,10 @@ export default function BudgetScreen({
           <BudgetKpis revision={revision} />
           <BudgetChanges revision={revision} />
 
-          <section className={styles.card}>
-            <div className={styles.cardHead}>
-              <h2 className={styles.cardTitle}>{t("detail")}</h2>
-              <span className={styles.muted}>
+          <section className={cardVariants()}>
+            <div className={cardHead}>
+              <h2>{t("detail")}</h2>
+              <span className={muted}>
                 {t("detailSummary", { chapters: revision.chapters.length, lines: lineCount })}
               </span>
             </div>
@@ -183,18 +190,18 @@ export default function BudgetScreen({
               }
             />
             {editable && (
-              <button type="button" className={styles.textButton} onClick={() => openDialog({ kind: "chapter" })}>
+              <Button type="button" variant="outline" className="w-fit" onClick={() => openDialog({ kind: "chapter" })}>
                 <span aria-hidden>+ </span>
                 {t("addChapter")}
-              </button>
+              </Button>
             )}
-            <div className={styles.dark} style={{ marginTop: 12 }}>
+            <div className="flex flex-wrap justify-between gap-2 rounded-lg bg-rail px-4 py-3.5 font-semibold text-rail-foreground">
               <span>{t("grandTotal", { number: revision.number })}</span>
-              <span className={styles.num}>{f.money(revision.totalCents)}</span>
+              <span className="num text-rail-accent">{f.money(revision.totalCents)}</span>
             </div>
           </section>
 
-          <section className={styles.kpis3}>
+          <section className="grid gap-3.5 md:grid-cols-3">
             <Kpi label={t("plan")} value={t("planLink")} href={`${base}/payments`} hints={[t("planHint")]} />
             <Kpi
               label={t("exclusions")}

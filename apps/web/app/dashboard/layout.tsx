@@ -2,7 +2,6 @@ import { auth } from "../../auth";
 import { redirect } from "next/navigation";
 import Sidebar from "./components/Sidebar";
 import Topbar from "./components/Topbar";
-import styles from "./layout.module.css";
 
 export default async function DashboardLayout({
   children,
@@ -13,15 +12,17 @@ export default async function DashboardLayout({
   if (!session?.user) redirect("/");
 
   return (
-    <div className={styles.wrapper}>
+    <div className="min-h-svh lg:grid lg:grid-cols-[236px_minmax(0,1fr)]">
       <Sidebar
         name={session.user.name ?? null}
         email={session.user.email ?? null}
         isAdmin={session.user.role === "admin"}
       />
-      <div className={styles.main}>
+      <div className="flex min-w-0 flex-col">
         <Topbar />
-        <div className={styles.content}>{children}</div>
+        <div className="flex w-full max-w-[1300px] min-w-0 flex-col gap-5 px-4 pt-[18px] pb-16 sm:px-7 sm:pt-6">
+          {children}
+        </div>
       </div>
     </div>
   );

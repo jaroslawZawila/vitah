@@ -2,7 +2,7 @@
 
 import type { ComponentType } from "react";
 import { useTranslations } from "next-intl";
-import styles from "./wizard.module.css";
+import { Button } from "@/components/ui/button";
 
 export type ReviewSection<D, O> = {
   id: string;
@@ -25,22 +25,26 @@ export default function ReviewStep<D, O>({
   const t = useTranslations("wizard");
 
   return (
-    <div className={styles.review}>
-      <p className={styles.intro}>{t("reviewIntro")}</p>
+    <div className="flex flex-col gap-3.5">
+      <p className="text-[13px] text-muted-foreground">{t("reviewIntro")}</p>
       {sections.map(({ id, title, Summary }, index) => (
-        <section key={id} className={styles.reviewSection} aria-labelledby={`review-${id}`}>
-          <div className={styles.reviewHeader}>
-            <h3 id={`review-${id}`} className={styles.reviewTitle}>
-              {title}
-            </h3>
-            <button
+        <section
+          key={id}
+          className="flex flex-col gap-2.5 border-t pt-3.5"
+          aria-labelledby={`review-${id}`}
+        >
+          <div className="flex items-center justify-between gap-2">
+            <h3 id={`review-${id}`}>{title}</h3>
+            <Button
               type="button"
-              className={styles.edit}
+              variant="ghost"
+              size="sm"
+              className="text-primary hover:text-primary"
               onClick={() => onEdit(index)}
               aria-label={t("editSection", { section: title })}
             >
               {t("edit")}
-            </button>
+            </Button>
           </div>
           <Summary draft={draft} options={options} />
         </section>

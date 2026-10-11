@@ -1,6 +1,9 @@
 "use client";
 
 import { useFormatter, useTranslations } from "next-intl";
+import { Field } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { fieldStyles as f } from "../../../components/wizard/fields";
 import SummaryList from "../../../components/wizard/SummaryList";
 import type { ProjectDraft, ProjectStepProps } from "../draft";
@@ -11,9 +14,9 @@ export function DetailsStep({ draft, onChange }: ProjectStepProps) {
 
   return (
     <div className={f.fields}>
-      <div className={f.field}>
-        <label htmlFor="project-ref">{t("ref")}</label>
-        <input
+      <Field>
+        <Label htmlFor="project-ref">{t("ref")}</Label>
+        <Input
           id="project-ref"
           required
           autoFocus
@@ -21,36 +24,36 @@ export function DetailsStep({ draft, onChange }: ProjectStepProps) {
           value={draft.ref}
           onChange={(e) => onChange({ ref: e.target.value })}
         />
-      </div>
-      <div className={`${f.field} ${f.wide}`}>
-        <label htmlFor="project-address">{t("address")}</label>
-        <input
+      </Field>
+      <Field className={f.wide}>
+        <Label htmlFor="project-address">{t("address")}</Label>
+        <Input
           id="project-address"
           required
           placeholder={t("addressPlaceholder")}
           value={draft.address}
           onChange={(e) => onChange({ address: e.target.value })}
         />
-      </div>
-      <div className={f.field}>
-        <label htmlFor="project-start">{t("startDate")}</label>
-        <input
+      </Field>
+      <Field>
+        <Label htmlFor="project-start">{t("startDate")}</Label>
+        <Input
           id="project-start"
           type="date"
           value={draft.startDate}
           onChange={(e) => onChange({ startDate: e.target.value })}
         />
-      </div>
-      <div className={f.field}>
-        <label htmlFor="project-completion">{t("completionDate")}</label>
-        <input
+      </Field>
+      <Field>
+        <Label htmlFor="project-completion">{t("completionDate")}</Label>
+        <Input
           id="project-completion"
           type="date"
           min={draft.startDate || undefined}
           value={draft.completionDate}
           onChange={(e) => onChange({ completionDate: e.target.value })}
         />
-      </div>
+      </Field>
     </div>
   );
 }
@@ -60,7 +63,10 @@ export function DetailsSummary({ draft }: { draft: ProjectDraft }) {
   const format = useFormatter();
   const date = (value: string) =>
     value
-      ? format.dateTime(new Date(`${value}T00:00:00Z`), { dateStyle: "long", timeZone: "UTC" })
+      ? format.dateTime(new Date(`${value}T00:00:00Z`), {
+          dateStyle: "long",
+          timeZone: "UTC",
+        })
       : null;
 
   return (

@@ -18,9 +18,11 @@ import {
   updateHitoAction,
   uploadHitoFileAction
 } from "../../../../../actions/obra";
+import { Button } from "@/components/ui/button";
 import type { ObraState } from "../../../../../actions/run";
-import FormError from "../../components/FormError";
+import FormError from "../../../../components/FormError";
 import Modal from "../../components/Modal";
+import { muted, textLink } from "../../components/obra/classes";
 import FieldsForm from "../../components/obra/FieldsForm";
 import { useObraFormat } from "../../components/obra/format";
 import {
@@ -32,7 +34,6 @@ import {
   PaymentCard,
   PhotoPicker,
 } from "../../components/obra/HitoParts";
-import styles from "../../components/obra/obra.module.css";
 import PhotoStrip from "../../components/obra/PhotoStrip";
 import { useObraAction } from "../../components/obra/useObraAction";
 import { projectPhotoUrl } from "../../components/photoUrl";
@@ -81,8 +82,8 @@ export default function HitoScreen({
   };
 
   return (
-    <div className={styles.stack}>
-      <Link href={`/dashboard/projects/${projectId}/payments`} className={styles.link}>
+    <div className="flex flex-col gap-5">
+      <Link href={`/dashboard/projects/${projectId}/payments`} className={`w-fit text-[13px] ${textLink}`}>
         ← {t("back")}
       </Link>
       <TabHeader
@@ -96,17 +97,17 @@ export default function HitoScreen({
         })}
         action={
           canManage && (
-            <button type="button" className={styles.button} onClick={() => setDialog("edit")}>
+            <Button type="button" variant="outline" onClick={() => setDialog("edit")}>
               {t("edit")}
-            </button>
+            </Button>
           )
         }
       />
       <FormError namespace="obra.errors" error={state?.error} />
       <HitoSteps hito={hito} />
 
-      <div className={styles.split}>
-        <div className={styles.stack}>
+      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+        <div className="flex min-w-0 flex-col gap-5">
           <HitoConditions
             hito={hito}
             onToggle={editor((id: string, done: boolean) => run(() => updateCheckAction(projectId, id, { done })))}
@@ -124,14 +125,14 @@ export default function HitoScreen({
             onRemove={removeFile("acta")}
           >
             {canManage && (
-              <button type="button" className={styles.button} onClick={() => setDialog("photos")}>
+              <Button type="button" variant="outline" size="sm" className="w-fit" onClick={() => setDialog("photos")}>
                 {t("choosePhotos")}
-              </button>
+              </Button>
             )}
             {actaPhotos.length > 0 ? (
               <PhotoStrip photos={actaPhotos} thumbUrl={thumbUrl} />
             ) : (
-              <span className={styles.muted}>{t("noActaPhotos")}</span>
+              <span className={muted}>{t("noActaPhotos")}</span>
             )}
           </HitoFileCard>
           <HitoFileCard
@@ -144,11 +145,11 @@ export default function HitoScreen({
             onUpload={editor(() => setDialog("invoice"))}
             onRemove={removeFile("invoice")}
           >
-            {hito.dueOn && <span className={styles.muted}>{t("dueNote", { date: f.date(hito.dueOn) })}</span>}
+            {hito.dueOn && <span className={muted}>{t("dueNote", { date: f.date(hito.dueOn) })}</span>}
           </HitoFileCard>
         </div>
 
-        <aside className={styles.aside}>
+        <aside className="flex min-w-0 flex-col gap-5">
           <PaymentCard
             hito={hito}
             pending={pending}

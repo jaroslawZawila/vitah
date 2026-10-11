@@ -6,17 +6,17 @@
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import type { ProjectObra } from "@repo/core/contract";
+import { buttonVariants } from "@/components/ui/button";
 import { setObraStageAction } from "../../../../actions/obra";
 import EmptyState from "../components/EmptyState";
-import FormError from "../components/FormError";
+import FormError from "../../../components/FormError";
 import { SleepingCamera } from "../components/illustrations";
 import ChapterTable from "../components/obra/ChapterTable";
+import { textLink } from "../components/obra/classes";
 import ObraKpis from "../components/obra/ObraKpis";
 import ObraStages from "../components/obra/ObraStages";
-import obraStyles from "../components/obra/obra.module.css";
 import { useObraAction } from "../components/obra/useObraAction";
 import TabHeader from "../components/TabHeader";
-import tabStyles from "../components/TabHeader.module.css";
 
 /** The construction process of the project: stage, key figures and chapters. */
 export default function ObraScreen({
@@ -40,7 +40,7 @@ export default function ObraScreen({
   const setStage = (stage: number) => run(() => setObraStageAction(projectId, stage));
 
   return (
-    <div className={obraStyles.stack}>
+    <div className="flex flex-col gap-5">
       <TabHeader
         projectRef={projectRef}
         title={t("title")}
@@ -52,7 +52,7 @@ export default function ObraScreen({
         action={
           canManage &&
           firstActive && (
-            <Link href={chapterHref(firstActive.code)} className={tabStyles.action}>
+            <Link href={chapterHref(firstActive.code)} className={buttonVariants()}>
               {t("updateProgress")}
             </Link>
           )
@@ -66,14 +66,16 @@ export default function ObraScreen({
           <ChapterTable obra={obra} chapterHref={chapterHref} />
         </>
       ) : (
-        <div className={obraStyles.card}>
-          <EmptyState illustration={<SleepingCamera />} title={t("noBudgetTitle")} text={t("noBudgetText")} />
-          <p className={obraStyles.center}>
-            <Link href={`${base}/budget`} className={obraStyles.link}>
+        <EmptyState
+          illustration={<SleepingCamera />}
+          title={t("noBudgetTitle")}
+          text={t("noBudgetText")}
+          action={
+            <Link href={`${base}/budget`} className={textLink}>
               {t("goToBudget")}
             </Link>
-          </p>
-        </div>
+          }
+        />
       )}
     </div>
   );

@@ -2,8 +2,12 @@
 
 import { useId } from "react";
 import { useTranslations } from "next-intl";
-import formStyles from "../cardForm.module.css";
-import FormError from "../FormError";
+import { Button } from "@/components/ui/button";
+import { Field as FieldBox, FieldDescription, FormActions } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import FormError from "../../../../components/FormError";
 
 export type Field = {
   name: string;
@@ -33,7 +37,7 @@ export default function FieldsForm({
   const id = useId();
   return (
     <form
-      className={formStyles.form}
+      className="flex flex-col gap-3"
       onSubmit={(event) => {
         event.preventDefault();
         const data = new FormData(event.currentTarget);
@@ -43,12 +47,12 @@ export default function FieldsForm({
       {fields.map((field) => {
         const fieldId = `${id}-${field.name}`;
         return (
-          <div key={field.name} className={formStyles.field}>
-            <label htmlFor={fieldId}>{field.label}</label>
+          <FieldBox key={field.name}>
+            <Label htmlFor={fieldId}>{field.label}</Label>
             {field.multiline ? (
-              <textarea id={fieldId} name={field.name} defaultValue={field.defaultValue} rows={5} />
+              <Textarea id={fieldId} name={field.name} defaultValue={field.defaultValue} rows={5} />
             ) : (
-              <input
+              <Input
                 id={fieldId}
                 name={field.name}
                 type="text"
@@ -57,19 +61,19 @@ export default function FieldsForm({
                 required={field.required}
               />
             )}
-            {field.hint && <span className={formStyles.hint}>{field.hint}</span>}
-          </div>
+            {field.hint && <FieldDescription>{field.hint}</FieldDescription>}
+          </FieldBox>
         );
       })}
       <FormError namespace="obra.errors" error={error} />
-      <div className={formStyles.actions}>
-        <button type="button" className={formStyles.secondary} onClick={onCancel}>
+      <FormActions>
+        <Button type="button" variant="outline" onClick={onCancel}>
           {t("cancel")}
-        </button>
-        <button type="submit" className={formStyles.primary} disabled={pending}>
+        </Button>
+        <Button type="submit" disabled={pending}>
           {pending ? t("saving") : t("save")}
-        </button>
-      </div>
+        </Button>
+      </FormActions>
     </form>
   );
 }

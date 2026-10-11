@@ -2,7 +2,6 @@
 
 import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
-import styles from "./Topbar.module.css";
 
 export default function Topbar() {
   const pathname = usePathname();
@@ -19,8 +18,8 @@ export default function Topbar() {
       : "projects";
 
   return (
-    <header className={styles.topbar}>
-      <div className={styles.title}>{t(`titles.${titleKey}`)}</div>
+    <header className="flex min-h-12 items-center border-b px-4 sm:px-7">
+      <div className="eyebrow">{t(`titles.${titleKey}`)}</div>
     </header>
   );
 }

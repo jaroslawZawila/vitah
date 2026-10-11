@@ -2,10 +2,12 @@
 
 import { useTranslations } from "next-intl";
 import type { ClientError, ClientListItem } from "@repo/core/contract";
+import { Button } from "@/components/ui/button";
+import { cardVariants } from "@/components/ui/card";
+import { FormActions } from "@/components/ui/field";
+import FormError from "../../components/FormError";
 import { displayName } from "./display";
-import FormError from "./FormError";
 import PasswordField from "./PasswordField";
-import styles from "./clients.module.css";
 
 /** Presentational: sets the password a client signs in to the app with. */
 export default function SetPasswordForm({
@@ -24,20 +26,18 @@ export default function SetPasswordForm({
   const t = useTranslations("clientsPage.passwordForm");
 
   return (
-    <form action={action} className={styles.card} aria-labelledby="password-form-title">
-      <h2 id="password-form-title" className={styles.cardTitle}>
-        {t("title", { name: displayName(client) })}
-      </h2>
+    <form action={action} className={cardVariants()} aria-labelledby="password-form-title">
+      <h2 id="password-form-title">{t("title", { name: displayName(client) })}</h2>
       <PasswordField id="client-new-password" label={t("password")} />
-      <FormError error={error} />
-      <div className={styles.actions}>
-        <button type="button" className={styles.secondary} onClick={onCancel}>
+      <FormError namespace="clientsPage.errors" error={error} />
+      <FormActions>
+        <Button type="button" variant="outline" onClick={onCancel}>
           {t("cancel")}
-        </button>
-        <button type="submit" className={styles.primary} disabled={pending}>
+        </Button>
+        <Button type="submit" disabled={pending}>
           {t("save")}
-        </button>
-      </div>
+        </Button>
+      </FormActions>
     </form>
   );
 }

@@ -2,8 +2,9 @@
 
 import { useTranslations } from "next-intl";
 import type { ClientOption, ProjectClientError } from "@repo/core/contract";
-import FormError from "./FormError";
-import styles from "./ClientAccessCard.module.css";
+import FormError from "../../../components/FormError";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 
 /** Presentational: the client attached to the project. */
 export default function AssignedClient({
@@ -20,17 +21,21 @@ export default function AssignedClient({
   const t = useTranslations("projectDetailPage.clientAccess");
 
   return (
-    <div className={styles.attached}>
-      <div className={styles.identity}>
-        <span className={styles.status}>{t("active")}</span>
-        <span className={styles.clientName}>{client.name ?? client.email}</span>
-        <span className={styles.clientEmail}>{client.email}</span>
+    <div className="flex flex-col gap-4">
+      <div className="flex min-w-0 flex-col items-start gap-0.5">
+        <Badge variant="good" className="mb-1.5">
+          {t("active")}
+        </Badge>
+        <span className="text-[15px] font-semibold wrap-anywhere">
+          {client.name ?? client.email}
+        </span>
+        <span className="text-[13px] wrap-anywhere text-muted-foreground">{client.email}</span>
       </div>
       <FormError namespace="projectDetailPage.clientAccess.errors" error={error} />
-      <div className={styles.actions}>
-        <button type="button" className={styles.danger} onClick={onRemove} disabled={removing}>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button type="button" variant="destructive" onClick={onRemove} disabled={removing}>
           {t("remove")}
-        </button>
+        </Button>
       </div>
     </div>
   );

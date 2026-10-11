@@ -13,11 +13,15 @@ import {
   type HitoFileKind,
   type ProjectPhoto,
 } from "@repo/core/contract";
-import formStyles from "../cardForm.module.css";
-import docStyles from "../documents.module.css";
-import FormError from "../FormError";
+import { Button } from "@/components/ui/button";
+import { cardVariants } from "@/components/ui/card";
+import { Field, FieldDescription, FormActions } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
+import FormError from "../../../../components/FormError";
+import { cardHead, checkLabel, checkRow, codeChip, muted } from "./classes";
 import { useObraFormat } from "./format";
-import styles from "./obra.module.css";
 import PhotoStrip from "./PhotoStrip";
 import Stepper from "./Stepper";
 
@@ -35,7 +39,7 @@ export function HitoSteps({ hito }: { hito: Hito }) {
     paid: hito.paidOn ? f.date(hito.paidOn) : hito.dueOn && t("stepDue", { date: f.date(hito.dueOn) }),
   };
   return (
-    <section className={styles.card}>
+    <section className={cardVariants()}>
       <Stepper
         label={t("stepsLabel")}
         steps={STEPS.map((step, index) => ({
@@ -65,30 +69,37 @@ export function HitoConditions({
   const t = useTranslations("obra.hito");
   const [label, setLabel] = useState("");
   const tick = (met: boolean) => (
-    <span className={styles.checkMark} aria-hidden>
-      {met && <Check size={18} />}
+    <span
+      className={cn(
+        "grid size-5 flex-none place-items-center rounded-sm border-[1.5px]",
+        met && "border-good bg-good text-card",
+      )}
+      aria-hidden
+    >
+      {met && <Check size={13} strokeWidth={3} />}
     </span>
   );
 
   return (
-    <section className={styles.cardTight}>
-      <h2 className={styles.cardTitle}>{t("conditions")}</h2>
-      <p className={styles.muted}>{hito.scope}</p>
+    <section className={cardVariants()}>
+      <h2>{t("conditions")}</h2>
+      <p className={muted}>{hito.scope}</p>
       <div>
         {hito.chapters.map((chapter) => (
-          <div key={chapter.code} className={styles.checkRow}>
+          <div key={chapter.code} className={checkRow}>
             {tick(chapter.progressPct === 100)}
-            <span className={styles.checkLabel}>
-              <span className={styles.code}>{chapter.code}</span> {chapter.name}
+            <span className={checkLabel}>
+              <span className={codeChip}>{chapter.code}</span> {chapter.name}
             </span>
-            <span className={`${styles.num} ${styles.muted}`}>{chapter.progressPct} %</span>
+            <span className="num text-muted-foreground">{chapter.progressPct} %</span>
           </div>
         ))}
         {hito.checks.map((check) => (
-          <div key={check.id} className={styles.checkRow}>
-            <label className={styles.checkLabel}>
+          <div key={check.id} className={checkRow}>
+            <label className={cn(checkLabel, "cursor-pointer")}>
               <input
                 type="checkbox"
+                className="size-5 flex-none accent-good"
                 checked={check.done}
                 disabled={!onToggle}
                 onChange={(event) => onToggle?.(check.id, event.target.checked)}
@@ -96,26 +107,28 @@ export function HitoConditions({
               {check.label}
             </label>
             {onDelete && (
-              <button
+              <Button
                 type="button"
-                className={styles.dangerText}
+                variant="ghost"
+                size="icon-sm"
+                className="hover:text-bad"
                 aria-label={t("deleteCheck", { label: check.label })}
                 onClick={() => onDelete(check.id)}
               >
-                <Trash2 size={14} aria-hidden />
-              </button>
+                <Trash2 aria-hidden />
+              </Button>
             )}
           </div>
         ))}
-        <div className={styles.checkRow}>
+        <div className={checkRow}>
           {tick(hito.photoIds.length > 0)}
-          <span className={styles.checkLabel}>{t("photosChosen")}</span>
-          <span className={`${styles.num} ${styles.muted}`}>{hito.photoIds.length}</span>
+          <span className={checkLabel}>{t("photosChosen")}</span>
+          <span className="num text-muted-foreground">{hito.photoIds.length}</span>
         </div>
       </div>
       {onAdd && (
         <form
-          className={styles.buttons}
+          className="flex flex-wrap gap-2"
           onSubmit={(event) => {
             event.preventDefault();
             if (!label.trim()) return;
@@ -123,17 +136,16 @@ export function HitoConditions({
             setLabel("");
           }}
         >
-          <input
-            className={styles.inputText}
-            style={{ flex: 1 }}
+          <Input
+            className="flex-[1_1_200px]"
             aria-label={t("newCheck")}
             placeholder={t("newCheck")}
             value={label}
             onChange={(event) => setLabel(event.target.value)}
           />
-          <button type="submit" className={styles.button}>
+          <Button type="submit" variant="outline">
             {t("addCheck")}
-          </button>
+          </Button>
         </form>
       )}
     </section>
@@ -169,40 +181,43 @@ export function HitoFileCard({
 }) {
   const t = useTranslations("obra.hito");
   return (
-    <section className={styles.cardSnug}>
-      <div className={styles.cardHeadFlush}>
-        <h2 className={styles.cardTitle}>{title}</h2>
+    <section className={cardVariants()}>
+      <div className={cn(cardHead, "items-center")}>
+        <h2>{title}</h2>
         {onUpload && !href && (
-          <button type="button" className={styles.button} onClick={onUpload}>
+          <Button type="button" variant="outline" size="sm" onClick={onUpload}>
             {uploadLabel}
-          </button>
+          </Button>
         )}
       </div>
       {children}
       {href ? (
-        <div className={docStyles.row}>
-          <span className={docStyles.fileType} aria-hidden>
+        <div className="grid grid-flow-col auto-cols-auto grid-cols-[auto_minmax(0,1fr)] items-center gap-3 border-b py-2.5 text-[13.5px] last:border-b-0">
+          <span
+            className="grid h-[42px] w-9 place-items-center rounded-sm border bg-raise text-[9.5px] font-semibold text-brand-ink"
+            aria-hidden
+          >
             PDF
           </span>
-          <div className={docStyles.details}>
-            <a href={href} target="_blank" rel="noreferrer" className={docStyles.title}>
+          <div className="flex min-w-0 flex-col gap-0.5">
+            <a href={href} target="_blank" rel="noreferrer" className="font-medium text-info [overflow-wrap:anywhere] hover:underline">
               {fileName}
             </a>
-            <span className={docStyles.meta}>{detail}</span>
+            <span className="text-xs text-muted-foreground">{detail}</span>
           </div>
           {onUpload && (
-            <button type="button" className={styles.textButton} onClick={onUpload}>
+            <Button type="button" variant="ghost" size="sm" onClick={onUpload}>
               {t("replace")}
-            </button>
+            </Button>
           )}
           {onRemove && (
-            <button type="button" className={styles.dangerText} onClick={onRemove}>
+            <Button type="button" variant="ghost-destructive" size="sm" onClick={onRemove}>
               {t("remove")}
-            </button>
+            </Button>
           )}
         </div>
       ) : (
-        <span className={styles.muted}>{empty}</span>
+        <span className={muted}>{empty}</span>
       )}
     </section>
   );
@@ -225,10 +240,10 @@ export function HitoFileForm({
   const t = useTranslations("obra.hito");
   const [tooLarge, setTooLarge] = useState(false);
   return (
-    <form action={action} className={formStyles.form}>
-      <div className={formStyles.field}>
-        <label htmlFor="hito-file">{t("file")}</label>
-        <input
+    <form action={action} className="flex flex-col gap-3">
+      <Field>
+        <Label htmlFor="hito-file">{t("file")}</Label>
+        <Input
           id="hito-file"
           name="file"
           type="file"
@@ -236,22 +251,22 @@ export function HitoFileForm({
           required
           onChange={(event) => setTooLarge((event.target.files?.[0]?.size ?? 0) > MAX_DOCUMENT_BYTES)}
         />
-        <span className={formStyles.hint}>{t("fileHint")}</span>
-      </div>
-      <div className={formStyles.field}>
-        <label htmlFor="hito-date">{kind === "acta" ? t("signedOn") : t("invoiceDate")}</label>
+        <FieldDescription>{t("fileHint")}</FieldDescription>
+      </Field>
+      <Field>
+        <Label htmlFor="hito-date">{kind === "acta" ? t("signedOn") : t("invoiceDate")}</Label>
         {/* The acta's date is when it was signed; an invoice defaults to today. */}
-        <input id="hito-date" name="date" type="date" required={kind === "acta"} />
-      </div>
+        <Input id="hito-date" name="date" type="date" required={kind === "acta"} />
+      </Field>
       <FormError namespace="obra.errors" error={tooLarge ? "file_too_large" : error} />
-      <div className={formStyles.actions}>
-        <button type="button" className={formStyles.secondary} onClick={onCancel}>
+      <FormActions>
+        <Button type="button" variant="outline" onClick={onCancel}>
           {t("cancel")}
-        </button>
-        <button type="submit" className={formStyles.primary} disabled={pending || tooLarge}>
+        </Button>
+        <Button type="submit" disabled={pending || tooLarge}>
           {pending ? t("uploading") : t("upload")}
-        </button>
-      </div>
+        </Button>
+      </FormActions>
     </form>
   );
 }
@@ -274,7 +289,7 @@ export function PhotoPicker({
 }) {
   const t = useTranslations("obra.hito");
   const [selected, setSelected] = useState(() => new Set(initial));
-  if (photos.length === 0) return <p className={styles.muted}>{t("pickerEmpty")}</p>;
+  if (photos.length === 0) return <p className={muted}>{t("pickerEmpty")}</p>;
 
   function toggle(photo: ProjectPhoto) {
     setSelected((current) => {
@@ -285,21 +300,20 @@ export function PhotoPicker({
   }
 
   return (
-    <div className={styles.stack}>
+    <div className="flex flex-col gap-4">
       <PhotoStrip photos={photos} thumbUrl={thumbUrl} selected={selected} onToggle={toggle} />
-      <div className={formStyles.actions}>
-        <button type="button" className={formStyles.secondary} onClick={onCancel}>
+      <FormActions>
+        <Button type="button" variant="outline" onClick={onCancel}>
           {t("cancel")}
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
-          className={formStyles.primary}
           disabled={pending}
           onClick={() => onSave(photos.filter((p) => selected.has(p.id)).map((p) => p.id))}
         >
           {t("pickerSave")}
-        </button>
-      </div>
+        </Button>
+      </FormActions>
     </div>
   );
 }
@@ -320,39 +334,39 @@ export function PaymentCard({
   const t = useTranslations("obra.hito");
   const f = useObraFormat();
   return (
-    <section id="payment" className={styles.cardSnug}>
-      <span className={styles.label}>{t("paymentTitle")}</span>
+    <section id="payment" className={cardVariants()}>
+      <span className="eyebrow">{t("paymentTitle")}</span>
       {hito.paidOn ? (
         <>
-          <span className={styles.good}>
+          <span className="text-[13.5px] font-semibold text-good">
             {t("paid", { date: f.date(hito.paidOn), amount: f.money(hito.paidAmountCents ?? 0) })}
           </span>
           {onCancel && (
-            <button type="button" className={styles.buttonDanger} onClick={onCancel} disabled={pending}>
+            <Button type="button" variant="destructive" className="w-fit" onClick={onCancel} disabled={pending}>
               {t("cancelPayment")}
-            </button>
+            </Button>
           )}
         </>
       ) : onPay ? (
         <form
-          className={formStyles.form}
+          className="flex flex-col gap-3"
           onSubmit={(event) => {
             event.preventDefault();
             const data = new FormData(event.currentTarget);
             onPay(String(data.get("paidOn")), String(data.get("amount")));
           }}
         >
-          <div className={formStyles.field}>
-            <label htmlFor="paid-on">{t("paidOn")}</label>
-            <input id="paid-on" name="paidOn" type="date" required />
-          </div>
-          <div className={formStyles.field}>
-            <label htmlFor="paid-amount">{t("paidAmount")}</label>
-            <input id="paid-amount" name="amount" inputMode="decimal" defaultValue={f.decimal(hito.totalCents / 100)} />
-          </div>
-          <button type="submit" className={formStyles.primary} disabled={pending}>
+          <Field>
+            <Label htmlFor="paid-on">{t("paidOn")}</Label>
+            <Input id="paid-on" name="paidOn" type="date" required />
+          </Field>
+          <Field>
+            <Label htmlFor="paid-amount">{t("paidAmount")}</Label>
+            <Input id="paid-amount" name="amount" inputMode="decimal" defaultValue={f.decimal(hito.totalCents / 100)} />
+          </Field>
+          <Button type="submit" disabled={pending}>
             {t("registerPayment")}
-          </button>
+          </Button>
         </form>
       ) : null}
     </section>
@@ -366,13 +380,13 @@ export function HitoNotes({ hito }: { hito: Hito }) {
   const status = hito.status === "pending" ? "active" : hito.status;
   return (
     <>
-      <section className={styles.cardTight}>
-        <span className={styles.label}>{t("appTitle")}</span>
-        <span className={styles.muted}>{t("appText", { status: t(`steps.${status}`) })}</span>
+      <section className={cn(cardVariants(), "gap-2")}>
+        <span className="eyebrow">{t("appTitle")}</span>
+        <span className={muted}>{t("appText", { status: t(`steps.${status}`) })}</span>
       </section>
-      <section className={styles.cardTight}>
-        <span className={styles.label}>{t("contractTitle")}</span>
-        <span className={styles.muted}>{t("contractText")}</span>
+      <section className={cn(cardVariants(), "gap-2")}>
+        <span className="eyebrow">{t("contractTitle")}</span>
+        <span className={muted}>{t("contractText")}</span>
       </section>
     </>
   );

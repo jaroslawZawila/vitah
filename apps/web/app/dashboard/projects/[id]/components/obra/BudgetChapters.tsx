@@ -4,11 +4,12 @@ import { ChevronDown, ChevronRight, Pencil, Trash2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import type { BudgetChapter, BudgetLine, BudgetRevision } from "@repo/core/contract";
 import { useObraFormat } from "./format";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { codeChip, columns, table } from "./classes";
 import InlineNumber from "./InlineNumber";
-import styles from "./obra.module.css";
-import { columns } from "./table";
 
-const COLUMNS = "64px minmax(0, 1fr) 48px 100px 110px 120px 88px";
+const COLUMNS = "64px minmax(160px, 1fr) 48px 100px 110px 120px 88px";
 
 type Handlers = {
   onAddLine: (chapter: BudgetChapter) => void;
@@ -39,52 +40,61 @@ export default function BudgetChapters({
   const f = useObraFormat();
 
   return (
-    <div>
+    <div className="flex flex-col gap-2">
       {revision.chapters.map((chapter) => {
         const isOpen = open.has(chapter.code);
         return (
-          <div key={chapter.id}>
+          <div key={chapter.id} className="overflow-hidden rounded-[12px] border bg-card">
             <button
               type="button"
-              className={`${styles.chapterHead} ${isOpen ? styles.chapterOpen : ""}`}
+              className={cn(
+                "flex min-h-12 w-full cursor-pointer flex-wrap items-center gap-x-3.5 gap-y-1 px-3.5 py-3 text-left text-[13.5px] transition-colors hover:bg-raise",
+                isOpen && "border-b bg-raise",
+              )}
               aria-expanded={isOpen}
               onClick={() => onToggle(chapter.code)}
             >
-              {isOpen ? <ChevronDown size={14} aria-hidden /> : <ChevronRight size={14} aria-hidden />}
-              <span className={styles.code}>{chapter.code}</span>{" "}
-              <span className={styles.chapterName}>
-                {chapter.name}
-                {chapter.change && <span className={styles.flag}> {t(`flags.${chapter.change}`)}</span>}
+              {isOpen ? (
+                <ChevronDown size={16} className="text-muted-foreground" aria-hidden />
+              ) : (
+                <ChevronRight size={16} className="text-muted-foreground" aria-hidden />
+              )}
+              <span className={codeChip}>
+                {chapter.code}
               </span>{" "}
-              <span className={styles.muted}>
+              <span className="flex-[1_1_200px] text-sm font-semibold">
+                {chapter.name}
+                {chapter.change && <span className="text-[11.5px] font-semibold text-brand-ink"> {t(`flags.${chapter.change}`)}</span>}
+              </span>{" "}
+              <span className="text-xs text-muted-foreground">
                 {t("lineCount", { count: chapter.lines.length })} · {f.share(chapter.shareBp)}
               </span>{" "}
-              <span className={`${styles.num} ${styles.strong}`}>{f.money(chapter.totalCents)}</span>
+              <span className="num font-semibold">{f.money(chapter.totalCents)}</span>
             </button>
             {isOpen && (
-              <div className={styles.chapterBody}>
-                {chapter.changeNote && <p className={styles.note}>{chapter.changeNote}</p>}
+              <div className="flex flex-col gap-3.5 p-3.5">
+                {chapter.changeNote && <p className="rounded-lg bg-raise px-[13px] py-2.5 text-[13px] text-muted-foreground">{chapter.changeNote}</p>}
                 <div
                   role="table"
                   aria-label={`${chapter.code} ${chapter.name}`}
-                  className={styles.table}
+                  className={table.root}
                   style={columns(COLUMNS)}
                 >
-                  <div role="row" className={styles.headRow}>
+                  <div role="row" className={table.head}>
                     <span role="columnheader">{t("codeCol")}</span>
                     <span role="columnheader">{t("descriptionCol")}</span>
                     <span role="columnheader">{t("unitCol")}</span>
-                    <span role="columnheader" className={styles.right}>{t("qtyCol")}</span>
-                    <span role="columnheader" className={styles.right}>{t("priceCol")}</span>
-                    <span role="columnheader" className={styles.right}>{t("amountCol")}</span>
+                    <span role="columnheader" className={table.right}>{t("qtyCol")}</span>
+                    <span role="columnheader" className={table.right}>{t("priceCol")}</span>
+                    <span role="columnheader" className={table.right}>{t("amountCol")}</span>
                     <span role="columnheader" />
                   </div>
                   {chapter.lines.map((line) => (
-                    <div role="row" key={line.id} className={styles.row}>
-                      <span role="cell" className={`${styles.num} ${styles.muted}`}>{line.code}</span>
-                      <span role="cell" className={styles.rowName}>{line.description}</span>
-                      <span role="cell" className={styles.muted}>{line.unit}</span>
-                      <span role="cell" className={`${styles.num} ${styles.right}`}>
+                    <div role="row" key={line.id} className={table.row}>
+                      <span role="cell" className="num text-muted-foreground">{line.code}</span>
+                      <span role="cell" className={table.name}>{line.description}</span>
+                      <span role="cell" className="text-muted-foreground">{line.unit}</span>
+                      <span role="cell" className={`num ${table.right}`}>
                         {handlers ? (
                           <InlineNumber
                             // A new saved value resets what was typed.
@@ -98,7 +108,7 @@ export default function BudgetChapters({
                           f.quantity(line.quantity)
                         )}
                       </span>
-                      <span role="cell" className={`${styles.num} ${styles.right}`}>
+                      <span role="cell" className={`num ${table.right}`}>
                         {handlers ? (
                           <InlineNumber
                             key={line.unitPriceCents}
@@ -114,40 +124,40 @@ export default function BudgetChapters({
                           f.decimal(line.unitPriceCents / 100)
                         )}
                       </span>
-                      <span role="cell" className={`${styles.num} ${styles.right} ${styles.strong}`}>
+                      <span role="cell" className={`num font-semibold ${table.right}`}>
                         {f.decimal(line.amountCents / 100)}
                       </span>
-                      <span role="cell" className={styles.buttons}>
+                      <span role="cell" className="flex flex-wrap justify-end gap-0.5">
                         {handlers && (
                           <>
-                            <button type="button" className={styles.textButton} aria-label={t("editLine", { code: line.code })} onClick={() => handlers.onEditLine(chapter, line)}>
-                              <Pencil size={14} aria-hidden />
-                            </button>
-                            <button type="button" className={styles.dangerText} aria-label={t("deleteLine", { code: line.code })} onClick={() => handlers.onDeleteLine(line)}>
-                              <Trash2 size={14} aria-hidden />
-                            </button>
+                            <Button type="button" variant="ghost" size="icon-sm" aria-label={t("editLine", { code: line.code })} onClick={() => handlers.onEditLine(chapter, line)}>
+                              <Pencil aria-hidden />
+                            </Button>
+                            <Button type="button" variant="ghost" size="icon-sm" className="hover:text-bad" aria-label={t("deleteLine", { code: line.code })} onClick={() => handlers.onDeleteLine(line)}>
+                              <Trash2 aria-hidden />
+                            </Button>
                           </>
                         )}
                       </span>
                     </div>
                   ))}
                 </div>
-                <div className={styles.subtotal}>
+                <div className="flex flex-wrap items-center gap-2">
                   {handlers && (
-                    <span className={styles.buttons}>
-                      <button type="button" className={styles.textButton} onClick={() => handlers.onAddLine(chapter)}>
+                    <span className="flex flex-wrap gap-1">
+                      <Button type="button" variant="outline" size="sm" onClick={() => handlers.onAddLine(chapter)}>
                         <span aria-hidden>+ </span>
                         {t("addLine")}
-                      </button>
-                      <button type="button" className={styles.textButton} onClick={() => handlers.onEditChapter(chapter)}>
+                      </Button>
+                      <Button type="button" variant="ghost" size="sm" onClick={() => handlers.onEditChapter(chapter)}>
                         {t("editChapter")}
-                      </button>
-                      <button type="button" className={styles.dangerText} onClick={() => handlers.onDeleteChapter(chapter)}>
+                      </Button>
+                      <Button type="button" variant="ghost-destructive" size="sm" onClick={() => handlers.onDeleteChapter(chapter)}>
                         {t("deleteChapter")}
-                      </button>
+                      </Button>
                     </span>
                   )}
-                  <strong>{t("subtotal", { code: chapter.code, amount: f.money(chapter.totalCents) })}</strong>
+                  <strong className="ml-auto text-[13.5px] font-semibold">{t("subtotal", { code: chapter.code, amount: f.money(chapter.totalCents) })}</strong>
                 </div>
               </div>
             )}

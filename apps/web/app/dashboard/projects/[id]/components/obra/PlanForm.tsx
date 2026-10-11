@@ -2,10 +2,12 @@
 
 import { useTranslations } from "next-intl";
 import type { Hito } from "@repo/core/contract";
-import formStyles from "../cardForm.module.css";
-import FormError from "../FormError";
+import { Button } from "@/components/ui/button";
+import { FormActions } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import FormError from "../../../../components/FormError";
 import { useObraFormat } from "./format";
-import styles from "./obra.module.css";
+import { codeChip, muted, pctInput } from "./classes";
 
 export type PlanChange = { id: string; pctBp: number; chapterCodes: string[] };
 
@@ -28,7 +30,7 @@ export default function PlanForm({
 
   return (
     <form
-      className={formStyles.form}
+      className="flex flex-col gap-3"
       onSubmit={(event) => {
         event.preventDefault();
         const data = new FormData(event.currentTarget);
@@ -45,38 +47,38 @@ export default function PlanForm({
         onSubmit(changes);
       }}
     >
-      <p className={styles.muted}>{t("planHint")}</p>
+      <p className={muted}>{t("planHint")}</p>
       {hitos.map((hito) => (
-        <div key={hito.id} className={styles.planRow}>
-          <span className={styles.code}>{hito.code}</span>
-          <span className={styles.checkLabel}>{hito.name}</span>
-          <span className={styles.pctInput}>
-            <input
+        <div key={hito.id} className="flex flex-wrap items-center gap-2.5 border-b py-2 text-[13.5px]">
+          <span className={codeChip}>{hito.code}</span>
+          <span className="min-w-0 flex-1 font-medium">{hito.name}</span>
+          <span className={pctInput.root}>
+            <Input
               name={`pct-${hito.id}`}
-              className={styles.input}
+              className={pctInput.input}
               inputMode="decimal"
               aria-label={t("planPct", { code: hito.code })}
               defaultValue={f.pctInput(hito.pctBp)}
             />
-            <span className={styles.pctSign} aria-hidden>%</span>
+            <span className={pctInput.sign} aria-hidden>%</span>
           </span>
-          <input
+          <Input
             name={`chapters-${hito.id}`}
-            className={styles.inputText}
+            className="flex-[1_1_160px]"
             aria-label={t("planChapters", { code: hito.code })}
             defaultValue={hito.chapters.map((c) => c.code).join(", ")}
           />
         </div>
       ))}
       <FormError namespace="obra.errors" error={error} />
-      <div className={formStyles.actions}>
-        <button type="button" className={formStyles.secondary} onClick={onCancel}>
+      <FormActions>
+        <Button type="button" variant="outline" onClick={onCancel}>
           {t("cancel")}
-        </button>
-        <button type="submit" className={formStyles.primary} disabled={pending}>
+        </Button>
+        <Button type="submit" disabled={pending}>
           {pending ? t("planSaving") : t("planSave")}
-        </button>
-      </div>
+        </Button>
+      </FormActions>
     </form>
   );
 }

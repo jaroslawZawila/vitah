@@ -4,11 +4,13 @@ import Link from "next/link";
 import { useTranslations } from "next-intl";
 import type { Hito } from "@repo/core/contract";
 import { useObraFormat } from "./format";
-import styles from "./obra.module.css";
-import { columns } from "./table";
+import { codeChip, columns, muted, table } from "./classes";
 import StatusPill from "./StatusPill";
 
-const COLUMNS = "44px minmax(0, 1fr) 48px 120px minmax(0, 0.8fr) minmax(0, 1fr) 140px";
+/** A small outlined tag in the chapters column. */
+const TAG = "inline-flex items-center gap-1.5 rounded-full border bg-card px-2 py-0.5 text-[11.5px] whitespace-nowrap";
+
+const COLUMNS = "44px minmax(160px, 1fr) 48px 120px minmax(120px, 0.8fr) minmax(140px, 1fr) 140px";
 
 /** Presentational: the payment plan H0–H9, each hito with its chapters and state. */
 export default function HitoTable({
@@ -30,12 +32,12 @@ export default function HitoTable({
   };
 
   return (
-    <div role="table" aria-label={t("title")} className={styles.table} style={columns(COLUMNS)}>
-      <div role="row" className={styles.headRow}>
+    <div role="table" aria-label={t("title")} className={table.root} style={columns(COLUMNS)}>
+      <div role="row" className={table.head}>
         <span role="columnheader">{t("hito")}</span>
         <span role="columnheader">{t("name")}</span>
-        <span role="columnheader" className={styles.right}>{t("pct")}</span>
-        <span role="columnheader" className={styles.right}>{t("amount")}</span>
+        <span role="columnheader" className={table.right}>{t("pct")}</span>
+        <span role="columnheader" className={table.right}>{t("amount")}</span>
         <span role="columnheader">{t("moment")}</span>
         <span role="columnheader">{t("chapters")}</span>
         <span role="columnheader">{t("state")}</span>
@@ -43,39 +45,39 @@ export default function HitoTable({
       {hitos.map((hito) => {
         const done = hito.checks.filter((c) => c.done).length;
         return (
-          <div role="row" key={hito.id} className={styles.row}>
-            <span role="cell" className={styles.code}>{hito.code}</span>
-            <span role="cell" className={styles.rowName}>
-              <Link href={hitoHref(hito)} className={styles.rowLink}>
+          <div role="row" key={hito.id} className={table.row}>
+            <span role="cell" className={codeChip}>{hito.code}</span>
+            <span role="cell" className={table.name}>
+              <Link href={hitoHref(hito)} className={table.nameLink}>
                 {hito.name}
               </Link>
             </span>
-            <span role="cell" className={`${styles.num} ${styles.right} ${styles.muted}`}>{f.share(hito.pctBp)}</span>
-            <span role="cell" className={`${styles.num} ${styles.right}`}>{f.money(hito.amountCents)}</span>
-            <span role="cell" className={styles.muted}>{hito.billingMoment}</span>
-            <span role="cell" className={styles.chips}>
+            <span role="cell" className={`num text-muted-foreground ${table.right}`}>{f.share(hito.pctBp)}</span>
+            <span role="cell" className={`num ${table.right}`}>{f.money(hito.amountCents)}</span>
+            <span role="cell" className="text-muted-foreground">{hito.billingMoment}</span>
+            <span role="cell" className="flex flex-wrap gap-1.5">
               {hito.chapters.map((chapter) => (
-                <span key={chapter.code} className={styles.chip}>
-                  <span className={styles.chipCode}>{chapter.code}</span>
-                  <span className={styles.muted}>{chapter.progressPct} %</span>
+                <span key={chapter.code} className={TAG}>
+                  <span className="font-mono font-semibold text-brand-ink">{chapter.code}</span>
+                  <span className="text-muted-foreground">{chapter.progressPct} %</span>
                 </span>
               ))}
               {hito.checks.length > 0 && (
-                <span className={styles.chip}>{t("checks", { done, total: hito.checks.length })}</span>
+                <span className={TAG}>{t("checks", { done, total: hito.checks.length })}</span>
               )}
             </span>
-            <span role="cell" className={styles.stateCell}>
+            <span role="cell" className="flex flex-col items-start gap-1">
               <StatusPill status={hito.status} kind="hitoStatus" />
-              {when(hito) && <span className={styles.muted}>{when(hito)}</span>}
+              {when(hito) && <span className={muted}>{when(hito)}</span>}
             </span>
           </div>
         );
       })}
-      <div role="row" className={styles.totalRow}>
+      <div role="row" className={table.total}>
         <span role="cell" />
         <span role="cell">{t("total")}</span>
-        <span role="cell" className={styles.right}>{f.share(hitos.reduce((sum, h) => sum + h.pctBp, 0))}</span>
-        <span role="cell" className={`${styles.num} ${styles.right}`}>{f.money(totalCents)}</span>
+        <span role="cell" className={table.right}>{f.share(hitos.reduce((sum, h) => sum + h.pctBp, 0))}</span>
+        <span role="cell" className={`num ${table.right}`}>{f.money(totalCents)}</span>
         <span role="cell" />
         <span role="cell" />
         <span role="cell" />

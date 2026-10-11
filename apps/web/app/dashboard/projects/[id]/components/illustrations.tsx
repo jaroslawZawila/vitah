@@ -1,5 +1,3 @@
-import styles from "./EmptyState.module.css";
-
 // Line drawings for the empty states, in the brand's thin-stroke style.
 // Decorative: the empty state's heading says what they mean.
 
@@ -10,7 +8,7 @@ const svgProps = {
   strokeWidth: 2,
   strokeLinecap: "round",
   strokeLinejoin: "round",
-  className: styles.illustration,
+  className: "mb-2 h-auto w-40 max-w-[60%] text-primary",
   "aria-hidden": true,
 } as const;
 
@@ -20,16 +18,13 @@ export function EmptyFolder() {
     <svg {...svgProps}>
       <path d="M24 56V38a4 4 0 0 1 4-4h26l8 8h56a4 4 0 0 1 4 4v10" />
       <path d="M84 4v36" strokeWidth={1.2} strokeDasharray="2 3" />
-      <path
-        d="M79 42l-6-4M79 46h-7M79 49l-6 4M89 42l6-4M89 46h7M89 49l6 4"
-        strokeWidth={1.5}
-      />
+      <path d="M79 42l-6-4M79 46h-7M79 49l-6 4M89 42l6-4M89 46h7M89 49l6 4" strokeWidth={1.5} />
       <ellipse cx="84" cy="46" rx="5" ry="6" fill="currentColor" />
-      <circle cx="82" cy="48" r="1.2" stroke="none" className={styles.solid} />
-      <circle cx="86" cy="48" r="1.2" stroke="none" className={styles.solid} />
+      <circle cx="82" cy="48" r="1.2" stroke="none" className="fill-card" />
+      <circle cx="86" cy="48" r="1.2" stroke="none" className="fill-card" />
       <path
         d="M16 60a4 4 0 0 1 4-4h112a4 4 0 0 1 4 4l-6 38a4 4 0 0 1-4 4H26a4 4 0 0 1-4-4Z"
-        className={styles.solid}
+        className="fill-card"
       />
     </svg>
   );

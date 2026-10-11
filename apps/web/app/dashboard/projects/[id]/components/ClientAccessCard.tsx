@@ -11,9 +11,9 @@ import {
   unassignProjectClientAction,
   type ClientAccessState,
 } from "../../../../actions/project-client";
-import shared from "../../../shared.module.css";
 import AssignedClient from "./AssignedClient";
 import ClientPicker from "./ClientPicker";
+import { cardVariants } from "@/components/ui/card";
 
 /** Admin-only card linking the project to the homeowner's app account. */
 export default function ClientAccessCard({
@@ -28,10 +28,11 @@ export default function ClientAccessCard({
   const t = useTranslations("projectDetailPage.clientAccess");
 
   return (
-    <section className={shared.card} aria-labelledby="client-access-title">
-      <h2 id="client-access-title" className={shared.cardTitle}>
-        {t("title")}
-      </h2>
+    <section
+      className={cardVariants()}
+      aria-labelledby="client-access-title"
+    >
+      <h2 id="client-access-title">{t("title")}</h2>
       {client ? (
         <Assigned projectId={projectId} client={client} />
       ) : (

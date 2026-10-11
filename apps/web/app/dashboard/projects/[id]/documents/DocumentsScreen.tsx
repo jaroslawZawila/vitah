@@ -6,20 +6,21 @@
 import { useActionState, useState, useTransition } from "react";
 import { Upload } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { Button } from "@/components/ui/button";
+import { cardVariants } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 import type { ProjectDocument } from "@repo/core/contract";
 import {
   addProjectDocumentAction,
   deleteProjectDocumentAction,
   type DocumentsState,
 } from "../../../../actions/documents";
-import shared from "../../../shared.module.css";
 import DocumentList from "../components/DocumentList";
 import DocumentUploadForm from "../components/DocumentUploadForm";
 import EmptyState from "../components/EmptyState";
 import { EmptyFolder } from "../components/illustrations";
 import Modal from "../components/Modal";
 import TabHeader from "../components/TabHeader";
-import tabStyles from "../components/TabHeader.module.css";
 
 /** PDFs shared with the project's client in the mobile app. */
 export default function DocumentsScreen({
@@ -53,10 +54,10 @@ export default function DocumentsScreen({
         summary={t("count", { count: documents.length })}
         action={
           canManage && (
-            <button type="button" className={tabStyles.action} onClick={() => setUploadOpen(true)}>
+            <Button type="button" onClick={() => setUploadOpen(true)}>
               <Upload size={16} aria-hidden />
               {t("upload")}
-            </button>
+            </Button>
           )
         }
       />
@@ -64,7 +65,10 @@ export default function DocumentsScreen({
       {documents.length === 0 ? (
         <EmptyState illustration={<EmptyFolder />} title={t("emptyTitle")} text={t("emptyText")} />
       ) : (
-        <section className={shared.card} aria-label={t("title")}>
+        <section
+          className={cn(cardVariants({ size: "list" }), "py-2")}
+          aria-label={t("title")}
+        >
           <DocumentList
             documents={documents}
             fileUrl={(document) => `/api/v1/projects/${projectId}/documents/${document.id}`}

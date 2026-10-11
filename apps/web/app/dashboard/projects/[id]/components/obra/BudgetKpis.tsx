@@ -4,7 +4,6 @@ import { useTranslations } from "next-intl";
 import type { BudgetRevision } from "@repo/core/contract";
 import { useObraFormat } from "./format";
 import Kpi from "./Kpi";
-import kpiStyles from "./obra.module.css";
 
 /** Presentational: a revision's total, VAT, surfaces and ratios. */
 export default function BudgetKpis({ revision }: { revision: BudgetRevision }) {
@@ -16,8 +15,9 @@ export default function BudgetKpis({ revision }: { revision: BudgetRevision }) {
   const perUseful = per(revision.usefulAreaM2);
 
   return (
-    <section className={kpiStyles.kpis}>
+    <section className="grid grid-cols-2 gap-3.5 xl:grid-cols-4">
       <Kpi
+        highlight
         label={t("total")}
         value={f.money(revision.totalCents)}
         hints={

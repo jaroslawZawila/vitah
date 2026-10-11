@@ -3,52 +3,55 @@
 import { useActionState } from "react";
 import { useTranslations } from "next-intl";
 import { loginAction } from "../actions/auth";
-import styles from "./LoginForm.module.css";
+import { Button } from "@/components/ui/button";
+import { Field, FormMessage } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 export function LoginForm() {
   const t = useTranslations("login");
   const [state, formAction, isPending] = useActionState(loginAction, null);
 
   return (
-    <form action={formAction} className={styles.form}>
-      <div className={styles.field}>
-        <label htmlFor="email" className={styles.label}>
+    <form action={formAction} className="mt-12 flex w-full max-w-[380px] flex-col gap-5">
+      <Field>
+        <Label htmlFor="email" className="tracking-[0.08em] uppercase">
           {t("emailLabel")}
-        </label>
-        <input
+        </Label>
+        <Input
           id="email"
           name="email"
           type="email"
           required
           placeholder={t("emailPlaceholder")}
-          className={styles.input}
+          className="h-12 px-4 text-[15px]"
           autoComplete="email"
         />
-      </div>
+      </Field>
 
-      <div className={styles.field}>
-        <label htmlFor="password" className={styles.label}>
+      <Field>
+        <Label htmlFor="password" className="tracking-[0.08em] uppercase">
           {t("passwordLabel")}
-        </label>
-        <input
+        </Label>
+        <Input
           id="password"
           name="password"
           type="password"
           required
           placeholder={t("passwordPlaceholder")}
-          className={styles.input}
+          className="h-12 px-4 text-[15px]"
           autoComplete="current-password"
         />
-      </div>
+      </Field>
 
-      <button type="submit" disabled={isPending} className={styles.button}>
+      <Button type="submit" disabled={isPending} size="lg" className="mt-1 h-12 bg-verde-oliva text-white">
         {isPending ? t("submitting") : t("submit")}
-      </button>
+      </Button>
 
       {state?.error && (
-        <p className={styles.error}>
+        <FormMessage className="text-center">
           {t(state.error === "too_many_attempts" ? "tooManyAttempts" : "error")}
-        </p>
+        </FormMessage>
       )}
     </form>
   );

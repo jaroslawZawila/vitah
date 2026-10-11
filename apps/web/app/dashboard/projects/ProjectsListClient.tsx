@@ -2,8 +2,17 @@
 
 import Link from "next/link";
 import { useFormatter, useTranslations } from "next-intl";
-import shared from "../shared.module.css";
-import styles from "./page.module.css";
+import { buttonVariants } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 
 type Project = {
   id: string;
@@ -32,63 +41,70 @@ export default function ProjectsListClient({
 
   return (
     <>
-      <div className={styles.filters}>
-        <span className={styles.count}>
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="flex items-center text-[13px] font-medium text-muted-foreground">
           {t("count", { count: projects.length })}
         </span>
         {canCreate && (
-          <Link href="/dashboard/projects/new" className={styles.newProjectBtn}>
+          <Link
+            href="/dashboard/projects/new"
+            className={cn(buttonVariants(), "ml-auto")}
+          >
             + {t("newProject")}
           </Link>
         )}
       </div>
 
       {projects.length === 0 ? (
-        <p className={shared.muted}>{t("empty")}</p>
+        <p className="py-10 text-center text-[13.5px] text-muted-foreground">
+          {t("empty")}
+        </p>
       ) : (
-        <div className={styles.tableWrapper}>
-          <table className={shared.table}>
-            <thead>
-              <tr>
-                <th>{t("table.ref")}</th>
-                <th>{t("table.address")}</th>
-                <th>{t("table.client")}</th>
-                <th>{t("table.startDate")}</th>
-                <th>{t("table.completionDate")}</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
+        <Card size="list">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>{t("table.ref")}</TableHead>
+                <TableHead>{t("table.address")}</TableHead>
+                <TableHead>{t("table.client")}</TableHead>
+                <TableHead>{t("table.startDate")}</TableHead>
+                <TableHead>{t("table.completionDate")}</TableHead>
+                <TableHead></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {projects.map((p) => (
-                <tr key={p.id}>
-                  <td style={{ fontWeight: 600, color: "var(--verde-oliva)" }}>
+                <TableRow key={p.id}>
+                  <TableCell className="num font-semibold text-primary">
                     {p.ref}
-                  </td>
-                  <td>{p.address}</td>
-                  <td style={{ color: "#6b6b6b" }}>
+                  </TableCell>
+                  <TableCell className="min-w-48 whitespace-normal">
+                    {p.address}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
                     {p.client
                       ? (p.client.name ?? p.client.email)
                       : t("table.noClient")}
-                  </td>
-                  <td style={{ color: "#6b6b6b" }}>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
                     {formatDate(p.startDate)}
-                  </td>
-                  <td style={{ color: "#6b6b6b" }}>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
                     {formatDate(p.completionDate)}
-                  </td>
-                  <td>
+                  </TableCell>
+                  <TableCell className="text-right">
                     <Link
                       href={`/dashboard/projects/${p.id}`}
-                      className={styles.viewBtn}
+                      className={buttonVariants({ variant: "outline", size: "sm" })}
                     >
                       {t("table.view")}
                     </Link>
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
-        </div>
+            </TableBody>
+          </Table>
+        </Card>
       )}
     </>
   );

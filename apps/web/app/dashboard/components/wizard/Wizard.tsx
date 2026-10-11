@@ -3,7 +3,10 @@
 import Link from "next/link";
 import type { FormEvent, ReactNode } from "react";
 import { useTranslations } from "next-intl";
-import styles from "./wizard.module.css";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { cardVariants } from "@/components/ui/card";
+import { FormMessage } from "@/components/ui/field";
+import { cn } from "@/lib/utils";
 
 export type WizardStepLink = { id: string; title: string; reachable: boolean };
 
@@ -51,58 +54,82 @@ export default function Wizard({
   }
 
   return (
-    <form className={styles.wizard} onSubmit={handleSubmit} aria-labelledby="wizard-title">
-      <header className={styles.header}>
-        <h1 id="wizard-title" className={styles.title}>
-          {title}
-        </h1>
-        <p className={styles.progress}>
+    <form
+      className="flex max-w-[760px] flex-col gap-5"
+      onSubmit={handleSubmit}
+      aria-labelledby="wizard-title"
+    >
+      <header className="flex flex-col gap-1.5">
+        <h1 id="wizard-title">{title}</h1>
+        <p className="text-[13px] text-muted-foreground">
           {t("stepOf", { current: position + 1, total: steps.length })}
           {current && ` · ${current.title}`}
         </p>
       </header>
 
-      <ol className={styles.stepper}>
-        {steps.map((step, index) => (
-          <li key={step.id}>
-            <button
-              type="button"
-              className={styles.stepLink}
-              data-state={index === position ? "current" : index < position ? "done" : "todo"}
-              aria-current={index === position ? "step" : undefined}
-              disabled={!step.reachable || index === position}
-              onClick={() => onGoTo(index)}
-            >
-              <span className={styles.stepNumber}>{index + 1}</span>
-              <span className={styles.stepTitle}>{step.title}</span>
-            </button>
-          </li>
-        ))}
+      <ol className="m-0 flex list-none gap-1.5 p-0">
+        {steps.map((step, index) => {
+          const state =
+            index === position ? "current" : index < position ? "done" : "todo";
+          return (
+            <li key={step.id} className="min-w-0 flex-1">
+              <button
+                type="button"
+                className={cn(
+                  "flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border bg-card px-2 py-1.5 text-[13px] font-medium text-muted-foreground shadow-card transition-colors not-disabled:cursor-pointer not-disabled:hover:border-primary md:justify-start md:px-3",
+                  state === "current" &&
+                    "border-primary font-semibold text-foreground",
+                  state === "done" && "text-brand-ink",
+                )}
+                aria-current={index === position ? "step" : undefined}
+                disabled={!step.reachable || index === position}
+                onClick={() => onGoTo(index)}
+              >
+                <span
+                  className={cn(
+                    "inline-flex size-6 flex-none items-center justify-center rounded-full bg-raise text-[11.5px] font-semibold tabular-nums",
+                    state === "current" && "bg-primary text-primary-foreground",
+                    state === "done" && "bg-brand-soft text-brand-ink",
+                  )}
+                >
+                  {index + 1}
+                </span>
+                <span className="hidden truncate md:inline">{step.title}</span>
+              </button>
+            </li>
+          );
+        })}
       </ol>
 
-      <section className={styles.body}>
-        {!isReview && current && <h2 className={styles.stepHeading}>{current.title}</h2>}
+      <section className={cardVariants()}>
+        {!isReview && current && <h2>{current.title}</h2>}
         {children}
         {error && (
-          <p role="alert" className={styles.error}>
-            {error}
-          </p>
+          <FormMessage role="alert">{error}</FormMessage>
         )}
       </section>
 
-      <footer className={styles.footer}>
-        <Link href={cancelHref} className={styles.cancel}>
+      <footer className="flex flex-col-reverse gap-2 md:flex-row md:items-center md:justify-end">
+        <Link
+          href={cancelHref}
+          className={buttonVariants({ variant: "ghost" })}
+        >
           {t("cancel")}
         </Link>
-        <div className={styles.navButtons}>
+        <div className="flex flex-col-reverse gap-2 md:flex-row">
           {!isFirst && (
-            <button type="button" className={styles.secondary} onClick={onBack} disabled={pending}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onBack}
+              disabled={pending}
+            >
               {t("back")}
-            </button>
+            </Button>
           )}
-          <button type="submit" className={styles.primary} disabled={pending}>
+          <Button type="submit" disabled={pending}>
             {isReview ? finishLabel : t("next")}
-          </button>
+          </Button>
         </div>
       </footer>
     </form>

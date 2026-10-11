@@ -6,6 +6,7 @@
 import { useActionState, useState, useTransition } from "react";
 import { ImagePlus } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { Button } from "@/components/ui/button";
 import type { ProjectPhoto } from "@repo/core/contract";
 import {
   addProjectPhotoAction,
@@ -19,7 +20,6 @@ import PhotoGrid from "../components/PhotoGrid";
 import PhotoUploadForm from "../components/PhotoUploadForm";
 import { projectPhotoUrl } from "../components/photoUrl";
 import TabHeader from "../components/TabHeader";
-import tabStyles from "../components/TabHeader.module.css";
 
 /** Site photos shared with the project's client in the mobile app. */
 export default function PhotosScreen({
@@ -53,10 +53,10 @@ export default function PhotosScreen({
         summary={t("count", { count: photos.length })}
         action={
           canManage && (
-            <button type="button" className={tabStyles.action} onClick={() => setUploadOpen(true)}>
+            <Button type="button" onClick={() => setUploadOpen(true)}>
               <ImagePlus size={16} aria-hidden />
               {t("upload")}
-            </button>
+            </Button>
           )
         }
       />

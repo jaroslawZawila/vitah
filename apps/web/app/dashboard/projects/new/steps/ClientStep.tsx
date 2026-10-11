@@ -3,9 +3,16 @@
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import type { ClientOption } from "@repo/core/contract";
+import { Field } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { fieldStyles as f } from "../../../components/wizard/fields";
 import SummaryList from "../../../components/wizard/SummaryList";
-import type { ProjectDraft, ProjectFlowOptions, ProjectStepProps } from "../draft";
+import type {
+  ProjectDraft,
+  ProjectFlowOptions,
+  ProjectStepProps,
+} from "../draft";
 
 /** Show a search box once the list gets longer than this. */
 const SEARCH_THRESHOLD = 6;
@@ -27,16 +34,16 @@ export function ClientStep({ draft, onChange, options }: ProjectStepProps) {
       <legend className={f.intro}>{t("intro")}</legend>
 
       {clients.length > SEARCH_THRESHOLD && (
-        <div className={f.field}>
-          <label htmlFor="client-search">{t("search")}</label>
-          <input
+        <Field>
+          <Label htmlFor="client-search">{t("search")}</Label>
+          <Input
             id="client-search"
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder={t("searchPlaceholder")}
           />
-        </div>
+        </Field>
       )}
 
       <label className={f.choice}>
@@ -64,7 +71,9 @@ export function ClientStep({ draft, onChange, options }: ProjectStepProps) {
           />
           <span className={f.choiceText}>
             <span>{client.name ?? client.email}</span>
-            {client.name && <span className={f.choiceHint}>{client.email}</span>}
+            {client.name && (
+              <span className={f.choiceHint}>{client.email}</span>
+            )}
           </span>
         </label>
       ))}
@@ -92,7 +101,9 @@ export function ClientSummary({
       items={[
         {
           label: t("label"),
-          value: client ? `${client.name ?? client.email} (${client.email})` : t("none"),
+          value: client
+            ? `${client.name ?? client.email} (${client.email})`
+            : t("none"),
         },
       ]}
     />

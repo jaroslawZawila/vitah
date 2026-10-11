@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import styles from "./obra.module.css";
+import { Input } from "@/components/ui/input";
 
 /**
  * Presentational: a number typed the local way ("1.250,50") that commits on
@@ -31,10 +31,10 @@ export default function InlineNumber({
   }
 
   return (
-    <input
+    <Input
       type="text"
       inputMode="decimal"
-      className={styles.input}
+      className="h-8 border-transparent bg-transparent px-1.5 text-right font-mono text-[12.5px] hover:border-border hover:bg-raise focus-visible:bg-raise"
       aria-label={label}
       value={text}
       onChange={(event) => setText(event.target.value)}

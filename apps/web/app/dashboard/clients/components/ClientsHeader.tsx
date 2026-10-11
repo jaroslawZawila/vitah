@@ -1,7 +1,8 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import styles from "./clients.module.css";
+import { Button } from "@/components/ui/button";
+import { FormMessage } from "@/components/ui/field";
 
 export default function ClientsHeader({
   count,
@@ -16,19 +17,19 @@ export default function ClientsHeader({
   const t = useTranslations("clientsPage");
   return (
     <>
-      <div className={styles.header}>
-        <h1 className={styles.title}>
+      <div className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-end md:justify-between">
+        <h1>
           {t("title")}
-          <span className={styles.count}>({count})</span>
+          <span className="ml-2 font-normal text-muted-foreground">({count})</span>
         </h1>
-        <button type="button" className={styles.primary} onClick={onCreate}>
+        <Button type="button" className="self-start md:self-auto" onClick={onCreate}>
           + {t("newClient")}
-        </button>
+        </Button>
       </div>
       {created && (
-        <p role="status" className={styles.notice}>
+        <FormMessage role="status" tone="success">
           {t("created")}
-        </p>
+        </FormMessage>
       )}
     </>
   );

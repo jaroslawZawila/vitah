@@ -2,28 +2,47 @@
 
 import { useState, useActionState } from "react";
 import { useTranslations } from "next-intl";
-import shared from "../shared.module.css";
-import styles from "./page.module.css";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Field, FormMessage } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  NativeSelect,
+  NativeSelectOption,
+} from "@/components/ui/native-select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import {
   createUser,
   updateUserRole,
   toggleUserActive,
 } from "../../actions/users";
 
+const ROLES = ["admin", "manager", "viewer"] as const;
+type Role = (typeof ROLES)[number];
+
 type UserRow = {
   id: string;
   name: string | null;
   email: string;
-  role: "admin" | "manager" | "viewer";
+  role: Role;
   active: boolean;
   createdAt: string | Date;
 };
 
-const ROLE_STYLE: Record<string, string> = {
-  admin: styles.roleAdmin!,
-  manager: styles.roleManager!,
-  viewer: styles.roleViewer!,
-};
+const ROLE_BADGE = {
+  admin: "info",
+  manager: "default",
+  viewer: "outline",
+} as const;
 
 export function UsersClient({
   users,
@@ -42,69 +61,75 @@ export function UsersClient({
     setRowError(result.error ?? null);
   }
 
+  const roleOptions = ROLES.map((role) => (
+    <NativeSelectOption key={role} value={role}>
+      {t(`roles.${role}`)}
+    </NativeSelectOption>
+  ));
+
   return (
     <>
-      <div className={styles.header}>
-        <div className={styles.title}>
+      <div className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-end md:justify-between">
+        <h1>
           {t("title")}
-          <span className={styles.count}>({users.length})</span>
-        </div>
-        <button
+          <span className="ml-2 font-normal text-muted-foreground">
+            ({users.length})
+          </span>
+        </h1>
+        <Button
           type="button"
-          className={styles.inviteBtn}
+          className="self-start md:self-auto"
           onClick={() => setShowForm(!showForm)}
         >
           + {t("inviteUser")}
-        </button>
+        </Button>
       </div>
 
       {rowError && (
-        <div className={styles.formError} role="alert">
-          {t(`errors.${rowError}`)}
-        </div>
+        <FormMessage role="alert">{t(`errors.${rowError}`)}</FormMessage>
       )}
 
       {showForm && (
-        <div className={styles.formOverlay}>
-          <div className={styles.formCard}>
-            <div className={styles.formTitle}>{t("inviteForm.title")}</div>
+        <div>
+          <Card>
+            <div className="text-[14.5px] font-semibold">
+              {t("inviteForm.title")}
+            </div>
 
             {formState?.error && (
-              <div className={styles.formError}>
-                {t(`errors.${formState.error}`)}
-              </div>
+              <FormMessage>{t(`errors.${formState.error}`)}</FormMessage>
             )}
             {formState?.success && (
-              <div className={styles.formSuccess}>{t("success.created")}</div>
+              <FormMessage tone="success">{t("success.created")}</FormMessage>
             )}
 
-            <form action={formAction}>
-              <div className={styles.formGrid}>
-                <div className={styles.formField}>
-                  <label htmlFor="name">{t("inviteForm.nameLabel")}</label>
-                  <input
+            <form action={formAction} className="flex flex-col gap-3">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field>
+                  <Label htmlFor="name">{t("inviteForm.nameLabel")}</Label>
+                  <Input
                     id="name"
                     name="name"
                     type="text"
                     placeholder={t("inviteForm.namePlaceholder")}
                     required
                   />
-                </div>
-                <div className={styles.formField}>
-                  <label htmlFor="email">{t("inviteForm.emailLabel")}</label>
-                  <input
+                </Field>
+                <Field>
+                  <Label htmlFor="email">{t("inviteForm.emailLabel")}</Label>
+                  <Input
                     id="email"
                     name="email"
                     type="email"
                     placeholder={t("inviteForm.emailPlaceholder")}
                     required
                   />
-                </div>
-                <div className={styles.formField}>
-                  <label htmlFor="password">
+                </Field>
+                <Field>
+                  <Label htmlFor="password">
                     {t("inviteForm.passwordLabel")}
-                  </label>
-                  <input
+                  </Label>
+                  <Input
                     id="password"
                     name="password"
                     type="password"
@@ -112,82 +137,76 @@ export function UsersClient({
                     minLength={8}
                     required
                   />
-                </div>
-                <div className={styles.formField}>
-                  <label htmlFor="role">{t("inviteForm.roleLabel")}</label>
-                  <select id="role" name="role" defaultValue="viewer">
-                    <option value="admin">{t("roles.admin")}</option>
-                    <option value="manager">{t("roles.manager")}</option>
-                    <option value="viewer">{t("roles.viewer")}</option>
-                  </select>
-                </div>
+                </Field>
+                <Field>
+                  <Label htmlFor="role">{t("inviteForm.roleLabel")}</Label>
+                  <NativeSelect
+                    id="role"
+                    name="role"
+                    defaultValue="viewer"
+                  >
+                    {roleOptions}
+                  </NativeSelect>
+                </Field>
               </div>
-              <div className={styles.formActions}>
-                <button
-                  type="submit"
-                  className={styles.submitBtn}
-                  disabled={isPending}
-                >
+              <div className="flex flex-wrap items-center gap-2">
+                <Button type="submit" disabled={isPending}>
                   {isPending
                     ? t("inviteForm.submitting")
                     : t("inviteForm.submit")}
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
-                  className={styles.cancelBtn}
+                  variant="outline"
                   onClick={() => setShowForm(false)}
                 >
                   {t("inviteForm.cancel")}
-                </button>
+                </Button>
               </div>
             </form>
-          </div>
+          </Card>
         </div>
       )}
 
-      <div className={styles.tableWrapper}>
-        <table className={shared.table}>
-          <thead>
-            <tr>
-              <th>{t("table.name")}</th>
-              <th>{t("table.email")}</th>
-              <th>{t("table.role")}</th>
-              <th>{t("table.status")}</th>
-              <th>{t("table.created")}</th>
-              <th>{t("table.actions")}</th>
-            </tr>
-          </thead>
-          <tbody>
+      <Card size="list">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>{t("table.name")}</TableHead>
+              <TableHead>{t("table.email")}</TableHead>
+              <TableHead>{t("table.role")}</TableHead>
+              <TableHead>{t("table.status")}</TableHead>
+              <TableHead>{t("table.created")}</TableHead>
+              <TableHead>{t("table.actions")}</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {users.map((user) => (
-              <tr key={user.id}>
-                <td style={{ fontWeight: 500 }}>{user.name ?? "—"}</td>
-                <td style={{ color: "#6b6b6b" }}>{user.email}</td>
-                <td>
-                  <span
-                    className={`${shared.chip} ${ROLE_STYLE[user.role] ?? ""}`}
-                  >
+              <TableRow key={user.id}>
+                <TableCell className="font-medium">{user.name ?? "—"}</TableCell>
+                <TableCell className="text-muted-foreground">
+                  {user.email}
+                </TableCell>
+                <TableCell>
+                  <Badge variant={ROLE_BADGE[user.role]}>
                     {t(`roles.${user.role}`)}
-                  </span>
-                </td>
-                <td>
-                  <span
-                    className={
-                      user.active ? styles.statusActive : styles.statusInactive
-                    }
-                    style={{ fontSize: 11, fontWeight: 500 }}
-                  >
+                  </Badge>
+                </TableCell>
+                <TableCell>
+                  <Badge variant={user.active ? "good" : "outline"}>
                     {user.active
                       ? t("statuses.active")
                       : t("statuses.inactive")}
-                  </span>
-                </td>
-                <td style={{ color: "#6b6b6b", fontSize: 11 }}>
+                  </Badge>
+                </TableCell>
+                <TableCell className="num text-muted-foreground">
                   {new Date(user.createdAt).toLocaleDateString("es-ES")}
-                </td>
-                <td>
-                  <div className={styles.actions}>
-                    <select
-                      className={styles.roleSelect}
+                </TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-1.5">
+                    <NativeSelect
+                      size="sm"
+                      className="w-fit"
                       value={user.role}
                       disabled={user.id === currentUserId}
                       title={
@@ -199,19 +218,19 @@ export function UsersClient({
                         runRowAction(
                           updateUserRole(
                             user.id,
-                            e.target.value as "admin" | "manager" | "viewer",
+                            e.target.value as Role,
                           ),
                         )
                       }
                     >
-                      <option value="admin">{t("roles.admin")}</option>
-                      <option value="manager">{t("roles.manager")}</option>
-                      <option value="viewer">{t("roles.viewer")}</option>
-                    </select>
+                      {roleOptions}
+                    </NativeSelect>
                     {user.active ? (
-                      <button
+                      <Button
                         type="button"
-                        className={styles.deactivateBtn}
+                        variant="destructive"
+                        size="sm"
+                        className="disabled:pointer-events-auto disabled:cursor-not-allowed"
                         disabled={user.id === currentUserId}
                         title={
                           user.id === currentUserId
@@ -223,25 +242,26 @@ export function UsersClient({
                         }
                       >
                         {t("actions.deactivate")}
-                      </button>
+                      </Button>
                     ) : (
-                      <button
+                      <Button
                         type="button"
-                        className={styles.activateBtn}
+                        variant="outline"
+                        size="sm"
                         onClick={() =>
                           runRowAction(toggleUserActive(user.id, true))
                         }
                       >
                         {t("actions.activate")}
-                      </button>
+                      </Button>
                     )}
                   </div>
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
-      </div>
+          </TableBody>
+        </Table>
+      </Card>
     </>
   );
 }

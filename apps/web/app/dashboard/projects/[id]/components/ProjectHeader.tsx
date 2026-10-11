@@ -5,7 +5,11 @@ import { useFormatter, useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import type { ProjectDetail } from "../../../../actions/projects";
 import { updateProject, deleteProject } from "../../../../actions/projects";
-import styles from "../page.module.css";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Field, FormMessage } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 /** Dates are calendar dates stored at UTC midnight. */
 function toInputDate(date: Date | null): string {
@@ -35,9 +39,7 @@ export default function ProjectHeader({
   });
 
   function formatDate(date: Date | null) {
-    return date
-      ? format.dateTime(date, { dateStyle: "long", timeZone: "UTC" })
-      : t("notSet");
+    return date ? format.dateTime(date, { dateStyle: "long", timeZone: "UTC" }) : t("notSet");
   }
 
   function handleSave() {
@@ -63,104 +65,101 @@ export default function ProjectHeader({
 
   if (editing) {
     return (
-      <div className={styles.editForm}>
-        <div className={styles.editField}>
-          <label htmlFor="project-address">{t("address")}</label>
-          <input
+      <Card className="grid gap-3 sm:grid-cols-2">
+        <Field className="sm:col-span-2">
+          <Label htmlFor="project-address">{t("address")}</Label>
+          <Input
             id="project-address"
             value={form.address}
             onChange={(e) => setForm({ ...form, address: e.target.value })}
           />
-        </div>
-        <div className={styles.editField}>
-          <label htmlFor="project-start">{t("startDate")}</label>
-          <input
+        </Field>
+        <Field>
+          <Label htmlFor="project-start">{t("startDate")}</Label>
+          <Input
             id="project-start"
             type="date"
             value={form.startDate}
             onChange={(e) => setForm({ ...form, startDate: e.target.value })}
           />
-        </div>
-        <div className={styles.editField}>
-          <label htmlFor="project-completion">{t("completionDate")}</label>
-          <input
+        </Field>
+        <Field>
+          <Label htmlFor="project-completion">{t("completionDate")}</Label>
+          <Input
             id="project-completion"
             type="date"
             value={form.completionDate}
-            onChange={(e) =>
-              setForm({ ...form, completionDate: e.target.value })
-            }
+            onChange={(e) => setForm({ ...form, completionDate: e.target.value })}
           />
-        </div>
+        </Field>
         {error && (
-          <p role="alert" className={styles.error}>
+          <FormMessage role="alert" className="sm:col-span-2">
             {t(`errors.${error}`)}
-          </p>
+          </FormMessage>
         )}
-        <div className={styles.editActions}>
+        <div className="flex flex-wrap items-center justify-end gap-2 sm:col-span-2">
           {canDelete && (
-            <button
+            <Button
               type="button"
-              className={styles.btnDanger}
+              variant="destructive"
+              className="mr-auto"
               onClick={handleDelete}
               disabled={isPending}
             >
               {t("delete")}
-            </button>
+            </Button>
           )}
-          <button
+          <Button
             type="button"
-            className={styles.btnSmall}
+            variant="outline"
             onClick={() => {
               setEditing(false);
               setError(null);
             }}
           >
             {t("cancel")}
-          </button>
-          <button
-            type="button"
-            className={styles.btnPrimary}
-            onClick={handleSave}
-            disabled={isPending}
-          >
+          </Button>
+          <Button type="button" onClick={handleSave} disabled={isPending}>
             {t("save")}
-          </button>
+          </Button>
         </div>
-      </div>
+      </Card>
     );
   }
 
   return (
-    <div className={styles.header}>
-      <div className={styles.headerTop}>
-        <div>
-          <div className={styles.headerRef}>{project.ref}</div>
-          <div className={styles.headerSub}>{project.address}</div>
+    <Card>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <div className="font-heading text-[26px] leading-[1.05] font-bold tracking-[0.01em] text-brand-ink">
+            {project.ref}
+          </div>
+          <div className="mt-1 text-[13.5px] wrap-anywhere text-muted-foreground">
+            {project.address}
+          </div>
         </div>
         {canEdit && (
-          <button
+          <Button
             type="button"
-            className={styles.btnSmall}
+            variant="outline"
+            className="self-start"
             onClick={() => setEditing(true)}
           >
             {t("edit")}
-          </button>
+          </Button>
         )}
       </div>
 
-      <dl className={styles.headerMeta}>
-        <div className={styles.metaItem}>
-          <dt className={styles.metaLabel}>{t("startDate")}</dt>
-          <dd className={styles.metaValue}>{formatDate(project.startDate)}</dd>
+      <dl className="grid grid-cols-2 gap-3.5 border-t pt-3.5 sm:grid-cols-[repeat(auto-fit,minmax(160px,1fr))]">
+        <div className="flex flex-col gap-1">
+          <dt className="eyebrow">{t("startDate")}</dt>
+          <dd className="text-[14px] font-semibold">{formatDate(project.startDate)}</dd>
         </div>
-        <div className={styles.metaItem}>
-          <dt className={styles.metaLabel}>{t("completionDate")}</dt>
-          <dd className={styles.metaValue}>
-            {formatDate(project.completionDate)}
-          </dd>
+        <div className="flex flex-col gap-1">
+          <dt className="eyebrow">{t("completionDate")}</dt>
+          <dd className="text-[14px] font-semibold">{formatDate(project.completionDate)}</dd>
         </div>
       </dl>
-    </div>
+    </Card>
   );
 }

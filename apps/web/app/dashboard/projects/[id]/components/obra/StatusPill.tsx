@@ -2,16 +2,19 @@
 
 import { useTranslations } from "next-intl";
 import type { HitoStatus, ProgressStatus } from "@repo/core/contract";
-import styles from "./obra.module.css";
+import type { VariantProps } from "class-variance-authority";
+import { Badge, type badgeVariants } from "@/components/ui/badge";
 
-const TONE: Record<ProgressStatus | HitoStatus, string> = {
-  pending: styles.pillPending!,
-  active: styles.pillActive!,
-  ready: styles.pillActive!,
-  signed: styles.pillDark!,
-  invoiced: styles.pillDark!,
-  done: styles.pillDone!,
-  paid: styles.pillDone!,
+type Variant = VariantProps<typeof badgeVariants>["variant"];
+
+const TONE: Record<ProgressStatus | HitoStatus, Variant> = {
+  pending: "outline",
+  active: "info",
+  ready: "yel",
+  signed: "default",
+  invoiced: "warn",
+  done: "good",
+  paid: "good",
 };
 
 /** Presentational: the status of a chapter ("status") or a hito ("hitoStatus"). */
@@ -23,5 +26,5 @@ export default function StatusPill({
   kind?: "status" | "hitoStatus";
 }) {
   const t = useTranslations(`obra.${kind}`);
-  return <span className={`${styles.pill} ${TONE[status]}`}>{t(status)}</span>;
+  return <Badge variant={TONE[status]}>{t(status)}</Badge>;
 }

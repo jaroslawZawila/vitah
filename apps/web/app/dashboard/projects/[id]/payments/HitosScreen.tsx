@@ -6,12 +6,14 @@
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import type { ProjectObra } from "@repo/core/contract";
+import { Button } from "@/components/ui/button";
+import { cardVariants } from "@/components/ui/card";
 import { savePlanAction } from "../../../../actions/obra";
 import Modal from "../components/Modal";
+import { muted } from "../components/obra/classes";
 import { useObraFormat } from "../components/obra/format";
 import HitoTable from "../components/obra/HitoTable";
 import Kpi from "../components/obra/Kpi";
-import styles from "../components/obra/obra.module.css";
 import PlanForm from "../components/obra/PlanForm";
 import { useObraAction } from "../components/obra/useObraAction";
 import TabHeader from "../components/TabHeader";
@@ -38,28 +40,29 @@ export default function HitosScreen({
   const invoiced = hitos.find((h) => h.status === "invoiced");
 
   return (
-    <div className={styles.stack}>
+    <div className="flex flex-col gap-5">
       <TabHeader
         projectRef={projectRef}
         title={t("title")}
         summary={obra.budget ? t("summary", { total: f.money(total) }) : t("noBudget")}
         action={
           canManage && (
-            <button
+            <Button
               type="button"
-              className={styles.button}
+              variant="outline"
               onClick={() => {
                 reset();
                 setPlanOpen(true);
               }}
             >
               {t("editPlan")}
-            </button>
+            </Button>
           )
         }
       />
-      <section className={styles.kpis3}>
+      <section className="grid gap-3.5 md:grid-cols-3">
         <Kpi
+          highlight
           label={t("collected")}
           value={f.money(obra.paidCents)}
           hints={[t("collectedHint", { count: count("paid"), pct: f.ratio(obra.paidCents, total) })]}
@@ -85,19 +88,19 @@ export default function HitosScreen({
         />
       </section>
       {obra.planPctBp !== 10_000 && hitos.length > 0 && (
-        <p role="status" className={styles.warning}>
+        <p role="status" className="rounded-lg bg-warn-soft px-3.5 py-[11px] text-[13.5px] text-warn">
           {t("pctWarning", { pct: f.share(obra.planPctBp) })}
         </p>
       )}
-      <section className={styles.card}>
+      <section className={cardVariants()}>
         <HitoTable
           hitos={hitos}
           totalCents={total}
           hitoHref={(hito) => `/dashboard/projects/${projectId}/payments/${hito.id}`}
         />
       </section>
-      <p className={styles.muted}>
-        <strong>{t("pipelineLabel")}</strong> {t("pipeline")}
+      <p className={muted}>
+        <strong className="font-semibold text-foreground">{t("pipelineLabel")}</strong> {t("pipeline")}
       </p>
       {canManage && (
         <Modal open={planOpen} onOpenChange={setPlanOpen} title={t("planTitle")}>

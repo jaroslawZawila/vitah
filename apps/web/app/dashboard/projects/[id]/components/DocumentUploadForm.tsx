@@ -2,13 +2,13 @@
 
 import { useState, type ChangeEvent } from "react";
 import { useTranslations } from "next-intl";
-import {
-  DOCUMENT_CATEGORIES,
-  MAX_DOCUMENT_BYTES,
-  type DocumentError,
-} from "@repo/core/contract";
-import FormError from "./FormError";
-import styles from "./documents.module.css";
+import { DOCUMENT_CATEGORIES, MAX_DOCUMENT_BYTES, type DocumentError } from "@repo/core/contract";
+import FormError from "../../../components/FormError";
+import { Button } from "@/components/ui/button";
+import { Field, FieldDescription, FormActions } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 
 /** Presentational: upload a PDF with a title and category (shown in a modal). */
 export default function DocumentUploadForm({
@@ -37,10 +37,10 @@ export default function DocumentUploadForm({
   }
 
   return (
-    <form action={action} className={styles.form}>
-      <div className={styles.field}>
-        <label htmlFor="document-file">{t("file")}</label>
-        <input
+    <form action={action} className="flex flex-col gap-3">
+      <Field>
+        <Label htmlFor="document-file">{t("file")}</Label>
+        <Input
           id="document-file"
           name="file"
           type="file"
@@ -48,37 +48,42 @@ export default function DocumentUploadForm({
           required
           onChange={handleFile}
         />
-        <span className={styles.hint}>{t("fileHint")}</span>
-      </div>
-      <div className={styles.field}>
-        <label htmlFor="document-title">{t("documentTitle")}</label>
-        <input id="document-title" name="title" type="text" required maxLength={200} />
-      </div>
-      <div className={styles.field}>
-        <label htmlFor="document-category">{t("category")}</label>
-        <select id="document-category" name="category" required defaultValue="">
-          <option value="" disabled>
+        <FieldDescription>{t("fileHint")}</FieldDescription>
+      </Field>
+      <Field>
+        <Label htmlFor="document-title">{t("documentTitle")}</Label>
+        <Input id="document-title" name="title" type="text" required maxLength={200} />
+      </Field>
+      <Field>
+        <Label htmlFor="document-category">{t("category")}</Label>
+        <NativeSelect
+          id="document-category"
+          name="category"
+          required
+          defaultValue=""
+        >
+          <NativeSelectOption value="" disabled>
             {t("chooseCategory")}
-          </option>
+          </NativeSelectOption>
           {DOCUMENT_CATEGORIES.map((category) => (
-            <option key={category} value={category}>
+            <NativeSelectOption key={category} value={category}>
               {t(`categories.${category}`)}
-            </option>
+            </NativeSelectOption>
           ))}
-        </select>
-      </div>
+        </NativeSelect>
+      </Field>
       <FormError
         namespace="projectDetailPage.documents.errors"
         error={tooLarge ? "file_too_large" : error}
       />
-      <div className={styles.actions}>
-        <button type="button" className={styles.secondary} onClick={onCancel}>
+      <FormActions>
+        <Button type="button" variant="outline" onClick={onCancel}>
           {t("cancel")}
-        </button>
-        <button type="submit" className={styles.primary} disabled={pending || tooLarge}>
+        </Button>
+        <Button type="submit" disabled={pending || tooLarge}>
           {pending ? t("uploading") : t("submit")}
-        </button>
-      </div>
+        </Button>
+      </FormActions>
     </form>
   );
 }

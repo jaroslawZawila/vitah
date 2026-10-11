@@ -8,14 +8,18 @@ import { useState } from "react";
 import { useTranslations } from "next-intl";
 import type { BudgetChapter, Hito, ProjectPhoto } from "@repo/core/contract";
 import { progressOf } from "@repo/core/obra-calc";
+import { Button } from "@/components/ui/button";
+import { cardVariants } from "@/components/ui/card";
+import { FormMessage } from "@/components/ui/field";
+import { cn } from "@/lib/utils";
 import { saveProgressAction } from "../../../../../actions/obra";
-import FormError from "../../components/FormError";
+import FormError from "../../../../components/FormError";
 import Modal from "../../components/Modal";
+import { cardHead, muted, textLink } from "../../components/obra/classes";
 import { useObraFormat } from "../../components/obra/format";
 import HitoReadiness from "../../components/obra/HitoReadiness";
-import styles from "../../components/obra/obra.module.css";
 import PhotoStrip from "../../components/obra/PhotoStrip";
-import ProgressBar from "../../components/obra/ProgressBar";
+import Kpi from "../../components/obra/Kpi";
 import ProgressTable from "../../components/obra/ProgressTable";
 import { useObraAction } from "../../components/obra/useObraAction";
 import { projectPhotoUrl } from "../../components/photoUrl";
@@ -67,8 +71,8 @@ export default function ChapterScreen({
     .join(" · ");
 
   return (
-    <div className={styles.stack}>
-      <Link href={`${base}/obra`} className={styles.link}>
+    <div className="flex flex-col gap-5">
+      <Link href={`${base}/obra`} className={cn("w-fit text-[13px]", textLink)}>
         ← {t("back")}
       </Link>
       <TabHeader
@@ -77,28 +81,23 @@ export default function ChapterScreen({
         summary={summary}
         action={
           canManage && (
-            <button
-              type="button"
-              className={styles.buttonPrimary}
-              onClick={save}
-              disabled={saving || changes.length === 0}
-            >
+            <Button type="button" onClick={save} disabled={saving || changes.length === 0}>
               {saving ? t("saving") : t("save")}
-            </button>
+            </Button>
           )
         }
       />
       <FormError namespace="obra.errors" error={state?.error} />
       {state?.success && changes.length === 0 && (
-        <p role="status" className={styles.good}>
+        <FormMessage role="status" tone="success">
           {t("saved")}
-        </p>
+        </FormMessage>
       )}
 
-      <div className={styles.split}>
-        <section className={styles.card}>
-          <div className={styles.cardHead}>
-            <h2 className={styles.cardTitle}>{t("lines")}</h2>
+      <div className="grid items-start gap-5 2xl:grid-cols-[minmax(0,1fr)_340px]">
+        <section className={cardVariants()}>
+          <div className={cardHead}>
+            <h2>{t("lines")}</h2>
           </div>
           <ProgressTable
             code={chapter.code}
@@ -107,31 +106,32 @@ export default function ChapterScreen({
             onChange={(id, pct) => setValues((v) => ({ ...v, [id]: pct }))}
             disabled={!canManage}
           />
-          <p className={styles.note}>{t("help")}</p>
+          <p className="rounded-lg bg-raise px-[13px] py-2.5 text-[13px] text-muted-foreground">{t("help")}</p>
         </section>
 
-        <aside className={styles.aside}>
-          <section className={styles.cardTight}>
-            <span className={styles.label}>{t("progressCard")}</span>
-            <span className={styles.big}>{progress.progressPct} %</span>
-            <ProgressBar pct={progress.progressPct} />
-            <span className={styles.muted}>
-              {t("executedOf", {
+        <aside className="flex min-w-0 flex-col gap-5">
+          <Kpi
+            highlight
+            label={t("progressCard")}
+            value={`${progress.progressPct} %`}
+            pct={progress.progressPct}
+            hints={[
+              t("executedOf", {
                 executed: f.money(progress.executedCents),
                 total: f.money(progress.totalCents),
-              })}
-            </span>
-          </section>
+              }),
+            ]}
+          />
 
           {hito && <HitoReadiness hito={hito} href={`${base}/payments/${hito.id}`} />}
 
-          <section className={styles.cardSnug}>
-            <div className={styles.cardHeadFlush}>
-              <span className={styles.label}>{t("photos", { count: photos.length })}</span>
+          <section className={cardVariants()}>
+            <div className={cn(cardHead, "items-center")}>
+              <span className="eyebrow">{t("photos", { count: photos.length })}</span>
               {canManage && (
-                <button type="button" className={styles.textButton} onClick={() => setUploadOpen(true)}>
+                <Button type="button" variant="outline" size="sm" onClick={() => setUploadOpen(true)}>
                   {t("addPhotos")}
-                </button>
+                </Button>
               )}
             </div>
             {photos.length > 0 ? (
@@ -140,9 +140,9 @@ export default function ChapterScreen({
                 thumbUrl={(photo) => projectPhotoUrl(projectId, photo.id, "thumb")}
               />
             ) : (
-              <span className={styles.muted}>{t("noPhotos")}</span>
+              <span className={muted}>{t("noPhotos")}</span>
             )}
-            <span className={styles.muted}>{t("photosHint")}</span>
+            <span className={muted}>{t("photosHint")}</span>
           </section>
         </aside>
       </div>

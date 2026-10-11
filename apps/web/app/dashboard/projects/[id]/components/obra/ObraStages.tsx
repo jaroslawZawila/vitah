@@ -2,8 +2,8 @@
 
 import { useTranslations } from "next-intl";
 import { OBRA_STAGES, STAGE_HITOS, type ProjectObra } from "@repo/core/contract";
+import { cardVariants } from "@/components/ui/card";
 import { useObraFormat } from "./format";
-import styles from "./obra.module.css";
 import Stepper from "./Stepper";
 
 /** Presentational: the 8 stages of the process, with what each rests on. */
@@ -30,10 +30,8 @@ export default function ObraStages({
   }
 
   return (
-    <section className={styles.card}>
-      <div className={styles.cardHead}>
-        <span className={styles.label}>{t("page.process")}</span>
-      </div>
+    <section className={cardVariants()}>
+      <span className="eyebrow">{t("page.process")}</span>
       <Stepper
         label={t("page.process")}
         steps={OBRA_STAGES.map((stage) => {

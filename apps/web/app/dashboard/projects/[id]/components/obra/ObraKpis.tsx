@@ -4,7 +4,6 @@ import { useTranslations } from "next-intl";
 import { isAwaitingPayment, type ProjectObra } from "@repo/core/contract";
 import { useObraFormat } from "./format";
 import Kpi from "./Kpi";
-import styles from "./obra.module.css";
 
 /** Presentational: built, collected, schedule and the next milestone. */
 export default function ObraKpis({ obra, paymentsHref }: { obra: ProjectObra; paymentsHref: string }) {
@@ -18,8 +17,9 @@ export default function ObraKpis({ obra, paymentsHref }: { obra: ProjectObra; pa
   const { term } = obra;
 
   return (
-    <section className={styles.kpis}>
+    <section className="grid grid-cols-2 gap-3.5 xl:grid-cols-4">
       <Kpi
+        highlight
         label={t("executed")}
         value={`${obra.progressPct} %`}
         pct={obra.progressPct}
@@ -44,12 +44,12 @@ export default function ObraKpis({ obra, paymentsHref }: { obra: ProjectObra; pa
           hints={[
             t("termDates", { start: f.date(term.startDate), end: f.date(term.completionDate) }),
             term.lateDays > 0 ? (
-              <span className={styles.bad}>
+              <span className="font-semibold text-bad">
                 {t("late", { days: term.lateDays })}
                 {term.penaltyCents > 0 && ` · ${t("penalty", { amount: f.money(term.penaltyCents) })}`}
               </span>
             ) : (
-              <span className={styles.good}>{t("onTime")}</span>
+              <span className="font-semibold text-good">{t("onTime")}</span>
             ),
           ]}
         />

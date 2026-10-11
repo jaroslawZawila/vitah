@@ -3,8 +3,11 @@
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import type { ClientOption, ProjectClientError } from "@repo/core/contract";
-import FormError from "./FormError";
-import styles from "./ClientAccessCard.module.css";
+import FormError from "../../../components/FormError";
+import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
+import { Label } from "@/components/ui/label";
+import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 
 /** Presentational: pick an existing client for the project. */
 export default function ClientPicker({
@@ -22,10 +25,10 @@ export default function ClientPicker({
 
   if (clients.length === 0) {
     return (
-      <p className={styles.intro}>
+      <p className="text-[13px] text-muted-foreground">
         {t.rich("noClients", {
           link: (chunks) => (
-            <Link href="/dashboard/clients" className={styles.link}>
+            <Link href="/dashboard/clients" className="font-medium text-info hover:underline">
               {chunks}
             </Link>
           ),
@@ -35,26 +38,26 @@ export default function ClientPicker({
   }
 
   return (
-    <form action={action} className={styles.form}>
-      <p className={styles.intro}>{t("intro")}</p>
-      <div className={styles.field}>
-        <label htmlFor="client-id">{t("client")}</label>
-        <select id="client-id" name="clientId" required defaultValue="">
-          <option value="" disabled>
+    <form action={action} className="flex flex-col gap-3">
+      <p className="text-[13px] text-muted-foreground">{t("intro")}</p>
+      <Field>
+        <Label htmlFor="client-id">{t("client")}</Label>
+        <NativeSelect id="client-id" name="clientId" required defaultValue="">
+          <NativeSelectOption value="" disabled>
             {t("choose")}
-          </option>
+          </NativeSelectOption>
           {clients.map((client) => (
-            <option key={client.id} value={client.id}>
+            <NativeSelectOption key={client.id} value={client.id}>
               {client.name ? `${client.name} — ${client.email}` : client.email}
-            </option>
+            </NativeSelectOption>
           ))}
-        </select>
-      </div>
+        </NativeSelect>
+      </Field>
       <FormError namespace="projectDetailPage.clientAccess.errors" error={error} />
-      <div className={styles.actions}>
-        <button type="submit" className={styles.primary} disabled={pending}>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button type="submit" disabled={pending}>
           {pending ? t("assigning") : t("assign")}
-        </button>
+        </Button>
       </div>
     </form>
   );

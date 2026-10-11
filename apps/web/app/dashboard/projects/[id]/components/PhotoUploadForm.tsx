@@ -8,8 +8,11 @@ import {
   PHOTO_TYPES,
   type PhotoError,
 } from "@repo/core/contract";
-import FormError from "./FormError";
-import styles from "./photos.module.css";
+import FormError from "../../../components/FormError";
+import { Button } from "@/components/ui/button";
+import { Field, FieldDescription, FormActions } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 /** Presentational: upload one photo with an optional caption (shown in a modal). */
 export default function PhotoUploadForm({
@@ -44,11 +47,11 @@ export default function PhotoUploadForm({
   }
 
   return (
-    <form action={action} className={styles.form}>
+    <form action={action} className="flex flex-col gap-3">
       {chapterCode && <input type="hidden" name="chapterCode" value={chapterCode} />}
-      <div className={styles.field}>
-        <label htmlFor="photo-file">{t("file")}</label>
-        <input
+      <Field>
+        <Label htmlFor="photo-file">{t("file")}</Label>
+        <Input
           id="photo-file"
           name="file"
           type="file"
@@ -56,30 +59,34 @@ export default function PhotoUploadForm({
           required
           onChange={handleFile}
         />
-        <span className={styles.hint}>{t("fileHint")}</span>
-      </div>
+        <FieldDescription>{t("fileHint")}</FieldDescription>
+      </Field>
       {preview && (
         // A local object URL: next/image has nothing to optimise.
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={preview} alt={t("preview")} className={styles.preview} />
+        <img
+          src={preview}
+          alt={t("preview")}
+          className="block max-h-60 w-full rounded-md bg-raise object-contain"
+        />
       )}
-      <div className={styles.field}>
-        <label htmlFor="photo-caption">{t("caption")}</label>
-        <input id="photo-caption" name="caption" type="text" maxLength={MAX_CAPTION_LENGTH} />
-        <span className={styles.hint}>{t("captionHint")}</span>
-      </div>
+      <Field>
+        <Label htmlFor="photo-caption">{t("caption")}</Label>
+        <Input id="photo-caption" name="caption" type="text" maxLength={MAX_CAPTION_LENGTH} />
+        <FieldDescription>{t("captionHint")}</FieldDescription>
+      </Field>
       <FormError
         namespace="projectDetailPage.photos.errors"
         error={tooLarge ? "file_too_large" : error}
       />
-      <div className={styles.actions}>
-        <button type="button" className={styles.secondary} onClick={onCancel}>
+      <FormActions>
+        <Button type="button" variant="outline" onClick={onCancel}>
           {t("cancel")}
-        </button>
-        <button type="submit" className={styles.primary} disabled={pending || tooLarge}>
+        </Button>
+        <Button type="submit" disabled={pending || tooLarge}>
           {pending ? t("uploading") : t("submit")}
-        </button>
-      </div>
+        </Button>
+      </FormActions>
     </form>
   );
 }

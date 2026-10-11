@@ -2,9 +2,13 @@
 
 import { useTranslations } from "next-intl";
 import type { ClientError } from "@repo/core/contract";
-import FormError from "./FormError";
+import { Button } from "@/components/ui/button";
+import { cardVariants } from "@/components/ui/card";
+import { Field, FormActions } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import FormError from "../../components/FormError";
 import PasswordField from "./PasswordField";
-import styles from "./clients.module.css";
 
 /** Presentational: the new-client form. Submits to `action`. */
 export default function ClientForm({
@@ -22,52 +26,54 @@ export default function ClientForm({
   const today = new Date().toISOString().slice(0, 10);
 
   return (
-    <form action={action} className={styles.card} aria-labelledby="client-form-title">
-      <h2 id="client-form-title" className={styles.cardTitle}>
-        {t("title")}
-      </h2>
-      <div className={styles.grid}>
-        <div className={styles.field}>
-          <label htmlFor="client-first-name">{t("firstName")}</label>
-          <input id="client-first-name" name="firstName" required autoComplete="off" />
-        </div>
-        <div className={styles.field}>
-          <label htmlFor="client-surnames">{t("surnames")}</label>
-          <input id="client-surnames" name="surnames" required autoComplete="off" />
-        </div>
-        <div className={styles.field}>
-          <label htmlFor="client-dob">{t("dateOfBirth")}</label>
-          <input id="client-dob" name="dateOfBirth" type="date" max={today} />
-        </div>
-        <div className={styles.field}>
-          <label htmlFor="client-phone">{t("phone")}</label>
-          <input
+    <form
+      action={action}
+      className={cardVariants()}
+      aria-labelledby="client-form-title"
+    >
+      <h2 id="client-form-title">{t("title")}</h2>
+      <div className="grid gap-3 md:grid-cols-2">
+        <Field>
+          <Label htmlFor="client-first-name">{t("firstName")}</Label>
+          <Input id="client-first-name" name="firstName" required autoComplete="off" />
+        </Field>
+        <Field>
+          <Label htmlFor="client-surnames">{t("surnames")}</Label>
+          <Input id="client-surnames" name="surnames" required autoComplete="off" />
+        </Field>
+        <Field>
+          <Label htmlFor="client-dob">{t("dateOfBirth")}</Label>
+          <Input id="client-dob" name="dateOfBirth" type="date" max={today} />
+        </Field>
+        <Field>
+          <Label htmlFor="client-phone">{t("phone")}</Label>
+          <Input
             id="client-phone"
             name="phone"
             type="tel"
             autoComplete="off"
             placeholder={t("phonePlaceholder")}
           />
-        </div>
-        <div className={`${styles.field} ${styles.wide}`}>
-          <label htmlFor="client-address">{t("address")}</label>
-          <input id="client-address" name="address" autoComplete="off" />
-        </div>
-        <div className={styles.field}>
-          <label htmlFor="client-email">{t("email")}</label>
-          <input id="client-email" name="email" type="email" required autoComplete="off" />
-        </div>
+        </Field>
+        <Field className="md:col-span-2">
+          <Label htmlFor="client-address">{t("address")}</Label>
+          <Input id="client-address" name="address" autoComplete="off" />
+        </Field>
+        <Field>
+          <Label htmlFor="client-email">{t("email")}</Label>
+          <Input id="client-email" name="email" type="email" required autoComplete="off" />
+        </Field>
         <PasswordField id="client-password" label={t("password")} />
       </div>
-      <FormError error={error} />
-      <div className={styles.actions}>
-        <button type="button" className={styles.secondary} onClick={onCancel}>
+      <FormError namespace="clientsPage.errors" error={error} />
+      <FormActions>
+        <Button type="button" variant="outline" onClick={onCancel}>
           {t("cancel")}
-        </button>
-        <button type="submit" className={styles.primary} disabled={pending}>
+        </Button>
+        <Button type="submit" disabled={pending}>
           {pending ? t("creating") : t("create")}
-        </button>
-      </div>
+        </Button>
+      </FormActions>
     </form>
   );
 }
