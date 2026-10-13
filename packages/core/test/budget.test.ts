@@ -662,8 +662,32 @@ describe("checks before issuing", () => {
     await svc.updateRevision(ctx, project.id, revisionId, { review: { done: ["annex:i1", estimated] } });
     checks = (await revisionOf(ctx, project.id)).checks;
     expect(checks.filter((c) => c.done).map((c) => c.key)).toEqual(["annex:i1", estimated]);
+    // One check at a time, merged with what is stored: the others stay ticked.
+    await Promise.all([
+      svc.updateRevision(ctx, project.id, revisionId, { reviewed: { key: "annex:s1", done: true } }),
+      svc.updateRevision(ctx, project.id, revisionId, { reviewed: { key: "ratio:01", done: true } }),
+    ]);
+    await svc.updateRevision(ctx, project.id, revisionId, { reviewed: { key: "annex:i1", done: false } });
+    checks = (await revisionOf(ctx, project.id)).checks;
+    expect(checks.filter((c) => c.done).map((c) => c.key)).toEqual(["annex:s1", estimated, "ratio:01"]);
+    // A key whose check is gone for now is kept, for when it comes back.
+    await svc.updateRevision(ctx, project.id, revisionId, { reviewed: { key: "ratio:02", done: true } });
+    await svc.updateRevision(ctx, project.id, revisionId, { reviewed: { key: "annex:i1", done: true } });
+    const [stored] = await db.select({ review: budgetRevisions.review }).from(budgetRevisions).where(eq(budgetRevisions.id, revisionId));
+    expect((stored!.review as { done: string[] }).done.slice().sort()).toEqual(["annex:i1", "annex:s1", estimated, "ratio:01", "ratio:02"].sort());
+    for (const reviewed of [{ key: "annex:i1" }, { key: "", done: true }, { key: "x".repeat(81), done: true }, null]) {
+      await expect(svc.updateRevision(ctx, project.id, revisionId, { reviewed })).rejects.toMatchObject({ code: "invalid_input" });
+    }
+    // Capped, so the stored list can't grow without end.
+    const full = Array.from({ length: 1_000 }, (_, i) => `annex:x${i}`);
+    await svc.updateRevision(ctx, project.id, revisionId, { review: { done: full } });
+    await expect(svc.updateRevision(ctx, project.id, revisionId, { reviewed: { key: "annex:i1", done: true } })).rejects.toMatchObject({ code: "invalid_input" });
+    await expect(svc.updateRevision(ctx, project.id, revisionId, { review: { done: [...full, "annex:i1"] } })).rejects.toMatchObject({ code: "invalid_input" });
+    await svc.updateRevision(ctx, project.id, revisionId, { review: { done: ["annex:i1", estimated] } });
+
     // A new revision keeps what was ticked: the line is the same line.
     await issue.issueRevision(ctx, project.id, revisionId, { shareWithClient: false });
+    await expect(svc.updateRevision(ctx, project.id, revisionId, { reviewed: { key: "annex:i1", done: false } })).rejects.toMatchObject({ code: "not_draft" });
     await svc.createRevision(ctx, project.id);
     expect((await revisionOf(ctx, project.id)).checks.find((c) => c.kind === "estimated")!.key).toBe(estimated);
   });
