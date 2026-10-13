@@ -11,6 +11,7 @@ import { Field, FieldDescription, FormActions } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 import FormError from "../../../../components/FormError";
 import { muted } from "../obra/classes";
 import { useObraFormat } from "../obra/format";
@@ -59,15 +60,16 @@ export default function IssueDialog({
         onSubmit({ issuedOn, validUntil, shareWithClient: share, ...(first ? {} : { changeReason: reason }) });
       }}
     >
-      <div className="grid gap-2.5 sm:grid-cols-3">
+      {/* Two amounts side by side; the contents, longer, get their own row. */}
+      <div className="grid gap-2.5 sm:grid-cols-2">
         {[
           [t("pec"), f.money(revision.totalCents)],
           [t("withVat"), f.money(revision.totalCents + revision.vatCents)],
           [t("contents"), t("contentsValue", { lines, options: revision.options.length })],
-        ].map(([label, value]) => (
-          <div key={label} className="rounded-[10px] bg-raise px-3 py-2.5">
+        ].map(([label, value], i) => (
+          <div key={label} className={cn("min-w-0 rounded-[10px] bg-raise px-3 py-2.5", i === 2 && "sm:col-span-2")}>
             <span className="eyebrow">{label}</span>
-            <div className="num text-[15px] font-semibold">{value}</div>
+            <div className="num text-[15px] font-semibold whitespace-normal">{value}</div>
           </div>
         ))}
       </div>
