@@ -214,14 +214,6 @@ describe("BudgetScreen", () => {
     await waitFor(() => expect(actions.updateOptionAction).toHaveBeenCalledWith("p-1", "option-1", { name: "Piscina" }));
   });
 
-  it("shows what changed since the previous revision", () => {
-    renderScreen({ tab: "revisions" });
-
-    expect(screen.getByText("Rev.1 frente a Rev.0")).toBeInTheDocument();
-    expect(screen.getByText("Remates de chapa")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("Mediciones del BC3")).toBeInTheDocument();
-  });
-
   it("is read-only for viewers", () => {
     renderScreen({ canManage: false, tab: "lines", chapterCode: "05" });
 
@@ -245,7 +237,7 @@ describe("BudgetScreen", () => {
     expect(within(newest!).getByRole("link")).toHaveAttribute("href", "/dashboard/projects/p-1/budget/options");
     expect(older).toHaveTextContent(/Rev\.0 · Emitida.*Emitida el 14 oct 2026/);
     expect(within(older!).getByRole("link")).toHaveAttribute("href", "/dashboard/projects/p-1/budget/options?revision=rev-0");
-    expect(menu.getByRole("link", { name: "Comparar revisiones" })).toHaveAttribute("href", "/dashboard/projects/p-1/budget/revisions");
+    expect(menu.getAllByRole("link")).toHaveLength(2);
 
     await userEvent.keyboard("{Escape}");
     expect(screen.queryByRole("dialog", { name: "Revisiones" })).not.toBeInTheDocument();
@@ -262,7 +254,6 @@ describe("BudgetScreen", () => {
     const menu = within(screen.getByRole("dialog", { name: "Revisiones" }));
     expect(menu.getByRole("link", { name: /Rev\.1/ })).toHaveAttribute("href", "/dashboard/projects/p-1/budget/lines?chapter=05");
     expect(menu.getByRole("link", { name: /Rev\.0/ })).toHaveAttribute("href", "/dashboard/projects/p-1/budget/lines?revision=rev-0&chapter=05");
-    expect(menu.getByRole("link", { name: "Comparar revisiones" })).toHaveAttribute("href", "/dashboard/projects/p-1/budget/revisions?revision=rev-0");
   });
 
   it("shows no read-only note on the newest revision", () => {

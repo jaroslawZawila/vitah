@@ -88,7 +88,6 @@ export default function BudgetFrame({
               revision={revision}
               revisions={revisions}
               hrefOf={revisionHref}
-              compareHref={budgetHref(projectId, TAB_PATH.revisions, revisionParam)}
             />
             {viewingOld && (
               <span className="inline-flex items-center gap-1.5 text-[13px] text-muted-foreground">

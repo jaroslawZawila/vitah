@@ -33,7 +33,7 @@ export default function RevisionPill({
 
 /** A revision's dates as one line: "Emitida el 14 oct 2026 · aceptada el 2 nov 2026". */
 export function useRevisionDates() {
-  const t = useTranslations("budget.revisions");
+  const t = useTranslations("budget.revisionMenu");
   const f = useObraFormat();
   return (r: BudgetRevisionSummary) =>
     [

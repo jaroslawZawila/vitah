@@ -599,7 +599,9 @@
     "viewLatest": "Ver la última (Rev.{number})",
     "revisionMenu": {
       "title": "Revisiones",
-      "compare": "Comparar revisiones"
+      "draft": "En borrador",
+      "issuedOn": "Emitida el {date}",
+      "acceptedOn": "aceptada el {date}"
     },
     "tabs": {
       "label": "Secciones del presupuesto",
@@ -869,38 +871,6 @@
         "penalty": "Penalización por retraso",
         "signingPlace": "Lugar de firma"
       }
-    },
-    "revisions": {
-      "history": "Historial",
-      "issuedOn": "Emitida el {date}",
-      "draft": "En borrador",
-      "acceptedOn": "aceptada el {date}",
-      "general": "PDF general",
-      "detailed": "PDF detallado",
-      "view": "Ver",
-      "aiDraft": "Borrador generado por la IA",
-      "aiDraftMeta": "{date} · a partir de los documentos del proyecto",
-      "frozenNote": "Lo emitido no se cambia nunca. Cada revisión es una copia de la anterior con sus cambios y su motivo.",
-      "compare": "Rev.{number} frente a Rev.{previous}",
-      "reason": "Motivo de la revisión",
-      "reasonHint": "obligatorio para emitir · sale en el «Resumen de revisiones» de los PDF",
-      "chapters": "Capítulos y opciones que cambian",
-      "code": "Cap.",
-      "difference": "Diferencia",
-      "revised": "★ revisado",
-      "new": "✦ nuevo",
-      "totalPec": "Total PEC",
-      "hideUnchanged": "Ocultar los que no cambian",
-      "showUnchanged": "Mostrar los {count} que no cambian",
-      "lines": "Partidas que cambian",
-      "line": "Partida",
-      "whatChanged": "Qué ha cambiado",
-      "beforeAfter": "Antes → ahora",
-      "amount": "Importe",
-      "added": "✦ nueva",
-      "removed": "quitada",
-      "firstTitle": "Primera revisión",
-      "first": "Es la primera revisión: no hay otra con la que compararla."
     },
     "issue": {
       "title": "Emitir la Rev.{number} al cliente",

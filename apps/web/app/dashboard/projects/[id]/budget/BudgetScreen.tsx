@@ -50,7 +50,6 @@ import LinesView, { type LineHandlers } from "../components/budget/LinesView";
 import OptionSummary from "../components/budget/OptionSummary";
 import OptionsView, { type OptionHandlers } from "../components/budget/OptionsView";
 import ReviewChecklist from "../components/budget/ReviewChecklist";
-import RevisionsView from "../components/budget/RevisionsView";
 import SummaryKpis from "../components/budget/SummaryKpis";
 import TextsView from "../components/budget/TextsView";
 import Modal from "../components/Modal";
@@ -260,18 +259,6 @@ export default function BudgetScreen({ projectId, projectRef, site, clientName, 
           onTexts={editable ? saveTexts : undefined}
           onConditions={editable ? saveConditions : undefined}
           onEditPlan={canManage ? () => open({ kind: "plan" }) : undefined}
-        />
-      );
-      break;
-    case "revisions":
-      body = (
-        <RevisionsView
-          revision={revision}
-          revisions={revisions}
-          generation={budget.generation}
-          viewHref={(id) => budgetHref(projectId, "/revisions", id === revisions[0]!.id ? null : id)}
-          pdfHref={(id, kind) => budgetHref(projectId, "/pdf", id, { kind })}
-          onReason={editable && revision.number > 0 ? (changeReason) => saveRevision({ changeReason }) : undefined}
         />
       );
       break;

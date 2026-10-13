@@ -216,7 +216,7 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
 - Review checks (`budget-review.ts`): the AI's inconsistencies and assumptions, estimated lines and chapters off the
   tenant's own €/m² averages; staff tick them off before issuing
 - Portal: Budget tab pages under `dashboard/projects/[id]/budget/` (summary, lines, options, texts, conditions,
-  revisions, pdf; `?revision=` shows an older one); `BudgetScreen` / `BudgetStartScreen` are the containers, views in
+  pdf; `?revision=` shows an older one, picked from the menu on the revision pill); `BudgetScreen` / `BudgetStartScreen` are the containers, views in
   `components/budget/`. Web-only: the app only sees the general PDF (Documentos) and the contract via the obra
 
 ### Live updates (app open)

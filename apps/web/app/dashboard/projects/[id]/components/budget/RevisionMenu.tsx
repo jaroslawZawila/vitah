@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useState } from "react";
-import { ArrowRight, Check, ChevronDown } from "lucide-react";
+import { Check, ChevronDown } from "lucide-react";
 import { useTranslations } from "next-intl";
 import type { BudgetRevisionSummary } from "@repo/core/contract";
 import { cn } from "@/lib/utils";
@@ -12,21 +12,18 @@ import RevisionPill, { useRevisionDates } from "./RevisionPill";
 
 /**
  * Presentational: the revision shown, as a pill beside the title that opens
- * every revision (newest first) and the link to compare them. Below `sm` the
- * menu is anchored to the nearest positioned ancestor (the title row), so on a
- * phone it spans the row.
+ * every revision, newest first. Below `sm` the menu is anchored to the nearest
+ * positioned ancestor (the title row), so on a phone it spans the row.
  */
 export default function RevisionMenu({
   revision,
   revisions,
   hrefOf,
-  compareHref,
 }: {
   revision: BudgetRevisionSummary;
   /** Newest first. */
   revisions: BudgetRevisionSummary[];
   hrefOf: (revisionId: string) => string;
-  compareHref: string;
 }) {
   const t = useTranslations("budget");
   const f = useObraFormat();
@@ -69,15 +66,6 @@ export default function RevisionMenu({
             );
           })}
         </ul>
-        <div className="mx-1 my-1.5 h-px bg-border" />
-        <Link
-          href={compareHref}
-          onClick={close}
-          className="flex min-h-11 items-center gap-1.5 rounded-lg pr-2.5 pl-9 text-[13.5px] font-semibold text-brand-ink hover:bg-raise"
-        >
-          {t("revisionMenu.compare")}
-          <ArrowRight aria-hidden className="size-4" />
-        </Link>
       </Popover>
     </div>
   );
