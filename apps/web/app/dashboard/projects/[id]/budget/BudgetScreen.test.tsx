@@ -39,7 +39,11 @@ const issued: Budget = {
 };
 
 function renderScreen(props: Partial<Parameters<typeof BudgetScreen>[0]> = {}) {
-  return render(
+  return render(screenWith(props));
+}
+
+function screenWith(props: Partial<Parameters<typeof BudgetScreen>[0]> = {}) {
+  return (
     <NextIntlClientProvider locale="es" messages={messages} timeZone="Europe/Madrid">
       <BudgetScreen
         projectId="p-1"
@@ -53,9 +57,15 @@ function renderScreen(props: Partial<Parameters<typeof BudgetScreen>[0]> = {}) {
         hitos={hitos}
         {...props}
       />
-    </NextIntlClientProvider>,
+    </NextIntlClientProvider>
   );
 }
+
+/** The draft with its AI checks ticked (all of them by default). */
+const reviewed = (done = [true, true]): Budget => ({
+  ...draft,
+  revision: { ...draft.revision, checks: draft.revision.checks.map((c, i) => ({ ...c, done: done[i] ?? true })) },
+});
 
 /**
  * The open dialog, once it has moved focus into itself. It does so a moment
@@ -87,6 +97,56 @@ describe("BudgetScreen", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Marcar revisado" }));
     expect(actions.updateRevisionAction).toHaveBeenCalledWith("p-1", "rev-1", { review: { done: ["line:lineage-line-2", "annex:i1"] } });
+  });
+
+  it("folds the AI checks into one row once all are reviewed, and opens them again", async () => {
+    renderScreen({ budget: reviewed() });
+
+    expect(screen.getByRole("heading", { name: "Todo revisado" })).toBeInTheDocument();
+    expect(screen.getByText("Los 2 puntos están revisados.")).toBeInTheDocument();
+    expect(screen.queryByText("Carga de nieve")).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Ver los 2 puntos" }));
+    expect(screen.getByText("Carga de nieve")).toBeInTheDocument();
+    expect(screen.getByText("2 de 2 revisados")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Ocultar" })).toHaveFocus();
+
+    await userEvent.click(screen.getByRole("button", { name: "Ocultar" }));
+    expect(screen.queryByText("Carga de nieve")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Ver los 2 puntos" })).toHaveFocus();
+  });
+
+  it("folds the checks again when the last open one is ticked", async () => {
+    const view = renderScreen({ budget: reviewed() });
+    await userEvent.click(screen.getByRole("button", { name: "Ver los 2 puntos" }));
+
+    // Untick one: the list stays open with it.
+    view.rerender(screenWith({ budget: reviewed([false, true]) }));
+    expect(screen.getByText("1 de 2 revisados")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Marcar revisado" }));
+    expect(actions.updateRevisionAction).toHaveBeenCalledWith("p-1", "rev-1", { review: { done: ["line:lineage-line-2", "annex:i1"] } });
+    view.rerender(screenWith({ budget: reviewed() }));
+    expect(screen.getByRole("heading", { name: "Todo revisado" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Ver los 2 puntos" })).toHaveFocus();
+  });
+
+  it("folds the checks when the last open one goes away", async () => {
+    const view = renderScreen({ budget: reviewed() });
+    await userEvent.click(screen.getByRole("button", { name: "Ver los 2 puntos" }));
+    view.rerender(screenWith({ budget: reviewed([false, true]) }));
+
+    // The open annex item is deleted on the Texts tab.
+    const [, line] = reviewed().revision.checks;
+    view.rerender(screenWith({ budget: { ...draft, revision: { ...draft.revision, checks: [line!] } } }));
+    expect(screen.getByRole("heading", { name: "Todo revisado" })).toBeInTheDocument();
+  });
+
+  it("shows a slim row with nothing to open when the AI flagged nothing", () => {
+    renderScreen({ budget: { ...draft, revision: { ...draft.revision, checks: [] } } });
+
+    expect(screen.getByRole("heading", { name: "Nada pendiente" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Ver / })).not.toBeInTheDocument();
   });
 
   it("issues the draft with its dates and the client sharing choice", async () => {

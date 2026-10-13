@@ -640,7 +640,12 @@
       "eyebrow": "Before issuing",
       "title": "Review what the AI has flagged",
       "progress": "{done} of {total} reviewed",
-      "none": "Nothing pending: there are no AI warnings.",
+      "none": "There is nothing to review before issuing.",
+      "noneTitle": "Nothing pending",
+      "allDone": "All reviewed",
+      "allDoneHint": "{count, plural, one {The item has been reviewed.} other {All # items have been reviewed.}}",
+      "expand": "{count, plural, one {View the item} other {View the # items}}",
+      "collapse": "Hide",
       "counts": {
         "inconsistency": "{count, plural, one {# inconsistency} other {# inconsistencies}}",
         "assumption": "{count, plural, one {# assumption} other {# assumptions}}",

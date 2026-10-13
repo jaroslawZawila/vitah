@@ -640,7 +640,12 @@
       "eyebrow": "Antes de emitir",
       "title": "Revisa lo que ha señalado la IA",
       "progress": "{done} de {total} revisados",
-      "none": "Nada pendiente: no hay avisos de la IA.",
+      "none": "No hay nada que revisar antes de emitir.",
+      "noneTitle": "Nada pendiente",
+      "allDone": "Todo revisado",
+      "allDoneHint": "{count, plural, one {El punto está revisado.} other {Los # puntos están revisados.}}",
+      "expand": "{count, plural, one {Ver el punto} other {Ver los # puntos}}",
+      "collapse": "Ocultar",
       "counts": {
         "inconsistency": "{count, plural, one {# incoherencia} other {# incoherencias}}",
         "assumption": "{count, plural, one {# supuesto} other {# supuestos}}",
