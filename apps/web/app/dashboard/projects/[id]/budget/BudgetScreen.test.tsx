@@ -230,11 +230,44 @@ describe("BudgetScreen", () => {
     expect(screen.queryByRole("button", { name: "Más acciones de 05.91" })).not.toBeInTheDocument();
   });
 
-  it("points back to the newest revision when showing an older one", () => {
-    renderScreen({ budget: { ...issued, revisions: budget.revisions } });
+  it("switches revision from the pill beside the title, staying on the same tab", async () => {
+    renderScreen({ tab: "options" });
 
-    expect(screen.getByText(/Estás viendo la Rev\.0/)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Ver la última" })).toHaveAttribute("href", "/dashboard/projects/p-1/budget");
+    const tabs = screen.getByRole("navigation", { name: "Secciones del presupuesto" });
+    expect(within(tabs).queryByRole("link", { name: /Revisiones/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "Revisiones" })).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Rev.1 · Borrador" }));
+    const menu = within(screen.getByRole("dialog", { name: "Revisiones" }));
+    const [newest, older] = menu.getAllByRole("listitem");
+    expect(newest).toHaveTextContent(/Rev\.1 · Borrador.*En borrador/);
+    expect(within(newest!).getByRole("link")).toHaveAttribute("aria-current", "page");
+    expect(within(newest!).getByRole("link")).toHaveAttribute("href", "/dashboard/projects/p-1/budget/options");
+    expect(older).toHaveTextContent(/Rev\.0 · Emitida.*Emitida el 14 oct 2026/);
+    expect(within(older!).getByRole("link")).toHaveAttribute("href", "/dashboard/projects/p-1/budget/options?revision=rev-0");
+    expect(menu.getByRole("link", { name: "Comparar revisiones" })).toHaveAttribute("href", "/dashboard/projects/p-1/budget/revisions");
+
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog", { name: "Revisiones" })).not.toBeInTheDocument();
+  });
+
+  it("marks an older revision read-only and points back to the newest", async () => {
+    renderScreen({ budget: { ...issued, revisions: budget.revisions }, tab: "lines", chapterCode: "05" });
+
+    expect(screen.getByText(/Solo lectura/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Ver la última (Rev.1)" })).toHaveAttribute("href", "/dashboard/projects/p-1/budget/lines?chapter=05");
     expect(screen.queryByRole("button", { name: "Registrar aceptación" })).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Rev.0 · Emitida" }));
+    const menu = within(screen.getByRole("dialog", { name: "Revisiones" }));
+    expect(menu.getByRole("link", { name: /Rev\.1/ })).toHaveAttribute("href", "/dashboard/projects/p-1/budget/lines?chapter=05");
+    expect(menu.getByRole("link", { name: /Rev\.0/ })).toHaveAttribute("href", "/dashboard/projects/p-1/budget/lines?revision=rev-0&chapter=05");
+    expect(menu.getByRole("link", { name: "Comparar revisiones" })).toHaveAttribute("href", "/dashboard/projects/p-1/budget/revisions?revision=rev-0");
+  });
+
+  it("shows no read-only note on the newest revision", () => {
+    renderScreen();
+
+    expect(screen.queryByText(/Solo lectura/)).not.toBeInTheDocument();
   });
 });

@@ -10,7 +10,7 @@ import { cardVariants } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { cardHead, columns, muted, table } from "../obra/classes";
 import { useObraFormat } from "../obra/format";
-import RevisionPill from "./RevisionPill";
+import RevisionPill, { useRevisionDates } from "./RevisionPill";
 import SaveOnBlur from "./SaveOnBlur";
 
 const CHAPTER_COLUMNS = "44px minmax(180px, 1fr) 120px 120px 120px";
@@ -37,6 +37,7 @@ export default function RevisionsView({
 }) {
   const t = useTranslations("budget.revisions");
   const f = useObraFormat();
+  const dates = useRevisionDates();
   const [showAll, setShowAll] = useState(false);
   const delta = (current: number, previous: number) => (
     <span className={cn(current > previous ? "text-warn" : current < previous ? "text-good" : "text-muted-foreground")}>{f.signedMoney(current - previous)}</span>
@@ -62,10 +63,7 @@ export default function RevisionsView({
                 <span className="num font-semibold">
                   {f.money(r.totalCents)} {previous && delta(r.totalCents, previous.totalCents)}
                 </span>
-                <span className={muted}>
-                  {r.issuedOn ? t("issuedOn", { date: f.date(r.issuedOn) }) : t("draft")}
-                  {r.acceptedAt && ` · ${t("acceptedOn", { date: f.date(r.acceptedAt.slice(0, 10)) })}`}
-                </span>
+                <span className={muted}>{dates(r)}</span>
                 <span className="flex flex-wrap gap-1.5 pt-1">
                   {frozen && (["general", "detailed"] as const).map((kind) => (
                     <Link key={kind} href={pdfHref(r.id, kind)} className={buttonVariants({ variant: "outline", size: "sm" })}>

@@ -595,16 +595,19 @@
       "accepted": "Aceptado",
       "acceptedMeta": "es el contrato"
     },
-    "viewingOld": "Estás viendo la Rev.{number} ({status}).",
-    "viewLatest": "Ver la última",
+    "readOnly": "Solo lectura ·",
+    "viewLatest": "Ver la última (Rev.{number})",
+    "revisionMenu": {
+      "title": "Revisiones",
+      "compare": "Comparar revisiones"
+    },
     "tabs": {
       "label": "Secciones del presupuesto",
       "summary": "Resumen",
       "lines": "Partidas",
       "options": "Opciones",
       "texts": "Justificación técnica",
-      "conditions": "Condiciones",
-      "revisions": "Revisiones"
+      "conditions": "Condiciones"
     },
     "deleteDraft": "Eliminar borrador",
     "confirmDeleteDraft": "¿Eliminar el borrador Rev.{number}? Se pierden sus cambios.",

@@ -595,16 +595,19 @@
       "accepted": "Accepted",
       "acceptedMeta": "is the contract"
     },
-    "viewingOld": "You are viewing Rev.{number} ({status}).",
-    "viewLatest": "View the latest",
+    "readOnly": "Read-only ·",
+    "viewLatest": "View the latest (Rev.{number})",
+    "revisionMenu": {
+      "title": "Revisions",
+      "compare": "Compare revisions"
+    },
     "tabs": {
       "label": "Budget sections",
       "summary": "Summary",
       "lines": "Line items",
       "options": "Options",
       "texts": "Technical justification",
-      "conditions": "Terms",
-      "revisions": "Revisions"
+      "conditions": "Terms"
     },
     "deleteDraft": "Delete draft",
     "confirmDeleteDraft": "Delete draft Rev.{number}? Its changes will be lost.",

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FileText } from "lucide-react";
+import { FileText, Lock } from "lucide-react";
 import { useTranslations } from "next-intl";
 import type { BudgetRevision, BudgetRevisionSummary } from "@repo/core/contract";
 import { buttonVariants } from "@/components/ui/button";
@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 import { useObraFormat } from "../obra/format";
 import Stepper, { type Step } from "../obra/Stepper";
 import { BUDGET_TABS, budgetHref, TAB_PATH, type BudgetTab } from "./links";
-import RevisionPill from "./RevisionPill";
+import RevisionMenu from "./RevisionMenu";
 
 /** The process as the stepper shows it, from the newest revision. */
 function steps(newest: BudgetRevisionSummary, inputCount: number, t: ReturnType<typeof useTranslations<"budget">>, date: (d: string) => string): Step[] {
@@ -31,8 +31,8 @@ function steps(newest: BudgetRevisionSummary, inputCount: number, t: ReturnType<
 
 /**
  * Presentational: what every tab of the budget shares: title, status,
- * actions (`actions`, from the container), the process stepper, a banner for
- * where the revision stands, and the tabs.
+ * revision menu, actions (`actions`, from the container), the process
+ * stepper, a banner for where the revision stands, and the tabs.
  */
 export default function BudgetFrame({
   projectId,
@@ -41,6 +41,7 @@ export default function BudgetFrame({
   revision,
   revisions,
   tab,
+  chapterCode,
   inputCount,
   saving,
   actions,
@@ -53,6 +54,8 @@ export default function BudgetFrame({
   revision: BudgetRevision;
   revisions: BudgetRevisionSummary[];
   tab: BudgetTab;
+  /** The chapter the Lines tab shows, kept when switching revision. */
+  chapterCode?: string;
   inputCount: number;
   saving: boolean;
   actions: React.ReactNode;
@@ -64,7 +67,10 @@ export default function BudgetFrame({
   const newest = revisions[0]!;
   const viewingOld = newest.id !== revision.id;
   const revisionParam = viewingOld ? revision.id : null;
-  const counts: Partial<Record<BudgetTab, number>> = { lines: revision.lineCount, options: revision.options.length, revisions: revisions.length };
+  // This page for another revision; the newest needs no `?revision=`.
+  const revisionHref = (id: string) =>
+    budgetHref(projectId, TAB_PATH[tab], id === newest.id ? null : id, tab === "lines" && chapterCode ? { chapter: chapterCode } : {});
+  const counts: Partial<Record<BudgetTab, number>> = { lines: revision.lineCount, options: revision.options.length };
   const summary = [
     revision.reference && t("summaryReference", { reference: revision.reference }),
     revision.texts.cover.promoter,
@@ -76,9 +82,23 @@ export default function BudgetFrame({
       <header className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-end md:justify-between">
         <div className="min-w-0">
           <p className="eyebrow">{[projectRef, site].filter(Boolean).join(" · ")}</p>
-          <div className="mt-1 flex flex-wrap items-center gap-2.5">
+          <div className="relative mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
             <h1>{t("title")}</h1>
-            <RevisionPill number={revision.number} status={revision.status} />
+            <RevisionMenu
+              revision={revision}
+              revisions={revisions}
+              hrefOf={revisionHref}
+              compareHref={budgetHref(projectId, TAB_PATH.revisions, revisionParam)}
+            />
+            {viewingOld && (
+              <span className="inline-flex items-center gap-1.5 text-[13px] text-muted-foreground">
+                <Lock aria-hidden className="size-3.5" />
+                {t("readOnly")}
+                <Link href={revisionHref(newest.id)} className="font-semibold text-brand-ink hover:underline">
+                  {t("viewLatest", { number: newest.number })}
+                </Link>
+              </span>
+            )}
           </div>
           <p className="mt-1.5 text-[13px] text-muted-foreground">
             {summary.join(" · ")}
@@ -104,14 +124,6 @@ export default function BudgetFrame({
         <Stepper label={t("steps.label")} steps={steps(newest, inputCount, t, f.date)} />
       </div>
 
-      {viewingOld && (
-        <p className="flex flex-wrap items-center justify-between gap-2 rounded-[12px] border bg-raise px-4 py-2.5 text-[13.5px]">
-          {t("viewingOld", { number: revision.number, status: t(`status.${revision.status}`) })}
-          <Link href={budgetHref(projectId, TAB_PATH[tab])} className="font-semibold text-brand-ink hover:underline">
-            {t("viewLatest")}
-          </Link>
-        </p>
-      )}
       {banner}
 
       <nav aria-label={t("tabs.label")} className="-mx-1 flex gap-0.5 overflow-x-auto border-b px-1">

@@ -285,6 +285,7 @@ export default function BudgetScreen({ projectId, projectRef, site, clientName, 
       revision={revision}
       revisions={revisions}
       tab={tab}
+      chapterCode={chapterCode}
       inputCount={inputs.length}
       saving={pending}
       actions={actions}
