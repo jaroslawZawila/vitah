@@ -311,7 +311,7 @@ apps/web/
 ### Testing
 
 - Vitest in `packages/core`, `packages/auth`, `apps/web`; jest-expo in `apps/mobile` (`__tests__/`)
-- DB tests run against a real, disposable Postgres database per package (`vitah_<pkg>_test`, recreated each run via `testDatabase()` from `@repo/db/vitest`). Override the server with `TEST_POSTGRES_URL`
+- DB tests run against a real, disposable Postgres database per package (`vitah_<pkg>_test_<checkout hash>`, so worktrees sharing one Postgres never collide; recreated each run via `testDatabase()` from `@repo/db/vitest`). Override the server with `TEST_POSTGRES_URL`
 - Seed data with `createTestTenant` / `createTestUser` / `createTestProject` from `@repo/db/testing`
 - Web server actions: mock the session with `vi.mock("<path>/auth", ...)` and `signInAs()` from `apps/web/test/session.ts`
 
