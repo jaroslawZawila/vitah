@@ -236,12 +236,12 @@ export default function BudgetScreen({ projectId, projectRef, site, clientName, 
     case "summary":
       body = (
         <>
+          <SummaryKpis revision={revision} onMargins={editable ? saveRevision : undefined} />
+          <ChapterSummary revision={revision} hrefOf={chapterHref} onContingency={editable ? (contingencyPct) => saveRevision({ contingencyPct }) : undefined} />
+          {revision.model && <OptionSummary options={revision.options} href={href("/options")} />}
           {revision.model && (
             <ReviewChecklist checks={revision.checks} limit={4} allHref={href("/texts")} hrefOf={checkHref} onToggle={editable ? toggleCheck : undefined} />
           )}
-          <SummaryKpis revision={revision} optionsHref={href("/options")} />
-          <ChapterSummary revision={revision} hrefOf={chapterHref} onContingency={editable ? (contingencyPct) => saveRevision({ contingencyPct }) : undefined} />
-          {revision.model && <OptionSummary options={revision.options} href={href("/options")} />}
         </>
       );
       break;

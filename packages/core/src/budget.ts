@@ -40,6 +40,7 @@ import {
   BUDGET_MODEL,
   BUDGET_QUALITIES,
   CONTINGENCY_CHAPTER,
+  DEFAULT_MARGINS,
   MAX_CHAPTER_CODE,
   type BudgetChapter,
   type BudgetConditions,
@@ -57,12 +58,12 @@ import {
 import { getLatestGeneration } from "./budget-generations";
 import { createDefaultHitos } from "./hitos";
 import type { Tx } from "./project-client";
-import { ofBp, perM2Cents, shareBp, todayInSpain } from "./obra-calc";
+import { marginsOn, ofBp, perM2Cents, shareBp, todayInSpain, withPrices } from "./obra-calc";
 import {
   calendarDate,
   fail,
   integer,
-  linesTotalSql,
+  linesPriceSql,
   loadChapters,
   nextPosition,
   optionalText,
@@ -104,12 +105,12 @@ const MAX_REVIEWED = 1_000;
 
 // ─── Reading ─────────────────────────────────────────────────────────────────
 
-/** Each revision's PEC (chapters only, never options), rounding each line as `amountCents` does. */
+/** Each revision's PEC (chapters only, never options, at the client's price). */
 async function revisionTotals(projectId: string) {
   const rows = await db
     .select({
       revisionId: budgetChapters.revisionId,
-      total: linesTotalSql(),
+      total: linesPriceSql(),
     })
     .from(budgetLines)
     .innerJoin(budgetChapters, eq(budgetChapters.id, budgetLines.chapterId))
@@ -137,12 +138,13 @@ function change(current: number, previous: number | undefined): ChapterChange {
 }
 
 /**
- * A revision's chapters as the API shows them: shares of `totalCents`, the
- * hito closing each, and how each changed against `before` (the previous
- * revision's chapters; null when there is none).
+ * A revision's chapters as the API shows them: their total (at cost) and price
+ * (`withPrices`) as a share of `totalCents`, the hito closing each, and how
+ * each changed against `before` (the previous revision's chapters; null when
+ * there is none).
  */
 export function toBudgetChapters(
-  chapters: LoadedChapter[],
+  chapters: (LoadedChapter & { priceCents: number })[],
   before: LoadedChapter[] | null,
   totalCents: number,
   hitoOf: Map<string, string>,
@@ -151,6 +153,7 @@ export function toBudgetChapters(
   const previousTotals = new Map(before?.map((c) => [c.code, c.totalCents]));
   return chapters.map((chapter) => {
     const previousTotal = previousTotals.get(chapter.code);
+    const { priceCents } = chapter;
     return {
       id: chapter.id,
       code: chapter.code,
@@ -161,14 +164,15 @@ export function toBudgetChapters(
       executedCents: chapter.executedCents,
       progressPct: chapter.progressPct,
       status: chapter.status,
-      shareBp: shareBp(chapter.totalCents, totalCents),
+      shareBp: shareBp(priceCents, totalCents),
       previousTotalCents: previousTotal ?? null,
       change: before ? change(chapter.totalCents, previousTotal) : null,
       hitoCode: hitoOf.get(chapter.code) ?? null,
       lines: chapter.lines,
       computed: framer && chapter.kind === "chapter" && chapter.code === CONTINGENCY_CHAPTER,
       lineCount: countLines([chapter]),
-      perM2Cents: perM2Cents(chapter.totalCents, builtAreaCm2),
+      priceCents,
+      perM2Cents: perM2Cents(priceCents, builtAreaCm2),
     };
   });
 }
@@ -177,14 +181,14 @@ export function toBudgetChapters(
 const countLines = (chapters: LoadedChapter[]) =>
   chapters.reduce((sum, c) => sum + c.lines.filter((l) => l.source !== "computed").length, 0);
 
-/** How many options add or subtract, and by how much. */
-function optionTotals(options: LoadedChapter[]) {
-  const side = (list: LoadedChapter[]) => ({ count: list.length, cents: list.reduce((sum, o) => sum + o.totalCents, 0) });
-  return { adding: side(options.filter((o) => o.totalCents > 0)), subtracting: side(options.filter((o) => o.totalCents < 0)) };
+/** How many options add or subtract, and by how much (at their price). */
+function optionTotals(options: BudgetOption[]) {
+  const side = (list: BudgetOption[]) => ({ count: list.length, cents: list.reduce((sum, o) => sum + o.priceCents, 0) });
+  return { adding: side(options.filter((o) => o.priceCents > 0)), subtracting: side(options.filter((o) => o.priceCents < 0)) };
 }
 
 function toOptions(
-  options: LoadedChapter[],
+  options: (LoadedChapter & { priceCents: number })[],
   before: LoadedChapter[] | null,
   hitoOf: Map<string, string>,
   view: { framer: boolean; builtAreaCm2: number | null },
@@ -266,16 +270,20 @@ export async function revisionView(
     revisionPdfs(row.id),
     row.model === BUDGET_MODEL ? tenantRatios(row.tenantId, row.projectId) : {},
   ]);
-  const chapters = loaded.filter((c) => c.kind === "chapter");
-  const options = loaded.filter((c) => c.kind === "option");
+  const priced = withPrices(loaded, row);
+  const chapters = priced.filter((c) => c.kind === "chapter");
+  const options = priced.filter((c) => c.kind === "option");
   const beforeChapters = before?.filter((c) => c.kind === "chapter") ?? null;
   const beforeOptions = before?.filter((c) => c.kind === "option") ?? null;
-  const totalCents = totals.get(row.id) ?? 0;
-  const chosenCents = options.filter((o) => o.chosen).reduce((sum, o) => sum + o.totalCents, 0);
+  const costCents = chapters.reduce((sum, c) => sum + c.totalCents, 0);
+  const totalCents = chapters.reduce((sum, c) => sum + c.priceCents, 0);
   const codes = new Set(chapters.map((c) => c.code));
   const framer = row.model === BUDGET_MODEL;
   const texts = framer ? readTexts(row.texts) : { ...defaultTexts(), exclusions: lines(row.exclusions) };
   const view = { framer, builtAreaCm2: row.builtAreaCm2 };
+  const budgetChapters = toBudgetChapters(chapters, beforeChapters, totalCents, hitoOf, view);
+  const budgetOptions = toOptions(options, beforeOptions, hitoOf, view);
+  const chosenCents = budgetOptions.filter((o) => o.chosen).reduce((sum, o) => sum + o.priceCents, 0);
   return {
     ...toSummary(row, totalCents),
     reference: row.reference,
@@ -288,12 +296,16 @@ export async function revisionView(
     removedChapters: (beforeChapters ?? [])
       .filter((c) => !codes.has(c.code))
       .map((c) => ({ code: c.code, name: c.name, totalCents: c.totalCents })),
-    chapters: toBudgetChapters(chapters, beforeChapters, totalCents, hitoOf, view),
+    chapters: budgetChapters,
     lineCount: countLines(chapters),
     perM2Cents: perM2Cents(totalCents, row.builtAreaCm2),
-    optionTotals: optionTotals(options),
+    costCents,
+    overheadBp: row.overheadBp,
+    profitBp: row.profitBp,
+    ...marginsOn(costCents, totalCents, row),
+    optionTotals: optionTotals(budgetOptions),
     model: row.model,
-    options: toOptions(options, beforeOptions, hitoOf, view),
+    options: budgetOptions,
     contractTotalCents: totalCents + chosenCents,
     contingencyBp: row.contingencyBp,
     quality: row.quality,
@@ -306,7 +318,7 @@ export async function revisionView(
     rejectedOn: row.rejectedOn,
     pdfs,
     checks: framer
-      ? computeChecks({ texts, chapters, builtAreaCm2: row.builtAreaCm2, ratios, done: reviewedKeys(row.review) })
+      ? computeChecks({ texts, chapters: budgetChapters, ratios, done: reviewedKeys(row.review) })
       : [],
     ratios,
     lineChanges: before ? lineChanges(loaded, before) : [],
@@ -374,6 +386,7 @@ export async function insertFramerRevision(
       model: BUDGET_MODEL,
       texts: defaultTexts(),
       conditions: defaultConditions(),
+      ...DEFAULT_MARGINS,
       ...values,
     })
     .returning({ id: budgetRevisions.id, contingencyBp: budgetRevisions.contingencyBp });
@@ -432,12 +445,12 @@ export async function createRevision(ctx: Ctx, projectId: string) {
     if (newest.status === "draft") fail("draft_exists");
 
     const { tenantId, reference, vatRateBp, builtAreaCm2, usefulAreaCm2, exclusions } = newest;
-    const { model, contingencyBp, quality, texts, conditions } = newest;
+    const { model, contingencyBp, overheadBp, profitBp, quality, texts, conditions } = newest;
     const [revision] = await tx
       .insert(budgetRevisions)
       .values({
         ...{ tenantId, projectId, reference, vatRateBp, builtAreaCm2, usefulAreaCm2, exclusions },
-        ...{ model, contingencyBp, quality, texts, conditions },
+        ...{ model, contingencyBp, overheadBp, profitBp, quality, texts, conditions },
         number: newest.number + 1,
       })
       .returning({ id: budgetRevisions.id });
@@ -534,7 +547,7 @@ function parseConditions(value: unknown, current: BudgetConditions): BudgetCondi
 
 /**
  * Body: any of { reference, vatRateBp, builtAreaM2, usefulAreaM2, exclusions,
- * contingencyPct, quality, changeReason, texts (partial), conditions (partial),
+ * contingencyPct, overheadPct, profitPct, quality, changeReason, texts (partial), conditions (partial),
  * review: { done: string[] } (the whole list), reviewed: { key, done } (one
  * check, merged with the stored list) } — drafts only.
  */
@@ -553,10 +566,12 @@ export async function updateRevision(
     quality: (v) => (v === null ? null : (BUDGET_QUALITIES.find((q) => q === v) ?? fail("invalid_input"))),
     changeReason: (v) => optionalText(v, MAX_NOTE),
   });
-  // The API names the areas in m² and the contingency in %; they're stored in hundredths.
+  // The API names the areas in m² and the contingency and margins in %; they're stored in hundredths.
   if ("builtAreaM2" in input) changes.builtAreaCm2 = area(input.builtAreaM2);
   if ("usefulAreaM2" in input) changes.usefulAreaCm2 = area(input.usefulAreaM2);
   if ("contingencyPct" in input) changes.contingencyBp = scaled(input.contingencyPct, 50, 100);
+  if ("overheadPct" in input) changes.overheadBp = scaled(input.overheadPct, 100, 100);
+  if ("profitPct" in input) changes.profitBp = scaled(input.profitPct, 100, 100);
   if ("texts" in input) changes.texts = parseTexts(input.texts, readTexts(revision.texts));
   if ("exclusions" in input) {
     // /api/v1's one-per-line string: a FRAMER revision keeps them in its texts.

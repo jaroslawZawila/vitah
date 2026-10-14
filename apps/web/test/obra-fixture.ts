@@ -27,7 +27,7 @@ export function line(overrides: Partial<BudgetLine> = {}): BudgetLine {
 }
 
 export function chapter(overrides: Partial<BudgetChapter> = {}): BudgetChapter {
-  const merged: Omit<BudgetChapter, "computed" | "lineCount"> & Partial<BudgetChapter> = {
+  const merged: Omit<BudgetChapter, "computed" | "lineCount" | "priceCents"> & Partial<BudgetChapter> = {
     id: "chapter-05",
     code: "05",
     name: "Envolvente Térmica — Paneles Thermochip",
@@ -52,6 +52,7 @@ export function chapter(overrides: Partial<BudgetChapter> = {}): BudgetChapter {
   return {
     computed: merged.lines.some((l) => l.source === "computed"),
     lineCount: merged.lines.filter((l) => l.source !== "computed").length,
+    priceCents: merged.totalCents,
     ...merged,
   };
 }
@@ -150,6 +151,12 @@ export const budget: ProjectBudget = {
     removedChapters: [],
     lineCount: 4,
     perM2Cents: 2_085_067,
+    // 13 % + 6 % on the cost: the PEC above.
+    costCents: 3_239_897,
+    overheadBp: 1300,
+    overheadCents: 421_187,
+    profitBp: 600,
+    profitCents: 194_394,
     optionTotals: { adding: { count: 1, cents: 4_597_500 }, subtracting: { count: 0, cents: 0 } },
     chapters: [
       chapter({ id: "chapter-01", code: "01", name: "Actuaciones previas y movimiento de tierras", totalCents: 166_256, shareBp: 431, hitoCode: "H2", lines: [line({ id: "line-01", code: "01.01", description: "Replanteo", unit: "ud", quantity: 1, unitPriceCents: 166_256, amountCents: 166_256, executedPct: 0 })] }),
@@ -164,7 +171,8 @@ export const budget: ProjectBudget = {
         name: "Piscina desbordante",
         changeNote: null,
         pdfNote: "Fuera del PEC a petición del promotor",
-        totalCents: 4_597_500,
+        totalCents: 3_863_445,
+        priceCents: 4_597_500,
         executedCents: 0,
         progressPct: 0,
         status: "pending",

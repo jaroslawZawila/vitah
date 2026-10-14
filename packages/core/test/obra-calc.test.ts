@@ -2,12 +2,17 @@ import { describe, expect, it } from "vitest";
 import {
   addBusinessDays,
   buildPhases,
+  forClient,
   hitoStatus,
   obraTerm,
+  marginsOn,
+  priceLines,
   progressOf,
   todayInSpain,
+  unitPrice,
+  withPrices,
 } from "../src/obra-calc";
-import { lineAmountCents, type Hito } from "../src/contract";
+import { lineAmountCents, type BudgetLine, type BudgetRevision, type Hito } from "../src/contract";
 
 describe("lineAmountCents", () => {
   it("multiplies quantity by unit price, to the cent", () => {
@@ -15,6 +20,52 @@ describe("lineAmountCents", () => {
     expect(lineAmountCents(219.76, 800)).toBe(175_808);
     expect(lineAmountCents(604.56, 920)).toBe(556_195); // 5.561,952 → 5.561,95
     expect(lineAmountCents(0, 1_000)).toBe(0);
+  });
+});
+
+describe("margins", () => {
+  const margins = { overheadBp: 1300, profitBp: 600 };
+  const line = (quantity: number, unitPriceCents: number) => ({ quantity, unitPriceCents, amountCents: lineAmountCents(quantity, unitPriceCents) });
+
+  it("puts both margins in a unit price, to the cent", () => {
+    expect(unitPrice(1_000, margins)).toBe(1_190);
+    expect(unitPrice(322, margins)).toBe(383); // 383,18
+    expect(unitPrice(-1_000, margins)).toBe(-1_190);
+    expect(unitPrice(500, { overheadBp: 0, profitBp: 0 })).toBe(500);
+  });
+
+  it("prices lines so each is its quantity × its unit price", () => {
+    const priced = priceLines([line(400, 322), line(1, 66_176)], margins);
+    expect(priced.map((l) => [l.unitPriceCents, l.amountCents])).toEqual([
+      [383, 153_200],
+      [78_749, 78_749],
+    ]);
+    expect(priceLines([], margins)).toEqual([]);
+  });
+
+  it("prices chapters and options as the sum of their priced lines", () => {
+    const [chapter, option] = withPrices(
+      [{ lines: [line(400, 322), line(1, 66_176)] as BudgetLine[] }, { lines: [line(1, -100_000)] as BudgetLine[] }],
+      margins,
+    );
+    expect(chapter!.priceCents).toBe(153_200 + 78_749);
+    expect(option!.priceCents).toBe(-119_000);
+  });
+
+  it("splits what the margins came to by their %", () => {
+    expect(marginsOn(1_000_000, 1_190_003, margins)).toEqual({ overheadCents: 130_002, profitCents: 60_001 });
+    expect(marginsOn(1_000, 1_000, { overheadBp: 0, profitBp: 0 })).toEqual({ overheadCents: 0, profitCents: 0 });
+  });
+
+  it("gives the client's view of a revision: chapters and options at their price, lines priced", () => {
+    const revision = {
+      ...margins,
+      chapters: [{ totalCents: 1_000, priceCents: 1_190, lines: [line(1, 1_000)] }],
+      options: [{ totalCents: -1_000, priceCents: -1_190, lines: [line(2, -500)] }],
+    } as unknown as BudgetRevision;
+    const client = forClient(revision);
+    expect(client.chapters[0]).toMatchObject({ totalCents: 1_190, lines: [{ amountCents: 1_190, unitPriceCents: 1_190 }] });
+    expect(client.options[0]).toMatchObject({ totalCents: -1_190, lines: [{ amountCents: -1_190, unitPriceCents: -595 }] });
   });
 });
 

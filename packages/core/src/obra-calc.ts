@@ -1,4 +1,8 @@
 import type {
+  BudgetChapter,
+  BudgetLine,
+  BudgetOption,
+  BudgetRevision,
   Hito,
   HitoStatus,
   MobilePhase,
@@ -6,7 +10,7 @@ import type {
   ObraTerm,
   ProgressStatus,
 } from "./contract";
-import { EXECUTION_STAGE } from "./contract";
+import { EXECUTION_STAGE, lineAmountCents } from "./contract";
 
 // ─── Obra arithmetic ─────────────────────────────────────────────────────────
 // Pure functions behind the budget, hitos and obra services: progress, dates,
@@ -58,6 +62,47 @@ export const ofBp = (cents: number, bp: number) => Math.round((cents * bp) / 10_
 /** Cents per m² of an area stored in cm² (hundredths of m²); null without an area. */
 export const perM2Cents = (cents: number, areaCm2: number | null) =>
   areaCm2 ? Math.round((cents * 100) / areaCm2) : null;
+
+// ─── Margins ─────────────────────────────────────────────────────────────────
+// Budget lines are priced at cost; the client pays the cost plus gastos
+// asociados and beneficio industrial. Both go into each unit price, to the
+// cent, so every priced line is its quantity × its unit price and chapters and
+// the PEC are plain sums (`linesPriceSql` in obra-data.ts is the same in SQL).
+// Only the portal's budget shows the margins apart; the PDFs, obra, hitos and
+// the app see the priced lines.
+
+/** Gastos asociados (overhead) and beneficio industrial (profit), in bp of the cost. */
+export type Margins = { overheadBp: number; profitBp: number };
+
+/** A unit cost with both margins in, to the cent. */
+export const unitPrice = (unitCostCents: number, { overheadBp, profitBp }: Margins) =>
+  ofBp(unitCostCents, 10_000 + overheadBp + profitBp);
+
+/** Lines at the client's price: each unit price with the margins in, its amount recomputed. */
+export function priceLines<L extends { quantity: number; unitPriceCents: number; amountCents: number }>(lines: L[], margins: Margins): L[] {
+  return lines.map((line) => {
+    const unitPriceCents = unitPrice(line.unitPriceCents, margins);
+    return { ...line, unitPriceCents, amountCents: lineAmountCents(line.quantity, unitPriceCents) };
+  });
+}
+
+/** Chapters (or options) with their price: the sum of their priced lines. */
+export function withPrices<C extends { lines: BudgetLine[] }>(chapters: C[], margins: Margins): (C & { priceCents: number })[] {
+  return chapters.map((c) => ({ ...c, priceCents: priceLines(c.lines, margins).reduce((sum, l) => sum + l.amountCents, 0) }));
+}
+
+/** What the margins came to on `costCents` priced at `priceCents`, split between them by their %. */
+export function marginsOn(costCents: number, priceCents: number, { overheadBp, profitBp }: Margins) {
+  const marginCents = priceCents - costCents;
+  const overheadCents = overheadBp + profitBp === 0 ? 0 : Math.round((marginCents * overheadBp) / (overheadBp + profitBp));
+  return { overheadCents, profitCents: marginCents - overheadCents };
+}
+
+/** A revision at the client's prices: each chapter and option at its price, its lines priced. */
+export function forClient(revision: BudgetRevision): BudgetRevision {
+  const price = <C extends BudgetChapter | BudgetOption>(c: C): C => ({ ...c, totalCents: c.priceCents, lines: priceLines(c.lines, revision) });
+  return { ...revision, chapters: revision.chapters.map(price), options: revision.options.map(price) };
+}
 
 export type Progress = {
   totalCents: number;

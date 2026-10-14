@@ -8,7 +8,7 @@ import type { Ctx } from "./context";
 import { CONTINGENCY_CHAPTER, promoterName, type BudgetPdfKind, type BudgetRevision, type ProjectBudget } from "./contract";
 import { newPdfDocument, openDocument } from "./documents";
 import { notifyProjectClient } from "./notifications";
-import { addDays, perM2Cents, todayInSpain } from "./obra-calc";
+import { addDays, forClient, perM2Cents, todayInSpain } from "./obra-calc";
 import { calendarDate, fail, optionalText } from "./obra-data";
 import { storeFiles, type StoredFile } from "./project-files";
 
@@ -38,8 +38,11 @@ async function pdfData(
   ctx: Ctx,
   projectId: string,
   budget: ProjectBudget,
-  revision: BudgetRevision,
+  atCost: BudgetRevision,
 ): Promise<Omit<BudgetPdfData, "kind">> {
+  // Neither PDF shows the margins apart: the detailed one carries the contract
+  // the client signs. The portal's budget does.
+  const revision = forClient(atCost);
   const [letterhead, project, hitos, history] = await Promise.all([
     letterheadOf(ctx.tenantId),
     db.query.projects.findFirst({ where: eq(projects.id, projectId), columns: { address: true } }),

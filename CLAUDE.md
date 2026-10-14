@@ -195,14 +195,18 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
 ### Budget (Presupuesto)
 
 - Spec: `features/budget/TECH_DESIGN.md` (decisions in §17); PDF template and AI prompts in the same folder
+- Lines are priced at **cost**; gastos asociados and beneficio industrial (`overhead_bp` / `profit_bp`, default 13 % +
+  6 %, §18) go into each unit price, and the PEC is the sum of the priced lines (`priceLines` in `obra-calc.ts`,
+  `linesPriceSql` in SQL). Only the portal's summary shows the margins apart; the PDFs (`forClient`), obra, hitos and
+  app see the priced lines
 - Model `framer20`: always the 20 fixed chapters 01–20 (`budget-template.ts`); chapter 20 is one computed line,
   `contingency_bp` × chapters 01–19, kept in sync by `syncDraft` (`budget-draft.ts`) inside every draft write.
   Options live below as `budget_chapters` with `kind = 'option'` (codes OP1, OP2…, lines numbered OP.01… across
   all options, renumbered automatically); they may subtract (deductions, alternatives). Lines can come from the fixed
-  FRAMER 2026 price base (`price-base-data.ts`, searched with `searchPriceBase`) or be "estimated"
+  FRAMER 2026 price base (`price-base-data.ts`, unit costs, searched with `searchPriceBase`) or be "estimated"
 - Status: draft → issued (frozen; both PDFs stored as project documents) → accepted or rejected; an older revision is
   superseded when a later one is accepted. One draft at a time; from Rev.1 issuing needs a `changeReason`.
-  Accepting records the options the client chose: contract price = PEC + chosen options, and that is what the obra,
+  Accepting records the options the client chose: contract price = PEC + chosen options (at price), and that is what the obra,
   hitos H0–H9 and the app use (`inContract` in `obra-data.ts`). Accepting a draft directly still works (v1)
 - PDFs (`budget-pdf/`, `@react-pdf/renderer`, DejaVu Sans embedded): general and detailed, rendered by
   `budget-issue.ts`; a draft's are rendered on the fly with a "BORRADOR" watermark. The general one is shared with the

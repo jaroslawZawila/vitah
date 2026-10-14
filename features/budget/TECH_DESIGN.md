@@ -183,8 +183,8 @@ They are validated in core (lengths, counts) with plain parsers, matching the ex
 
 ### 3.7 Money and totals
 
-- **PEC** = the sum of the lines in `kind = 'chapter'` (01–20). `revisionTotals()` gains `where kind = 'chapter'`.
-- **Contract price** of an accepted revision = PEC + the lines of options with `chosen = true`.
+- **Cost** = the sum of the lines in `kind = 'chapter'` (01–20). **PEC** = the same lines at price: each unit price with gastos asociados (`overhead_bp`) and beneficio industrial (`profit_bp`) in (§18).
+- **Contract price** of an accepted revision = PEC + the price of the options with `chosen = true` (their lines priced the same way).
 - `loadBudget()` (what Obra, Pagos and the app read) loads the chapters plus the chosen options, so `progress.totalCents`, and through it every hito amount, already uses the contract price. Unchosen options are invisible to Obra and the app.
 
 ## 4. Fixed data in core
@@ -453,3 +453,27 @@ Draft edits, options, texts and generations → none: the app only sees accepted
 3. No monthly AI limit for now (the column stays null; usage is still logged per call).
 4. Vercel Workflow runs the generation.
 5. Admins and managers generate, edit, issue and accept; viewers read.
+
+## 18. Margins (2026-10-14, client feedback "Modificaciones plataforma")
+
+Budgets are built from **costs**, then a % of **gastos asociados** and of **beneficio industrial** goes on top.
+Both matter more to staff than VAT, so they lead the summary tab.
+
+- `budget_revisions.overhead_bp` / `profit_bp` (bp of the cost). A new revision starts at 13 % + 6 %
+  (`DEFAULT_MARGINS`), a copy keeps its source's, and existing rows got 0 (their unit prices already included both;
+  `packages/db/sql/2026-10-budget-margins.sql`). PATCH takes `overheadPct` / `profitPct` on drafts.
+- The FRAMER 2026 price base is now at cost: the prototype's prices ÷ 1.19. The AI prompt says the P.U. are costs.
+  The Caviedes seed takes, for each line, the cost whose price comes back to the document's unit price; its PEC
+  lands within a few euros of the document.
+- Lines stay at cost. Prices are per line: the unit price with both margins in, to the cent (`unitPrice` /
+  `priceLines` in `obra-calc.ts`; `linesPriceSql` in SQL), amount = quantity × unit price. A chapter's or option's
+  `priceCents` and the PEC are plain sums, so every printed row multiplies out. The portal shows what the margins
+  came to (PEC − cost) split between gastos and beneficio by their % (`marginsOn`).
+- **The client never sees the margins apart.** Both PDFs (the detailed one carries the contract) print the priced
+  lines (`forClient`), and the obra, hitos and the app read the contract the same way (`loadBudget`). Only the
+  portal's summary shows cost, gastos and beneficio. A draft at 0 % shows a warning: its lines are at cost (budgets
+  from before the margins copy 0 % into new revisions).
+- €/m² (chapters, the KPI, the review's tenant averages) is at price, so budgets priced before the margins
+  compare alike.
+- Summary tab order: KPIs (importe de la obra, beneficio industrial, gastos asociados, €/m² and m²) →
+  chapters (price and cost, then cost / gastos / beneficio / PEC) → options → the AI's review checklist.

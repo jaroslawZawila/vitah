@@ -106,6 +106,48 @@ describe("BudgetScreen", () => {
     expect(actions.updateRevisionAction).toHaveBeenCalledWith("p-1", "rev-1", { reviewed: { key: "annex:i1", done: true } });
   });
 
+  it("leads with the works' price and its margins, then the chapters, the AI's checks last", async () => {
+    renderScreen();
+
+    const work = screen.getByText("Importe de la obra").parentElement!;
+    expect(work).toHaveTextContent(/38\.554,78/);
+    expect(work).toHaveTextContent(/Coste 32\.398,97/);
+    expect(screen.getByText("Beneficio industrial").parentElement).toHaveTextContent(/1943,94/);
+    expect(screen.getByText("Gastos asociados").parentElement).toHaveTextContent(/4211,87/);
+    expect(screen.getByText("€/m² construido").parentElement).toHaveTextContent("184,91 m² construidos");
+    // Under the chapters: the cost, then each margin in % and €.
+    expect(screen.getByText(/Coste de ejecución/)).toBeInTheDocument();
+    expect(screen.getByText(/Gastos asociados · 13/)).toBeInTheDocument();
+    expect(screen.getByText(/Beneficio industrial · 6/)).toBeInTheDocument();
+    const chapters = screen.getByRole("table", { name: "Resumen por capítulos" });
+    expect(chapters.compareDocumentPosition(screen.getByText("1 de 2 revisados")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    // Typed in % on the draft.
+    const profit = screen.getByLabelText("Porcentaje de beneficio industrial");
+    expect(profit).toHaveValue("6");
+    await userEvent.clear(profit);
+    await userEvent.type(profit, "7{Enter}");
+    expect(actions.updateRevisionAction).toHaveBeenCalledWith("p-1", "rev-1", { profitPct: 7 });
+    const overhead = screen.getByLabelText("Porcentaje de gastos asociados");
+    await userEvent.clear(overhead);
+    await userEvent.type(overhead, "12,5{Enter}");
+    expect(actions.updateRevisionAction).toHaveBeenCalledWith("p-1", "rev-1", { overheadPct: 12.5 });
+  });
+
+  it("warns when a draft has no margin, its lines being at cost", () => {
+    renderScreen({ budget: { ...draft, revision: { ...draft.revision, profitBp: 0, profitCents: 0 } } });
+
+    expect(screen.getByText("Beneficio industrial").parentElement).toHaveTextContent("Sin margen: las partidas están a coste");
+    expect(screen.getByText("Gastos asociados").parentElement).not.toHaveTextContent("Sin margen");
+  });
+
+  it("shows the margins read-only once issued", () => {
+    renderScreen({ budget: issued });
+
+    expect(screen.queryByLabelText("Porcentaje de beneficio industrial")).not.toBeInTheDocument();
+    expect(screen.getByText("Beneficio industrial").parentElement).toHaveTextContent(/6\s%\ssobre el coste/);
+  });
+
   it("folds the AI checks into one row once all are reviewed, and opens them again", async () => {
     renderScreen({ budget: reviewed() });
 
@@ -228,6 +270,9 @@ describe("BudgetScreen", () => {
     const pool = dialog.getByRole("button", { name: /Piscina desbordante/ });
     await userEvent.click(pool);
     expect(pool).toHaveAttribute("aria-pressed", "true");
+    // The option at its price, margins in: 38.554,78 € + 45.975,00 €.
+    expect(pool).toHaveTextContent(/\+45\.975,00/);
+    expect(dialog.getByText(/84\.529,78/)).toBeInTheDocument();
     await userEvent.upload(dialog.getByLabelText(/Presupuesto firmado/), new File(["%PDF-"], "firmado.pdf", { type: "application/pdf" }));
     await userEvent.click(dialog.getByRole("button", { name: "Aceptar como contrato" }));
 

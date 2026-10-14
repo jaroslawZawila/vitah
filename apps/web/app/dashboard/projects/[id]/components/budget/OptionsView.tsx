@@ -76,7 +76,10 @@ export default function OptionsView({ revision, handlers }: { revision: BudgetRe
               )}
               {option.replacesLine && <p className={muted}>{t("replaces", { code: option.replacesLine })}</p>}
             </div>
-            <span className="num text-xl font-semibold">{f.signedMoney(option.totalCents)}</span>
+            <span className="flex flex-col items-end">
+              <span className="num text-xl font-semibold">{f.signedMoney(option.priceCents)}</span>
+              <span className={muted}>{t("price")}</span>
+            </span>
           </div>
           {handlers && (
             <div className="flex flex-wrap items-end gap-3">

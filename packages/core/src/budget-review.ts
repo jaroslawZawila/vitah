@@ -1,13 +1,13 @@
 import { db, sql } from "@repo/db";
-import { BUDGET_MODEL, checkKey, CONTINGENCY_CHAPTER, type BudgetCheck, type BudgetTexts } from "./contract";
-import { perM2Cents as perM2 } from "./obra-calc";
-import type { LoadedChapter } from "./obra-data";
+import { linesPriceSql } from "./obra-data";
+import { BUDGET_MODEL, checkKey, CONTINGENCY_CHAPTER, type BudgetChapter, type BudgetCheck, type BudgetTexts } from "./contract";
 
 // ─── Budget review ────────────────────────────────────────────────────────────
 // The "Antes de emitir" checklist: what the AI flagged (inconsistencies and
 // assumptions), the lines it priced outside the price base, and chapters whose
-// €/m² is far from the tenant's other budgets. Computed on every read; only
-// which items staff ticked is stored (`budget_revisions.review`).
+// €/m² (at their price, margins in) is far from the tenant's other budgets.
+// Computed on every read; only which items staff ticked is stored
+// (`budget_revisions.review`).
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** A chapter this far from the average (35 %) is worth a second look. */
@@ -21,12 +21,11 @@ export function reviewedKeys(stored: unknown): Set<string> {
 
 export function computeChecks(input: {
   texts: BudgetTexts;
-  chapters: LoadedChapter[];
-  builtAreaCm2: number | null;
+  chapters: BudgetChapter[];
   ratios: Record<string, number>;
   done: Set<string>;
 }): BudgetCheck[] {
-  const { texts, chapters, builtAreaCm2, ratios, done } = input;
+  const { texts, chapters, ratios, done } = input;
   const checks: BudgetCheck[] = [];
   for (const item of texts.annex) {
     if (item.kind === "note") continue;
@@ -48,49 +47,48 @@ export function computeChecks(input: {
       });
     }
   }
-  if (builtAreaCm2) {
-    for (const chapter of chapters) {
-      const averageCents = ratios[chapter.code];
-      if (chapter.code === CONTINGENCY_CHAPTER || !averageCents || chapter.totalCents === 0) continue;
-      const perM2Cents = perM2(chapter.totalCents, builtAreaCm2)!;
-      if (Math.abs(perM2Cents / averageCents - 1) <= RATIO_TOLERANCE) continue;
-      const key = checkKey.ratio(chapter.code);
-      checks.push({
-        key,
-        kind: "ratio",
-        title: `${chapter.code} ${chapter.name}`,
-        detail: "",
-        ref: chapter.code,
-        chapterCode: chapter.code,
-        done: done.has(key),
-        perM2Cents,
-        averageCents,
-      });
-    }
+  // €/m² at price (null without a built area).
+  for (const { code, name, priceCents, perM2Cents } of chapters) {
+    const averageCents = ratios[code];
+    if (code === CONTINGENCY_CHAPTER || !averageCents || priceCents === 0 || perM2Cents === null) continue;
+    if (Math.abs(perM2Cents / averageCents - 1) <= RATIO_TOLERANCE) continue;
+    const key = checkKey.ratio(code);
+    checks.push({
+      key,
+      kind: "ratio",
+      title: `${code} ${name}`,
+      detail: "",
+      ref: code,
+      chapterCode: code,
+      done: done.has(key),
+      perM2Cents,
+      averageCents,
+    });
   }
   return checks;
 }
 
 /**
  * The tenant's average €/m² built per chapter code (cents), over the issued
- * and accepted FRAMER budgets of its other projects.
+ * and accepted FRAMER budgets of its other projects. At price, margins in, so
+ * budgets priced at cost and older ones (margins inside the unit prices, 0 %
+ * on top) compare alike.
  */
 export async function tenantRatios(tenantId: string, projectId: string): Promise<Record<string, number>> {
   const rows = (await db.execute(sql`
     select code, round(avg(total * 100.0 / area))::int as average
     from (
-      select chapter.code, revision.built_area_cm2 as area,
-        sum(round(line.quantity_milli::numeric * line.unit_price_cents / 1000)) as total
-      from budget_lines as line
-      join budget_chapters as chapter on chapter.id = line.chapter_id
-      join budget_revisions as revision on revision.id = chapter.revision_id
-      where revision.tenant_id = ${tenantId}
-        and revision.project_id <> ${projectId}
-        and revision.model = ${BUDGET_MODEL}
-        and revision.status in ('issued', 'accepted')
-        and revision.built_area_cm2 > 0
-        and chapter.kind = 'chapter'
-      group by chapter.id, chapter.code, revision.built_area_cm2
+      select budget_chapters.code, budget_revisions.built_area_cm2 as area, ${linesPriceSql()} as total
+      from budget_lines
+      join budget_chapters on budget_chapters.id = budget_lines.chapter_id
+      join budget_revisions on budget_revisions.id = budget_chapters.revision_id
+      where budget_revisions.tenant_id = ${tenantId}
+        and budget_revisions.project_id <> ${projectId}
+        and budget_revisions.model = ${BUDGET_MODEL}
+        and budget_revisions.status in ('issued', 'accepted')
+        and budget_revisions.built_area_cm2 > 0
+        and budget_chapters.kind = 'chapter'
+      group by budget_chapters.id, budget_chapters.code, budget_revisions.built_area_cm2
     ) as chapters
     group by code
   `)) as unknown as { code: string; average: number }[];

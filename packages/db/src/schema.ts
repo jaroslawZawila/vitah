@@ -377,6 +377,11 @@ export const budgetRevisions = pgTable(
     model: text("model"),
     // Chapter 20 (Imprevistos) as a share of chapters 01–19: 5 % = 500.
     contingencyBp: integer("contingency_bp").default(500).notNull(),
+    // The margins on top of the cost (chapters 01–20): gastos asociados and
+    // beneficio industrial, 13 % = 1300. 0 for budgets priced before them, whose
+    // unit prices already included both; new revisions get core's defaults.
+    overheadBp: integer("overhead_bp").default(0).notNull(),
+    profitBp: integer("profit_bp").default(0).notNull(),
     // The AI's quality reference: framer | project.
     quality: text("quality").$type<"framer" | "project">(),
     // What the PDFs print besides numbers (BudgetTexts in core's contract).

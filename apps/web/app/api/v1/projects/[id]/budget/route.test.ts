@@ -60,6 +60,10 @@ describe("/api/v1/projects/:id/budget", () => {
     expect(created.status).toBe(201);
     const { revisionId } = await created.json();
     expect((await patchRevision(patch({ vatRateBp: 1000 }), routeParams({ id, revisionId }))).status).toBe(200);
+    // Priced at cost, with gastos asociados and beneficio industrial on top (in %).
+    expect((await read()).revision).toMatchObject({ overheadBp: 1300, profitBp: 600 });
+    expect((await patchRevision(patch({ overheadPct: 10, profitPct: 5 }), routeParams({ id, revisionId }))).status).toBe(200);
+    expect((await patchRevision(patch({ profitPct: -1 }), routeParams({ id, revisionId }))).status).toBe(400);
     // One review check at a time.
     expect((await patchRevision(patch({ reviewed: { key: "annex:i1", done: true } }), routeParams({ id, revisionId }))).status).toBe(200);
     expect((await patchRevision(patch({ reviewed: { key: "annex:i1" } }), routeParams({ id, revisionId }))).status).toBe(400);
@@ -76,10 +80,10 @@ describe("/api/v1/projects/:id/budget", () => {
     expect(line.status).toBe(201);
     const { lineId } = await line.json();
     expect((await patchLine(patch({ quantity: 100 }), routeParams({ id, lineId }))).status).toBe(200);
-    // 350,00 € plus chapter 20's 5 %.
+    // 350,00 € plus chapter 20's 5 %, then 10 % + 5 % in each unit price: 100 × 4,03 € + 20,13 €.
     const edited = (await read()).revision;
-    expect(edited.totalCents).toBe(35_000 + 1_750);
-    expect(edited.chapters[0]).toMatchObject({ name: "Actuaciones previas", totalCents: 35_000 });
+    expect(edited).toMatchObject({ costCents: 35_000 + 1_750, overheadCents: 3_709, profitCents: 1_854, totalCents: 42_313 });
+    expect(edited.chapters[0]).toMatchObject({ name: "Actuaciones previas", totalCents: 35_000, priceCents: 40_300 });
 
     expect((await accept(post(), routeParams({ id, revisionId }))).status).toBe(200);
     const saved = await progress(apiRequest(token, { method: "PUT", body: { lines: [{ id: lineId, executedPct: 40 }] } }), routeParams({ id }));
@@ -120,7 +124,7 @@ describe("/api/v1/projects/:id/budget", () => {
     const { optionId: deductionId } = await deduction.json();
     expect((await read()).revision.options.map((o: { name: string; totalCents: number }) => [o.name, o.totalCents])).toEqual([
       ["Piscina exterior", 2_500_000],
-      [expect.any(String), -78_750],
+      [expect.any(String), -66_176],
     ]);
     expect((await deleteOption(del(), routeParams({ id, optionId: deductionId }))).status).toBe(200);
 
@@ -136,7 +140,7 @@ describe("/api/v1/projects/:id/budget", () => {
 
     expect((await accept(post({ acceptedBy: "Ana", chosenOptionIds: [optionId] }), routeParams({ id, revisionId }))).status).toBe(200);
     const accepted = (await read()).revision;
-    expect(accepted).toMatchObject({ status: "accepted", acceptedBy: "Ana", contractTotalCents: accepted.totalCents + 2_500_000 });
+    expect(accepted).toMatchObject({ status: "accepted", acceptedBy: "Ana", contractTotalCents: accepted.totalCents + 2_975_000 }); // the pool plus 13 % + 6 %
   }, 60_000);
 
   it("records that the client rejected an issued revision", async () => {
@@ -152,7 +156,7 @@ describe("/api/v1/projects/:id/budget", () => {
   it("searches the price base", async () => {
     const { token } = await setup("viewer");
     const res = await priceBase(apiRequest(token, { query: "?q=replanteo&chapter=01" }));
-    expect((await res.json())[0]).toMatchObject({ code: "01.01", unit: "ud", unitPriceCents: 78_750 });
+    expect((await res.json())[0]).toMatchObject({ code: "01.01", unit: "ud", unitPriceCents: 66_176 });
     expect((await priceBase(apiRequest(null))).status).toBe(401);
   });
 

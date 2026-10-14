@@ -32,7 +32,7 @@ export default function OptionSummary({ options, href }: { options: BudgetOption
             <div role="row" key={option.id} className={table.row}>
               <span role="cell" className="num text-muted-foreground">{codeRange(option.lines)}</span>
               <span role="cell" className={table.name}>{option.name}</span>
-              <span role="cell" className={`num font-semibold ${table.right}`}>{f.signedMoney(option.totalCents)}</span>
+              <span role="cell" className={`num font-semibold ${table.right}`}>{f.signedMoney(option.priceCents)}</span>
               <span role="cell" className="flex flex-wrap gap-1.5">
                 <Badge variant={OPTION_VARIANT[option.optionKind]}>{t(`kinds.${option.optionKind}`)}</Badge>
                 {option.chosen === true && <Badge variant="good">{t("chosen")}</Badge>}

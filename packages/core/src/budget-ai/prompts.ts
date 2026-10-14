@@ -67,13 +67,13 @@ export function groupInstruction(chapters: readonly string[]) {
   return [
     `Genera las partidas de los capítulos ${chapters.map((c) => `${c} ${CHAPTER_NAMES[c]}`).join("; ")}.`,
     "Reglas:",
-    "- Usa las partidas de la BASE DE PRECIOS FRAMER 2026 siempre que encajen, con su código, unidad y P.U. (los P.U. ya incluyen gastos generales y beneficio; no añadas nada). fuente = \"base\".",
+    "- Usa las partidas de la BASE DE PRECIOS FRAMER 2026 siempre que encajen, con su código, unidad y P.U. (los P.U. son costes de ejecución, sin gastos generales ni beneficio industrial: se suman aparte en el resumen; no añadas nada). fuente = \"base\".",
     "- Las mediciones salen de los datos, superficies y mediciones del proyecto. Si estimas una medición, dilo en nota; si no, nota = \"\".",
-    "- Si hace falta una partida que no está en la base, créala con código del capítulo y .9x (p. ej. 06.91), P.U. de mercado razonable y fuente = \"estimado\".",
+    "- Si hace falta una partida que no está en la base, créala con código del capítulo y .9x (p. ej. 06.91), P.U. de coste de mercado razonable (sin gastos generales ni beneficio) y fuente = \"estimado\".",
     "- No incluyas imprevistos (el capítulo 20 se calcula aparte). Un capítulo puede quedar sin partidas si el proyecto no lo necesita.",
     "- desc: la descripción completa de la unidad de obra, adaptada a este proyecto.",
     "",
-    "BASE DE PRECIOS (código | descripción | ud | P.U. €):",
+    "BASE DE PRECIOS (código | descripción | ud | P.U. de coste €):",
     base,
   ].join("\n");
 }

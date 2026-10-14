@@ -12,6 +12,7 @@ import {
   budgetService as svc,
   documentsService,
   hitosService,
+  obraService,
   BUDGET_CHAPTER_CODES,
   type Ctx,
 } from "../src";
@@ -74,6 +75,8 @@ describe("createBudget", () => {
     expect(budget.generation).toBeNull();
     const revision = budget.revision!;
     expect(revision).toMatchObject({ reference: "036/2026", vatRateBp: 1000, model: "framer20", contingencyBp: 500, options: [] });
+    // Priced at cost: gastos asociados and beneficio industrial go on top.
+    expect(revision).toMatchObject({ overheadBp: 1300, profitBp: 600, costCents: 0, overheadCents: 0, profitCents: 0 });
     expect(revision.chapters.map((c) => [c.code, c.name])).toEqual(BUDGET_CHAPTER_CODES.map((code) => [code, CHAPTER_NAMES[code]]));
     // Chapter 20 is one computed line, at 0 while 01–19 are empty.
     expect(revision.chapters[19]!.lines).toMatchObject([{ code: "20.01", source: "computed", amountCents: 0 }]);
@@ -169,7 +172,7 @@ describe("chapters and lines", () => {
       code: "03.14",
       description: "Viga de cumbrera en cajón y pilar interior galvanizado",
       unit: "ud",
-      unitPriceCents: 173_250,
+      unitPriceCents: 145_588, // the base is at cost: the old 1.732,50 € over 1.19
       source: "base",
       baseCode: "03.14",
     });
@@ -272,7 +275,7 @@ describe("options", () => {
     await options.addOption(ctx, project.id, revisionId, { baseCode: "10.09" });
 
     expect((await revisionOf(ctx, project.id)).options).toMatchObject([
-      { name: "Puerta de garaje seccional motorizada", totalCents: 320_250, lines: [{ code: "OP.01", baseCode: "10.09", source: "base" }] },
+      { name: "Puerta de garaje seccional motorizada", totalCents: 269_118, lines: [{ code: "OP.01", baseCode: "10.09", source: "base" }] },
     ]);
     await expect(options.addOption(ctx, project.id, revisionId, { baseCode: "nope" })).rejects.toMatchObject({ code: "invalid_input" });
   });
@@ -310,6 +313,109 @@ describe("options", () => {
     expect(revision).toMatchObject({ model: null, totalCents: 1_000, checks: [] });
     expect(revision.chapters.map((c) => c.code)).toEqual(["17"]);
     await svc.deleteChapter(ctx, project.id, chapterId);
+  });
+});
+
+describe("margins", () => {
+  /** draftBudget (2.785,13 € at cost) with 13 % gastos asociados and 6 % beneficio industrial. */
+  async function withMargins(ctx: Ctx, projectId: string) {
+    const draft = await draftBudget(ctx, projectId);
+    await svc.updateRevision(ctx, projectId, draft.revisionId, { overheadPct: 13, profitPct: 6 });
+    return draft;
+  }
+
+  it("puts gastos asociados and beneficio industrial on the cost: the PEC, its chapters and VAT", async () => {
+    const { project, ctx } = await setup();
+    const { revisionId } = await withMargins(ctx, project.id);
+    await svc.updateRevision(ctx, project.id, revisionId, { builtAreaM2: 100 });
+
+    const revision = await revisionOf(ctx, project.id);
+    // 19 % in each unit price, to the cent: 3,50 → 4,17 €, 72,50 → 86,28 €, 1.000 → 1.190 €
+    // and chapter 20 132,63 → 157,83 €. The PEC, 3.315,68 €, is 530,55 € over the cost:
+    // 363,01 € of gastos asociados and 167,54 € of beneficio industrial (13 : 6).
+    expect(revision).toMatchObject({
+      costCents: 278_513,
+      overheadBp: 1300,
+      overheadCents: 36_301,
+      profitBp: 600,
+      profitCents: 16_754,
+      totalCents: 331_568,
+      contractTotalCents: 331_568,
+      vatCents: 33_157,
+      perM2Cents: 3_316,
+    });
+    expect((await svc.getBudget(ctx, project.id)).revisions[0]!.totalCents).toBe(331_568);
+    // Each chapter keeps its cost; its price is the sum of its priced lines.
+    const [c1, c2] = revision.chapters;
+    expect(c1).toMatchObject({ totalCents: 165_250, priceCents: 110_505 + 86_280, perM2Cents: 1_968 });
+    expect(c2).toMatchObject({ totalCents: 100_000, priceCents: 119_000 });
+    expect(revision.chapters.reduce((sum, c) => sum + c.priceCents, 0)).toBe(331_568);
+    // Lines stay at cost.
+    expect(c1!.lines.map((l) => l.amountCents)).toEqual([92_750, 72_500]);
+  });
+
+  it("prices each option on its own, and the contract with the chosen ones", async () => {
+    const { project, ctx } = await setup();
+    const { revisionId } = await withMargins(ctx, project.id);
+    const { optionId: pool } = await options.addOption(ctx, project.id, revisionId, { name: "Piscina" });
+    await svc.addLine(ctx, project.id, pool, { description: "Vaso", unit: "ud", quantity: 1, unitPriceCents: 1_000_000 });
+    const { optionId: deduction } = await options.addOption(ctx, project.id, revisionId, { name: "Sin cerramiento", optionKind: "deduction" });
+    await svc.addLine(ctx, project.id, deduction, { description: "Cerramiento", unit: "ud", quantity: 1, unitPriceCents: -100_000 });
+
+    let revision = await revisionOf(ctx, project.id);
+    expect(revision.options.map((o) => [o.totalCents, o.priceCents])).toEqual([
+      [1_000_000, 1_190_000],
+      [-100_000, -119_000],
+    ]);
+    expect(revision.optionTotals).toEqual({ adding: { count: 1, cents: 1_190_000 }, subtracting: { count: 1, cents: -119_000 } });
+
+    await issue.issueRevision(ctx, project.id, revisionId, { shareWithClient: false });
+    await svc.acceptRevision(ctx, project.id, revisionId, { acceptedOn: "2026-10-21", chosenOptionIds: [pool] });
+
+    revision = await revisionOf(ctx, project.id);
+    expect(revision.contractTotalCents).toBe(331_568 + 1_190_000);
+    // The obra and the hitos follow the price: every line priced, quantity × unit price.
+    const obra = await obraService.getObra(ctx, project.id);
+    expect(obra.budget!.totalCents).toBe(1_521_568);
+    expect(obra.chapters.find((c) => c.code === "01")!.totalCents).toBe(196_785);
+    expect(obra.chapters.reduce((sum, c) => sum + c.totalCents, 0)).toBe(1_521_568);
+    expect((await hitosService.listHitos(ctx, project.id))[0]).toMatchObject({ amountCents: 76_078 });
+    const chapter = await obraService.getChapter(ctx, project.id, "01");
+    expect(chapter.chapter.lines.map((l) => [l.amountCents, l.unitPriceCents])).toEqual([
+      [265 * 417, 417],
+      [10 * 8_628, 8_628],
+    ]);
+  });
+
+  it("takes them in % on a draft only, and a new revision keeps them", async () => {
+    const { project, ctx } = await setup();
+    const { revisionId } = await withMargins(ctx, project.id);
+
+    await svc.updateRevision(ctx, project.id, revisionId, { overheadPct: 12.5, profitPct: 0 });
+    expect(await revisionOf(ctx, project.id)).toMatchObject({ overheadBp: 1250, profitBp: 0, profitCents: 0 });
+    for (const bad of [-1, 101, "13", null]) {
+      await expect(svc.updateRevision(ctx, project.id, revisionId, { overheadPct: bad })).rejects.toMatchObject({ code: "invalid_input" });
+      await expect(svc.updateRevision(ctx, project.id, revisionId, { profitPct: bad })).rejects.toMatchObject({ code: "invalid_input" });
+    }
+
+    await issue.issueRevision(ctx, project.id, revisionId, { shareWithClient: false });
+    await expect(svc.updateRevision(ctx, project.id, revisionId, { profitPct: 6 })).rejects.toMatchObject({ code: "not_draft" });
+    await svc.createRevision(ctx, project.id);
+    expect(await revisionOf(ctx, project.id)).toMatchObject({ number: 1, overheadBp: 1250, profitBp: 0 });
+  });
+
+  it("keeps them to their tenant and away from viewers", async () => {
+    const { tenant, project, ctx } = await setup();
+    const { revisionId } = await withMargins(ctx, project.id);
+    const other = await setup();
+    const viewer = await createTestUser(tenant.id, { role: "viewer" });
+
+    await expect(svc.updateRevision(other.ctx, project.id, revisionId, { profitPct: 50 })).rejects.toMatchObject({ code: "project_not_found" });
+    await expect(svc.updateRevision(other.ctx, other.project.id, revisionId, { profitPct: 50 })).rejects.toMatchObject({ code: "not_found" });
+    await expect(
+      svc.updateRevision({ tenantId: tenant.id, userId: viewer.id, role: "viewer" }, project.id, revisionId, { profitPct: 50 }),
+    ).rejects.toMatchObject({ code: "forbidden" });
+    expect((await revisionOf(ctx, project.id)).profitBp).toBe(600);
   });
 });
 
@@ -628,10 +734,11 @@ describe("the v1 exclusions field", () => {
 describe("checks before issuing", () => {
   it("lists the AI's inconsistencies and assumptions, estimated lines and chapters off the tenant's ratios", async () => {
     const { tenant, project, ctx } = await setup();
-    // Another project's issued budget: 01 at 100 €/m² built.
+    // Another project's issued budget: 01 at 100 €/m² built, at price (80 € of
+    // cost and 25 % of margins; budgets compare at what the client pays).
     const reference = await createTestProject(tenant.id);
-    const { revisionId: refRev, chapterId: refChapter } = await framerDraft(ctx, reference.id, []);
-    await svc.addLine(ctx, reference.id, refChapter("01"), line("01.01", 100, 10_000));
+    const { revisionId: refRev, chapterId: refChapter } = await framerDraft(ctx, reference.id, [], 0, { overheadPct: 15, profitPct: 10 });
+    await svc.addLine(ctx, reference.id, refChapter("01"), line("01.01", 100, 8_000));
     await svc.updateRevision(ctx, reference.id, refRev, { builtAreaM2: 100 });
     await issue.issueRevision(ctx, reference.id, refRev, { shareWithClient: false });
 

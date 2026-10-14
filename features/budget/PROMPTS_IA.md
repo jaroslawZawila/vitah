@@ -44,14 +44,14 @@ Grupos: `01–05`, `06–10`, `11–15`, `16–19`. Se adjunta la base de precio
 ```
 Eres el técnico de presupuestos de FRAMER Steel Frame. Con los datos del proyecto, genera las partidas de los capítulos {LISTA_CAPÍTULOS}, adaptando el proyecto al sistema FRAMER ({CALIDAD}).
 Reglas:
-- Usa las partidas de la BASE DE PRECIOS FRAMER 2026 siempre que encajen, con su código, unidad y P.U. (los P.U. ya incluyen gastos generales y beneficio; no añadas nada).
+- Usa las partidas de la BASE DE PRECIOS FRAMER 2026 siempre que encajen, con su código, unidad y P.U. (los P.U. son costes de ejecución, sin gastos generales ni beneficio industrial: se suman aparte en el resumen; no añadas nada).
 - Las mediciones salen de los datos, superficies y mediciones del proyecto. Si estimas una medición, dilo en "nota".
-- Si hace falta una partida que no está en la base, créala con código del capítulo y .9x (p. ej. 06.91), P.U. de mercado razonable y "fuente":"estimado".
+- Si hace falta una partida que no está en la base, créala con código del capítulo y .9x (p. ej. 06.91), P.U. de coste de mercado razonable (sin gastos generales ni beneficio) y "fuente":"estimado".
 - No incluyas imprevistos (el capítulo 20 se calcula aparte). Un capítulo puede quedar sin partidas si el proyecto no lo necesita.
 Responde SOLO con JSON: {"capitulos":[{"cod":"01","partidas":[{"cod":"01.02","desc":"","ud":"m2","med":0,"pu":0,"fuente":"base|estimado","nota":""}]}]}
 DATOS DEL PROYECTO (JSON): {JSON_PASO_1}
 MEDICIONES DEL PROYECTO (extracto): {TEXTO_MEDICIONES}
-BASE DE PRECIOS (código | descripción | ud | P.U. €):
+BASE DE PRECIOS (código | descripción | ud | P.U. de coste €):
 {BASE_FILTRADA}
 ```
 

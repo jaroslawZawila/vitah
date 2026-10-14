@@ -77,6 +77,9 @@ describe("budget actions", () => {
     expect(draft.chapters.map((c) => c.code)).toHaveLength(20);
 
     expect(await updateRevisionAction(project.id, draft.id, { contingencyPct: 4, builtAreaM2: 200 })).toEqual({ success: true });
+    // The margins, in % of the cost (a new budget starts at 13 % + 6 %).
+    expect(await updateRevisionAction(project.id, draft.id, { overheadPct: 12, profitPct: 6 })).toEqual({ success: true });
+    expect(await updateRevisionAction(project.id, draft.id, { profitPct: 101 })).toEqual({ error: "invalid_input" });
     expect(await updateRevisionAction(project.id, draft.id, { reviewed: { key: "annex:i1", done: true } })).toEqual({ success: true });
     expect(await updateRevisionAction(project.id, draft.id, { reviewed: { key: "annex:i1", done: "yes" } })).toEqual({ error: "invalid_input" });
     const c01 = await chapter(project.id, "01");
@@ -89,12 +92,14 @@ describe("budget actions", () => {
     expect(await addOptionAction(project.id, draft.id, { baseCode: "10.09" })).toEqual({ success: true });
 
     let current = await revision(project.id);
-    // 01: 787,50 € + 400 × 3,83 € = 2.319,50 €; 20 = 4 % of that.
-    expect(current).toMatchObject({ contingencyBp: 400, totalCents: 231_950 + 9_278 });
+    // At cost, 01: 661,76 € + 400 × 3,22 € = 1.949,76 €; 20 = 4 % of that (77,99 €).
+    // Priced with 18 % in each unit price: 780,88 € + 400 × 3,80 € + 92,03 € = 2.392,91 €,
+    // 364,16 € over the cost, split 12 : 6 into gastos asociados and beneficio industrial.
+    expect(current).toMatchObject({ contingencyBp: 400, costCents: 194_976 + 7_799, overheadCents: 24_344, profitCents: 12_172, totalCents: 239_291 });
     expect(current.chapters[0]).toMatchObject({ pdfNote: "Sobre parcela llana." });
     const [deduction, garage] = current.options;
-    expect(deduction).toMatchObject({ optionKind: "deduction", totalCents: -78_750 });
-    expect(garage).toMatchObject({ name: "Puerta de garaje seccional motorizada", totalCents: 320_250 });
+    expect(deduction).toMatchObject({ optionKind: "deduction", totalCents: -66_176 });
+    expect(garage).toMatchObject({ name: "Puerta de garaje seccional motorizada", totalCents: 269_118, priceCents: 317_559 });
     expect(await updateOptionAction(project.id, garage!.id, { name: "Puerta de garaje" })).toEqual({ success: true });
     expect(revalidatePath).toHaveBeenCalledWith(`/dashboard/projects/${project.id}`, "layout");
 
@@ -116,7 +121,7 @@ describe("budget actions", () => {
     form.set("signed", new File(["%PDF-1.7 firmado"], "firmado.pdf", { type: "application/pdf" }));
     expect(await acceptRevisionAction(project.id, draft.id, form)).toEqual({ success: true });
     current = await revision(project.id);
-    expect(current).toMatchObject({ status: "accepted", acceptedBy: "Ana", contractTotalCents: current.totalCents + 320_250 });
+    expect(current).toMatchObject({ status: "accepted", acceptedBy: "Ana", contractTotalCents: current.totalCents + 317_559 });
     // The signed copy is filed with the contracts.
     expect((await getProjectDocuments(project.id)).documents.find((d) => d.category === "contract")).toMatchObject({ title: "Presupuesto 041/2026 · Rev.0 · firmado" });
 

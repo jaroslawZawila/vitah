@@ -44,7 +44,7 @@ export default function AcceptDialog({
   const id = useId();
   const [chosen, setChosen] = useState<Set<string>>(new Set());
   const [signed, setSigned] = useState<File | null>(null);
-  const delta = revision.options.filter((o) => chosen.has(o.id)).reduce((sum, o) => sum + o.totalCents, 0);
+  const delta = revision.options.filter((o) => chosen.has(o.id)).reduce((sum, o) => sum + o.priceCents, 0);
   const contract = revision.totalCents + delta;
   const toggle = (optionId: string) =>
     setChosen((current) => {
@@ -99,7 +99,7 @@ export default function AcceptDialog({
                 <span>
                   <span className="num text-muted-foreground">{codeRange(option.lines)}</span> · {option.name}
                 </span>
-                <span className="num font-semibold">{f.signedMoney(option.totalCents)}</span>
+                <span className="num font-semibold">{f.signedMoney(option.priceCents)}</span>
               </button>
             );
           })}

@@ -111,7 +111,9 @@ export async function getChapter(
   const own = chapters.filter((c) => c.code === code);
   if (own.length === 0) fail("not_found");
   // Not compared with the previous revision here: that is the Budget's view.
-  const [chapter] = toBudgetChapters(own, null, progress.totalCents, hitoByChapter(hitos));
+  // The contract's lines are priced already: the total is the price.
+  const priced = own.map((c) => ({ ...c, priceCents: c.totalCents }));
+  const [chapter] = toBudgetChapters(priced, null, progress.totalCents, hitoByChapter(hitos));
   return {
     chapter: chapter!,
     hito: hitos.find((h) => h.chapters.some((c) => c.code === code)) ?? null,

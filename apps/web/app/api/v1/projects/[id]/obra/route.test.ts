@@ -22,7 +22,7 @@ describe("/api/v1/projects/:id/obra", () => {
 
     const res = await GET(apiRequest(token), routeParams({ id: project.id }));
     expect(res.status).toBe(200);
-    expect(await res.json()).toMatchObject({ stage: 6, progressPct: 33, budget: { number: 0, totalCents: 51_994_864 } });
+    expect(await res.json()).toMatchObject({ stage: 6, progressPct: 33, budget: { number: 0, totalCents: 51_995_083 } });
 
     const put = await PUT(apiRequest(token, { method: "PUT", body: { stage: 7 } }), routeParams({ id: project.id }));
     expect(await put.json()).toEqual({ stage: 7 });

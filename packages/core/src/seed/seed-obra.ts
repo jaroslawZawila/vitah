@@ -1,6 +1,8 @@
 import { budgetChapters, budgetLines, eq } from "@repo/db";
 import type { Ctx } from "../context";
 import * as budget from "../budget";
+import { DEFAULT_MARGINS } from "../contract";
+import { unitPrice } from "../obra-calc";
 import { inDraft } from "../budget-draft";
 import * as options from "../budget-options";
 import * as hitos from "../hitos";
@@ -31,6 +33,21 @@ const PROGRESS: Record<string, number> = {
   "19": 30,
 };
 
+/**
+ * The document's unit prices included gastos and beneficio; the budget now
+ * holds costs and adds the default margins on top. Each cost is the one whose
+ * price comes back to the document's (or as near as the cent allows).
+ */
+const atCost = <L extends { unitPriceCents: number }>(line: L): L => {
+  const price = line.unitPriceCents;
+  const markup = 10_000 + DEFAULT_MARGINS.overheadBp + DEFAULT_MARGINS.profitBp;
+  const guess = Math.round((price * 10_000) / markup);
+  const [unitPriceCents] = [guess, guess - 1, guess + 1].sort(
+    (a, b) => Math.abs(unitPrice(a, DEFAULT_MARGINS) - price) - Math.abs(unitPrice(b, DEFAULT_MARGINS) - price),
+  );
+  return { ...line, unitPriceCents: unitPriceCents! };
+};
+
 const pdf = (text: string) => new File([`%PDF-1.4\n% ${text}\n`], `${text}.pdf`, { type: "application/pdf" });
 
 /** The Caviedes budget as an accepted Rev.0 (the pool offered, not chosen). */
@@ -55,7 +72,7 @@ export async function seedBudget(ctx: Ctx, projectId: string, { accept = true } 
     }
     await tx.insert(budgetLines).values(
       chapters.flatMap((chapter) =>
-        chapter.lines.map(({ quantity, ...line }, position) => ({
+        chapter.lines.map(atCost).map(({ quantity, ...line }, position) => ({
           ...line,
           tenantId: ctx.tenantId,
           chapterId: chapterIds.get(chapter.code)!,
@@ -69,7 +86,7 @@ export async function seedBudget(ctx: Ctx, projectId: string, { accept = true } 
   for (const option of CAVIEDES_BUDGET.options) {
     const intro = [option.intro, option.footnote].filter(Boolean).join("\n\n");
     const { optionId } = await options.addOption(ctx, projectId, revisionId, { name: option.name, optionKind: option.optionKind, intro });
-    for (const { code: _, ...line } of option.lines) await budget.addLine(ctx, projectId, optionId, line);
+    for (const { code: _, ...line } of option.lines) await budget.addLine(ctx, projectId, optionId, atCost(line));
   }
   const plan = await hitos.listHitos(ctx, projectId);
   await hitos.updatePlan(ctx, projectId, {

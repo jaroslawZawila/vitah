@@ -249,6 +249,11 @@ export const BUDGET_CHAPTER_CODES = Array.from({ length: 20 }, (_, i) => String(
 /** Chapter 20: a share of chapters 01–19, held as one computed line. */
 export const CONTINGENCY_CHAPTER = "20";
 export const CONTINGENCY_LINE = "20.01";
+/**
+ * Lines are priced at cost; the PEC adds gastos asociados and beneficio
+ * industrial on top, as % of the cost. A new budget starts from these.
+ */
+export const DEFAULT_MARGINS = { overheadBp: 1300, profitBp: 600 };
 
 export const OPTION_KINDS = ["extra", "alternative", "deduction"] as const;
 export type OptionKind = (typeof OPTION_KINDS)[number];
@@ -357,11 +362,12 @@ export type BudgetChapter = {
   changeNote: string | null;
   /** Printed under the chapter's title in the PDFs ("Sustituye a…"). */
   pdfNote: string | null;
+  /** Its lines' sum: at cost on the budget (`priceCents` adds the margins); at price in the obra. */
   totalCents: number;
   executedCents: number;
   progressPct: number;
   status: ProgressStatus;
-  /** Share of the revision's total, in basis points. */
+  /** Share of the revision's total (at price), in basis points. */
   shareBp: number;
   /** The same chapter's total in the previous revision; null when it is new. */
   previousTotalCents: number | null;
@@ -373,7 +379,9 @@ export type BudgetChapter = {
   computed: boolean;
   /** Lines staff wrote (the computed one isn't). */
   lineCount: number;
-  /** €/m² built, in cents; null without a built area. */
+  /** What it costs the client: its lines' cost plus its share of the margins. */
+  priceCents: number;
+  /** €/m² built at that price, in cents; null without a built area. */
   perM2Cents: number | null;
 };
 
@@ -390,7 +398,7 @@ export type BudgetRevisionSummary = {
   id: string;
   number: number;
   status: BudgetRevisionStatus;
-  /** The PEC: chapters only (01–20), never options. */
+  /** The PEC: chapters only (01–20), never options, plus the margins. */
   totalCents: number;
   /** ISO timestamp. */
   acceptedAt: string | null;
@@ -402,7 +410,14 @@ export type BudgetRevision = BudgetRevisionSummary & {
   lineCount: number;
   /** The PEC per m² built, in cents. */
   perM2Cents: number | null;
-  /** Options that add to the PEC and that subtract from it. */
+  /** Chapters 01–20 at cost (ejecución material): the PEC before the margins. */
+  costCents: number;
+  /** Gastos asociados and beneficio industrial: % of the cost (bp) and amount. */
+  overheadBp: number;
+  overheadCents: number;
+  profitBp: number;
+  profitCents: number;
+  /** Options that add to the PEC and that subtract from it (at their price). */
   optionTotals: Record<"adding" | "subtracting", { count: number; cents: number }>;
   reference: string | null;
   vatRateBp: number;
@@ -418,7 +433,7 @@ export type BudgetRevision = BudgetRevisionSummary & {
   /** "framer20", or null for a budget entered before the FRAMER model (free chapters). */
   model: string | null;
   options: BudgetOption[];
-  /** PEC + the options the client chose (accepted revisions); the PEC otherwise. */
+  /** PEC + the price of the options the client chose (accepted revisions); the PEC otherwise. */
   contractTotalCents: number;
   contingencyBp: number;
   quality: BudgetQuality | null;
@@ -559,7 +574,7 @@ export type ProjectObra = {
   term: ObraTerm | null;
   chapters: Omit<
     BudgetChapter,
-    "lines" | "id" | "previousTotalCents" | "change" | "changeNote" | "pdfNote" | "computed" | "lineCount" | "perM2Cents"
+    "lines" | "id" | "previousTotalCents" | "change" | "changeNote" | "pdfNote" | "computed" | "lineCount" | "perM2Cents" | "priceCents"
   >[];
   hitos: Hito[];
 };

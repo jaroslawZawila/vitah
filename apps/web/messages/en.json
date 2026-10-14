@@ -665,18 +665,21 @@
       "all": "View all {count} items →"
     },
     "kpis": {
-      "pec": "PEC (ex VAT)",
-      "pecHint": "20 chapters · {count, plural, one {# line item} other {# line items}}",
-      "withVat": "With VAT {rate}",
-      "vat": "VAT {amount}",
+      "work": "Works price",
+      "workHint": "Cost {cost} · {count, plural, one {# line item} other {# line items}}",
+      "withVat": "With VAT {rate}: {total}",
+      "contract": "Contract with the chosen options: {amount}",
+      "profit": "Industrial profit",
+      "overhead": "Associated costs",
+      "profitLabel": "Industrial profit percentage",
+      "overheadLabel": "Associated costs percentage",
+      "onCost": "{pct} on cost",
+      "onCostInput": "on cost",
       "perBuilt": "€/m² built",
       "noArea": "No floor area",
+      "area": "{area} m² built",
       "perBuiltHint": "Company average {average} · {delta}",
-      "contract": "Contract price",
-      "contractHint": "PEC plus the chosen options",
-      "options": "Options",
-      "optionsValue": "{count, plural, =0 {None} one {# option} other {# options}}",
-      "optionsHint": "{plus} adding · {minus} subtracting"
+      "noMargin": "No margin: line items are at cost"
     },
     "chapters": {
       "title": "Summary by chapter",
@@ -684,6 +687,7 @@
       "code": "Ch.",
       "name": "Name",
       "lines": "Line items",
+      "cost": "Cost",
       "amount": "Amount",
       "share": "% PEC",
       "perM2": "€/m² built",
@@ -695,7 +699,10 @@
       "up": "★ above",
       "down": "▼ below",
       "total": "TOTAL PEC (ex VAT) · Rev.{number}",
-      "vatNote": "Unit prices already include overheads and industrial profit. VAT {rate}: {vat} · Total with VAT: {total}."
+      "vatNote": "Each chapter's amount includes its share of the associated costs and industrial profit, as in the PDF. VAT {rate}: {vat} · Total with VAT: {total}.",
+      "costTotal": "Construction cost (chapters 01–20)",
+      "overhead": "Associated costs · {pct}",
+      "profit": "Industrial profit · {pct}"
     },
     "options": {
       "summaryTitle": "Optional line items",
@@ -725,12 +732,13 @@
       "addLine": "Line item",
       "delete": "Delete option",
       "freeLine": "New line item",
-      "total": "Total {name} · {amount} · not included in the PEC",
+      "total": "Total {name} at cost · {amount} · not included in the PEC",
       "pec": "PEC · 20 chapters",
       "pecHint": "options do not change it",
       "withAdding": "With all the ones that add",
       "withSubtracting": "With all the ones that subtract",
-      "confirmDelete": "Delete the option “{name}” and its line items?"
+      "confirmDelete": "Delete the option “{name}” and its line items?",
+      "price": "price with margins"
     },
     "picker": {
       "title": "FRAMER 2026 price base",
@@ -780,7 +788,7 @@
       "addFree": "New line item outside the base",
       "computed": "Chapter 20 is {pct} of chapters 01–19 and is recalculated automatically. Change the percentage in the Summary.",
       "saveHint": "Change the quantity or the price and it saves automatically.",
-      "subtotal": "Chapter {code} subtotal · {amount}",
+      "subtotal": "Chapter {code} subtotal at cost · {amount}",
       "editTitle": "Edit {code}",
       "moveTitle": "Move {code} to another chapter",
       "moveTo": "Destination chapter",

@@ -25,7 +25,7 @@ import {
   type ObraStage,
 } from "./contract";
 import { CoreError } from "./errors";
-import { hitoStatus, ofBp, paymentDueOn, progressOf, type Progress } from "./obra-calc";
+import { hitoStatus, ofBp, paymentDueOn, priceLines, progressOf, type Margins, type Progress } from "./obra-calc";
 import { requireProject as requireProjectRow } from "./project-files";
 import { clientProjectWhere } from "./project-client";
 
@@ -142,6 +142,14 @@ export function pickChanges<T>(
 export const linesTotalSql = () =>
   sql<string>`coalesce(sum(round(${budgetLines.quantityMilli}::numeric * ${budgetLines.unitPriceCents} / 1000)), 0)`;
 
+/**
+ * The same at the client's price, as `priceLines` (obra-calc.ts): each unit
+ * price with its revision's margins in, to the cent. Lines joined to their
+ * revision; chapters only (never negative, so SQL and JS round alike).
+ */
+export const linesPriceSql = () =>
+  sql<string>`coalesce(sum(round(${budgetLines.quantityMilli}::numeric * round(${budgetLines.unitPriceCents}::numeric * (10000 + ${budgetRevisions.overheadBp} + ${budgetRevisions.profitBp}) / 10000) / 1000)), 0)`;
+
 export function nextPosition(table: PgTable, position: AnyColumn, where: SQL | undefined) {
   return sql<number>`(select coalesce(max(${position}), -1) + 1 from ${table} where ${where})`;
 }
@@ -215,9 +223,18 @@ export async function loadChapters(revisionId: string): Promise<LoadedChapter[]>
   }));
 }
 
+/** Chapters and options at the client's price: their lines priced, progress with them. */
+function priceChapters(loaded: LoadedChapter[], margins: Margins): LoadedChapter[] {
+  return loaded.map((c) => {
+    const lines = priceLines(c.lines, margins);
+    return { ...c, lines, ...progressOf(lines) };
+  });
+}
+
 /**
- * The accepted revision (the contract) with its chapters: what the works, the
- * hitos' prices and the client's app follow. Drafts only show on the Budget.
+ * The accepted revision (the contract) with its chapters at the client's
+ * price: what the works, the hitos' prices and the client's app follow.
+ * Drafts only show on the Budget.
  */
 export async function loadBudget(tenantId: string, projectId: string) {
   const revision =
@@ -230,7 +247,9 @@ export async function loadBudget(tenantId: string, projectId: string) {
     })) ?? null;
   // The works follow the contract: chapters plus the options the client chose.
   // A FRAMER budget has all twenty chapters; those without lines aren't built.
-  const chapters = revision ? (await loadChapters(revision.id)).filter((c) => inContract(c) && c.lines.length > 0) : [];
+  const chapters = revision
+    ? priceChapters(await loadChapters(revision.id), revision).filter((c) => inContract(c) && c.lines.length > 0)
+    : [];
   return { revision, chapters, progress: progressOf(chapters.flatMap((c) => c.lines)) };
 }
 

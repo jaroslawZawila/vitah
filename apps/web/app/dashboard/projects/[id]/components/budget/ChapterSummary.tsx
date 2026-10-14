@@ -7,14 +7,15 @@ import { Badge } from "@/components/ui/badge";
 import { cardVariants } from "@/components/ui/card";
 import { cardHead, codeChip, columns, muted, table } from "../obra/classes";
 import { useObraFormat } from "../obra/format";
-import InlineNumber from "../obra/InlineNumber";
+import InlinePct from "./InlinePct";
 
-const COLUMNS = "52px minmax(200px, 1fr) 70px 120px 70px 84px minmax(150px, auto)";
+const COLUMNS = "52px minmax(200px, 1fr) 70px 110px 120px 70px 84px minmax(150px, auto)";
 
 /**
  * Presentational: the twenty chapters as the client sees them (the PDF's
- * "Resumen por capítulos"), each linking to its lines. Chapter 20's share is
- * editable on a draft (`onContingency`, in %).
+ * "Resumen por capítulos": each at its price, margins spread in) beside their
+ * cost, each linking to its lines; then the cost, the margins and the PEC.
+ * Chapter 20's share is editable on a draft (`onContingency`, in %).
  */
 export default function ChapterSummary({
   revision,
@@ -40,6 +41,7 @@ export default function ChapterSummary({
           <span role="columnheader">{t("code")}</span>
           <span role="columnheader">{t("name")}</span>
           <span role="columnheader" className={table.right}>{t("lines")}</span>
+          <span role="columnheader" className={table.right}>{t("cost")}</span>
           <span role="columnheader" className={table.right}>{t("amount")}</span>
           <span role="columnheader" className={table.right}>{t("share")}</span>
           <span role="columnheader" className={table.right}>{t("perM2")}</span>
@@ -62,23 +64,15 @@ export default function ChapterSummary({
               </span>
               <span role="cell" className={`num text-muted-foreground ${table.right}`}>
                 {contingency && onContingency ? (
-                  <span className="inline-flex w-[84px] items-center gap-1">
-                    <InlineNumber
-                      key={revision.contingencyBp}
-                      label={t("contingencyLabel")}
-                      display={f.pctInput(revision.contingencyBp)}
-                      parse={f.parse}
-                      onCommit={onContingency}
-                    />
-                    %
-                  </span>
+                  <InlinePct label={t("contingencyLabel")} bp={revision.contingencyBp} onCommit={onContingency} />
                 ) : contingency ? (
                   f.share(revision.contingencyBp)
                 ) : (
                   lineCount
                 )}
               </span>
-              <span role="cell" className={`num font-semibold ${table.right}`}>{f.money(chapter.totalCents)}</span>
+              <span role="cell" className={`num text-muted-foreground ${table.right}`}>{f.money(chapter.totalCents)}</span>
+              <span role="cell" className={`num font-semibold ${table.right}`}>{f.money(chapter.priceCents)}</span>
               <span role="cell" className={`num text-muted-foreground ${table.right}`}>{f.share(chapter.shareBp)}</span>
               <span role="cell" className={`num text-muted-foreground ${table.right}`}>{chapter.perM2Cents === null ? "—" : f.money(chapter.perM2Cents)}</span>
               <span role="cell" className="flex flex-wrap gap-1.5">
@@ -91,6 +85,20 @@ export default function ChapterSummary({
           );
         })}
       </div>
+      <dl className="grid gap-1.5 px-4 text-sm">
+        {(
+          [
+            [t("costTotal"), revision.costCents],
+            [t("overhead", { pct: f.share(revision.overheadBp) }), revision.overheadCents],
+            [t("profit", { pct: f.share(revision.profitBp) }), revision.profitCents],
+          ] as const
+        ).map(([label, cents]) => (
+          <div key={label} className="flex flex-wrap justify-between gap-2">
+            <dt className="text-muted-foreground">{label}</dt>
+            <dd className="num">{f.money(cents)}</dd>
+          </div>
+        ))}
+      </dl>
       <div className="flex flex-wrap justify-between gap-2 rounded-lg bg-rail px-4 py-3.5 font-semibold text-rail-foreground">
         <span>{t("total", { number: revision.number })}</span>
         <span className="num text-rail-accent">{f.money(revision.totalCents)}</span>

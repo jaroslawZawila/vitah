@@ -665,18 +665,21 @@
       "all": "Ver los {count} puntos →"
     },
     "kpis": {
-      "pec": "PEC sin IVA",
-      "pecHint": "20 capítulos · {count, plural, one {# partida} other {# partidas}}",
-      "withVat": "Con IVA {rate}",
-      "vat": "IVA {amount}",
+      "work": "Importe de la obra",
+      "workHint": "Coste {cost} · {count, plural, one {# partida} other {# partidas}}",
+      "withVat": "Con IVA {rate}: {total}",
+      "contract": "Contrato con las opciones elegidas: {amount}",
+      "profit": "Beneficio industrial",
+      "overhead": "Gastos asociados",
+      "profitLabel": "Porcentaje de beneficio industrial",
+      "overheadLabel": "Porcentaje de gastos asociados",
+      "onCost": "{pct} sobre el coste",
+      "onCostInput": "sobre el coste",
       "perBuilt": "€/m² construido",
       "noArea": "Sin superficie",
+      "area": "{area} m² construidos",
       "perBuiltHint": "Media de la empresa {average} · {delta}",
-      "contract": "Precio del contrato",
-      "contractHint": "PEC más las opciones elegidas",
-      "options": "Opciones",
-      "optionsValue": "{count, plural, =0 {Ninguna} one {# opción} other {# opciones}}",
-      "optionsHint": "{plus} que suman · {minus} que restan"
+      "noMargin": "Sin margen: las partidas están a coste"
     },
     "chapters": {
       "title": "Resumen por capítulos",
@@ -684,6 +687,7 @@
       "code": "Cap.",
       "name": "Denominación",
       "lines": "Partidas",
+      "cost": "Coste",
       "amount": "Importe",
       "share": "% PEC",
       "perM2": "€/m²c",
@@ -695,7 +699,10 @@
       "up": "★ al alza",
       "down": "▼ a la baja",
       "total": "TOTAL PEC (sin IVA) · Rev.{number}",
-      "vatNote": "Los precios unitarios ya incluyen gastos generales y beneficio industrial. IVA {rate}: {vat} · Total con IVA: {total}."
+      "vatNote": "El importe de cada capítulo incluye su parte de los gastos asociados y del beneficio industrial, como en el PDF. IVA {rate}: {vat} · Total con IVA: {total}.",
+      "costTotal": "Coste de ejecución (capítulos 01–20)",
+      "overhead": "Gastos asociados · {pct}",
+      "profit": "Beneficio industrial · {pct}"
     },
     "options": {
       "summaryTitle": "Partidas opcionales",
@@ -725,12 +732,13 @@
       "addLine": "Partida",
       "delete": "Borrar opción",
       "freeLine": "Partida nueva",
-      "total": "Total {name} · {amount} · no incluida en el PEC",
+      "total": "Total {name} a coste · {amount} · no incluida en el PEC",
       "pec": "PEC · 20 capítulos",
       "pecHint": "las opciones no lo cambian",
       "withAdding": "Con todas las que suman",
       "withSubtracting": "Con todas las que restan",
-      "confirmDelete": "¿Borrar la opción «{name}» y sus partidas?"
+      "confirmDelete": "¿Borrar la opción «{name}» y sus partidas?",
+      "price": "precio con márgenes"
     },
     "picker": {
       "title": "Base de precios FRAMER 2026",
@@ -780,7 +788,7 @@
       "addFree": "Partida nueva fuera de la base",
       "computed": "El capítulo 20 es el {pct} de los capítulos 01–19 y se recalcula solo. Cambia el porcentaje en el Resumen.",
       "saveHint": "Cambia la cantidad o el precio y se guarda solo.",
-      "subtotal": "Subtotal capítulo {code} · {amount}",
+      "subtotal": "Subtotal capítulo {code} a coste · {amount}",
       "editTitle": "Editar {code}",
       "moveTitle": "Mover {code} a otro capítulo",
       "moveTo": "Capítulo de destino",
