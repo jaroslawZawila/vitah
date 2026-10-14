@@ -36,6 +36,9 @@ export async function recreateTestDatabase(url: string): Promise<void> {
   try {
     await client.unsafe(`DROP DATABASE IF EXISTS "${dbName}" WITH (FORCE)`);
     await client.unsafe(`CREATE DATABASE "${dbName}"`);
+    // A throwaway database: commits needn't wait for the disk, which keeps the
+    // DB-heavy suites well inside Vitest's timeout when they run side by side.
+    await client.unsafe(`ALTER DATABASE "${dbName}" SET synchronous_commit = off`);
   } finally {
     await client.end();
   }

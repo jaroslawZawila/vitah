@@ -19,5 +19,8 @@ export function testDatabase(name: `${string}_test`) {
     globalSetup: [fileURLToPath(new URL("./test-global-setup.ts", import.meta.url))],
     // Test files share one database, so run them one at a time.
     fileParallelism: false,
+    // Real-DB tests (some render PDFs) run beside the other packages' suites in
+    // the commit gate: 5 s is too tight once the CPU is shared.
+    testTimeout: 20_000,
   };
 }

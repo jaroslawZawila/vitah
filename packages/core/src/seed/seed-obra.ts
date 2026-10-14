@@ -1,5 +1,7 @@
+import { budgetChapters, budgetLines, eq } from "@repo/db";
 import type { Ctx } from "../context";
 import * as budget from "../budget";
+import { inDraft } from "../budget-draft";
 import * as options from "../budget-options";
 import * as hitos from "../hitos";
 import * as obra from "../obra";
@@ -43,11 +45,27 @@ export async function seedBudget(ctx: Ctx, projectId: string, { accept = true } 
   });
   const { revision } = await budget.getBudget(ctx, projectId, revisionId);
   const chapterIds = new Map(revision!.chapters.map((c) => [c.code, c.id]));
-  for (const chapter of chapters) {
-    const chapterId = chapterIds.get(chapter.code)!;
-    await budget.updateChapter(ctx, projectId, chapterId, { name: chapter.name, pdfNote: chapter.note ?? null });
-    for (const line of chapter.lines) await budget.addLine(ctx, projectId, chapterId, { ...line, source: "base" });
-  }
+  // In one go, like the AI's draft: line by line took seconds, and tests seed it often.
+  await inDraft(revisionId, async (tx) => {
+    for (const chapter of chapters) {
+      await tx
+        .update(budgetChapters)
+        .set({ name: chapter.name, pdfNote: chapter.note ?? null })
+        .where(eq(budgetChapters.id, chapterIds.get(chapter.code)!));
+    }
+    await tx.insert(budgetLines).values(
+      chapters.flatMap((chapter) =>
+        chapter.lines.map(({ quantity, ...line }, position) => ({
+          ...line,
+          tenantId: ctx.tenantId,
+          chapterId: chapterIds.get(chapter.code)!,
+          quantityMilli: Math.round(quantity * 1000),
+          source: "base" as const,
+          position,
+        })),
+      ),
+    );
+  });
   for (const option of CAVIEDES_BUDGET.options) {
     const intro = [option.intro, option.footnote].filter(Boolean).join("\n\n");
     const { optionId } = await options.addOption(ctx, projectId, revisionId, { name: option.name, optionKind: option.optionKind, intro });
