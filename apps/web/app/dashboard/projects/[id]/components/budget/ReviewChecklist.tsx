@@ -53,7 +53,7 @@ export default function ReviewChecklist({
   const toggleRef = useRef<HTMLButtonElement>(null);
   const refocus = useRef(false);
   useEffect(() => {
-    // Waits for the toggle to exist: after a tick it appears once the save lands.
+    // Only once the toggle exists (a tick folds the card as it re-renders).
     if (!refocus.current || !toggleRef.current) return;
     toggleRef.current.focus();
     refocus.current = false;

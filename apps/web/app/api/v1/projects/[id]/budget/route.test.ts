@@ -60,6 +60,9 @@ describe("/api/v1/projects/:id/budget", () => {
     expect(created.status).toBe(201);
     const { revisionId } = await created.json();
     expect((await patchRevision(patch({ vatRateBp: 1000 }), routeParams({ id, revisionId }))).status).toBe(200);
+    // One review check at a time.
+    expect((await patchRevision(patch({ reviewed: { key: "annex:i1", done: true } }), routeParams({ id, revisionId }))).status).toBe(200);
+    expect((await patchRevision(patch({ reviewed: { key: "annex:i1" } }), routeParams({ id, revisionId }))).status).toBe(400);
 
     // Every budget now has the 20 FRAMER chapters; the lines go into them.
     const draft = (await read()).revision;

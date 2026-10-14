@@ -1,7 +1,7 @@
 import { budgetService } from "@repo/core";
 import { readJson, withContext } from "../../../../../../../../lib/api";
 
-// PATCH  { reference?, vatRateBp?, builtAreaM2?, usefulAreaM2?, exclusions? } (drafts)
+// PATCH  { reference?, vatRateBp?, builtAreaM2?, usefulAreaM2?, exclusions?, reviewed?: { key, done } } (drafts)
 // DELETE (drafts)
 
 type Params = { params: Promise<{ id: string; revisionId: string }> };

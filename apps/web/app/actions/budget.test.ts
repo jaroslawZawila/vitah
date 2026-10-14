@@ -77,6 +77,8 @@ describe("budget actions", () => {
     expect(draft.chapters.map((c) => c.code)).toHaveLength(20);
 
     expect(await updateRevisionAction(project.id, draft.id, { contingencyPct: 4, builtAreaM2: 200 })).toEqual({ success: true });
+    expect(await updateRevisionAction(project.id, draft.id, { reviewed: { key: "annex:i1", done: true } })).toEqual({ success: true });
+    expect(await updateRevisionAction(project.id, draft.id, { reviewed: { key: "annex:i1", done: "yes" } })).toEqual({ error: "invalid_input" });
     const c01 = await chapter(project.id, "01");
     expect(await updateChapterAction(project.id, c01.id, { pdfNote: "Sobre parcela llana." })).toEqual({ success: true });
     expect(await addLineAction(project.id, c01.id, { baseCode: "01.01", quantity: 1 })).toEqual({ success: true });

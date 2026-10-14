@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -61,6 +61,13 @@ function screenWith(props: Partial<Parameters<typeof BudgetScreen>[0]> = {}) {
   );
 }
 
+/** Holds the review saves until the returned function lets them finish. */
+function holdSaves() {
+  let release = () => {};
+  vi.mocked(actions.updateRevisionAction).mockReturnValue(new Promise((resolve) => (release = () => resolve({ success: true }))));
+  return () => act(async () => release());
+}
+
 /** The draft with its AI checks ticked (all of them by default). */
 const reviewed = (done = [true, true]): Budget => ({
   ...draft,
@@ -96,7 +103,7 @@ describe("BudgetScreen", () => {
     expect(screen.getByText("Piscina desbordante")).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: "Marcar revisado" }));
-    expect(actions.updateRevisionAction).toHaveBeenCalledWith("p-1", "rev-1", { review: { done: ["line:lineage-line-2", "annex:i1"] } });
+    expect(actions.updateRevisionAction).toHaveBeenCalledWith("p-1", "rev-1", { reviewed: { key: "annex:i1", done: true } });
   });
 
   it("folds the AI checks into one row once all are reviewed, and opens them again", async () => {
@@ -124,11 +131,33 @@ describe("BudgetScreen", () => {
     view.rerender(screenWith({ budget: reviewed([false, true]) }));
     expect(screen.getByText("1 de 2 revisados")).toBeInTheDocument();
 
+    const release = holdSaves();
     await userEvent.click(screen.getByRole("button", { name: "Marcar revisado" }));
-    expect(actions.updateRevisionAction).toHaveBeenCalledWith("p-1", "rev-1", { review: { done: ["line:lineage-line-2", "annex:i1"] } });
-    view.rerender(screenWith({ budget: reviewed() }));
+    expect(actions.updateRevisionAction).toHaveBeenCalledWith("p-1", "rev-1", { reviewed: { key: "annex:i1", done: true } });
+    // Folded at once, while it saves.
     expect(screen.getByRole("heading", { name: "Todo revisado" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Ver los 2 puntos" })).toHaveFocus();
+    view.rerender(screenWith({ budget: reviewed() }));
+    await release();
+    expect(screen.getByRole("heading", { name: "Todo revisado" })).toBeInTheDocument();
+  });
+
+  it("shows quick ticks at once and saves each one on its own", async () => {
+    const release = holdSaves();
+    renderScreen({ budget: reviewed([false, false]) });
+
+    const [first] = screen.getAllByRole("button", { name: "Marcar revisado" });
+    await userEvent.click(first!);
+    // Shown at once, before the save comes back.
+    expect(screen.getByText("1 de 2 revisados")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Marcar revisado" }));
+
+    expect(vi.mocked(actions.updateRevisionAction).mock.calls.map((call) => call[2])).toEqual([
+      { reviewed: { key: "annex:i1", done: true } },
+      { reviewed: { key: "line:lineage-line-2", done: true } },
+    ]);
+    expect(screen.getByRole("heading", { name: "Todo revisado" })).toBeInTheDocument();
+    await release();
   });
 
   it("folds the checks when the last open one goes away", async () => {
@@ -217,7 +246,10 @@ describe("BudgetScreen", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Rechazado" }));
     expect(actions.rejectRevisionAction).toHaveBeenCalledWith("p-1", "rev-0");
-    await userEvent.click(screen.getByRole("button", { name: "Crear Rev.1 con cambios" }));
+    // The buttons wait for that action to finish.
+    const next = screen.getByRole("button", { name: "Crear Rev.1 con cambios" });
+    await waitFor(() => expect(next).toBeEnabled());
+    await userEvent.click(next);
     expect(actions.createRevisionAction).toHaveBeenCalledWith("p-1");
   });
 

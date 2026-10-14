@@ -5,7 +5,7 @@
 
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { useState } from "react";
+import { useOptimistic, useState } from "react";
 import type {
   BudgetChapter,
   BudgetCheck,
@@ -85,7 +85,12 @@ export default function BudgetScreen({ projectId, projectRef, site, clientName, 
   const t = useTranslations("budget");
   const f = useObraFormat();
   const router = useRouter();
-  const { revision, revisions } = budget;
+  const { revisions } = budget;
+  // The user's ticks show at once, over whatever the server sends meanwhile.
+  const [checks, showTick] = useOptimistic(budget.revision.checks, (current, tick: { key: string; done: boolean }) =>
+    current.map((c) => (c.key === tick.key ? { ...c, done: tick.done } : c)),
+  );
+  const revision = { ...budget.revision, checks };
   const { state, pending, run, confirmThen, reset } = useObraAction();
   const [dialog, setDialog] = useState<Dialog | null>(null);
   const editable = canManage && revision.status === "draft";
@@ -98,7 +103,8 @@ export default function BudgetScreen({ projectId, projectRef, site, clientName, 
     reset();
     setDialog(next);
   };
-  const saveRevision = (input: Record<string, unknown>) => run(() => updateRevisionAction(projectId, revision.id, input));
+  const updateRevision = (input: Record<string, unknown>) => updateRevisionAction(projectId, revision.id, input);
+  const saveRevision = (input: Record<string, unknown>) => run(() => updateRevision(input));
   const nextNumber = revisions[0]!.number + 1;
 
   // ─── Header actions and the banner for where the revision stands ──────────
@@ -164,10 +170,12 @@ export default function BudgetScreen({ projectId, projectRef, site, clientName, 
   // ─── Handlers for the views ───────────────────────────────────────────────
   const onSearch = (query: string, chapter?: string) => searchPriceBaseAction(query, chapter);
   const toggleCheck = (check: BudgetCheck) => {
-    const done = new Set(revision.checks.filter((c) => c.done).map((c) => c.key));
-    if (done.has(check.key)) done.delete(check.key);
-    else done.add(check.key);
-    saveRevision({ review: { done: [...done] } });
+    // One check per save, merged on the server: quick ticks don't undo each other.
+    const tick = { key: check.key, done: !check.done };
+    run(async () => {
+      showTick(tick);
+      return updateRevision({ reviewed: tick });
+    });
   };
   const checkHref = (check: BudgetCheck) => (check.chapterCode ? chapterHref(check.chapterCode) : href("/texts"));
   // The same for a chapter's lines and an option's.

@@ -99,6 +99,8 @@ const MAX_QUANTITY = 1_000_000;
 const MAX_AREA_M2 = 1_000_000;
 const MAX_UNIT_PRICE_CENTS = 100_000_000;
 const MAX_BLOCKS = 50;
+/** Ticked review checks kept on a revision (keys of checks hidden for now stay too). */
+const MAX_REVIEWED = 1_000;
 
 // ─── Reading ─────────────────────────────────────────────────────────────────
 
@@ -533,7 +535,8 @@ function parseConditions(value: unknown, current: BudgetConditions): BudgetCondi
 /**
  * Body: any of { reference, vatRateBp, builtAreaM2, usefulAreaM2, exclusions,
  * contingencyPct, quality, changeReason, texts (partial), conditions (partial),
- * review: { done: string[] } } — drafts only.
+ * review: { done: string[] } (the whole list), reviewed: { key, done } (one
+ * check, merged with the stored list) } — drafts only.
  */
 export async function updateRevision(
   ctx: Ctx,
@@ -564,11 +567,29 @@ export async function updateRevision(
   if ("conditions" in input) changes.conditions = parseConditions(input.conditions, readConditions(revision.conditions));
   if ("review" in input) {
     const done = (input.review as { done?: unknown } | null)?.done;
-    if (!Array.isArray(done) || done.some((key) => typeof key !== "string" || key.length > 80)) fail("invalid_input");
+    if (!Array.isArray(done) || done.length > MAX_REVIEWED || done.some((key) => typeof key !== "string" || key.length > 80)) fail("invalid_input");
     changes.review = { done: [...new Set(done as string[])] };
   }
-  if (Object.keys(changes).length > 0) {
-    await inDraft(revisionId, (tx) => tx.update(budgetRevisions).set(changes).where(eq(budgetRevisions.id, revisionId)), {
+  let reviewed: { key: string; done: boolean } | undefined;
+  if ("reviewed" in input) {
+    const { key, done } = (input.reviewed ?? {}) as { key?: unknown; done?: unknown };
+    if (typeof key !== "string" || key.length === 0 || key.length > 80 || typeof done !== "boolean") fail("invalid_input");
+    reviewed = { key, done };
+  }
+  if (Object.keys(changes).length > 0 || reviewed) {
+    await inDraft(revisionId, async (tx) => {
+      if (reviewed) {
+        // Read under inDraft's row lock, so ticks sent together (two people, quick
+        // clicks) all stick, and keys whose check is hidden for now are kept.
+        const [row] = await tx.select({ review: budgetRevisions.review }).from(budgetRevisions).where(eq(budgetRevisions.id, revisionId));
+        const keys = reviewedKeys(changes.review ?? row?.review);
+        if (reviewed.done) keys.add(reviewed.key);
+        else keys.delete(reviewed.key);
+        if (keys.size > MAX_REVIEWED) fail("invalid_input");
+        changes.review = { done: [...keys] };
+      }
+      await tx.update(budgetRevisions).set(changes).where(eq(budgetRevisions.id, revisionId));
+    }, {
       // Only the percentage moves chapter 20.
       sync: "contingencyBp" in changes,
     });
