@@ -214,6 +214,7 @@ describe("buildPhases", () => {
     dueOn: null,
     paidOn: null,
     paidAmountCents: null,
+    invoiceRequestedAt: null,
     ...overrides,
   });
   const chapter = (code: string, progressPct: number) => ({

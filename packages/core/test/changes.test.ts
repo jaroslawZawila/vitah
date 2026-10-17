@@ -14,6 +14,7 @@ import {
   budgetOptionsService,
   budgetService,
   changesService as svc,
+  constructionService,
   CHANGE_AREAS,
   documentsService,
   hitosService,
@@ -97,6 +98,27 @@ const cases: Case[] = [
     "setStage",
     ["obra"],
     async ({ ctx, project }) => () => obraService.setStage(ctx, project.id, { stage: 6 }),
+  ],
+  [
+    "startChapter",
+    ["obra"],
+    async ({ ctx, project }) => () => constructionService.startChapter(ctx, project.id, "01", { date: "2026-06-01" }),
+  ],
+  [
+    "finishChapter",
+    ["obra"],
+    async ({ ctx, project }) => {
+      await constructionService.startChapter(ctx, project.id, "01", { date: "2026-06-01" });
+      return () => constructionService.finishChapter(ctx, project.id, "01", { date: "2026-06-10" });
+    },
+  ],
+  [
+    "correctChapter",
+    ["obra"],
+    async ({ ctx, project }) => {
+      await constructionService.startChapter(ctx, project.id, "01", { date: "2026-06-01" });
+      return () => constructionService.correctChapter(ctx, project.id, "01", { actualStart: "2026-06-02" });
+    },
   ],
   [
     "addPhoto",
@@ -339,6 +361,12 @@ describe("writes the client sees", () => {
     "withFreeCode",
     "revisionView",
     "lineChanges",
+    // Staff-only: the Obra tab's review flags and its issues log.
+    "reviewChanges",
+    "createIssue",
+    "updateIssue",
+    "addIssueFile",
+    "deleteIssueFile",
     // Helpers, not writes.
     "requirePdf",
     "newPdfDocument",
@@ -362,6 +390,7 @@ describe("writes the client sees", () => {
       budgetIssueService,
       budgetGenerationsService,
       hitosService,
+      constructionService,
     ];
     const covered = new Set([...cases.map(([name]) => name), "createBudget"]);
     const unchecked = services

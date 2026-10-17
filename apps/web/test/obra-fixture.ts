@@ -81,6 +81,7 @@ export function hito(overrides: Partial<Hito> = {}): Hito {
     dueOn: null,
     paidOn: null,
     paidAmountCents: null,
+    invoiceRequestedAt: null,
     ...overrides,
   };
 }

@@ -67,6 +67,17 @@ describe("addPhoto", () => {
     expect(files.has(row!.pathname)).toBe(true);
   });
 
+  it("records the day it was taken and its chapter; refuses a day after today", async () => {
+    const { project, ctx } = await setup();
+
+    const { photoId } = await upload(ctx, project.id, { takenOn: "2026-03-02", chapterCode: "06" });
+    const row = await db.query.projectPhotos.findFirst({ where: eq(projectPhotos.id, photoId) });
+    expect(row).toMatchObject({ takenOn: "2026-03-02", chapterCode: "06" });
+
+    await expect(upload(ctx, project.id, { takenOn: "2999-01-01" })).rejects.toMatchObject({ code: "invalid_date" });
+    await expect(upload(ctx, project.id, { takenOn: "02/03/2026" })).rejects.toMatchObject({ code: "invalid_date" });
+  });
+
   it("makes an upright WebP thumbnail of at most 800 px", async () => {
     const { tenant, project, ctx } = await setup();
     // Stored landscape; EXIF orientation 6 turns it portrait.
@@ -225,6 +236,8 @@ describe("listPhotos", () => {
         sizeBytes: 2048,
         uploadedAt: "2026-02-01T10:00:00.000Z",
         uploadedBy: "Admin",
+        chapterCode: null,
+        takenOn: "2026-02-01",
       },
       {
         id: older.id,
@@ -232,8 +245,23 @@ describe("listPhotos", () => {
         sizeBytes: 4096,
         uploadedAt: "2026-01-01T10:00:00.000Z",
         uploadedBy: null,
+        chapterCode: null,
+        takenOn: "2026-01-01",
       },
     ]);
+  });
+
+  it("orders photos by the day they were taken, as staff set it", async () => {
+    const { tenant, project, ctx } = await setup();
+    const late = await createTestPhoto(tenant.id, project.id, { createdAt: new Date("2026-01-01T10:00:00Z"), takenOn: "2026-03-01" });
+    const early = await createTestPhoto(tenant.id, project.id, { createdAt: new Date("2026-02-01T10:00:00Z"), chapterCode: "06" });
+
+    const photos = await svc.listPhotos(ctx, project.id);
+    expect(photos.map((p) => [p.id, p.takenOn, p.chapterCode])).toEqual([
+      [late.id, "2026-03-01", null],
+      [early.id, "2026-02-01", "06"],
+    ]);
+    expect(await svc.listPhotos(ctx, project.id, { limit: 1 })).toHaveLength(1);
   });
 
   it("does not list another tenant's project", async () => {

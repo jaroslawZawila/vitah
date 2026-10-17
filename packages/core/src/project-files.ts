@@ -16,6 +16,7 @@ const STATUS: Record<DocumentError | PhotoError, number> = {
   generation_running: 409,
   missing_fields: 400,
   missing_file: 400,
+  invalid_date: 400,
   invalid_category: 400,
   invalid_file_type: 400,
   file_too_large: 413,

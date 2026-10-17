@@ -10,6 +10,9 @@ import {
   obraHitoChecks,
   obraHitoPhotos,
   obraHitos,
+  users,
+  obraChapterProgress,
+  obraInvoiceRequests,
   sql,
   type AnyColumn,
   type PgTable,
@@ -25,7 +28,7 @@ import {
   type ObraStage,
 } from "./contract";
 import { CoreError } from "./errors";
-import { hitoStatus, ofBp, paymentDueOn, priceLines, progressOf, type Margins, type Progress } from "./obra-calc";
+import { hitoStatus, ofBp, paymentDueOn, priceLines, progressOf, todayInSpain, type Margins, type Progress } from "./obra-calc";
 import { requireProject as requireProjectRow } from "./project-files";
 import { clientProjectWhere } from "./project-client";
 
@@ -46,6 +49,7 @@ const STATUS: Record<ObraError, number> = {
   invalid_input: 400,
   invalid_stage: 400,
   invalid_date: 400,
+  invalid_state: 409,
   missing_file: 400,
   invalid_file_type: 400,
   file_too_large: 413,
@@ -120,6 +124,13 @@ export function scaled(value: unknown, max: number, factor: number): number {
 export function calendarDate(value: unknown): string {
   if (typeof value !== "string" || !isCalendarDate(value)) fail("invalid_date");
   return value;
+}
+
+/** A day something happened on site: a calendar date, not after today (in Spain). */
+export function workDate(value: unknown, today = todayInSpain()): string {
+  const date = calendarDate(value);
+  if (date > today) fail("invalid_date");
+  return date;
 }
 
 /**
@@ -247,10 +258,9 @@ export async function loadBudget(tenantId: string, projectId: string) {
     })) ?? null;
   // The works follow the contract: chapters plus the options the client chose.
   // A FRAMER budget has all twenty chapters; those without lines aren't built.
-  const chapters = revision
-    ? priceChapters(await loadChapters(revision.id), revision).filter((c) => inContract(c) && c.lines.length > 0)
-    : [];
-  return { revision, chapters, progress: progressOf(chapters.flatMap((c) => c.lines)) };
+  const costChapters = revision ? (await loadChapters(revision.id)).filter((c) => inContract(c) && c.lines.length > 0) : [];
+  const chapters = revision ? priceChapters(costChapters, revision) : [];
+  return { revision, chapters, costChapters, progress: progressOf(chapters.flatMap((c) => c.lines)) };
 }
 
 // ─── Hitos ───────────────────────────────────────────────────────────────────
@@ -270,7 +280,7 @@ function groupBy<T>(rows: T[], key: (row: T) => string): Map<string, T[]> {
 /** The project's hito rows and everything hanging off them, grouped by hito. */
 async function loadHitoRows(tenantId: string, projectId: string) {
   const inProject = and(eq(obraHitos.projectId, projectId), eq(obraHitos.tenantId, tenantId));
-  const [rows, codes, checks, photos] = await Promise.all([
+  const [rows, codes, checks, photos, requests] = await Promise.all([
     db.select().from(obraHitos).where(inProject).orderBy(asc(obraHitos.position)),
     db
       .select()
@@ -289,8 +299,14 @@ async function loadHitoRows(tenantId: string, projectId: string) {
       .from(obraHitoPhotos)
       .innerJoin(obraHitos, eq(obraHitos.id, obraHitoPhotos.hitoId))
       .where(inProject),
+    db
+      .select({ request: obraInvoiceRequests, by: users.name, byEmail: users.email })
+      .from(obraInvoiceRequests)
+      .leftJoin(users, eq(users.id, obraInvoiceRequests.requestedById))
+      .where(and(eq(obraInvoiceRequests.projectId, projectId), eq(obraInvoiceRequests.tenantId, tenantId))),
   ]);
   return {
+    requests: requests.map(({ request, by, byEmail }) => ({ ...request, requestedBy: by ?? byEmail })),
     rows,
     codes: groupBy(codes, (c) => c.hitoId),
     checks: groupBy(
@@ -305,7 +321,7 @@ type HitoRows = Awaited<ReturnType<typeof loadHitoRows>>;
 
 /** Hitos priced from `totalCents`, following their chapters' progress. */
 function toHitos(
-  { rows, codes, checks, photos }: HitoRows,
+  { rows, codes, checks, photos, requests }: HitoRows,
   chapters: LoadedChapter[],
   totalCents: number,
   vatRateBp: number,
@@ -344,17 +360,42 @@ function toHitos(
       dueOn: dueFrom ? paymentDueOn(dueFrom) : null,
       paidOn: row.paidOn,
       paidAmountCents: row.paidAmountCents,
+      invoiceRequestedAt: requests.find((r) => r.hitoId === row.id)?.requestedAt.toISOString() ?? null,
     };
   });
 }
 
-/** The project's accepted budget and hitos, computed. */
+/** The chapters' actual dates recorded on the Obra tab (construction control). */
+export async function loadProgressRows(tenantId: string, projectId: string) {
+  return db
+    .select()
+    .from(obraChapterProgress)
+    .where(and(eq(obraChapterProgress.projectId, projectId), eq(obraChapterProgress.tenantId, tenantId)));
+}
+
+/**
+ * The project's accepted budget and hitos, computed. A chapter recorded as
+ * finished on the Obra tab counts as built in full, whatever its lines' %:
+ * the hitos and the client's app follow it.
+ */
 export async function loadObra(tenantId: string, projectId: string) {
-  const [{ revision, chapters, progress }, hitoRows] = await Promise.all([
+  const [budget, hitoRows, progressRows] = await Promise.all([
     loadBudget(tenantId, projectId),
     loadHitoRows(tenantId, projectId),
+    loadProgressRows(tenantId, projectId),
   ]);
+  const { revision, costChapters } = budget;
+  let { chapters, progress } = budget;
+  const finished = new Set(progressRows.filter((r) => r.actualEnd).map((r) => r.chapterCode));
+  if (finished.size > 0) {
+    chapters = chapters.map((c) => {
+      if (!finished.has(c.code)) return c;
+      const lines = c.lines.map((line) => ({ ...line, executedPct: 100 }));
+      return { ...c, lines, ...progressOf(lines) };
+    });
+    progress = progressOf(chapters.flatMap((c) => c.lines));
+  }
   const vatRateBp = revision?.vatRateBp ?? 1000;
   const hitos = toHitos(hitoRows, chapters, progress.totalCents, vatRateBp);
-  return { revision, chapters, progress, vatRateBp, hitos };
+  return { revision, chapters, costChapters, progress, vatRateBp, hitos, progressRows, requests: hitoRows.requests };
 }

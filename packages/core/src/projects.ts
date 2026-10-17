@@ -44,8 +44,10 @@ function checkOrder(start: Date | null | undefined, completion: Date | null | un
 
 const clientColumns = { columns: { id: true, name: true, email: true } } as const;
 
-// The change counters are the app's business (./changes), not staff's.
+// The change counters are the app's business (./changes), and the reviewed
+// revision the Obra tab's (./construction): not part of the project.
 const projectColumns = {
+  obraReviewedRevisionId: false,
   projectRev: false,
   obraRev: false,
   photosRev: false,

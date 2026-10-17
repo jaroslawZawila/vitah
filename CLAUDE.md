@@ -174,7 +174,8 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
 ### Database
 
 - **Driver:** `postgres` (postgres.js) — works with any PostgreSQL (local Docker, Vercel Postgres, AWS RDS, etc.)
-- Schema in `packages/db/src/schema.ts` — tables: `tenants`, `users`, `client_profiles`, `client_settings`, `push_tokens`, `accounts`, `sessions`, `verification_tokens`, `projects`, `project_documents`, `project_photos`, and the obra's `budget_revisions`, `budget_chapters`, `budget_lines`, `obra_hitos`, `obra_hito_chapters`, `obra_hito_checks`, `obra_hito_photos`, plus `budget_generations` (AI runs) and `ai_usage` (one row per Claude call, with its cost), and the
+- Schema in `packages/db/src/schema.ts` — tables: `tenants`, `users`, `client_profiles`, `client_settings`, `push_tokens`, `accounts`, `sessions`, `verification_tokens`, `projects`, `project_documents`, `project_photos`, the construction control's `obra_chapter_progress`, `obra_progress_events`,
+  `obra_invoice_requests`, `obra_issues`, `obra_issue_files`, and the obra's `budget_revisions`, `budget_chapters`, `budget_lines`, `obra_hitos`, `obra_hito_chapters`, `obra_hito_checks`, `obra_hito_photos`, plus `budget_generations` (AI runs) and `ai_usage` (one row per Claude call, with its cost), and the
   Subcontratas tables `subcontractors`, `subcontractor_workers`, `subcontractor_documents`, `subcontractor_document_versions`,
   `subcontractor_assignments`, `subcontractor_audit`. A project is deliberately minimal — exactly what the mobile app shows: `ref`, `address`, `start_date`, `completion_date`, plus `client_user_id` linking it to its mobile app client
 - Prod migrations are additive SQL files in `packages/db/sql/`, applied by hand (no plain `db:push` on prod)
@@ -191,8 +192,33 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
   chapter codes it closes. The acta is signed on paper; staff upload it and the invoice (PDFs), then record the payment
 - `obra.ts` builds the portal's Obra page and the app's phases (pre-construction + one per hito); the arithmetic
   (progress, due dates, penalty, phases) is pure in `obra-calc.ts`, also used by the portal for live figures
-- Portal tabs Obra (chapter control at `obra/[code]`), Presupuesto and Pagos (`payments/[hitoId]`); app tab Obra with
-  pushed screens under `app/(app)/obra/`. `pnpm db:seed` gives VTH-26-001 the real Caviedes budget (`seed/caviedes.ts`), its obra half built
+- Portal tabs Obra (construction control, below), Presupuesto and Pagos (`payments/[hitoId]`); the stage stepper is on
+  the project's General tab; app tab Obra with pushed screens under `app/(app)/obra/`. `pnpm db:seed` gives VTH-26-001 the real Caviedes budget (`seed/caviedes.ts`), its obra half built
+
+### Construction control (the Obra tab)
+
+- Requirements CC-01…CC-63: Claude Doc https://claude.ai/code/artifact/f9eda39b-0206-45a9-aea0-4cef149bab16; design canvas
+  https://claude.ai/code/artifact/95ac23ac-b528-4711-91fb-a658bfcd1589 (Resumen, Avance, Capítulo, Finalizar, Costes, Hitos,
+  Incidencias, Fotos, Avance at 390 px)
+- Service `packages/core/src/construction.ts` (`constructionService`), pure rules in `control-calc.ts`. The "main budget
+  items" are the contract's chapters at cost (chosen options too), never chapter 20 (contingency reserve). A chapter is
+  pending → in progress → finished **only** by the actual dates staff record (`obra_chapter_progress`; start/finish
+  dates may be before today, never after); every record and correction is kept in `obra_progress_events`. Passing a
+  planned date never changes anything
+- Finishing the last chapter of a hito creates one `obra_invoice_requests` row for Administration (unique per hito:
+  never a second one, whatever is corrected); hito states pending → reached → requested → invoiced → collected follow
+  the Pagos tab's invoice and payment. `Hito.invoiceRequestedAt` shows it on Pagos. A finished chapter counts as 100 %
+  built for the hitos and the client's app (`loadObra`), so start/finish/correct call `markChanged(["obra"])`
+- Planning and Purchasing don't exist yet: planned dates (hitos in turn, each a share of the works' time like its share
+  of the price) and contracted amounts (lines of started chapters, cost ± 6 %) are **simulated** in `control-calc.ts`
+  (`sources: "mock"`, shown as "Simulado"). Sales is the hitos' invoices/payments. Swap the real modules in there
+- Issues and changes log (`obra_issues`, numbered per kind INC-/CAM-, files in `obra_issue_files`, private Blob,
+  served as downloads): history only, never changes dates, amounts or invoices. Document warnings come from
+  Subcontratas (`listProjectAttention`). Photos have a `taken_on` day. Staff only; viewers read
+- Portal: `dashboard/projects/[id]/obra/` (Resumen) + `avance`, `avance/[code]`, `costes`, `hitos`, `incidencias`,
+  `fotos` (the old project Fotos tab redirects there); views in `components/construction/`. API: `/api/v1/projects/:id/obra/`
+  `control`, `header`, `costs`, `review`, `chapters/:code/{control,start,finish}` (`PATCH …/control` corrects), `issues`,
+  `issues/:issueId`, `issues/:issueId/files[/:fileId]`. Prod SQL: `packages/db/sql/2026-10-construction-control.sql`
 
 ### Budget (Presupuesto)
 

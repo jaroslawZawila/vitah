@@ -1,4 +1,4 @@
-import { and, db, desc, eq, gt, isNotNull, ne, projectPhotos, projects, users } from "@repo/db";
+import { and, db, desc, eq, gt, isNotNull, ne, projectPhotos, projects, sql, users } from "@repo/db";
 import { markChanged } from "./changes";
 import { requireEditor, type Ctx } from "./context";
 import {
@@ -12,6 +12,7 @@ import {
   type ProjectPhoto,
 } from "./contract";
 import { clippedText } from "./input";
+import { workDate } from "./obra-data";
 import { notifyProjectClient } from "./notifications";
 import type { PhotosByChapter } from "./obra-calc";
 import {
@@ -75,6 +76,12 @@ async function readImage(file: Blob) {
   }
 }
 
+/** The day a photo was taken: as staff set it, else the day (in Spain) it was uploaded. */
+const photoDay = sql<string>`coalesce(${projectPhotos.takenOn}, (${projectPhotos.createdAt} at time zone 'UTC' at time zone 'Europe/Madrid')::date)::text`;
+
+/** Far more than a project has: the list is never cut short. */
+const MAX_PHOTOS = 100_000;
+
 function photoInProject(ctx: Ctx, projectId: string, photoId: string) {
   return and(
     eq(projectPhotos.id, photoId),
@@ -97,8 +104,9 @@ function toMobilePhoto({ createdAt, ...photo }: PhotoRow): MobilePhoto {
 }
 
 /**
- * Body (multipart form): { file, caption?, chapterCode? } — file is a JPEG, PNG
- * or WebP of at most 4 MB; chapterCode the budget chapter it shows.
+ * Body (multipart form): { file, caption?, chapterCode?, takenOn? } — file is a
+ * JPEG, PNG or WebP of at most 4 MB; chapterCode the budget chapter it shows;
+ * takenOn the day it was taken (YYYY-MM-DD, not after today; default today).
  */
 export async function addPhoto(ctx: Ctx, projectId: string, input: Record<string, unknown>) {
   requireEditor(ctx);
@@ -106,6 +114,7 @@ export async function addPhoto(ctx: Ctx, projectId: string, input: Record<string
   const { file } = input;
   const caption = clippedText(input.caption, MAX_CAPTION_LENGTH);
   const chapterCode = clippedText(input.chapterCode, MAX_CHAPTER_CODE);
+  const takenOn = input.takenOn ? workDate(input.takenOn) : null;
   if (!(file instanceof Blob) || file.size === 0) fail("missing_file");
   if (file.size > MAX_PHOTO_BYTES) fail("file_too_large");
   const [image] = await Promise.all([readImage(file), requireProject(ctx.tenantId, projectId)]);
@@ -127,6 +136,7 @@ export async function addPhoto(ctx: Ctx, projectId: string, input: Record<string
         projectId,
         caption: caption || null,
         chapterCode: chapterCode || null,
+        takenOn,
         pathname,
         contentType,
         sizeBytes: file.size,
@@ -153,12 +163,18 @@ export async function addPhoto(ctx: Ctx, projectId: string, input: Record<string
 export async function listPhotos(
   ctx: Ctx,
   projectId: string,
-  { chapterCode }: { chapterCode?: string } = {},
+  { chapterCode, limit }: { chapterCode?: string; limit?: number } = {},
 ): Promise<ProjectPhoto[]> {
   const [, rows] = await Promise.all([
     requireProject(ctx.tenantId, projectId),
     db
-      .select({ ...mobileColumns, uploaderName: users.name, uploaderEmail: users.email })
+      .select({
+        ...mobileColumns,
+        chapterCode: projectPhotos.chapterCode,
+        takenOn: photoDay,
+        uploaderName: users.name,
+        uploaderEmail: users.email,
+      })
       .from(projectPhotos)
       .leftJoin(users, eq(users.id, projectPhotos.uploadedById))
       .where(
@@ -168,12 +184,16 @@ export async function listPhotos(
           chapterCode === undefined ? undefined : eq(projectPhotos.chapterCode, chapterCode),
         ),
       )
-      .orderBy(desc(projectPhotos.createdAt)),
+      // The day it was taken first: photos are organised by it.
+      .orderBy(desc(photoDay), desc(projectPhotos.createdAt))
+      .limit(limit ?? MAX_PHOTOS),
   ]);
 
-  return rows.map(({ uploaderName, uploaderEmail, ...photo }) => ({
+  return rows.map(({ uploaderName, uploaderEmail, chapterCode, takenOn, ...photo }) => ({
     ...toMobilePhoto(photo),
     uploadedBy: uploaderName ?? uploaderEmail,
+    chapterCode,
+    takenOn,
   }));
 }
 

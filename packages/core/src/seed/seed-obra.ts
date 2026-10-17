@@ -6,7 +6,9 @@ import { unitPrice } from "../obra-calc";
 import { inDraft } from "../budget-draft";
 import * as options from "../budget-options";
 import * as hitos from "../hitos";
+import * as construction from "../construction";
 import * as obra from "../obra";
+import { todayInSpain } from "../obra-calc";
 import { CAVIEDES_BUDGET } from "./caviedes";
 
 // ─── Demo obra ───────────────────────────────────────────────────────────────
@@ -129,4 +131,42 @@ export async function seedObra(ctx: Ctx, projectId: string, { files = true } = {
     }
   }
   await hitos.registerPayment(ctx, projectId, hito("H2").id, { paidOn: "2026-07-24" });
+}
+
+/** The works' actual dates by chapter, matching the built %s above: [start, end?]. */
+const ACTUAL_DATES: [string, string, string?][] = [
+  ["18", "2026-04-20"],
+  ["19", "2026-04-20"],
+  ["01", "2026-04-20", "2026-05-08"],
+  ["02", "2026-05-11", "2026-07-10"],
+  ["03", "2026-07-13", "2026-09-18"],
+  ["05", "2026-09-21"],
+  ["06", "2026-09-28"],
+  ["10", "2026-10-05"],
+];
+
+const ISSUES = [
+  { kind: "issue", occurredOn: "2026-06-02", chapterCode: "02", description: "Nivel freático más alto de lo previsto en la zapata Z4: se achica y se añade un dren.", party: "other", costImpactCents: 86_000, scheduleImpactDays: 2, status: "resolved" },
+  { kind: "change", occurredOn: "2026-09-15", chapterCode: "12", description: "Aerotermia de 8 a 10 kW por el recálculo de cargas de la ingeniería.", party: "own", costImpactCents: 118_000, status: "pending" },
+  { kind: "change", occurredOn: "2026-09-30", chapterCode: "10", description: "El cliente pide cambiar la ventana fija del salón por una corredera elevable.", party: "client", costImpactCents: 235_000, scheduleImpactDays: 5, status: "pending" },
+  { kind: "issue", occurredOn: "2026-10-08", chapterCode: "06", description: "Retraso en el suministro del panel Thermochip de la fachada norte: el camión se reprograma.", party: "subcontractor", partyName: "Montajes Thermochip Norte", scheduleImpactDays: 3, status: "review" },
+];
+
+/**
+ * Construction control for the demo obra: the chapters' actual dates (up to
+ * today) and a few issues and changes. Finishing H2's and H3's chapters asks
+ * for their invoices, as staff would have.
+ */
+export async function seedControl(ctx: Ctx, projectId: string) {
+  const today = todayInSpain();
+  // Only what this project's contract has (a dev budget may have been edited).
+  const codes = new Set((await construction.getControl(ctx, projectId)).chapters.map((c) => c.code));
+  for (const [code, start, end] of ACTUAL_DATES) {
+    if (start > today || !codes.has(code)) continue;
+    await construction.startChapter(ctx, projectId, code, { date: start });
+    if (end && end <= today) await construction.finishChapter(ctx, projectId, code, { date: end });
+  }
+  for (const issue of ISSUES) {
+    if (issue.occurredOn <= today && codes.has(issue.chapterCode)) await construction.createIssue(ctx, projectId, issue);
+  }
 }

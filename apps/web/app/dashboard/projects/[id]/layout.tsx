@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 
-/** Shared by the project's tabs (General, Documents, Photos) in the sidebar. */
+/** Shared by the project's tabs (General, Obra, Budget, Payments, Documents) in the sidebar. */
 export default async function ProjectLayout({ children }: { children: React.ReactNode }) {
   const t = await getTranslations("projectDetailPage");
 

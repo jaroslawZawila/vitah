@@ -8,18 +8,21 @@ export default function Modal({
   open,
   onOpenChange,
   title,
+  className,
   children,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title: string;
+  /** E.g. a wider `sm:max-w-*` for a two-column dialog. */
+  className?: string;
   children: React.ReactNode;
 }) {
   const t = useTranslations("projectDetailPage");
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent closeLabel={t("close")}>
+      <DialogContent closeLabel={t("close")} className={className}>
         <DialogTitle>{title}</DialogTitle>
         {children}
       </DialogContent>

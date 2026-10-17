@@ -64,6 +64,19 @@ describe("HitosScreen", () => {
     ]);
   });
 
+  it("shows Administration the invoice the Obra tab asked for", () => {
+    const requested = obra.hitos.map((h) =>
+      h.code === "H4" ? { ...h, invoiceRequestedAt: "2026-10-17T10:00:00.000Z" } : h.code === "H3" ? { ...h, invoiceRequestedAt: "2026-09-11T10:00:00.000Z" } : h,
+    );
+    renderScreen({ obra: { ...obra, hitos: requested } });
+
+    const h4 = screen.getByRole("link", { name: "Envolvente estanca" }).closest("[role=row]") as HTMLElement;
+    expect(within(h4).getByText("Factura solicitada · 17 oct 2026")).toBeInTheDocument();
+    // Once invoiced, the request is done.
+    const h3 = screen.getByRole("link", { name: "Estructura Steel Frame" }).closest("[role=row]") as HTMLElement;
+    expect(within(h3).queryByText(/Factura solicitada/)).not.toBeInTheDocument();
+  });
+
   it("is read-only for viewers", () => {
     renderScreen({ canManage: false });
     expect(screen.queryByRole("button", { name: "Editar % y capítulos" })).not.toBeInTheDocument();

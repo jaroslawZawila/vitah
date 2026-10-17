@@ -19,6 +19,7 @@ import {
   ACTIVE_GENERATION_STATUSES,
   BUDGET_INPUTS,
   BUDGET_INPUT_EXTENSIONS,
+  fileTypeOf,
   DOCUMENT_CATEGORIES,
   MAX_CAPTION_LENGTH,
   MAX_DIRECT_UPLOAD_BYTES,
@@ -234,11 +235,7 @@ export async function setDocumentVisibility(
 // asks for a pathname here, uploads, then registers the file.
 
 /** The file type of a budget input, from its name ("planos.pdf" → pdf); null if not allowed. */
-function inputType(filename: string): { extension: string; contentType: string } | null {
-  const extension = filename.toLowerCase().split(".").pop() ?? "";
-  const contentType = BUDGET_INPUT_EXTENSIONS[extension];
-  return contentType ? { extension, contentType } : null;
-}
+const inputType = (filename: string) => fileTypeOf(filename, BUDGET_INPUT_EXTENSIONS);
 
 const inputsFolder = (tenantId: string, projectId: string) => `${projectFolder(tenantId, projectId)}inputs/`;
 

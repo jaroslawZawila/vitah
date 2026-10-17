@@ -31,9 +31,9 @@ export default function ObraStages({
 
   return (
     <section className={cardVariants()}>
-      <span className="eyebrow">{t("page.process")}</span>
+      <span className="eyebrow">{t("process")}</span>
       <Stepper
-        label={t("page.process")}
+        label={t("process")}
         steps={OBRA_STAGES.map((stage) => {
           const name = t(`stages.${stage}`);
           return {
@@ -42,7 +42,7 @@ export default function ObraStages({
             meta: meta(stage),
             state: stage < obra.stage ? "done" : stage === obra.stage ? "current" : "todo",
             onSelect: onSetStage && stage !== obra.stage ? () => onSetStage(stage) : undefined,
-            selectLabel: t("page.setStage", { number: stage, name }),
+            selectLabel: t("setStage", { number: stage, name }),
           };
         })}
       />

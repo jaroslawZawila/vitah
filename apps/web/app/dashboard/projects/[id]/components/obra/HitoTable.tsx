@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useTranslations } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
 import type { Hito } from "@repo/core/contract";
+import { Badge } from "@/components/ui/badge";
 import { useObraFormat } from "./format";
 import { codeChip, columns, muted, table } from "./classes";
 import StatusPill from "./StatusPill";
@@ -24,6 +25,12 @@ export default function HitoTable({
 }) {
   const t = useTranslations("obra.payments");
   const f = useObraFormat();
+  const format = useFormatter();
+  /** Finishing its last chapter on the Obra tab asked Administration to invoice it. */
+  const requested = (hito: Hito) =>
+    hito.invoiceRequestedAt && hito.status !== "invoiced" && hito.status !== "paid"
+      ? format.dateTime(new Date(hito.invoiceRequestedAt), { dateStyle: "medium", timeZone: "Europe/Madrid" })
+      : null;
   const when = (hito: Hito) => {
     if (hito.paidOn) return t("paidOn", { date: f.date(hito.paidOn) });
     if (hito.dueOn) return t("due", { date: f.date(hito.dueOn) });
@@ -67,7 +74,8 @@ export default function HitoTable({
               )}
             </span>
             <span role="cell" className="flex flex-col items-start gap-1">
-              <StatusPill status={hito.status} kind="hitoStatus" />
+              <StatusPill status={hito.status} />
+              {requested(hito) && <Badge variant="yel">{t("requested", { date: requested(hito)! })}</Badge>}
               {when(hito) && <span className={muted}>{when(hito)}</span>}
             </span>
           </div>

@@ -20,7 +20,6 @@ const PROJECT_TABS = [
   { key: "budget", path: "/budget" },
   { key: "payments", path: "/payments" },
   { key: "documents", path: "/documents" },
-  { key: "photos", path: "/photos" },
 ] as const;
 
 const SUBCONTRACTORS_HREF = "/dashboard/subcontratas";

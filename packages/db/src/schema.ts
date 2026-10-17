@@ -239,6 +239,9 @@ export const projects = pgTable(
     // Stage of the construction process, 1–8 (features/construction_process/
     // PROCESS.md §2): set by staff on the project's Obra page.
     obraStage: integer("obra_stage").default(1).notNull(),
+    // Construction control: the accepted budget revision whose added and
+    // removed chapters staff have reviewed (null: none reviewed yet).
+    obraReviewedRevisionId: text("obra_reviewed_revision_id"),
     // Homeowner with mobile app access. At most one project per client.
     clientUserId: text("client_user_id")
       .unique("projects_client_user_unique")
@@ -329,6 +332,8 @@ export const projectPhotos = pgTable(
     // Budget chapter the photo shows (e.g. "05"), if any: the photo then also
     // appears on that chapter and on its phase in the app.
     chapterCode: text("chapter_code"),
+    // The day the photo was taken (staff may set it); null: its upload day.
+    takenOn: date("taken_on", { mode: "string" }),
     // Size of the small copy for grids, stored next to the photo as
     // "<id>.thumb.webp". Null for photos uploaded before thumbnails existed.
     thumbSizeBytes: integer("thumb_size_bytes"),
@@ -602,6 +607,163 @@ export const obraHitoPhotos = pgTable(
   },
   (table) => ({
     pk: primaryKey({ columns: [table.hitoId, table.photoId] }),
+  }),
+);
+
+// --- Obra: construction control ---
+// The technical follow-up of a project's works (features/construction_control):
+// when each budget chapter of the contract really started and finished, every
+// such record and correction, the invoice requests that finishing a hito's
+// last chapter creates, and a log of issues and changes. Chapters are matched
+// by code, so the records hold across budget revisions. Staff only.
+
+// One chapter's actual dates: none = pending, a start = in progress, both = finished.
+export const obraChapterProgress = pgTable(
+  "obra_chapter_progress",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    chapterCode: text("chapter_code").notNull(),
+    actualStart: date("actual_start", { mode: "string" }),
+    actualEnd: date("actual_end", { mode: "string" }),
+    updatedAt: timestamp("updated_at", { mode: "date" })
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => ({
+    projectChapterUnique: unique("obra_chapter_progress_project_chapter_unique").on(
+      table.projectId,
+      table.chapterCode,
+    ),
+  }),
+);
+
+// Every recorded date and correction: the day the work happened, and who recorded it when.
+export const obraProgressEvents = pgTable(
+  "obra_progress_events",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    chapterCode: text("chapter_code").notNull(),
+    // start | finish | correct_start | correct_finish
+    kind: text("kind").$type<"start" | "finish" | "correct_start" | "correct_finish">().notNull(),
+    // The date before and after (null: none, or cleared).
+    previousDate: date("previous_date", { mode: "string" }),
+    newDate: date("new_date", { mode: "string" }),
+    note: text("note"),
+    recordedById: text("recorded_by_id").references(() => users.id, { onDelete: "set null" }),
+    recordedAt: timestamp("recorded_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => ({
+    projectIdx: index("obra_progress_events_project_idx").on(table.projectId, table.recordedAt),
+  }),
+);
+
+// The request to Administration to invoice a hito, made once when its last chapter finishes.
+export const obraInvoiceRequests = pgTable("obra_invoice_requests", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  tenantId: text("tenant_id")
+    .notNull()
+    .references(() => tenants.id, { onDelete: "cascade" }),
+  projectId: text("project_id")
+    .notNull()
+    .references(() => projects.id, { onDelete: "cascade" }),
+  // Unique: never a second request for the same hito.
+  hitoId: text("hito_id")
+    .notNull()
+    .unique("obra_invoice_requests_hito_unique")
+    .references(() => obraHitos.id, { onDelete: "cascade" }),
+  // The chapter whose finish met the hito.
+  chapterCode: text("chapter_code").notNull(),
+  amountCents: integer("amount_cents").notNull(),
+  description: text("description").notNull(),
+  clientName: text("client_name"),
+  requestedById: text("requested_by_id").references(() => users.id, { onDelete: "set null" }),
+  requestedAt: timestamp("requested_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+// A problem during the works (issue) or a difference from what was planned (change).
+export const obraIssues = pgTable(
+  "obra_issues",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    // issue | change; numbered per project and kind (INC-007, CAM-004).
+    kind: text("kind").$type<"issue" | "change">().notNull(),
+    number: integer("number").notNull(),
+    occurredOn: date("occurred_on", { mode: "string" }).notNull(),
+    chapterCode: text("chapter_code").notNull(),
+    description: text("description").notNull(),
+    // client | subcontractor | own | other
+    party: text("party").$type<"client" | "subcontractor" | "own" | "other">().notNull(),
+    partyName: text("party_name"),
+    // Estimates, never required: they may not be known yet.
+    costImpactCents: integer("cost_impact_cents"),
+    scheduleImpactDays: integer("schedule_impact_days"),
+    // pending | review | resolved
+    status: text("status").$type<"pending" | "review" | "resolved">().default("pending").notNull(),
+    createdById: text("created_by_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date" })
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => ({
+    projectKindNumberUnique: unique("obra_issues_project_kind_number_unique").on(
+      table.projectId,
+      table.kind,
+      table.number,
+    ),
+  }),
+);
+
+// A photo, email or document supporting an issue (private Blob store).
+export const obraIssueFiles = pgTable(
+  "obra_issue_files",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    issueId: text("issue_id")
+      .notNull()
+      .references(() => obraIssues.id, { onDelete: "cascade" }),
+    filename: text("filename").notNull(),
+    pathname: text("pathname").unique().notNull(),
+    contentType: text("content_type").notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    uploadedById: text("uploaded_by_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => ({
+    issueIdx: index("obra_issue_files_issue_idx").on(table.issueId),
   }),
 );
 

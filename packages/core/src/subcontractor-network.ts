@@ -221,10 +221,11 @@ async function latestVersions(tenantId: string, documentIds: string[] | undefine
   return new Map(rows.map((row) => [row.documentId, row]));
 }
 
-/** Everything of the tenant's network, optionally only one company's. */
-export async function loadNetwork(tenantId: string, subcontractorId?: string) {
+/** Everything of the tenant's network, optionally only one company's (or a few's). */
+export async function loadNetwork(tenantId: string, subcontractorId?: string | string[]) {
+  const only = subcontractorId === undefined ? undefined : [subcontractorId].flat();
   const scoped = (tenantColumn: AnyColumn, subcontractorColumn: AnyColumn) =>
-    and(eq(tenantColumn, tenantId), subcontractorId ? eq(subcontractorColumn, subcontractorId) : undefined);
+    and(eq(tenantColumn, tenantId), only ? inArray(subcontractorColumn, only) : undefined);
 
   const [companies, workers, docs, assignments, projectRows] = await Promise.all([
     db
@@ -251,7 +252,7 @@ export async function loadNetwork(tenantId: string, subcontractorId?: string) {
       .where(eq(projects.tenantId, tenantId))
       .orderBy(asc(projects.ref)),
   ]);
-  const ids = subcontractorId ? docs.map((d) => d.id) : undefined;
+  const ids = only ? docs.map((d) => d.id) : undefined;
   const [versions, validated] = await Promise.all([
     latestVersions(tenantId, ids, false),
     latestVersions(tenantId, ids, true),

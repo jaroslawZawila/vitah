@@ -399,6 +399,24 @@ export async function getOverview(ctx: Ctx): Promise<SubcontractorsOverview> {
   };
 }
 
+/**
+ * What needs attention among the companies working on one obra: their own
+ * documents, their workers' and this obra's. The Obra tab warns with it.
+ */
+export async function listProjectAttention(ctx: Ctx, projectId: string): Promise<AttentionItem[]> {
+  // Only the companies working on this obra are loaded.
+  const rows = await db
+    .select({ id: subcontractorAssignments.subcontractorId })
+    .from(subcontractorAssignments)
+    .where(and(eq(subcontractorAssignments.projectId, projectId), eq(subcontractorAssignments.tenantId, ctx.tenantId)));
+  if (rows.length === 0) return [];
+  const assigned = new Set(rows.map((r) => r.id));
+  const net = await loadNetwork(ctx.tenantId, [...assigned]);
+  return attentionItems(net).filter(
+    (item) => assigned.has(item.subcontractorId) && (item.projectId === null || item.projectId === projectId),
+  );
+}
+
 function expiryCounts(net: Network) {
   let expiring = 0;
   let expired = 0;

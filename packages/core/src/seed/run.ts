@@ -1,10 +1,11 @@
 // `pnpm db:seed` (after @repo/db's seed): gives the local dev project VTH-26-001
-// the real Caviedes budget (004/2026) part built (./seed-obra), and fictional
+// the real Caviedes budget (004/2026) part built with its construction control
+// records (./seed-obra), and fictional
 // subcontractors working on it (./subcontractors). Skips what is already there.
 // PDFs need a Blob store (BLOB_READ_WRITE_TOKEN); without one they're left out.
 
-import { and, budgetRevisions, db, eq, projects, seedConfig, tenants, users } from "@repo/db";
-import { seedObra } from "./seed-obra";
+import { and, budgetRevisions, db, eq, obraChapterProgress, projects, seedConfig, tenants, users } from "@repo/db";
+import { seedControl, seedObra } from "./seed-obra";
 import { seedSubcontractors } from "./subcontractors";
 
 const { tenantSlug, email, projectRef } = seedConfig();
@@ -39,6 +40,17 @@ async function run() {
   } else {
     await seedObra(ctx, project.id, { files });
     console.log(`Seeded the obra of ${projectRef} (budget 004/2026)`);
+  }
+
+  const recorded = await db.query.obraChapterProgress.findFirst({
+    where: eq(obraChapterProgress.projectId, project.id),
+    columns: { id: true },
+  });
+  if (recorded) {
+    console.log(`${projectRef} already has construction control records, skipping them`);
+  } else {
+    await seedControl(ctx, project.id);
+    console.log(`Seeded the construction control of ${projectRef}`);
   }
 
   const companies = await seedSubcontractors(ctx, project.id, { files });

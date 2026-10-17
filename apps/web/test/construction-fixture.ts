@@ -1,0 +1,416 @@
+import type {
+  ConstructionControl,
+  ConstructionCosts,
+  ControlChapter,
+  ControlChapterDetail,
+  ControlMilestone,
+  ObraIssue,
+  ProjectPhoto,
+} from "@repo/core/contract";
+
+// Static data for the Obra tab's tests: VTH-26-001 on 17 Oct 2026, halfway
+// through the works. Chapter 06 is the last one H4 waits for.
+
+export const TODAY = "2026-10-17";
+
+export function controlChapter(overrides: Partial<ControlChapter> = {}): ControlChapter {
+  const chapter: Omit<ControlChapter, "deviationBp"> & { deviationBp?: number | null } = {
+    code: "06",
+    name: "Envolvente térmica Thermochip",
+    state: "in_progress",
+    plannedStart: "2026-09-14",
+    plannedEnd: "2026-10-09",
+    actualStart: "2026-09-21",
+    actualEnd: null,
+    startDelayDays: 7,
+    endDelayDays: null,
+    overdueDays: 8,
+    plannedDays: 26,
+    actualDays: 27,
+    hitoCode: "H4",
+    costCents: 3_484_000,
+    lineCount: 9,
+    contractedLines: 6,
+    contractedCents: 3_040_000,
+    contractedCostCents: 3_084_000,
+    deviationCents: 44_000,
+    openIssues: 1,
+    added: false,
+    ...overrides,
+  };
+  const { deviationCents, contractedCostCents } = chapter;
+  const deviationBp =
+    deviationCents === null || !contractedCostCents ? null : Math.round((deviationCents * 10_000) / contractedCostCents);
+  return { ...chapter, deviationBp: chapter.deviationBp ?? deviationBp };
+}
+
+export const chapters: ControlChapter[] = [
+  controlChapter(),
+  controlChapter({
+    code: "04",
+    name: "Albañilería y saneamiento",
+    plannedStart: "2026-10-05",
+    plannedEnd: "2026-11-27",
+    actualStart: "2026-10-12",
+    overdueDays: null,
+    plannedDays: 54,
+    actualDays: 6,
+    hitoCode: "H8",
+    costCents: 2_791_100,
+    lineCount: 10,
+    contractedLines: 10,
+    contractedCents: 2_710_000,
+    contractedCostCents: 2_791_100,
+    deviationCents: 81_100,
+    openIssues: 0,
+  }),
+  controlChapter({
+    code: "13",
+    name: "Electricidad e iluminación",
+    state: "pending",
+    plannedStart: "2026-10-19",
+    plannedEnd: "2026-11-27",
+    actualStart: null,
+    startDelayDays: null,
+    overdueDays: null,
+    plannedDays: 40,
+    actualDays: null,
+    hitoCode: "H6",
+    costCents: 1_335_900,
+    lineCount: 8,
+    contractedLines: 0,
+    contractedCents: null,
+    contractedCostCents: 0,
+    deviationCents: null,
+    openIssues: 0,
+  }),
+  controlChapter({
+    code: "12",
+    name: "Climatización y VMC",
+    state: "pending",
+    plannedStart: "2026-10-26",
+    plannedEnd: "2026-12-18",
+    actualStart: null,
+    startDelayDays: null,
+    overdueDays: null,
+    plannedDays: 54,
+    actualDays: null,
+    hitoCode: "H7",
+    costCents: 3_325_000,
+    lineCount: 8,
+    contractedLines: 0,
+    contractedCents: null,
+    contractedCostCents: 0,
+    deviationCents: null,
+    openIssues: 0,
+    added: true,
+  }),
+  controlChapter({
+    code: "05",
+    name: "Cubierta inclinada",
+    state: "finished",
+    plannedStart: "2026-09-07",
+    plannedEnd: "2026-10-02",
+    actualStart: "2026-09-14",
+    actualEnd: "2026-10-09",
+    endDelayDays: 7,
+    overdueDays: null,
+    plannedDays: 26,
+    actualDays: 26,
+    costCents: 5_535_600,
+    lineCount: 9,
+    contractedLines: 9,
+    contractedCents: 5_790_000,
+    contractedCostCents: 5_535_600,
+    deviationCents: -254_400,
+    openIssues: 0,
+  }),
+  controlChapter({
+    code: "10",
+    name: "Carpintería exterior e interior",
+    state: "finished",
+    plannedStart: "2026-09-21",
+    plannedEnd: "2026-10-09",
+    actualStart: "2026-09-22",
+    actualEnd: "2026-10-14",
+    startDelayDays: 1,
+    endDelayDays: 5,
+    overdueDays: null,
+    plannedDays: 19,
+    actualDays: 23,
+    costCents: 9_061_000,
+    lineCount: 16,
+    contractedLines: 16,
+    contractedCents: 8_940_000,
+    contractedCostCents: 9_061_000,
+    deviationCents: 121_000,
+    openIssues: 0,
+  }),
+];
+
+export function milestone(overrides: Partial<ControlMilestone> = {}): ControlMilestone {
+  return {
+    id: "hito-h4",
+    code: "H4",
+    name: "Envolvente estanca",
+    pctBp: 1300,
+    amountCents: 8_079_240,
+    chapters: [
+      { code: "05", name: "Cubierta inclinada", state: "finished" },
+      { code: "06", name: "Envolvente térmica Thermochip", state: "in_progress" },
+      { code: "10", name: "Carpintería exterior e interior", state: "finished" },
+    ],
+    state: "pending",
+    invoicedCents: 0,
+    collectedCents: 0,
+    outstandingCents: 0,
+    invoicedOn: null,
+    paidOn: null,
+    hasInvoice: false,
+    request: null,
+    ...overrides,
+  };
+}
+
+export const milestones: ControlMilestone[] = [
+  milestone({
+    id: "hito-h3",
+    code: "H3",
+    name: "Estructura Steel Frame",
+    pctBp: 1500,
+    amountCents: 9_322_200,
+    chapters: [{ code: "03", name: "Estructura Steel Frame", state: "finished" }],
+    state: "invoiced",
+    invoicedCents: 9_322_200,
+    outstandingCents: 9_322_200,
+    invoicedOn: "2026-09-25",
+    hasInvoice: true,
+    request: {
+      id: "req-h3",
+      hitoId: "hito-h3",
+      hitoCode: "H3",
+      chapterCode: "03",
+      amountCents: 9_322_200,
+      description: "H3 Estructura Steel Frame (03)",
+      clientName: "Marta Ruiz Gómez",
+      requestedBy: "Rubén García",
+      requestedAt: "2026-09-11T16:22:00.000Z",
+    },
+  }),
+  milestone(),
+  milestone({
+    id: "hito-h6",
+    code: "H6",
+    name: "Electricidad y telecomunicaciones",
+    pctBp: 800,
+    amountCents: 4_971_840,
+    chapters: [{ code: "13", name: "Electricidad e iluminación", state: "pending" }],
+  }),
+];
+
+export function issue(overrides: Partial<ObraIssue> = {}): ObraIssue {
+  return {
+    id: "issue-7",
+    kind: "issue",
+    number: 7,
+    occurredOn: "2026-10-08",
+    chapterCode: "06",
+    description: "Retraso en el suministro del panel de la fachada norte",
+    party: "subcontractor",
+    partyName: "Montajes Thermochip Norte",
+    costImpactCents: null,
+    scheduleImpactDays: 3,
+    status: "review",
+    files: [{ id: "file-1", filename: "albaran.pdf", contentType: "application/pdf", sizeBytes: 1200 }],
+    createdBy: "Rubén García",
+    createdAt: "2026-10-08T10:00:00.000Z",
+    updatedAt: "2026-10-08T10:00:00.000Z",
+    ...overrides,
+  };
+}
+
+export const issues: ObraIssue[] = [
+  issue(),
+  issue({
+    id: "change-4",
+    kind: "change",
+    number: 4,
+    occurredOn: "2026-09-30",
+    chapterCode: "10",
+    description: "Corredera elevable en lugar de fijo en el salón",
+    party: "client",
+    partyName: null,
+    costImpactCents: 235_000,
+    scheduleImpactDays: 5,
+    status: "pending",
+    files: [],
+  }),
+  issue({
+    id: "issue-5",
+    number: 5,
+    occurredOn: "2026-09-26",
+    description: "El remate de alero no casa con el detalle 5",
+    party: "own",
+    partyName: null,
+    costImpactCents: 32_000,
+    scheduleImpactDays: 1,
+    status: "resolved",
+    files: [],
+  }),
+];
+
+export function photo(overrides: Partial<ProjectPhoto> = {}): ProjectPhoto {
+  return {
+    id: "photo-1",
+    caption: "Fachada norte",
+    sizeBytes: 1000,
+    uploadedAt: "2026-10-17T09:00:00.000Z",
+    uploadedBy: "Rubén García",
+    chapterCode: "06",
+    takenOn: "2026-10-17",
+    ...overrides,
+  };
+}
+
+export const photos: ProjectPhoto[] = [
+  photo(),
+  photo({ id: "photo-2", caption: "Tabiquería planta 1", chapterCode: "04", takenOn: "2026-10-16" }),
+  photo({ id: "photo-3", caption: null, chapterCode: null, takenOn: "2026-10-08" }),
+];
+
+export const control: ConstructionControl = {
+  project: {
+    ref: "VTH-26-001",
+    address: "Caviedes-Corrales, Valdáliga (Cantabria)",
+    clientName: "Marta Ruiz Gómez",
+    startDate: "2026-06-01",
+    completionDate: "2027-03-31",
+    stage: 6,
+  },
+  budget: { revisionId: "rev-1", number: 1, reference: "004/2026" },
+  today: TODAY,
+  chapters,
+  removedChapters: [],
+  reviewPending: false,
+  cost: {
+    budgetedCents: 25_532_600,
+    contractedCents: 20_480_000,
+    contractedCostCents: 20_471_700,
+    deviationCents: -8_300,
+    deviationBp: -4,
+    contingencyCents: 2_475_900,
+  },
+  sales: {
+    contractCents: 62_148_000,
+    invoicedCents: 24_237_720,
+    collectedCents: 14_915_520,
+    outstandingCents: 9_322_200,
+    toInvoiceCents: 37_910_280,
+  },
+  milestones,
+  documentAlerts: [
+    {
+      subcontractorId: "sub-1",
+      subcontractorName: "Cubiertas del Saja",
+      workerId: null,
+      workerName: null,
+      projectId: "p-1",
+      projectRef: "VTH-26-001",
+      documentId: "doc-1",
+      requirementIds: ["rnt_mensual"],
+      state: "expiring",
+      daysLeft: 5,
+      date: "2026-10-22",
+      affectedWorkers: 0,
+    },
+  ],
+  issues: issues.filter((i) => i.status !== "resolved"),
+  events: [
+    {
+      id: "event-1",
+      chapterCode: "10",
+      chapterName: "Carpintería exterior e interior",
+      kind: "finish",
+      previousDate: null,
+      newDate: "2026-10-14",
+      note: null,
+      recordedBy: "Rubén García",
+      recordedAt: "2026-10-14T16:22:00.000Z",
+    },
+    {
+      id: "event-2",
+      chapterCode: "05",
+      chapterName: "Cubierta inclinada",
+      kind: "correct_finish",
+      previousDate: "2026-10-08",
+      newDate: "2026-10-09",
+      note: "La teja de cumbrera se remató el 9",
+      recordedBy: "Admin ViTAH",
+      recordedAt: "2026-10-10T09:05:00.000Z",
+    },
+  ],
+  photos,
+  photoCount: 148,
+  sources: { planning: "mock", purchasing: "mock" },
+};
+
+export const header = { ref: "VTH-26-001", stage: 6 as const, openIssues: 2 };
+
+export const detail: ControlChapterDetail = {
+  chapter: chapters[0]!,
+  milestone: milestone(),
+  events: [
+    {
+      id: "event-3",
+      chapterCode: "06",
+      kind: "correct_start",
+      previousDate: "2026-09-22",
+      newDate: "2026-09-21",
+      note: "El montaje empezó el lunes 21",
+      recordedBy: "Admin ViTAH",
+      recordedAt: "2026-09-23T07:12:00.000Z",
+    },
+    {
+      id: "event-4",
+      chapterCode: "06",
+      kind: "start",
+      previousDate: null,
+      newDate: "2026-09-22",
+      note: null,
+      recordedBy: "Rubén García",
+      recordedAt: "2026-09-22T17:40:00.000Z",
+    },
+  ],
+  issues: [issues[0]!, issues[2]!],
+  photos: [photos[0]!],
+  lines: [
+    { id: "line-1", code: "06.01", description: "Panel Thermochip de fachada", unit: "m²", executedPct: 80 },
+    { id: "line-2", code: "06.02", description: "Lámina transpirable", unit: "m²", executedPct: 100 },
+  ],
+  today: TODAY,
+  sources: { planning: "mock", purchasing: "mock" },
+};
+
+export const costs: ConstructionCosts = {
+  chapters: [
+    {
+      code: "06",
+      name: "Envolvente térmica Thermochip",
+      state: "in_progress",
+      lines: [
+        { id: "l-1", code: "06.01", description: "Panel Thermochip de fachada", unit: "m²", quantity: 201.6, costCents: 1_260_000, contractedCents: 1_215_000, deviationCents: 45_000, deviationBp: 357 },
+        { id: "l-2", code: "06.02", description: "Lámina transpirable Tyvek", unit: "m²", quantity: 201.6, costCents: 116_928, contractedCents: 124_000, deviationCents: -7_072, deviationBp: -605 },
+        { id: "l-3", code: "06.06", description: "Perfilería de arranque y goterones", unit: "ml", quantity: 180, costCents: 171_000, contractedCents: null, deviationCents: null, deviationBp: null },
+      ],
+    },
+    {
+      code: "05",
+      name: "Cubierta inclinada",
+      state: "finished",
+      lines: [
+        { id: "l-4", code: "05.01", description: "Teja cerámica mixta", unit: "m²", quantity: 180, costCents: 2_000_000, contractedCents: 2_100_000, deviationCents: -100_000, deviationBp: -500 },
+      ],
+    },
+  ],
+  sources: { planning: "mock", purchasing: "mock" },
+};
