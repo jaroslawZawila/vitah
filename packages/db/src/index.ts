@@ -39,6 +39,11 @@ export {
   subcontractorDocumentVersions,
   subcontractorAssignments,
   subcontractorAudit,
+  purchaseOrders,
+  purchaseOrderLines,
+  purchaseOrderEvents,
+  type PurchaseOrderKind,
+  type PurchaseOrderStatus,
 } from "./schema";
 export { seedConfig, seedPassword } from "./seed-config";
 export type { AnyColumn } from "drizzle-orm";

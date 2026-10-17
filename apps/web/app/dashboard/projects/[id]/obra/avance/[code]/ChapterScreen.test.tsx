@@ -59,7 +59,16 @@ describe("ChapterScreen", () => {
 
     const cost = within(screen.getByRole("region", { name: "Coste" }));
     expect(cost.getByText("+440,00 € · +1,4 %")).toBeInTheDocument();
-    expect(cost.getByText("· 6 de 9 partidas")).toBeInTheDocument();
+    expect(cost.getByText("· 6 de 9 cerradas · 1 abierta")).toBeInTheDocument();
+    expect(cost.queryByText("Simulado")).not.toBeInTheDocument();
+
+    // Compras: the late delivery is a warning only; the chapter's orders are listed.
+    expect(screen.getByRole("status")).toHaveTextContent("1 entrega con retraso: PED-049 Piedra de Liébana, capítulo 06, prevista el 14 oct.");
+    const orders = within(screen.getByRole("region", { name: /^Pedidos/ }));
+    expect(orders.getByRole("link", { name: "PED-049" })).toHaveAttribute("href", "/dashboard/projects/p-1/compras/order-49");
+    expect(orders.getByRole("link", { name: "PED-041" })).toHaveAttribute("href", "/dashboard/projects/p-1/compras/order-41");
+    expect(orders.getByText("3 d tarde")).toBeInTheDocument();
+    expect(orders.getByRole("link", { name: "+ Nuevo pedido" })).toHaveAttribute("href", "/dashboard/projects/p-1/compras/nuevo?capitulo=06");
 
     const issues = within(screen.getByRole("region", { name: "Incidencias y cambios" }));
     expect(issues.getByRole("article", { name: "INC-007" })).toBeInTheDocument();
@@ -175,6 +184,7 @@ describe("ChapterScreen", () => {
   it("is read-only for viewers", () => {
     renderScreen({ canManage: false });
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "+ Nuevo pedido" })).not.toBeInTheDocument();
     expect(screen.getByLabelText("% ejecutado de 06.01")).toBeDisabled();
   });
 });

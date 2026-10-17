@@ -20,7 +20,10 @@ import { ChapterPhotos, CostCard, DatesCard, LineProgressCard, MilestoneCard } f
 import { HistoryTable } from "../../../components/construction/History";
 import { IssueCard } from "../../../components/construction/IssueViews";
 import { obraHref, StageEyebrow } from "../../../components/construction/ObraFrame";
+import LateDeliveriesBanner from "../../../components/construction/LateDeliveriesBanner";
 import { ChapterStatePill } from "../../../components/construction/pills";
+import ChapterOrders from "../../../components/purchasing/ChapterOrders";
+import { newOrderHref, orderHref, purchasesHref } from "../../../components/purchasing/links";
 import { completesMilestone } from "../../../components/construction/schedule";
 import { SchedulePill } from "../../../components/construction/SummaryTable";
 import ChapterProgress, { type ProgressRequest } from "../../ChapterProgress";
@@ -92,6 +95,11 @@ export default function ChapterScreen({
         )}
       </header>
 
+      <LateDeliveriesBanner
+        orders={detail.orders.filter((o) => o.lateDays !== null)}
+        orderHref={(id) => orderHref(projectId, id)}
+      />
+
       <div className="grid grid-cols-[repeat(auto-fit,minmax(min(300px,100%),1fr))] items-start gap-3.5">
         <DatesCard
           chapter={chapter}
@@ -110,7 +118,6 @@ export default function ChapterScreen({
         <CostCard
           chapter={chapter}
           budgetNumber={control.budget?.number ?? null}
-          purchasingMock={sources.purchasing === "mock"}
           costsHref={obraHref(projectId, "costs")}
         />
       </div>
@@ -145,6 +152,13 @@ export default function ChapterScreen({
           fullUrl={(photo) => projectPhotoUrl(projectId, photo.id)}
         />
       </div>
+
+      <ChapterOrders
+        orders={detail.orders}
+        orderHref={(order) => orderHref(projectId, order.id)}
+        purchasesHref={purchasesHref(projectId)}
+        newOrderHref={canManage ? newOrderHref(projectId, chapter.code) : undefined}
+      />
 
       <LineProgressCard
         lines={detail.lines}

@@ -3,9 +3,10 @@
 import Link from "next/link";
 import { useParams, usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Contact, FolderKanban, HardHat, UserCog } from "lucide-react";
+import { Contact, FolderKanban, HardHat, ShoppingCart, UserCog } from "lucide-react";
 import type { SubcontractorCounts } from "@repo/core/contract";
 import { cn } from "@/lib/utils";
+import { COMPANY_PURCHASES_HREF } from "../projects/[id]/components/purchasing/links";
 
 const NAV_ITEMS = [
   { key: "projects", href: "/dashboard/projects", icon: FolderKanban, adminOnly: false },
@@ -18,6 +19,7 @@ const PROJECT_TABS = [
   { key: "general", path: "" },
   { key: "obra", path: "/obra" },
   { key: "budget", path: "/budget" },
+  { key: "purchases", path: "/compras" },
   { key: "payments", path: "/payments" },
   { key: "documents", path: "/documents" },
 ] as const;
@@ -97,6 +99,7 @@ export default function Sidebar({
           );
         })}
         <SubcontractorsNav pathname={pathname} counts={subcontractors} />
+        <PurchasesNav pathname={pathname} />
       </nav>
 
       <SignedInUser
@@ -195,6 +198,21 @@ function SubcontractorsNav({ pathname, counts }: { pathname: string; counts: Sub
         </ul>
       )}
     </div>
+  );
+}
+
+function PurchasesNav({ pathname }: { pathname: string }) {
+  const t = useTranslations("sidebar");
+  const active = pathname.startsWith(COMPANY_PURCHASES_HREF);
+  return (
+    <Link href={COMPANY_PURCHASES_HREF} className={navLinkClass(active)} aria-current={active ? "page" : undefined}>
+      <ShoppingCart
+        aria-hidden
+        className={cn("size-[19px] flex-none opacity-85", active && "text-rail-accent opacity-100")}
+        strokeWidth={1.8}
+      />
+      {t("purchases")}
+    </Link>
   );
 }
 

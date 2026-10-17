@@ -3,6 +3,7 @@
 import { useTranslations } from "next-intl";
 import { Check, Minus, TriangleAlert } from "lucide-react";
 import { MANDATORY_COMPANY_REQUIREMENTS, provinceForPostalCode, type ProjectOption } from "@repo/core/contract";
+import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { CompanyStatusBadge } from "../../../components/Badges";
@@ -53,7 +54,7 @@ export default function RegistrationStatus({ draft, projects }: { draft: Company
       <Card aria-labelledby="registration-status">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 id="registration-status">{t("title")}</h2>
-          <CompanyStatusBadge status="pendiente" />
+          {draft.suppliesOnly ? <Badge variant="outline">{tr("noCae")}</Badge> : <CompanyStatusBadge status="pendiente" />}
         </div>
         <ul className="m-0 flex list-none flex-col p-0">
           <Item
@@ -80,27 +81,31 @@ export default function RegistrationStatus({ draft, projects }: { draft: Company
                     : t("activityPending")
             }
           />
-          <Item
-            tone={chosen === total ? "good" : "yel"}
-            title={t("documents")}
-            detail={t("documentsDetail", { chosen, total })}
-          />
-          <Item
-            tone={project ? "good" : "muted"}
-            title={t("obra")}
-            detail={
-              project
-                ? draft.obra.chapterCodes.length > 0
-                  ? t("obraChapters", { ref: project.ref, chapters: draft.obra.chapterCodes.join(", ") })
-                  : project.ref
-                : t("obraNone")
-            }
-          />
+          {!draft.suppliesOnly && (
+            <>
+              <Item
+                tone={chosen === total ? "good" : "yel"}
+                title={t("documents")}
+                detail={t("documentsDetail", { chosen, total })}
+              />
+              <Item
+                tone={project ? "good" : "muted"}
+                title={t("obra")}
+                detail={
+                  project
+                    ? draft.obra.chapterCodes.length > 0
+                      ? t("obraChapters", { ref: project.ref, chapters: draft.obra.chapterCodes.join(", ") })
+                      : project.ref
+                    : t("obraNone")
+                }
+              />
+            </>
+          )}
         </ul>
       </Card>
       <Card className="bg-raise shadow-none">
-        <p className="eyebrow">{t("whenApta")}</p>
-        <p className="m-0 text-[13px]">{t("whenAptaDetail", { total })}</p>
+        <p className="eyebrow">{draft.suppliesOnly ? t("supplier") : t("whenApta")}</p>
+        <p className="m-0 text-[13px]">{draft.suppliesOnly ? t("supplierDetail") : t("whenAptaDetail", { total })}</p>
       </Card>
     </aside>
   );

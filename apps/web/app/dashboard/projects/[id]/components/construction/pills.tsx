@@ -77,6 +77,17 @@ export function MockBadge() {
   );
 }
 
+/** Marks a figure that comes from a module that exists (where it used to be simulated). */
+export function LiveBadge() {
+  const t = useTranslations("construction.sources");
+  return (
+    <Badge variant="good" className="px-2 py-0 text-[10.5px]" title={t("liveHint")}>
+      <Dot />
+      {t("live")}
+    </Badge>
+  );
+}
+
 /** A module a figure comes from, in bold; `mock` adds the "Simulado" badge so it isn't mistaken for real data. */
 export function Source({ name, mock = false }: { name: string; mock?: boolean }) {
   return (

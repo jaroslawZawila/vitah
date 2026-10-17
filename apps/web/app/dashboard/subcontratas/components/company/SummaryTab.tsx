@@ -5,6 +5,7 @@ import { MANDATORY_COMPANY_REQUIREMENTS, type SubcontractorDetail } from "@repo/
 import { Badge } from "@/components/ui/badge";
 import { cardVariants } from "@/components/ui/card";
 import { useDates } from "../display";
+import { NoCaeCard } from "./OrdersTab";
 
 function Rows({ rows }: { rows: [string, React.ReactNode][] }) {
   return (
@@ -117,32 +118,36 @@ export default function SummaryTab({ company }: { company: SubcontractorDetail }
           ]}
         />
       </section>
-      <section className={cardVariants()}>
-        <div className="flex items-center justify-between gap-2">
-          <h2>{t("docs")}</h2>
-          <span className="text-[12.5px] text-muted-foreground">{t("mandatory")}</span>
-        </div>
-        <div className="flex items-baseline gap-2">
-          <span className="font-heading text-[38px] leading-none font-bold tabular-nums">
-            {valid} <span className="text-[22px] text-muted-foreground">/ {total}</span>
-          </span>
-          <span className="text-[12.5px] text-muted-foreground">{t("validCount")}</span>
-        </div>
-        <div
-          className="flex h-2 overflow-hidden rounded-full bg-raise"
-          role="img"
-          aria-label={`${valid} / ${total}`}
-        >
-          <span className="bg-good" style={{ width: `${(valid / total) * 100}%` }} />
-          <span className="bg-bad" style={{ width: `${(expired.length / total) * 100}%` }} />
-          <span className="bg-yel" style={{ width: `${(pending.length / total) * 100}%` }} />
-        </div>
-        <div className="flex flex-wrap gap-1.5">
-          <Badge variant="good">{t("valid", { count: valid })}</Badge>
-          {expired.length > 0 && <Badge variant="destructive">{t("expired", { count: expired.length })}</Badge>}
-          {pending.length > 0 && <Badge variant="yel">{t("pending", { count: pending.length })}</Badge>}
-        </div>
-      </section>
+      {company.suppliesOnly ? (
+        <NoCaeCard />
+      ) : (
+        <section className={cardVariants()}>
+          <div className="flex items-center justify-between gap-2">
+            <h2>{t("docs")}</h2>
+            <span className="text-[12.5px] text-muted-foreground">{t("mandatory")}</span>
+          </div>
+          <div className="flex items-baseline gap-2">
+            <span className="font-heading text-[38px] leading-none font-bold tabular-nums">
+              {valid} <span className="text-[22px] text-muted-foreground">/ {total}</span>
+            </span>
+            <span className="text-[12.5px] text-muted-foreground">{t("validCount")}</span>
+          </div>
+          <div
+            className="flex h-2 overflow-hidden rounded-full bg-raise"
+            role="img"
+            aria-label={`${valid} / ${total}`}
+          >
+            <span className="bg-good" style={{ width: `${(valid / total) * 100}%` }} />
+            <span className="bg-bad" style={{ width: `${(expired.length / total) * 100}%` }} />
+            <span className="bg-yel" style={{ width: `${(pending.length / total) * 100}%` }} />
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            <Badge variant="good">{t("valid", { count: valid })}</Badge>
+            {expired.length > 0 && <Badge variant="destructive">{t("expired", { count: expired.length })}</Badge>}
+            {pending.length > 0 && <Badge variant="yel">{t("pending", { count: pending.length })}</Badge>}
+          </div>
+        </section>
+      )}
     </div>
   );
 }

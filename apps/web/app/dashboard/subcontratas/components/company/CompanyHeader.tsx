@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { Download, Pencil } from "lucide-react";
-import type { SubcontractorDetail } from "@repo/core/contract";
+import { companyType, type SubcontractorDetail } from "@repo/core/contract";
+import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { CompanyStatusBadge } from "../Badges";
 import { companyHref, dossierUrl } from "../display";
@@ -22,7 +23,7 @@ export default function CompanyHeader({ company }: { company: SubcontractorDetai
         {ts(`regions.${company.reaRegion}`)}
       </span>,
     ],
-    [t("meta.kind"), ts(`kinds.${company.kind}`)],
+    [t("meta.kind"), ts(`fields.types.${companyType(company)}.label`)],
   ];
 
   return (
@@ -33,7 +34,16 @@ export default function CompanyHeader({ company }: { company: SubcontractorDetai
         </Link>
         <div className="flex flex-wrap items-center gap-x-3.5 gap-y-2">
           <h1 className="[overflow-wrap:anywhere]">{company.legalName}</h1>
-          <CompanyStatusBadge status={company.status.status} className="px-3 py-1 text-[13px]" />
+          {company.suppliesOnly ? (
+            <>
+              <Badge className="px-3 py-1 text-[13px]">{ts("fields.types.supplier.label")}</Badge>
+              <Badge variant="outline" className="px-3 py-1 text-[13px]">
+                {ts("noCae")}
+              </Badge>
+            </>
+          ) : (
+            <CompanyStatusBadge status={company.status.status} className="px-3 py-1 text-[13px]" />
+          )}
         </div>
         <dl className="m-0 flex flex-wrap gap-x-5 gap-y-1 text-[13.5px]">
           {meta.map(([label, value]) => (
@@ -46,7 +56,7 @@ export default function CompanyHeader({ company }: { company: SubcontractorDetai
       </div>
       <div className="flex flex-col gap-2 sm:flex-row">
         {/* The dossier holds CIFs and DNIs in full: admins and managers only. */}
-        {company.canManage && (
+        {company.canManage && !company.suppliesOnly && (
           <a className={buttonVariants({ variant: "outline" })} href={dossierUrl({ subcontractorId: company.id })} download>
             <Download aria-hidden />
             {t("dossier")}

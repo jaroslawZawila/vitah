@@ -8,7 +8,10 @@ export default async function NewWorkerPage({ searchParams }: { searchParams: Pr
   const [{ empresa = "" }, ctx] = await Promise.all([searchParams, getSessionContext()]);
   // Viewers can't register workers (core refuses too).
   if (!ctx || !canEdit(ctx.role)) redirect("/dashboard/subcontratas/trabajadores");
-  const companies = ((await getSubcontractorList()) ?? []).map(({ id, legalName, kind, status }) => ({ id, legalName, kind, status }));
+  // A material supplier has no workers (core refuses too).
+  const companies = ((await getSubcontractorList()) ?? [])
+    .filter((c) => !c.suppliesOnly)
+    .map(({ id, legalName, kind, status }) => ({ id, legalName, kind, status }));
   return (
     <WorkerScreen
       worker={null}

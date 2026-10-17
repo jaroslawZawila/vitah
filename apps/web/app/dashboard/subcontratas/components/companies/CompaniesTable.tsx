@@ -5,10 +5,12 @@ import { useTranslations } from "next-intl";
 import { ChevronRight, Search } from "lucide-react";
 import {
   DOC_PILLARS,
+  companyType,
   type CompanyStatus,
   type ProjectOption,
   type SubcontractorListItem,
 } from "@repo/core/contract";
+import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { cardVariants } from "@/components/ui/card";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
@@ -31,7 +33,8 @@ export function filterCompanies(companies: SubcontractorListItem[], filter: Comp
   const query = filter.query.trim().toLowerCase();
   return companies.filter(
     (c) =>
-      (filter.status === "all" || c.status === filter.status) &&
+      // A material supplier has no CAE status: only under "all".
+      (filter.status === "all" || (!c.suppliesOnly && c.status === filter.status)) &&
       (!query || c.legalName.toLowerCase().includes(query) || c.taxIdMasked.toLowerCase().includes(query)) &&
       (!filter.trade || c.trades.includes(filter.trade)) &&
       (!filter.projectId || c.projectIds.includes(filter.projectId)),
@@ -72,7 +75,7 @@ export default function CompaniesTable({
             <ToggleChip key={status} tone="solid" on={filter.status === status} onToggle={() => set({ status })}>
               {t(`filters.${status}`)}
               <span className="num text-[11.5px] opacity-80">
-                {status === "all" ? counted.length : counted.filter((c) => c.status === status).length}
+                {status === "all" ? counted.length : counted.filter((c) => !c.suppliesOnly && c.status === status).length}
               </span>
             </ToggleChip>
           ))}
@@ -152,19 +155,29 @@ export default function CompaniesTable({
                 </TableCell>
                 <TableCell className="min-w-40 whitespace-normal">
                   {c.trades.map((trade) => ts(`trades.${trade}`)).join(" · ") || "—"}
-                  <div className="text-[12.5px] text-muted-foreground">{ts(`kinds.${c.kind}`)}</div>
+                  <div className="text-[12.5px] text-muted-foreground">
+                    {ts(`fields.types.${companyType(c)}.label`)}
+                  </div>
                 </TableCell>
-                {DOC_PILLARS.map((pillar) => (
-                  <TableCell key={pillar} className="text-center">
-                    <DocStateBadge state={c.pillars[pillar].state} daysLeft={c.pillars[pillar].daysLeft} short />
+                {c.suppliesOnly ? (
+                  <TableCell colSpan={DOC_PILLARS.length + 2} className="text-center text-[12.5px] text-muted-foreground">
+                    {t("table.noCae")}
                   </TableCell>
-                ))}
-                <TableCell className="text-center num">
-                  {c.docsValid}/{c.docsTotal}
-                </TableCell>
-                <TableCell className="text-center num">{c.workers}</TableCell>
+                ) : (
+                  <>
+                    {DOC_PILLARS.map((pillar) => (
+                      <TableCell key={pillar} className="text-center">
+                        <DocStateBadge state={c.pillars[pillar].state} daysLeft={c.pillars[pillar].daysLeft} short />
+                      </TableCell>
+                    ))}
+                    <TableCell className="text-center num">
+                      {c.docsValid}/{c.docsTotal}
+                    </TableCell>
+                    <TableCell className="text-center num">{c.workers}</TableCell>
+                  </>
+                )}
                 <TableCell>
-                  <CompanyStatusBadge status={c.status} />
+                  {c.suppliesOnly ? <Badge>{ts("fields.types.supplier.label")}</Badge> : <CompanyStatusBadge status={c.status} />}
                 </TableCell>
                 <TableCell>
                   <Link

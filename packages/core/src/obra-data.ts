@@ -55,6 +55,9 @@ const STATUS: Record<ObraError, number> = {
   file_too_large: 413,
   duplicate_code: 409,
   unknown_chapter: 400,
+  unknown_line: 400,
+  unknown_supplier: 400,
+  supplies_only: 409,
   budget_exists: 409,
   draft_exists: 409,
   not_draft: 409,
@@ -132,6 +135,24 @@ export function workDate(value: unknown, today = todayInSpain()): string {
   if (date > today) fail("invalid_date");
   return date;
 }
+
+/** Null when missing or empty; else as `parse` reads it. */
+export const orNull =
+  <T>(parse: (value: unknown) => T) =>
+  (value: unknown): T | null =>
+    value === undefined || value === null || value === "" ? null : parse(value);
+
+/** One of `allowed`; `invalid_input` otherwise. */
+export const pick =
+  <T extends string>(allowed: readonly T[]) =>
+  (value: unknown): T =>
+    allowed.find((a) => a === value) ?? fail("invalid_input");
+
+export const isObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+/** Who did something: their name, else their email. */
+export const userName = sql<string | null>`coalesce(${users.name}, ${users.email})`;
 
 /**
  * The columns a partial update sets: each parser runs only for the keys
@@ -267,7 +288,7 @@ export async function loadBudget(tenantId: string, projectId: string) {
 
 export type HitoRow = typeof obraHitos.$inferSelect;
 
-function groupBy<T>(rows: T[], key: (row: T) => string): Map<string, T[]> {
+export function groupBy<T>(rows: T[], key: (row: T) => string): Map<string, T[]> {
   const groups = new Map<string, T[]>();
   for (const row of rows) {
     const group = groups.get(key(row));

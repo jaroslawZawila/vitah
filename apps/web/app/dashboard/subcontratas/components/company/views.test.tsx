@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
 import type { ReactNode } from "react";
@@ -17,6 +17,8 @@ import CompanyHeader from "./CompanyHeader";
 import CompanyTabs from "./CompanyTabs";
 import HistoryList from "./HistoryList";
 import ObrasTab from "./ObrasTab";
+import OrdersTab from "./OrdersTab";
+import { orderItem } from "../../../../../test/purchasing-fixture";
 import SummaryTab from "./SummaryTab";
 import WorkersTab from "./WorkersTab";
 
@@ -66,6 +68,7 @@ const worker: WorkerListItem = {
 const company: SubcontractorDetail = {
   id: "c-1",
   kind: "company",
+  suppliesOnly: false,
   legalName: "Electricidad Saja S.L.",
   taxId: "B39123450",
   address: "C/ Ramón y Cajal 14",
@@ -118,6 +121,42 @@ describe("CompanyHeader", () => {
   it("hides editing from viewers", () => {
     wrap(<CompanyHeader company={{ ...company, canManage: false }} />);
     expect(screen.queryByRole("link", { name: /Editar datos/ })).not.toBeInTheDocument();
+  });
+});
+
+describe("a material supplier", () => {
+  const supplier: SubcontractorDetail = { ...company, legalName: "Piedra de Liébana S.L.", suppliesOnly: true };
+
+  it("is marked as such in its header, without CAE status or dossier", () => {
+    wrap(<CompanyHeader company={supplier} />);
+    expect(screen.getAllByText("Proveedor de material").length).toBeGreaterThan(0);
+    expect(screen.getByText("Sin CAE")).toBeInTheDocument();
+    expect(screen.queryByText("Bloqueada")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Dossier CAE/ })).not.toBeInTheDocument();
+  });
+
+  it("has only its data, orders and history as tabs", () => {
+    wrap(<CompanyTabs tab="pedidos" tabs={["resumen", "pedidos", "historial"]} counts={{ pedidos: 3 }} onChange={() => {}} />);
+    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["Resumen", "Pedidos3", "Historial"]);
+  });
+
+  it("lists its orders across the obras and says why it has no CAE", () => {
+    const orders = [orderItem(), orderItem({ id: "order-6", number: 6, projectId: "p-3", projectRef: "VTH-26-003", status: "delivered", lateDays: null, amountCents: 126_000 })];
+    wrap(<OrdersTab company={supplier} orders={orders} />);
+
+    const table = within(screen.getByRole("table", { name: "Pedidos" }));
+    expect(table.getByRole("link", { name: "PED-049" })).toHaveAttribute("href", "/dashboard/projects/p-1/compras/order-49");
+    expect(table.getByRole("link", { name: "VTH-26-003" })).toHaveAttribute("href", "/dashboard/projects/p-3/compras");
+    expect(table.getByText("3 d tarde")).toBeInTheDocument();
+    expect(table.getByText("Contratado con este proveedor").closest("tr")).toHaveTextContent("4380,00");
+    expect(screen.getByRole("heading", { name: "Sin documentación CAE" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Contacto" })).toBeInTheDocument();
+  });
+
+  it("shows the no-CAE note instead of the documents in its summary", () => {
+    wrap(<SummaryTab company={supplier} />);
+    expect(screen.getByRole("heading", { name: "Sin documentación CAE" })).toBeInTheDocument();
+    expect(screen.queryByText("1 caducado")).not.toBeInTheDocument();
   });
 });
 

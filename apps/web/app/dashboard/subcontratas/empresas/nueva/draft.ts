@@ -75,6 +75,8 @@ export const obraComplete = ({ obra }: CompanyFlowDraft) => !obra.projectId || a
  */
 export function createInput(draft: CompanyFlowDraft) {
   const { documents, obra, ...fields } = draft;
+  // A material supplier has no obra and no CAE documents.
+  if (draft.suppliesOnly) return fields;
   // The PSS adhesion is a file: it goes up after, with the others.
   const assignment = { ...obra, pssFile: undefined };
   return {
@@ -90,6 +92,7 @@ export type Upload = { requirementId: string; file: File; issuedAt: string; expi
 
 /** The files to upload once the company exists, one request each (a function body is limited to 4.5 MB). */
 export function uploadsOf(draft: CompanyFlowDraft): Upload[] {
+  if (draft.suppliesOnly) return [];
   const uploads: Upload[] = Object.entries(draft.documents)
     .filter(([, doc]) => doc.file && !doc.notApplicable)
     .map(([requirementId, doc]) => ({ requirementId, file: doc.file!, issuedAt: doc.issuedAt, expiresAt: doc.expiresAt }));

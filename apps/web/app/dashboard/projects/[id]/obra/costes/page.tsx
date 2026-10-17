@@ -9,6 +9,6 @@ export default async function ObraCostsPage({ params }: { params: Promise<{ id: 
   const [header, result] = await Promise.all([loadHeader(id), getConstructionCosts(id)]);
   if (!result) redirect(`/dashboard/projects/${id}/obra`);
   return (
-    <CostsScreen projectId={id} header={header} costs={result.costs} budgetNumber={header.budgetNumber} />
+    <CostsScreen projectId={id} header={header} costs={result.costs} budgetNumber={header.budgetNumber} canManage={result.canManage} />
   );
 }

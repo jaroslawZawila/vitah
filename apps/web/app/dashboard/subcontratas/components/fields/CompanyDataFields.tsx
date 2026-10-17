@@ -2,7 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import { MapPin } from "lucide-react";
-import { SUBCONTRACTOR_KINDS, provinceForPostalCode } from "@repo/core/contract";
+import { companyType, provinceForPostalCode, type CompanyType } from "@repo/core/contract";
 import { Field, FieldDescription } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,6 +14,21 @@ export const segmentStyles = {
   group: "m-0 flex w-fit flex-wrap gap-[3px] rounded-[10px] border bg-raise p-[3px]",
   option:
     "flex min-h-11 cursor-pointer items-center rounded-[7px] px-4 text-[13.5px] font-semibold text-muted-foreground transition-colors has-checked:bg-card has-checked:text-foreground has-checked:shadow-card has-disabled:cursor-not-allowed has-disabled:opacity-45 lg:min-h-9 [&>input]:sr-only",
+};
+
+/** The first choice of the company form: on-site company, self-employed, or a material supplier (no CAE). */
+const COMPANY_TYPES: readonly CompanyType[] = ["company", "self_employed", "supplier"];
+
+const TYPE_PATCH: Record<CompanyType, Partial<CompanyFormDraft>> = {
+  company: { kind: "company", suppliesOnly: false },
+  self_employed: { kind: "self_employed", suppliesOnly: false, subcontractsFurther: false },
+  supplier: { kind: "company", suppliesOnly: true, subcontractsFurther: false },
+};
+
+const typeStyles = {
+  option:
+    "flex min-h-11 cursor-pointer items-start gap-3 rounded-[10px] border bg-card px-3.5 py-3 text-[13.5px] transition-colors hover:border-primary/50 has-checked:border-primary has-checked:bg-brand-soft",
+  radio: "mt-0.5 size-4 flex-none cursor-pointer accent-primary",
 };
 
 /**
@@ -56,19 +71,25 @@ export default function CompanyDataFields({
     <div className={f.fields}>
       <fieldset className={cn("m-0 flex min-w-0 flex-col gap-1.5 border-0 p-0", f.wide)}>
         <legend className="mb-1.5 p-0 text-xs font-medium text-muted-foreground">{t("kind")}</legend>
-        <div className={segmentStyles.group}>
-          {SUBCONTRACTOR_KINDS.map((kind) => (
-            <label key={kind} className={segmentStyles.option}>
+        <div className="grid gap-2.5 sm:grid-cols-3">
+          {COMPANY_TYPES.map((type) => (
+            <label key={type} className={typeStyles.option}>
               <input
                 type="radio"
                 name="company-kind"
-                value={kind}
-                checked={draft.kind === kind}
-                onChange={() =>
-                  onChange(kind === "self_employed" ? { kind, subcontractsFurther: false } : { kind })
-                }
+                value={type}
+                checked={companyType(draft) === type}
+                onChange={() => onChange(TYPE_PATCH[type])}
+                className={typeStyles.radio}
+                aria-label={t(`types.${type}.label`)}
+                aria-describedby={`company-type-${type}-hint`}
               />
-              {tr(`kinds.${kind}`)}
+              <span className="min-w-0">
+                <b className="font-semibold">{t(`types.${type}.label`)}</b>
+                <span id={`company-type-${type}-hint`} className="block text-[12.5px] text-muted-foreground">
+                  {t(`types.${type}.hint`)}
+                </span>
+              </span>
             </label>
           ))}
         </div>

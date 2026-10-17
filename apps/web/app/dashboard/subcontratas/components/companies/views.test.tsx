@@ -42,6 +42,7 @@ function company(overrides: Partial<SubcontractorListItem> = {}): SubcontractorL
     docsTotal: 7,
     workers: 4,
     projectIds: ["p-1"],
+    suppliesOnly: false,
     ...overrides,
   };
 }
@@ -176,6 +177,18 @@ describe("CompaniesTable", () => {
     expect(filterCompanies(companies, { ...NO_FILTER, query: "836b" }).map((c) => c.id)).toEqual(["c-3"]);
     expect(filterCompanies(companies, { ...NO_FILTER, trade: "roofing" }).map((c) => c.id)).toEqual(["c-1"]);
     expect(filterCompanies(companies, { ...NO_FILTER, projectId: "p-1" }).map((c) => c.id)).toEqual(["c-1"]);
+  });
+
+  it("shows a material supplier without CAE status or document columns, and only under 'all'", () => {
+    const supplier = company({ id: "c-9", legalName: "Piedra de Liébana S.L.", suppliesOnly: true, workers: 0 });
+    wrap(<CompaniesTable companies={[...companies, supplier]} projects={[]} filter={NO_FILTER} onFilterChange={() => {}} />);
+
+    const row = screen.getByRole("link", { name: "Piedra de Liébana S.L." }).closest("tr")!;
+    expect(within(row).getAllByText("Proveedor de material")).toHaveLength(2);
+    expect(within(row).getByText("Sin documentación CAE")).toBeInTheDocument();
+    expect(within(row).queryByText("Apta")).not.toBeInTheDocument();
+    expect(filterCompanies([supplier], { ...NO_FILTER, status: "apta" })).toEqual([]);
+    expect(filterCompanies([supplier], NO_FILTER)).toEqual([supplier]);
   });
 
   it("says when nothing matches", () => {

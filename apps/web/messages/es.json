@@ -26,7 +26,8 @@
       "obra": "Obra",
       "budget": "Presupuesto",
       "payments": "Pagos",
-      "documents": "Documentos"
+      "documents": "Documentos",
+      "purchases": "Compras"
     },
     "network": "Red",
     "subcontractors": "Subcontratas",
@@ -36,7 +37,8 @@
       "workers": "Trabajadores",
       "expiries": "Caducidades",
       "expiriesCount": "{count, plural, one {# documento caducado o por caducar} other {# documentos caducados o por caducar}}"
-    }
+    },
+    "purchases": "Compras"
   },
   "topbar": {
     "titles": {
@@ -477,7 +479,10 @@
       "ai_limit_reached": "Se ha alcanzado el límite mensual de uso de la IA.",
       "too_many_pages": "Los documentos son demasiado largos para la IA.",
       "no_documents": "Sube al menos un documento del proyecto.",
-      "invalid_state": "El capítulo ya no está en ese estado. Recarga la página."
+      "invalid_state": "El capítulo ya no está en ese estado. Recarga la página.",
+      "unknown_line": "Una de las partidas ya no está en el presupuesto aceptado. Recarga la página.",
+      "unknown_supplier": "Ese proveedor ya no está en Subcontratas.",
+      "supplies_only": "Un proveedor de material solo recibe pedidos de material, no subcontratos."
     }
   },
   "construction": {
@@ -534,7 +539,9 @@
       "progress": "Avance",
       "budget": "Presupuesto",
       "sales": "Ventas",
-      "payments": "Pagos"
+      "payments": "Pagos",
+      "live": "Real",
+      "liveHint": "Dato real del módulo Compras."
     },
     "groups": {
       "in_progress": "En curso · {count}",
@@ -605,9 +612,9 @@
         "budgeted": "Presupuestado",
         "contracted": "Contratado",
         "deviation": "Desviación",
-        "savingNote": "Ahorro sobre las partidas contratadas ({amount} presupuestados). Lo no contratado no cuenta.",
-        "overrunNote": "Sobrecoste sobre las partidas contratadas ({amount} presupuestados). Lo no contratado no cuenta.",
-        "nothingContracted": "Todavía no hay partidas contratadas: la desviación se mide solo sobre lo contratado.",
+        "savingNote": "Ahorro sobre las partidas cerradas ({amount} presupuestados). Lo abierto o sin contratar no cuenta.",
+        "overrunNote": "Sobrecoste sobre las partidas cerradas ({amount} presupuestados). Lo abierto o sin contratar no cuenta.",
+        "nothingContracted": "Todavía no hay partidas cerradas: la desviación se mide solo sobre ellas.",
         "revision": "Rev.{number}",
         "sales": "Venta",
         "contract": "Contratado",
@@ -643,9 +650,9 @@
         "cost": "Coste presup.",
         "contracted": "Contratado",
         "deviation": "Desviación",
-        "contractedLines": "{contracted} de {total} partidas contratadas",
+        "contractedLines": "{contracted} de {total} partidas cerradas",
         "total": "Total · {count, plural, one {# capítulo} other {# capítulos}} a coste",
-        "footnote": "Importes en euros, a coste. Imprevistos (cap. 20, {contingency} €) quedan como reserva. Desviación = coste presupuestado − contratado, solo sobre partidas contratadas: positivo es ahorro, negativo sobrecoste."
+        "footnote": "Importes en euros, a coste. Imprevistos (cap. 20, {contingency} €) quedan como reserva. Desviación = coste presupuestado − contratado, solo sobre partidas cerradas: positivo es ahorro, negativo sobrecoste."
       },
       "milestones": {
         "title": "Hitos de pago",
@@ -833,10 +840,10 @@
       "seeLines": "Ver partidas",
       "budgeted": "Presupuestado",
       "contracted": "Contratado",
-      "contractedLines": "{contracted} de {total} partidas",
+      "contractedLines": "{closed} de {total} cerradas",
       "notContracted": "Sin contratar",
       "deviation": "Desviación",
-      "deviationOn": "Sobre {count, plural, one {la partida contratada} other {las # partidas contratadas}} ({amount} presupuestados).",
+      "deviationOn": "Sobre {count, plural, one {la partida cerrada} other {las # partidas cerradas}} ({amount} presupuestados).",
       "revision": "Rev.{number}",
       "photos": "Fotos del capítulo",
       "seeAll": "Ver todas",
@@ -851,7 +858,8 @@
       "lineProgressHint": "El % ejecutado de cada partida es lo que la app del cliente muestra como avance de este capítulo.",
       "lineProgressFinished": "Capítulo finalizado: en la app del cliente cuenta como 100 %.",
       "noLines": "Este capítulo no tiene partidas.",
-      "executedLabel": "% ejecutado de {code}"
+      "executedLabel": "% ejecutado de {code}",
+      "openLines": "{count, plural, one {# abierta} other {# abiertas}}"
     },
     "costs": {
       "title": "Costes por partida",
@@ -863,7 +871,8 @@
       "contracting": "Contratación",
       "filter": {
         "all": "Todas",
-        "contracted": "Contratadas",
+        "closed": "Cerradas",
+        "open": "Abiertas",
         "uncontracted": "Sin contratar",
         "overrun": "Con sobrecoste"
       },
@@ -873,14 +882,18 @@
       "noMatch": "Ninguna partida coincide con los filtros.",
       "line": "Partida",
       "descriptionCol": "Descripción",
-      "unit": "Ud",
-      "quantity": "Cantidad",
       "cost": "Coste presup.",
       "contracted": "Contratado",
       "deviation": "Desviación",
-      "contractedOf": "{contracted} de {total} contratadas",
       "notContracted": "Sin contratar",
-      "footnote": "Desviación = coste presupuestado − contratado. Positivo es ahorro, negativo sobrecoste, cero neutro. Una partida sin contratar solo muestra su coste presupuestado: contratado y desviación quedan vacíos, nunca a cero. Nada de esta pantalla se edita aquí: el coste viene del presupuesto aceptado y lo contratado de Compras."
+      "footnote": "Lo contratado es la suma de los pedidos de la partida desde Pedido o Contratado; los pendientes y cancelados no suman. Desviación = coste presupuestado − contratado, solo en partidas cerradas: positivo es ahorro, negativo sobrecoste. Una partida abierta (falta contratar otra parte) muestra lo contratado hasta ahora, pero su desviación se deja vacía: nunca cuenta como ahorro. Una sin contratar solo muestra su coste, nunca un cero.",
+      "orders": "Pedidos",
+      "late": "retraso",
+      "openLine": "Abierta",
+      "closedOf": "{closed} de {total} cerradas",
+      "openCount": "{count, plural, one {# abierta} other {# abiertas}}",
+      "order": "Pedir",
+      "noDeviationYet": "sin desviación hasta cerrarla"
     },
     "milestones": {
       "title": "Hitos de pago",
@@ -1018,6 +1031,12 @@
         "not_found": "Foto no encontrada.",
         "forbidden": "Solo administradores y gestores pueden gestionar fotos."
       }
+    },
+    "lateDeliveries": {
+      "title": "{count, plural, one {# entrega con retraso:} other {# entregas con retraso:}}",
+      "chapter": "capítulo {codes}",
+      "expected": "prevista el {date}",
+      "onlyWarning": "Solo es un aviso: no cambia el estado ni las fechas."
     }
   },
   "budget": {
@@ -1889,7 +1908,8 @@
       "project_not_found": "La obra no existe.",
       "worker_not_found": "El trabajador no existe.",
       "not_found": "No encontrado.",
-      "forbidden": "No tienes permiso para hacer esto."
+      "forbidden": "No tienes permiso para hacer esto.",
+      "supplies_only": "Un proveedor de material no tiene trabajadores, obras ni documentos CAE; y una empresa con trabajadores u obras no puede pasar a serlo."
     },
     "audit": {
       "system": "Sistema",
@@ -2013,7 +2033,8 @@
         "openFor": "Abrir la ficha de {name}",
         "reaIn": "REA {region}",
         "empty": "Ninguna empresa coincide con el filtro.",
-        "none": "Aún no hay empresas registradas."
+        "none": "Aún no hay empresas registradas.",
+        "noCae": "Sin documentación CAE"
       }
     },
     "company": {
@@ -2039,7 +2060,8 @@
         "documentos": "Documentos",
         "trabajadores": "Trabajadores",
         "obras": "Obras",
-        "historial": "Historial"
+        "historial": "Historial",
+        "pedidos": "Pedidos"
       },
       "summary": {
         "data": "Datos de la empresa",
@@ -2071,7 +2093,8 @@
         "validCount": "validados y vigentes",
         "valid": "{count, plural, one {# validado} other {# validados}}",
         "expired": "{count, plural, one {# caducado} other {# caducados}}",
-        "pending": "{count, plural, one {# pendiente} other {# pendientes}}"
+        "pending": "{count, plural, one {# pendiente} other {# pendientes}}",
+        "contact": "Contacto"
       },
       "documents": {
         "title": "Documentos",
@@ -2120,6 +2143,15 @@
         "hint": "Registro de cada alta, cambio, validación y rechazo",
         "empty": "Sin cambios registrados.",
         "worker": "Trabajador: {name}"
+      },
+      "supplier": {
+        "title": "Sin documentación CAE",
+        "text": "Un proveedor de material solo suministra: no trabaja en obra con personal propio, así que no se le piden documentos CAE ni se dan de alta trabajadores.",
+        "change": "Si va a montar o colocar en obra, cámbialo a subcontrata en Editar: se le pedirá la documentación como a cualquier otra."
+      },
+      "orders": {
+        "title": "Pedidos",
+        "empty": "Todavía no tiene pedidos en ninguna obra."
       }
     },
     "fields": {
@@ -2183,6 +2215,20 @@
         "bookOrder": "Nº de orden",
         "bookDate": "Fecha del asiento",
         "cssInformed": "Coordinador de SyS informado"
+      },
+      "types": {
+        "company": {
+          "label": "Empresa subcontratista",
+          "hint": "Trabaja en obra. Documentación CAE de empresa y de trabajadores."
+        },
+        "self_employed": {
+          "label": "Autónomo",
+          "hint": "Trabaja en obra por su cuenta. Documentación CAE de autónomo."
+        },
+        "supplier": {
+          "label": "Proveedor de material",
+          "hint": "Solo suministra. Sin CAE ni trabajadores; puede recibir pedidos."
+        }
       }
     },
     "wizard": {
@@ -2245,7 +2291,9 @@
         "obraChapters": "{ref} · cap. {chapters}",
         "obraNone": "Sin asignar (opcional)",
         "whenApta": "Cuándo será apta",
-        "whenAptaDetail": "Al validar los {total} documentos obligatorios. Sus trabajadores tendrán acceso a una obra cuando además estén la adhesión al PSS y el asiento en el libro de subcontratación."
+        "whenAptaDetail": "Al validar los {total} documentos obligatorios. Sus trabajadores tendrán acceso a una obra cuando además estén la adhesión al PSS y el asiento en el libro de subcontratación.",
+        "supplier": "Proveedor de material",
+        "supplierDetail": "Solo suministra: no se le piden documentos CAE ni trabajadores, y queda listo para recibir pedidos de material desde Compras."
       },
       "reviewIntro": "Revisa los datos antes de registrar la empresa."
     },
@@ -2372,6 +2420,354 @@
           "hiring": "Alta y contratación"
         }
       }
+    },
+    "noCae": "Sin CAE"
+  },
+  "purchasing": {
+    "status": {
+      "pending": "Pendiente",
+      "ordered": "Pedido",
+      "confirmed": "Confirmado",
+      "in_transit": "En tránsito",
+      "delivered": "Entregado",
+      "contracted": "Contratado",
+      "finished": "Finalizado",
+      "cancelled": "Cancelado"
+    },
+    "kind": {
+      "material": "Material",
+      "subcontract": "Subcontrato"
+    },
+    "cae": {
+      "none": "Sin CAE",
+      "apta": "Apta",
+      "pendiente": "CAE pendiente",
+      "bloqueada": "CAE bloqueada"
+    },
+    "lateDays": "{days} d tarde",
+    "notCounted": "Pendientes y cancelados no suman",
+    "groups": {
+      "label": "Estado",
+      "all": "Todos",
+      "open": "Abiertos",
+      "pending": "Sin enviar",
+      "done": "Cerrados",
+      "cancelled": "Cancelados"
+    },
+    "list": {
+      "cards": "Pedidos",
+      "table": "Pedidos",
+      "number": "Nº",
+      "projectNumber": "Obra · Nº",
+      "supplier": "Proveedor",
+      "concept": "Concepto",
+      "chapter": "Cap.",
+      "chapterShort": "cap. {codes}",
+      "amount": "Importe",
+      "orderedOn": "Pedido",
+      "expected": "Entrega prevista",
+      "when": "Entrega / trabajos",
+      "status": "Estado",
+      "footer": "{count, plural, one {# pedido} other {# pedidos}} · contratado",
+      "supplierFooter": "Contratado con este proveedor",
+      "all": "Todos",
+      "chapterFilter": "Capítulo",
+      "lateOnly": "Solo con retraso",
+      "noMatch": "Ningún pedido con estos filtros."
+    },
+    "kpis": {
+      "label": "Resumen de compras",
+      "contracted": "Contratado",
+      "contractedHint": "{pct} de {cost} a coste (cap. 01–19)",
+      "deviation": "Desviación",
+      "savingHint": "Ahorro del {pct} sobre {count, plural, one {# partida cerrada} other {# partidas cerradas}}. Las que siguen abiertas no cuentan.",
+      "overrunHint": "Sobrecoste del {pct} sobre {count, plural, one {# partida cerrada} other {# partidas cerradas}}. Las que siguen abiertas no cuentan.",
+      "noneClosed": "Ninguna partida cerrada todavía: la desviación solo se mide sobre las cerradas.",
+      "toContract": "Por contratar",
+      "toContractHint": "{lines, plural, one {# partida} other {# partidas}} sin pedido · {pending, plural, one {# pedido pendiente} other {# pedidos pendientes}} de enviar",
+      "late": "Entregas con retraso",
+      "lateHint": "{supplier} · prevista {date}, {days, plural, one {# día} other {# días}}",
+      "noneLate": "Ninguna entrega va con retraso."
+    },
+    "upcoming": {
+      "title": "Por contratar pronto",
+      "text": "Capítulos que empiezan en los próximos {days} días con partidas sin pedido.",
+      "empty": "Nada pendiente de pedir para los próximos días.",
+      "started": "En curso",
+      "starts": "Inicio {date}",
+      "noDate": "Sin fecha",
+      "lines": "{count, plural, one {# partida} other {# partidas}}",
+      "notSent": "sin enviar",
+      "order": "Pedir partidas de un capítulo"
+    },
+    "project": {
+      "title": "Compras",
+      "description": "Pedidos de material y subcontratos de la obra, repartidos por partida. Lo contratado aquí es lo que Obra compara con el coste del presupuesto.",
+      "new": "Nuevo pedido",
+      "orders": "Pedidos",
+      "none": "Todavía no hay pedidos en esta obra.",
+      "footnote": "Un pedido cuenta como contratado desde <b>Pedido</b> (material) o <b>Contratado</b> (subcontrato). Los pendientes y cancelados no suman. Una entrega pasada de fecha solo avisa: nunca cambia el estado ni las fechas de la obra."
+    },
+    "order": {
+      "back": "Compras",
+      "subcontractor": "Subcontrata",
+      "steps": "Estado del pedido",
+      "plannedOn": "previsto {date}",
+      "cancelledOn": "Cancelado el {date}: no suma a lo contratado.",
+      "edit": "Editar",
+      "cancelOrder": "Cancelar pedido",
+      "confirmCancel": "¿Cancelar {number}? Dejará de sumar a lo contratado.",
+      "confirmRemoveFile": "¿Quitar el documento de este pedido?",
+      "advance": {
+        "ordered": "Marcar pedido",
+        "confirmed": "Marcar confirmado",
+        "in_transit": "Marcar en tránsito",
+        "delivered": "Registrar entrega",
+        "contracted": "Marcar contratado",
+        "finished": "Registrar fin de trabajos"
+      },
+      "dated": {
+        "delivered": {
+          "title": "Registrar entrega",
+          "hint": "El día en que llegó el material a obra. Puede ser anterior a hoy, nunca posterior.",
+          "date": "Fecha de entrega",
+          "confirm": "Confirmar entrega"
+        },
+        "finished": {
+          "title": "Registrar fin de trabajos",
+          "hint": "El día en que la subcontrata terminó sus trabajos. Puede ser anterior a hoy, nunca posterior.",
+          "date": "Fecha de fin",
+          "confirm": "Confirmar fin"
+        }
+      },
+      "note": "Nota (opcional)",
+      "notePlaceholder": "Albarán, incidencias en la descarga…",
+      "cancel": "Cancelar",
+      "saving": "Guardando…",
+      "late": {
+        "title": "{days, plural, one {Entrega con # día de retraso.} other {Entrega con # días de retraso.}}",
+        "expected": "Estaba prevista el {date}.",
+        "running": "{count, plural, one {El capítulo {codes} sigue en curso.} other {Los capítulos {codes} siguen en curso.}}",
+        "onlyWarning": "El aviso no cambia ninguna fecha de la obra.",
+        "recordIssue": "Registrar incidencia"
+      },
+      "lines": {
+        "title": "Partidas del pedido",
+        "atCost": "Coste del presupuesto aceptado, sin margen",
+        "atCostRevision": "Coste del presupuesto Rev.{number} aceptado, sin margen",
+        "line": "Partida",
+        "description": "Descripción",
+        "cost": "Coste presup.",
+        "others": "Otros pedidos",
+        "this": "Este pedido",
+        "closes": "Cierra",
+        "deviation": "Desviación",
+        "yes": "Sí",
+        "no": "No",
+        "open": "abierta",
+        "gone": "Ya no está en el presupuesto aceptado",
+        "total": "Total del pedido (sin IVA)",
+        "closedNote": "Una partida cerrada (por este pedido o por otro) cuenta su desviación: coste − todo lo contratado para ella. Las abiertas no cuentan hasta cerrarse.",
+        "openNote": "Ninguna partida de este pedido está cerrada: lo contratado suma, pero su desviación no cuenta hasta cerrarlas."
+      },
+      "data": {
+        "title": "Datos",
+        "orderedOn": "Pedido",
+        "expectedOn": "Entrega prevista",
+        "works": "Trabajos",
+        "deliveredOn": "Entregado",
+        "finishedOn": "Finalizado",
+        "chapter": "Capítulo",
+        "chapters": "Capítulos",
+        "document": "Documento",
+        "noDocument": "Ninguno",
+        "upload": "Subir PDF",
+        "replace": "Sustituir PDF",
+        "remove": "Quitar",
+        "notes": "Notas",
+        "createdBy": "Creado por",
+        "change": "Cambiar"
+      }
+    },
+    "history": {
+      "title": "Historial",
+      "empty": "Sin cambios todavía.",
+      "created": "{count, plural, one {Creado con # partida} other {Creado con # partidas}}, {amount} €",
+      "deliveredOn": ", entregado el {date}",
+      "finishedOn": ", finalizado el {date}",
+      "field": "{field}: {from} → {to}",
+      "fields": {
+        "description": "Concepto",
+        "orderedOn": "Fecha de pedido",
+        "expectedOn": "Entrega prevista",
+        "workStart": "Trabajos desde",
+        "workEnd": "Trabajos hasta",
+        "kind": "Tipo"
+      },
+      "changed": {
+        "subcontractorId": "Proveedor cambiado",
+        "notes": "Notas cambiadas"
+      },
+      "lineAdded": "{code} añadida: {amount}",
+      "lineRemoved": "{code} quitada",
+      "lineAmount": "Importe de {code}: {from} → {to}",
+      "lineCloses": "{code} ahora cierra la partida",
+      "lineReopens": "{code} ya no cierra la partida",
+      "fileAdded": "Documento añadido: {name}",
+      "fileRemoved": "Documento quitado: {name}"
+    },
+    "form": {
+      "back": "Compras",
+      "numbered": "{ref} · se numerará {number}",
+      "newTitle": "Nuevo pedido",
+      "editTitle": "Editar pedido",
+      "intro": "Un pedido de material o un subcontrato, con su importe repartido entre las partidas del presupuesto.",
+      "newLabel": "Nuevo pedido",
+      "editLabel": "Editar pedido",
+      "kindTitle": "1 · Tipo y proveedor",
+      "kind": "Tipo",
+      "kinds": {
+        "material": "Pedido de material",
+        "subcontract": "Subcontrato"
+      },
+      "kindLocked": "El tipo solo se cambia mientras el pedido está pendiente.",
+      "supplier": "Proveedor",
+      "supplierSearch": "Buscar por nombre o CIF",
+      "supplierHint": "De Subcontratas: empresas, autónomos y proveedores de material",
+      "suppliers": "Proveedores",
+      "noSuppliers": "Todavía no hay empresas en Subcontratas.",
+      "noSupplierMatch": "Ningún proveedor coincide con la búsqueda.",
+      "caeWarningTitle": "{name} no está apta para CAE:",
+      "caeMissing": "falta {documents}.",
+      "caeWarning": "Puedes guardar el pedido; sus trabajadores no podrán entrar en obra hasta que Administración lo valide.",
+      "seeCompany": "Ver ficha",
+      "conceptTitle": "2 · Concepto y fechas",
+      "description": "Concepto",
+      "orderedOn": "Fecha de pedido",
+      "orderedOnHint": "Al marcarlo como pedido",
+      "expectedOn": "Entrega prevista",
+      "workStart": "Trabajos desde",
+      "workEnd": "Trabajos hasta",
+      "chapterPlanned": "Capítulo {code} previsto {range}",
+      "datesNote": "Estas fechas son las del proveedor: no cambian las de la obra.",
+      "linesTitle": "3 · Partidas",
+      "linesHint": "Marca las partidas que cubre y cuánto de cada una. Importes sin IVA.",
+      "chapter": "Capítulo",
+      "elsewhere": "También en el pedido:",
+      "elsewhereChapter": "{count, plural, one {# partida} other {# partidas}} de {code}",
+      "noLines": "Este capítulo no tiene partidas.",
+      "linesOf": "Partidas del capítulo {code}",
+      "includeColumn": "Incluir",
+      "include": "Incluir {code}",
+      "line": "Partida",
+      "cost": "Coste presup.",
+      "contracted": "Ya contratado",
+      "thisOrder": "Este pedido",
+      "closes": "Cierra la partida",
+      "deviation": "Desviación",
+      "alreadyClosed": "cerrada",
+      "amountOf": "Importe de {code}",
+      "closesOf": "{code} cierra la partida",
+      "closesYes": "Sí",
+      "closesNo": "No, falta otra parte",
+      "open": "abierta",
+      "closesNote": "Desmarca “Cierra la partida” si falta contratar otra parte (por ejemplo el material o la colocación). Mientras siga abierta, la partida muestra lo contratado hasta ahora pero no su desviación.",
+      "documentTitle": "4 · Documento",
+      "optional": "(opcional)",
+      "documentHint": "El pedido o el contrato firmado (PDF, hasta 4 MB)",
+      "chooseFile": "Elegir archivo",
+      "removeFile": "Quitar {name}",
+      "totalLabel": "Total",
+      "total": "Total del pedido",
+      "deviationOn": "{count, plural, =0 {Desviación} one {Desviación en # partida cerrada} other {Desviación en # partidas cerradas}}",
+      "savePending": "Guardar como pendiente",
+      "savePlaced": {
+        "ordered": "Guardar y marcar pedido",
+        "contracted": "Guardar y marcar contratado"
+      },
+      "saveChanges": "Guardar cambios",
+      "cancel": "Cancelar",
+      "saving": "Guardando…",
+      "uploadFailed": "{number} se ha guardado, pero su documento no se ha subido:",
+      "goToOrder": "Ir al pedido",
+      "noBudget": "Este proyecto aún no tiene presupuesto aceptado: no hay partidas que pedir."
+    },
+    "chapter": {
+      "title": "Pedidos",
+      "new": "Nuevo pedido",
+      "all": "Ver en Compras",
+      "empty": "Ningún pedido tiene partidas de este capítulo."
+    },
+    "company": {
+      "eyebrow": "Todas las obras",
+      "title": "Compras",
+      "description": "Cada pedido y subcontrato de la empresa, de todas las obras. Los pedidos se crean desde la obra.",
+      "export": "Exportar CSV",
+      "ordersLabel": "Pedidos",
+      "view": "Vista",
+      "views": {
+        "orders": "Pedidos",
+        "suppliers": "Por proveedor"
+      },
+      "search": "Nº, proveedor o concepto",
+      "project": "Obra",
+      "allProjects": "Todas",
+      "kind": "Tipo",
+      "orderedOn": "Fecha de pedido",
+      "none": "Todavía no hay pedidos.",
+      "csv": [
+        "Obra",
+        "Nº",
+        "Tipo",
+        "Proveedor",
+        "Concepto",
+        "Capítulos",
+        "Importe (€, sin IVA)",
+        "Fecha de pedido",
+        "Entrega / trabajos",
+        "Entregado / finalizado",
+        "Estado",
+        "Días de retraso"
+      ],
+      "csvName": "compras-{date}.csv",
+      "kpis": {
+        "label": "Resumen",
+        "year": "Contratado en {year}",
+        "yearHint": "{orders, plural, one {# pedido} other {# pedidos}} en {projects, plural, one {# obra} other {# obras}}",
+        "open": "Abiertos",
+        "openHint": "{count, plural, one {# pedido} other {# pedidos}} por entregar o terminar",
+        "pending": "Sin enviar",
+        "pendingHint": "{count, plural, one {# pedido pendiente} other {# pedidos pendientes}}",
+        "late": "Entregas con retraso",
+        "lateIn": "En {refs}",
+        "noneLate": "Ninguna entrega va con retraso."
+      },
+      "bySupplier": {
+        "label": "Pedidos por proveedor",
+        "supplier": "Proveedor",
+        "kind": "Tipo",
+        "orders": "Pedidos",
+        "projects": "Obras",
+        "contracted": "Contratado",
+        "open": "Abierto"
+      }
+    },
+    "errors": {
+      "generic": "No se ha podido guardar. Inténtalo de nuevo.",
+      "missing_fields": "Elige un proveedor, escribe el concepto y marca al menos una partida con su importe.",
+      "invalid_input": "Revisa los importes y los valores introducidos.",
+      "invalid_date": "Revisa las fechas: la de pedido, entrega o fin no puede ser posterior a hoy, y los trabajos deben acabar después de empezar.",
+      "unknown_line": "Una de las partidas ya no está en el presupuesto aceptado. Recarga la página.",
+      "unknown_supplier": "Ese proveedor ya no está en Subcontratas.",
+      "supplies_only": "Un proveedor de material solo recibe pedidos de material, no subcontratos.",
+      "invalid_state": "El pedido ya no está en ese estado. Recarga la página.",
+      "not_found": "No se ha encontrado el pedido.",
+      "forbidden": "Solo administradores y gestores pueden hacer cambios.",
+      "project_not_found": "Proyecto no encontrado.",
+      "no_budget": "Todavía no hay un presupuesto aceptado.",
+      "missing_file": "Selecciona un archivo PDF.",
+      "invalid_file_type": "El archivo no es un PDF válido.",
+      "file_too_large": "El archivo supera el máximo de 4 MB."
     }
   }
 }

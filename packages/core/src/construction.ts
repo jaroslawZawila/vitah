@@ -50,27 +50,24 @@ import {
   type ObraStage,
   type ProgressEvent,
 } from "./contract";
-import {
-  chapterState,
-  chapterTiming,
-  contractedCents,
-  deviation,
-  milestoneState,
-  plannedDates,
-} from "./control-calc";
+import { chapterState, chapterTiming, contractSchedule, contractTotals, deviation, milestoneState } from "./control-calc";
 import { MAX_TEXT } from "./input";
 import {
   fail,
   integer,
   loadObra,
   optionalText,
+  orNull,
+  pick,
   pickChanges,
   requiredText,
   requireProject,
+  userName,
   workDate,
 } from "./obra-data";
 import { todayInSpain } from "./obra-calc";
 import { listPhotos } from "./photos";
+import { contractingOf, loadProjectOrders } from "./purchasing";
 import { projectInTenant, type Tx } from "./project-client";
 import { isPdf, openStoredFile, projectFolder, removeFiles, storeFiles, type StoredFile } from "./project-files";
 import { listProjectAttention } from "./subcontractors";
@@ -81,19 +78,18 @@ import { listProjectAttention } from "./subcontractors";
 // actual dates staff record here (and every record and correction is kept);
 // finishing the last chapter of a hito asks Administration to invoice it,
 // once. The budget, the hitos' invoices and payments, the subcontractors'
-// documents and the photos are read from their own services, never copied.
-// Planning and Purchasing don't exist yet: ./control-calc stands in for them.
+// documents, the photos and what Compras contracted are read from their own
+// services, never copied. Planning doesn't exist yet: ./control-calc stands
+// in for it.
 // Staff only; the client's app sees the result as the obra's progress.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const SOURCES: ControlSources = { planning: "mock", purchasing: "mock" };
+const SOURCES: ControlSources = { planning: "mock", purchasing: "live" };
 const MAX_NOTE = 500;
 const RECENT_PHOTOS = 6;
 const RECENT_EVENTS = 5;
 const MAX_EVENTS = 1000;
 
-/** Who did something: their name, else their email. */
-const userName = sql<string | null>`coalesce(${users.name}, ${users.email})`;
 
 type ProgressRow = typeof obraChapterProgress.$inferSelect;
 
@@ -141,7 +137,7 @@ async function contractCodes(ctx: Ctx, projectId: string) {
 
 /** Everything the tab is built from, for one project. */
 async function loadControl(ctx: Ctx, projectId: string) {
-  const [project, obra, previous] = await Promise.all([
+  const [project, obra, previous, purchases] = await Promise.all([
     db.query.projects.findFirst({
       where: projectInTenant(ctx.tenantId, projectId),
       columns: {
@@ -167,26 +163,20 @@ async function loadControl(ctx: Ctx, projectId: string) {
       orderBy: desc(budgetRevisions.number),
       columns: { id: true },
     }),
+    loadProjectOrders(ctx.tenantId, projectId),
   ]);
   if (!project) fail("project_not_found");
   const { revision, hitos, progress, costChapters, progressRows, requests } = obra;
 
-  // The main budget items: the contract's chapters at cost, but not the contingency.
-  const items = costChapters.filter((c) => c.code !== CONTINGENCY_CHAPTER);
   // While staff haven't reviewed the change, what the previous contract had.
   const reviewing = Boolean(revision && previous && project.obraReviewedRevisionId !== revision.id);
   const previousCodes = reviewing ? new Map((await contractChapters(previous!.id)).map((c) => [c.code, c.name])) : null;
 
   const today = todayInSpain();
   const works = { startDate: toCalendarDate(project.startDate), completionDate: toCalendarDate(project.completionDate) };
-  const dates = new Map(progressRows.map((row) => [row.chapterCode, row]));
-  const states = new Map(items.map((c) => [c.code, chapterState(dates.get(c.code))]));
+  // The main budget items: the contract's chapters at cost, but not the contingency.
+  const { items, dates, states, plan } = contractSchedule(costChapters, hitos, progressRows, works);
   const hitoOf = new Map(hitos.flatMap((h) => h.chapters.map((c) => [c.code, h] as const)));
-  const plan = plannedDates(
-    works,
-    hitos.map((h) => ({ pctBp: h.pctBp, chapterCodes: h.chapters.map((c) => c.code) })),
-    items.map((c) => c.code),
-  );
   const requestOf = new Map(requests.map((r) => [r.hitoId, toRequest(r, hitos)]));
 
   return {
@@ -206,6 +196,9 @@ async function loadControl(ctx: Ctx, projectId: string) {
     hitoOf,
     plan,
     requestOf,
+    contracts: purchases.contracts,
+    orders: purchases.orders,
+    lateDeliveries: purchases.orders.filter((o) => o.lateDays !== null),
     today,
   };
 }
@@ -234,17 +227,7 @@ function toChapter(control: Control, item: Control["items"][number], openIssues:
   const recorded = dates.get(item.code);
   const planned = plan.get(item.code);
   const timing = chapterTiming(recorded, planned, today);
-  let contractedLines = 0;
-  let contracted = 0;
-  let contractedCost = 0;
-  for (const line of item.lines) {
-    const amount = contractedCents({ lineageId: line.lineageId, costCents: line.amountCents }, timing.state);
-    if (amount === null) continue;
-    contractedLines++;
-    contracted += amount;
-    contractedCost += line.amountCents;
-  }
-  const contractedTotal = contractedLines > 0 ? contracted : null;
+  const totals = contractTotals(item.lines, control.contracts);
   return {
     code: item.code,
     name: item.name,
@@ -256,10 +239,13 @@ function toChapter(control: Control, item: Control["items"][number], openIssues:
     hitoCode: hitoOf.get(item.code)?.code ?? null,
     costCents: item.totalCents,
     lineCount: item.lines.length,
-    contractedLines,
-    contractedCents: contractedTotal,
-    contractedCostCents: contractedCost,
-    ...deviation(contractedCost, contractedTotal),
+    contractedLines: totals.closedLines,
+    openLines: totals.openLines,
+    contractedCents: totals.closedLines + totals.openLines > 0 ? totals.contractedCents : null,
+    contractedCostCents: totals.closedCostCents,
+    // Only the closed lines: one with more still to order never counts as a saving.
+    deviationCents: totals.deviationCents,
+    deviationBp: totals.deviationBp,
     openIssues,
     added: previousCodes !== null && !previousCodes.has(item.code),
   };
@@ -402,7 +388,7 @@ export async function getControl(ctx: Ctx, projectId: string): Promise<Construct
   const sum = (values: number[]) => values.reduce((total, v) => total + v, 0);
   const contractedCents = sum(chapters.map((c) => c.contractedCents ?? 0));
   const contractedCostCents = sum(chapters.map((c) => c.contractedCostCents));
-  const { deviationCents, deviationBp } = deviation(contractedCostCents, contractedCostCents ? contractedCents : null);
+  const total = deviation(contractedCostCents, contractedCostCents - sum(chapters.map((c) => c.deviationCents ?? 0)));
   const { contractCents } = control;
   const invoicedCents = sum(milestones.map((m) => m.invoicedCents));
   const collectedCents = sum(milestones.map((m) => m.collectedCents));
@@ -425,8 +411,8 @@ export async function getControl(ctx: Ctx, projectId: string): Promise<Construct
       budgetedCents: sum(chapters.map((c) => c.costCents)),
       contractedCents,
       contractedCostCents,
-      deviationCents: deviationCents ?? 0,
-      deviationBp: deviationBp ?? 0,
+      deviationCents: total.deviationCents ?? 0,
+      deviationBp: total.deviationBp ?? 0,
       contingencyCents: control.contingencyCents,
     },
     sales: {
@@ -438,6 +424,7 @@ export async function getControl(ctx: Ctx, projectId: string): Promise<Construct
     },
     milestones,
     documentAlerts,
+    lateDeliveries: control.lateDeliveries,
     issues: openIssues,
     events: events.map((e) => ({ ...e, chapterName: names.get(e.chapterCode) ?? null })),
     photos,
@@ -491,6 +478,7 @@ export async function getControlChapter(ctx: Ctx, projectId: string, code: strin
       unit,
       executedPct,
     })),
+    orders: control.orders.filter((o) => o.chapterCodes.includes(code)),
     today: control.today,
     sources: SOURCES,
   };
@@ -498,29 +486,30 @@ export async function getControlChapter(ctx: Ctx, projectId: string, code: strin
 
 /** Cost control per budget line: its budgeted cost against what was contracted. */
 export async function getCosts(ctx: Ctx, projectId: string): Promise<ConstructionCosts> {
-  const { items, states } = await loadControl(ctx, projectId);
+  const { items, states, contracts, lateDeliveries } = await loadControl(ctx, projectId);
   return {
-    chapters: items.map((item) => {
-      const state = states.get(item.code)!;
-      return {
-        code: item.code,
-        name: item.name,
-        state,
-        lines: item.lines.map((line) => {
-          const contracted = contractedCents({ lineageId: line.lineageId, costCents: line.amountCents }, state);
-          return {
-            id: line.id,
-            code: line.code,
-            description: line.description,
-            unit: line.unit,
-            quantity: line.quantity,
-            costCents: line.amountCents,
-            contractedCents: contracted,
-            ...deviation(line.amountCents, contracted),
-          };
-        }),
-      };
-    }),
+    chapters: items.map((item) => ({
+      code: item.code,
+      name: item.name,
+      state: states.get(item.code)!,
+      lines: item.lines.map((line) => {
+        const contract = contracts.get(line.lineageId);
+        const contracting = contractingOf(contract);
+        return {
+          id: line.id,
+          code: line.code,
+          description: line.description,
+          unit: line.unit,
+          quantity: line.quantity,
+          costCents: line.amountCents,
+          contractedCents: contract?.contractedCents ?? null,
+          contracting,
+          orders: contract?.orders ?? [],
+          ...deviation(line.amountCents, contracting === "closed" ? contract!.contractedCents : null),
+        };
+      }),
+    })),
+    lateDeliveries,
     sources: SOURCES,
   };
 }
@@ -695,7 +684,7 @@ export async function finishChapter(ctx: Ctx, projectId: string, code: string, i
 }
 
 /** A date in a correction: a work date, or null to clear it. */
-const correctedDate = (value: unknown) => (value === null || value === "" ? null : workDate(value));
+const correctedDate = orNull(workDate);
 
 /**
  * Corrects recorded dates. Body: { actualStart?, actualEnd?, note? } — each
@@ -773,11 +762,6 @@ const nullableInteger = (min: number, max: number) => (value: unknown) =>
   value === null || value === undefined || value === "" ? null : integer(value, min, max);
 
 /** One of `allowed`, else `invalid_input`. */
-const pick =
-  <T extends string>(allowed: readonly T[]) =>
-  (value: unknown): T =>
-    allowed.find((a) => a === value) ?? fail("invalid_input");
-
 type IssueValues = {
   kind: (typeof ISSUE_KINDS)[number];
   occurredOn: string;

@@ -1,7 +1,7 @@
 "use client";
 
 // Container: the only part of the flow that talks to the server. It runs the
-// wizard over COMPANY_STEPS; on the review screen it creates the company (with
+// wizard over its steps (fewer for a material supplier); on the review screen it creates the company (with
 // its obra and "No aplica" documents, in one call), then uploads each chosen
 // file in a request of its own (a function body is limited to 4.5 MB).
 
@@ -26,16 +26,17 @@ export default function NewCompanyScreen({ options }: { options: CompanyFlowOpti
   const te = useTranslations("subcontractors.errors");
   const name = useRequirementName();
   const router = useRouter();
-  const wizard = useWizard(COMPANY_STEPS, EMPTY_COMPANY_FLOW);
+  const wizard = useWizard(COMPANY_STEPS, EMPTY_COMPANY_FLOW, options);
+  const { steps } = wizard;
   const [error, setError] = useState<string | null>(null);
   // Set once the company exists but one of its uploads failed.
   const [created, setCreated] = useState<{ id: string; failed: string[] } | null>(null);
   const [pending, startTransition] = useTransition();
 
-  const sections = COMPANY_STEPS.map((step) => ({ id: step.id, title: t(`steps.${step.titleKey}`), Summary: step.Summary }));
+  const sections = steps.map((step) => ({ id: step.id, title: t(`steps.${step.titleKey}`), Summary: step.Summary }));
   const stops = [
     ...sections.map((section, index) => ({ id: section.id, title: section.title, reachable: wizard.canReach(index) })),
-    { id: "review", title: t("steps.review"), reachable: wizard.canReach(COMPANY_STEPS.length) },
+    { id: "review", title: t("steps.review"), reachable: wizard.canReach(steps.length) },
   ];
 
   const message = (code: SubcontractorError | undefined) =>

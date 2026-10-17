@@ -48,6 +48,12 @@ export function useControlFormat() {
     },
     /** "jun" */
     month: (day: string) => format.dateTime(dayDate(day), { month: "short", timeZone: "UTC" }).replace(".", ""),
+    /** "14 oct" */
+    shortDay: (day: string) => format.dateTime(dayDate(day), { day: "numeric", month: "short", timeZone: "UTC" }),
+    /** Cents with their two decimals, no symbol: "3120,00" (tables that say they are in euros). */
+    amount: (cents: number) => `${cents < 0 ? "−" : ""}${obra.decimal(Math.abs(cents) / 100)}`,
+    /** The same, signed: "+196,00" / "−196,00". */
+    signedDecimal: (cents: number) => `${sign(cents)}${obra.decimal(Math.abs(cents) / 100)}`,
     /** "13 – 17 oct" */
     range: (from: string, to: string) =>
       from === to

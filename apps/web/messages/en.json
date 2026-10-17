@@ -26,7 +26,8 @@
       "obra": "Works",
       "budget": "Budget",
       "payments": "Payments",
-      "documents": "Documents"
+      "documents": "Documents",
+      "purchases": "Purchasing"
     },
     "network": "Network",
     "subcontractors": "Subcontractors",
@@ -36,7 +37,8 @@
       "workers": "Workers",
       "expiries": "Expiries",
       "expiriesCount": "{count, plural, one {# document expired or expiring} other {# documents expired or expiring}}"
-    }
+    },
+    "purchases": "Purchasing"
   },
   "topbar": {
     "titles": {
@@ -477,7 +479,10 @@
       "ai_limit_reached": "The monthly AI usage limit has been reached.",
       "too_many_pages": "The documents are too long for the AI.",
       "no_documents": "Upload at least one project document.",
-      "invalid_state": "The chapter is no longer in that state. Reload the page."
+      "invalid_state": "The chapter is no longer in that state. Reload the page.",
+      "unknown_line": "One of the lines is no longer in the accepted budget. Reload the page.",
+      "unknown_supplier": "That supplier is no longer in Subcontractors.",
+      "supplies_only": "A material supplier only takes material orders, not subcontracts."
     }
   },
   "construction": {
@@ -534,7 +539,9 @@
       "progress": "Progress",
       "budget": "Budget",
       "sales": "Sales",
-      "payments": "Payments"
+      "payments": "Payments",
+      "live": "Live",
+      "liveHint": "Live data from the Purchasing module."
     },
     "groups": {
       "in_progress": "In progress · {count}",
@@ -605,9 +612,9 @@
         "budgeted": "Budgeted",
         "contracted": "Contracted",
         "deviation": "Deviation",
-        "savingNote": "Saving on the contracted lines ({amount} budgeted). What isn't contracted doesn't count.",
-        "overrunNote": "Overrun on the contracted lines ({amount} budgeted). What isn't contracted doesn't count.",
-        "nothingContracted": "Nothing is contracted yet: the deviation is only measured on what is.",
+        "savingNote": "Saving on the closed lines ({amount} budgeted). Open or uncontracted lines don't count.",
+        "overrunNote": "Overrun on the closed lines ({amount} budgeted). Open or uncontracted lines don't count.",
+        "nothingContracted": "No line is closed yet: the deviation is only measured on closed lines.",
         "revision": "Rev.{number}",
         "sales": "Sales",
         "contract": "Contracted",
@@ -643,9 +650,9 @@
         "cost": "Budgeted cost",
         "contracted": "Contracted",
         "deviation": "Deviation",
-        "contractedLines": "{contracted} of {total} lines contracted",
+        "contractedLines": "{contracted} of {total} lines closed",
         "total": "Total · {count, plural, one {# chapter} other {# chapters}} at cost",
-        "footnote": "Amounts in euros, at cost. Contingencies (ch. 20, {contingency} €) are kept as a reserve. Deviation = budgeted cost − contracted, only on contracted lines: positive is a saving, negative an overrun."
+        "footnote": "Amounts in euros, at cost. Contingencies (ch. 20, {contingency} €) are kept as a reserve. Deviation = budgeted cost − contracted, only on closed lines: positive is a saving, negative an overrun."
       },
       "milestones": {
         "title": "Payment milestones",
@@ -833,10 +840,10 @@
       "seeLines": "See lines",
       "budgeted": "Budgeted",
       "contracted": "Contracted",
-      "contractedLines": "{contracted} of {total} lines",
+      "contractedLines": "{closed} of {total} closed",
       "notContracted": "Not contracted",
       "deviation": "Deviation",
-      "deviationOn": "On {count, plural, one {the contracted line} other {the # contracted lines}} ({amount} budgeted).",
+      "deviationOn": "On {count, plural, one {the closed line} other {the # closed lines}} ({amount} budgeted).",
       "revision": "Rev.{number}",
       "photos": "Chapter photos",
       "seeAll": "See all",
@@ -851,7 +858,8 @@
       "lineProgressHint": "Each line's executed % is what the client's app shows as this chapter's progress.",
       "lineProgressFinished": "Chapter finished: it counts as 100 % in the client's app.",
       "noLines": "This chapter has no lines.",
-      "executedLabel": "Executed % of {code}"
+      "executedLabel": "Executed % of {code}",
+      "openLines": "{count, plural, one {# open} other {# open}}"
     },
     "costs": {
       "title": "Cost by line",
@@ -863,7 +871,8 @@
       "contracting": "Contracting",
       "filter": {
         "all": "All",
-        "contracted": "Contracted",
+        "closed": "Closed",
+        "open": "Open",
         "uncontracted": "Not contracted",
         "overrun": "Over budget"
       },
@@ -873,14 +882,18 @@
       "noMatch": "No line matches the filters.",
       "line": "Line",
       "descriptionCol": "Description",
-      "unit": "Unit",
-      "quantity": "Quantity",
       "cost": "Budgeted cost",
       "contracted": "Contracted",
       "deviation": "Deviation",
-      "contractedOf": "{contracted} of {total} contracted",
       "notContracted": "Not contracted",
-      "footnote": "Deviation = budgeted cost − contracted. Positive is a saving, negative an overrun, zero neutral. A line not contracted yet only shows its budgeted cost: contracted and deviation stay empty, never zero. Nothing on this page is edited here: the cost comes from the accepted budget and the contracted amount from Purchasing."
+      "footnote": "Contracted is the sum of the line's orders from Ordered or Contracted on; pending and cancelled ones don't count. Deviation = budgeted cost − contracted, only on closed lines: positive is a saving, negative an overrun. An open line (another part still to contract) shows what is contracted so far but no deviation: it never counts as a saving. A line not contracted only shows its cost, never a zero.",
+      "orders": "Orders",
+      "late": "late",
+      "openLine": "Open",
+      "closedOf": "{closed} of {total} closed",
+      "openCount": "{count, plural, one {# open} other {# open}}",
+      "order": "Order",
+      "noDeviationYet": "no deviation until closed"
     },
     "milestones": {
       "title": "Payment milestones",
@@ -1018,6 +1031,12 @@
         "not_found": "Photo not found.",
         "forbidden": "Only admins and managers can manage photos."
       }
+    },
+    "lateDeliveries": {
+      "title": "{count, plural, one {# late delivery:} other {# late deliveries:}}",
+      "chapter": "chapter {codes}",
+      "expected": "expected on {date}",
+      "onlyWarning": "It's only a warning: it doesn't change any status or date."
     }
   },
   "budget": {
@@ -1889,7 +1908,8 @@
       "project_not_found": "The site doesn't exist.",
       "worker_not_found": "The worker doesn't exist.",
       "not_found": "Not found.",
-      "forbidden": "You aren't allowed to do this."
+      "forbidden": "You aren't allowed to do this.",
+      "supplies_only": "A material supplier has no workers, sites or CAE documents; and a company with workers or sites can't become one."
     },
     "audit": {
       "system": "System",
@@ -2013,7 +2033,8 @@
         "openFor": "Open {name}'s record",
         "reaIn": "REA {region}",
         "empty": "No company matches the filter.",
-        "none": "No companies registered yet."
+        "none": "No companies registered yet.",
+        "noCae": "No CAE documents"
       }
     },
     "company": {
@@ -2039,7 +2060,8 @@
         "documentos": "Documents",
         "trabajadores": "Workers",
         "obras": "Sites",
-        "historial": "History"
+        "historial": "History",
+        "pedidos": "Orders"
       },
       "summary": {
         "data": "Company details",
@@ -2071,7 +2093,8 @@
         "validCount": "validated and in date",
         "valid": "{count} validated",
         "expired": "{count} expired",
-        "pending": "{count} pending"
+        "pending": "{count} pending",
+        "contact": "Contact"
       },
       "documents": {
         "title": "Documents",
@@ -2120,6 +2143,15 @@
         "hint": "Every registration, change, validation and rejection",
         "empty": "No changes recorded.",
         "worker": "Worker: {name}"
+      },
+      "supplier": {
+        "title": "No CAE documents",
+        "text": "A material supplier only supplies: it doesn't work on site with its own staff, so no CAE documents are asked of it and no workers are registered.",
+        "change": "If it will fit or install on site, change it to a subcontractor in Edit: its documents will be asked for like any other."
+      },
+      "orders": {
+        "title": "Orders",
+        "empty": "It has no orders on any site yet."
       }
     },
     "fields": {
@@ -2183,6 +2215,20 @@
         "bookOrder": "Entry number",
         "bookDate": "Entry date",
         "cssInformed": "H&S coordinator informed"
+      },
+      "types": {
+        "company": {
+          "label": "Subcontracting company",
+          "hint": "Works on site. CAE documents for the company and its workers."
+        },
+        "self_employed": {
+          "label": "Self-employed",
+          "hint": "Works on site on their own. Self-employed CAE documents."
+        },
+        "supplier": {
+          "label": "Material supplier",
+          "hint": "Only supplies. No CAE and no workers; can take orders."
+        }
       }
     },
     "wizard": {
@@ -2245,7 +2291,9 @@
         "obraChapters": "{ref} · ch. {chapters}",
         "obraNone": "Not assigned (optional)",
         "whenApta": "When it will be cleared",
-        "whenAptaDetail": "Once its {total} mandatory documents are validated. Its workers get site access when the H&S Plan adherence and the subcontracting book entry are there too."
+        "whenAptaDetail": "Once its {total} mandatory documents are validated. Its workers get site access when the H&S Plan adherence and the subcontracting book entry are there too.",
+        "supplier": "Material supplier",
+        "supplierDetail": "It only supplies: no CAE documents or workers are asked of it, and it's ready to take material orders from Purchasing."
       },
       "reviewIntro": "Check the details before registering the company."
     },
@@ -2372,6 +2420,354 @@
           "hiring": "Registration and contract"
         }
       }
+    },
+    "noCae": "No CAE"
+  },
+  "purchasing": {
+    "status": {
+      "pending": "Pending",
+      "ordered": "Ordered",
+      "confirmed": "Confirmed",
+      "in_transit": "In transit",
+      "delivered": "Delivered",
+      "contracted": "Contracted",
+      "finished": "Finished",
+      "cancelled": "Cancelled"
+    },
+    "kind": {
+      "material": "Material",
+      "subcontract": "Subcontract"
+    },
+    "cae": {
+      "none": "No CAE",
+      "apta": "Cleared",
+      "pendiente": "CAE pending",
+      "bloqueada": "CAE blocked"
+    },
+    "lateDays": "{days} d late",
+    "notCounted": "Pending and cancelled orders don't count",
+    "groups": {
+      "label": "Status",
+      "all": "All",
+      "open": "Open",
+      "pending": "Not sent",
+      "done": "Closed",
+      "cancelled": "Cancelled"
+    },
+    "list": {
+      "cards": "Orders",
+      "table": "Orders",
+      "number": "No.",
+      "projectNumber": "Project · No.",
+      "supplier": "Supplier",
+      "concept": "Description",
+      "chapter": "Ch.",
+      "chapterShort": "ch. {codes}",
+      "amount": "Amount",
+      "orderedOn": "Ordered",
+      "expected": "Expected delivery",
+      "when": "Delivery / works",
+      "status": "Status",
+      "footer": "{count, plural, one {# order} other {# orders}} · contracted",
+      "supplierFooter": "Contracted with this supplier",
+      "all": "All",
+      "chapterFilter": "Chapter",
+      "lateOnly": "Late only",
+      "noMatch": "No orders match these filters."
+    },
+    "kpis": {
+      "label": "Purchasing summary",
+      "contracted": "Contracted",
+      "contractedHint": "{pct} of {cost} at cost (ch. 01–19)",
+      "deviation": "Deviation",
+      "savingHint": "A {pct} saving over {count, plural, one {# closed line} other {# closed lines}}. Lines still open don't count.",
+      "overrunHint": "A {pct} overrun over {count, plural, one {# closed line} other {# closed lines}}. Lines still open don't count.",
+      "noneClosed": "No line is closed yet: the deviation is only measured over closed lines.",
+      "toContract": "To contract",
+      "toContractHint": "{lines, plural, one {# line} other {# lines}} without an order · {pending, plural, one {# pending order} other {# pending orders}} to send",
+      "late": "Late deliveries",
+      "lateHint": "{supplier} · expected {date}, {days, plural, one {# day} other {# days}}",
+      "noneLate": "No delivery is late."
+    },
+    "upcoming": {
+      "title": "To contract soon",
+      "text": "Chapters starting in the next {days} days with lines nobody has ordered.",
+      "empty": "Nothing left to order for the coming days.",
+      "started": "In progress",
+      "starts": "Starts {date}",
+      "noDate": "No date",
+      "lines": "{count, plural, one {# line} other {# lines}}",
+      "notSent": "not sent",
+      "order": "Order a chapter's lines"
+    },
+    "project": {
+      "title": "Purchasing",
+      "description": "The works' material orders and subcontracts, split across budget lines. What is contracted here is what Obra compares with the budgeted cost.",
+      "new": "New order",
+      "orders": "Orders",
+      "none": "There are no orders for this project yet.",
+      "footnote": "An order counts as contracted from <b>Ordered</b> (material) or <b>Contracted</b> (subcontract). Pending and cancelled ones don't count. A late delivery is only a warning: it never changes the works' status or dates."
+    },
+    "order": {
+      "back": "Purchasing",
+      "subcontractor": "Subcontractor",
+      "steps": "Order status",
+      "plannedOn": "planned {date}",
+      "cancelledOn": "Cancelled on {date}: it no longer counts as contracted.",
+      "edit": "Edit",
+      "cancelOrder": "Cancel order",
+      "confirmCancel": "Cancel {number}? It will no longer count as contracted.",
+      "confirmRemoveFile": "Remove this order's document?",
+      "advance": {
+        "ordered": "Mark as ordered",
+        "confirmed": "Mark as confirmed",
+        "in_transit": "Mark as in transit",
+        "delivered": "Record delivery",
+        "contracted": "Mark as contracted",
+        "finished": "Record end of works"
+      },
+      "dated": {
+        "delivered": {
+          "title": "Record delivery",
+          "hint": "The day the material arrived on site. It may be before today, never after.",
+          "date": "Delivery date",
+          "confirm": "Confirm delivery"
+        },
+        "finished": {
+          "title": "Record end of works",
+          "hint": "The day the subcontractor finished its works. It may be before today, never after.",
+          "date": "End date",
+          "confirm": "Confirm end"
+        }
+      },
+      "note": "Note (optional)",
+      "notePlaceholder": "Delivery note, unloading issues…",
+      "cancel": "Cancel",
+      "saving": "Saving…",
+      "late": {
+        "title": "{days, plural, one {Delivery # day late.} other {Delivery # days late.}}",
+        "expected": "It was expected on {date}.",
+        "running": "{count, plural, one {Chapter {codes} is still in progress.} other {Chapters {codes} are still in progress.}}",
+        "onlyWarning": "The warning doesn't change any date of the works.",
+        "recordIssue": "Record an issue"
+      },
+      "lines": {
+        "title": "Order lines",
+        "atCost": "Cost from the accepted budget, without margin",
+        "atCostRevision": "Cost from the accepted budget Rev.{number}, without margin",
+        "line": "Line",
+        "description": "Description",
+        "cost": "Budgeted cost",
+        "others": "Other orders",
+        "this": "This order",
+        "closes": "Closes",
+        "deviation": "Deviation",
+        "yes": "Yes",
+        "no": "No",
+        "open": "open",
+        "gone": "No longer in the accepted budget",
+        "total": "Order total (excl. VAT)",
+        "closedNote": "A closed line (by this order or another) counts its deviation: cost − everything contracted for it. Open lines don't count until they are closed.",
+        "openNote": "None of this order's lines is closed: what is contracted adds up, but their deviation doesn't count until they are closed."
+      },
+      "data": {
+        "title": "Details",
+        "orderedOn": "Ordered",
+        "expectedOn": "Expected delivery",
+        "works": "Works",
+        "deliveredOn": "Delivered",
+        "finishedOn": "Finished",
+        "chapter": "Chapter",
+        "chapters": "Chapters",
+        "document": "Document",
+        "noDocument": "None",
+        "upload": "Upload PDF",
+        "replace": "Replace PDF",
+        "remove": "Remove",
+        "notes": "Notes",
+        "createdBy": "Created by",
+        "change": "Change"
+      }
+    },
+    "history": {
+      "title": "History",
+      "empty": "No changes yet.",
+      "created": "{count, plural, one {Created with # line} other {Created with # lines}}, €{amount}",
+      "deliveredOn": ", delivered on {date}",
+      "finishedOn": ", finished on {date}",
+      "field": "{field}: {from} → {to}",
+      "fields": {
+        "description": "Description",
+        "orderedOn": "Order date",
+        "expectedOn": "Expected delivery",
+        "workStart": "Works from",
+        "workEnd": "Works until",
+        "kind": "Type"
+      },
+      "changed": {
+        "subcontractorId": "Supplier changed",
+        "notes": "Notes changed"
+      },
+      "lineAdded": "{code} added: {amount}",
+      "lineRemoved": "{code} removed",
+      "lineAmount": "Amount of {code}: {from} → {to}",
+      "lineCloses": "{code} now closes the line",
+      "lineReopens": "{code} no longer closes the line",
+      "fileAdded": "Document added: {name}",
+      "fileRemoved": "Document removed: {name}"
+    },
+    "form": {
+      "back": "Purchasing",
+      "numbered": "{ref} · will be numbered {number}",
+      "newTitle": "New order",
+      "editTitle": "Edit order",
+      "intro": "A material order or a subcontract, with its amount split across the budget's lines.",
+      "newLabel": "New order",
+      "editLabel": "Edit order",
+      "kindTitle": "1 · Type and supplier",
+      "kind": "Type",
+      "kinds": {
+        "material": "Material order",
+        "subcontract": "Subcontract"
+      },
+      "kindLocked": "The type can only change while the order is pending.",
+      "supplier": "Supplier",
+      "supplierSearch": "Search by name or tax ID",
+      "supplierHint": "From Subcontractors: companies, self-employed and material suppliers",
+      "suppliers": "Suppliers",
+      "noSuppliers": "There are no companies in Subcontractors yet.",
+      "noSupplierMatch": "No supplier matches the search.",
+      "caeWarningTitle": "{name} isn't cleared for CAE:",
+      "caeMissing": "{documents} missing.",
+      "caeWarning": "You can save the order; its workers won't be allowed on site until Administration validates it.",
+      "seeCompany": "See company",
+      "conceptTitle": "2 · Description and dates",
+      "description": "Description",
+      "orderedOn": "Order date",
+      "orderedOnHint": "When marked as ordered",
+      "expectedOn": "Expected delivery",
+      "workStart": "Works from",
+      "workEnd": "Works until",
+      "chapterPlanned": "Chapter {code} planned {range}",
+      "datesNote": "These are the supplier's dates: they don't change the works' dates.",
+      "linesTitle": "3 · Lines",
+      "linesHint": "Tick the lines it covers and how much of each. Amounts excl. VAT.",
+      "chapter": "Chapter",
+      "elsewhere": "Also in the order:",
+      "elsewhereChapter": "{count, plural, one {# line} other {# lines}} of {code}",
+      "noLines": "This chapter has no lines.",
+      "linesOf": "Lines of chapter {code}",
+      "includeColumn": "Include",
+      "include": "Include {code}",
+      "line": "Line",
+      "cost": "Budgeted cost",
+      "contracted": "Already contracted",
+      "thisOrder": "This order",
+      "closes": "Closes the line",
+      "deviation": "Deviation",
+      "alreadyClosed": "closed",
+      "amountOf": "Amount of {code}",
+      "closesOf": "{code} closes the line",
+      "closesYes": "Yes",
+      "closesNo": "No, another part is missing",
+      "open": "open",
+      "closesNote": "Untick “Closes the line” if another part is still to contract (e.g. the material or the fitting). While it stays open, the line shows what is contracted so far but no deviation.",
+      "documentTitle": "4 · Document",
+      "optional": "(optional)",
+      "documentHint": "The order or the signed contract (PDF, up to 4 MB)",
+      "chooseFile": "Choose file",
+      "removeFile": "Remove {name}",
+      "totalLabel": "Total",
+      "total": "Order total",
+      "deviationOn": "{count, plural, =0 {Deviation} one {Deviation over # closed line} other {Deviation over # closed lines}}",
+      "savePending": "Save as pending",
+      "savePlaced": {
+        "ordered": "Save and mark as ordered",
+        "contracted": "Save and mark as contracted"
+      },
+      "saveChanges": "Save changes",
+      "cancel": "Cancel",
+      "saving": "Saving…",
+      "uploadFailed": "{number} was saved, but its document wasn't uploaded:",
+      "goToOrder": "Go to the order",
+      "noBudget": "This project has no accepted budget yet: there are no lines to order."
+    },
+    "chapter": {
+      "title": "Orders",
+      "new": "New order",
+      "all": "See in Purchasing",
+      "empty": "No order has lines in this chapter."
+    },
+    "company": {
+      "eyebrow": "All projects",
+      "title": "Purchasing",
+      "description": "Every order and subcontract of the company, across all projects. Orders are created from the project.",
+      "export": "Export CSV",
+      "ordersLabel": "Orders",
+      "view": "View",
+      "views": {
+        "orders": "Orders",
+        "suppliers": "By supplier"
+      },
+      "search": "No., supplier or description",
+      "project": "Project",
+      "allProjects": "All",
+      "kind": "Type",
+      "orderedOn": "Order date",
+      "none": "There are no orders yet.",
+      "csv": [
+        "Project",
+        "No.",
+        "Type",
+        "Supplier",
+        "Description",
+        "Chapters",
+        "Amount (€, excl. VAT)",
+        "Order date",
+        "Delivery / works",
+        "Delivered / finished",
+        "Status",
+        "Days late"
+      ],
+      "csvName": "purchasing-{date}.csv",
+      "kpis": {
+        "label": "Summary",
+        "year": "Contracted in {year}",
+        "yearHint": "{orders, plural, one {# order} other {# orders}} in {projects, plural, one {# project} other {# projects}}",
+        "open": "Open",
+        "openHint": "{count, plural, one {# order} other {# orders}} to deliver or finish",
+        "pending": "Not sent",
+        "pendingHint": "{count, plural, one {# pending order} other {# pending orders}}",
+        "late": "Late deliveries",
+        "lateIn": "In {refs}",
+        "noneLate": "No delivery is late."
+      },
+      "bySupplier": {
+        "label": "Orders by supplier",
+        "supplier": "Supplier",
+        "kind": "Type",
+        "orders": "Orders",
+        "projects": "Projects",
+        "contracted": "Contracted",
+        "open": "Open"
+      }
+    },
+    "errors": {
+      "generic": "It couldn't be saved. Please try again.",
+      "missing_fields": "Choose a supplier, write the description and tick at least one line with its amount.",
+      "invalid_input": "Check the amounts and values entered.",
+      "invalid_date": "Check the dates: the order, delivery or end date can't be after today, and works must end after they start.",
+      "unknown_line": "One of the lines is no longer in the accepted budget. Reload the page.",
+      "unknown_supplier": "That supplier is no longer in Subcontractors.",
+      "supplies_only": "A material supplier only takes material orders, not subcontracts.",
+      "invalid_state": "The order is no longer in that status. Reload the page.",
+      "not_found": "The order wasn't found.",
+      "forbidden": "Only admins and managers can make changes.",
+      "project_not_found": "Project not found.",
+      "no_budget": "There is no accepted budget yet.",
+      "missing_file": "Choose a PDF file.",
+      "invalid_file_type": "The file isn't a valid PDF.",
+      "file_too_large": "The file is over the 4 MB limit."
     }
   }
 }

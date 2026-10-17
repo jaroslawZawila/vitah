@@ -1,7 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createTestProject, createTestTenant, createTestUser, resetDatabase } from "@repo/db/testing";
 import { db, eq, obraInvoiceRequests, obraProgressEvents } from "@repo/db";
-import { budgetService, constructionService as svc, hitosService, obraService, type Ctx } from "../src";
+import {
+  budgetService,
+  constructionService as svc,
+  hitosService,
+  obraService,
+  purchasingService,
+  subcontractorsService,
+  type Ctx,
+} from "../src";
 import { files } from "../src/testing";
 import { framerDraft } from "./budget-fixture";
 
@@ -73,7 +81,8 @@ describe("getControl", () => {
       toInvoiceCents: 315_000,
     });
     expect(control.milestones.map((m) => [m.code, m.state])).toContainEqual(["H2", "pending"]);
-    expect(control.sources).toEqual({ planning: "mock", purchasing: "mock" });
+    expect(control.sources).toEqual({ planning: "mock", purchasing: "live" });
+    expect(control.lateDeliveries).toEqual([]);
     expect(control.reviewPending).toBe(false);
   });
 
@@ -339,22 +348,33 @@ describe("budget revisions", () => {
 });
 
 describe("getCosts", () => {
-  it("compares each line's cost with what was contracted, leaving uncontracted lines empty", async () => {
-    const { ctx, project } = await setup();
-    await svc.startChapter(ctx, project.id, "01", { date: "2026-07-01" });
-    await svc.finishChapter(ctx, project.id, "01", { date: "2026-08-01" });
+  it("compares each line's cost with what Compras contracted, leaving uncontracted lines empty", async () => {
+    const { ctx, admin, project } = await setup();
+    const { id: subcontractorId } = await subcontractorsService.createSubcontractor(admin, {
+      kind: "company",
+      legalName: "Montajes Steel Norte S.L.",
+      taxId: "B39123450",
+      address: "Polígono Raos 4",
+      postalCode: "39600",
+      city: "Maliaño",
+    });
+    const form = await purchasingService.getPurchaseForm(ctx, project.id);
+    await purchasingService.createPurchase(ctx, project.id, {
+      kind: "subcontract",
+      subcontractorId,
+      description: "Actuaciones previas",
+      status: "contracted",
+      lines: [{ lineageId: form.chapters[0]!.lines[0]!.lineageId, amountCents: 104_000 }],
+    });
 
     const { chapters, sources } = await svc.getCosts(ctx, project.id);
-    expect(sources.purchasing).toBe("mock");
-    const [built] = chapters[0]!.lines;
-    expect(built!.contractedCents).not.toBeNull();
-    expect(built!.deviationCents).toBe(built!.costCents - built!.contractedCents!);
-    expect(chapters[1]!.lines[0]).toMatchObject({ costCents: 100_000, contractedCents: null, deviationCents: null, deviationBp: null });
+    expect(sources.purchasing).toBe("live");
+    expect(chapters[0]!.lines[0]).toMatchObject({ contractedCents: 104_000, contracting: "closed", deviationCents: -4_000, deviationBp: -400 });
+    expect(chapters[1]!.lines[0]).toMatchObject({ costCents: 100_000, contractedCents: null, contracting: "none", deviationCents: null, deviationBp: null });
 
     // The summary's deviation is over the contracted lines only.
     const { cost } = await svc.getControl(ctx, project.id);
-    expect(cost.contractedCostCents).toBe(100_000);
-    expect(cost.deviationCents).toBe(built!.deviationCents);
+    expect(cost).toMatchObject({ contractedCents: 104_000, contractedCostCents: 100_000, deviationCents: -4_000, deviationBp: -400 });
   });
 });
 

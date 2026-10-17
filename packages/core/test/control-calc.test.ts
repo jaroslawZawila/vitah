@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   chapterState,
   chapterTiming,
-  contractedCents,
   daysBetween,
   deviation,
   milestoneState,
@@ -101,24 +100,6 @@ describe("plannedDates", () => {
 
   it("plans nothing without the project's dates", () => {
     expect(plannedDates({ startDate: null, completionDate: "2027-03-31" }, [], ["01"]).size).toBe(0);
-  });
-});
-
-describe("contractedCents", () => {
-  const line = { lineageId: "lineage-1", costCents: 1_260_000 };
-
-  it("has nothing contracted for a pending chapter, everything for a finished one", () => {
-    expect(contractedCents(line, "pending")).toBeNull();
-    const amount = contractedCents(line, "finished")!;
-    expect(Math.abs(amount - line.costCents)).toBeLessThanOrEqual(75_600);
-    // Stable for the line.
-    expect(contractedCents(line, "finished")).toBe(amount);
-  });
-
-  it("leaves some lines of a chapter in progress uncontracted", () => {
-    const states = Array.from({ length: 30 }, (_, i) => contractedCents({ lineageId: `l${i}`, costCents: 1000 }, "in_progress"));
-    expect(states.some((s) => s === null)).toBe(true);
-    expect(states.some((s) => s !== null)).toBe(true);
   });
 });
 

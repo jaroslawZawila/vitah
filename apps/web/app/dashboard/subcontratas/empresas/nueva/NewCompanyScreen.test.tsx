@@ -175,4 +175,25 @@ describe("NewCompanyScreen", () => {
     expect(screen.getAllByRole("link", { name: "Ir a la ficha" })[0]).toHaveAttribute("href", "/dashboard/subcontratas/empresas/c-1");
     expect(router.push).not.toHaveBeenCalled();
   });
+
+  it("registers a material supplier in two steps: no CAE documents, no obra", async () => {
+    renderScreen();
+    await userEvent.click(screen.getByRole("radio", { name: "Proveedor de material" }));
+    expect(screen.getByText("Sin CAE")).toBeInTheDocument();
+    await fillData();
+    await next();
+    await next();
+
+    expect(screen.getByText("Paso 3 de 3 · Revisión")).toBeInTheDocument();
+    expect(screen.getAllByText("Proveedor de material").length).toBeGreaterThan(0);
+    await userEvent.click(screen.getByRole("button", { name: "Registrar empresa" }));
+
+    await waitFor(() => expect(router.push).toHaveBeenCalledWith("/dashboard/subcontratas/empresas/c-1"));
+    const input = vi.mocked(actions.createSubcontractorAction).mock.calls[0]![0];
+    expect(input).toMatchObject({ kind: "company", suppliesOnly: true, legalName: "Carpintería Metálica Liébana S.L." });
+    // Core refuses a supplier with an obra or "No aplica" documents.
+    expect(input).not.toHaveProperty("assignment");
+    expect(input).not.toHaveProperty("notApplicable");
+    expect(actions.uploadSubcontractorDocumentAction).not.toHaveBeenCalled();
+  });
 });

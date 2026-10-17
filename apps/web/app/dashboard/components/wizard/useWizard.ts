@@ -1,12 +1,14 @@
-import { useCallback, useState } from "react";
-import type { WizardStep } from "./types";
+import { useCallback, useMemo, useState } from "react";
+import { activeSteps, type WizardStep } from "./types";
 
 // Wizard state and navigation, without any UI. Positions 0..steps.length-1
-// are the steps; position steps.length is the review screen.
+// are the steps that apply (each step's `when`, given `options` and the
+// draft); position steps.length is the review screen.
 
-export function useWizard<D, O>(steps: readonly WizardStep<D, O>[], initialDraft: D) {
+export function useWizard<D, O>(allSteps: readonly WizardStep<D, O>[], initialDraft: D, options?: O) {
   const [draft, setDraft] = useState(initialDraft);
   const [position, setPosition] = useState(0);
+  const steps = useMemo(() => activeSteps(allSteps, options as O, draft), [allSteps, options, draft]);
 
   const reviewPosition = steps.length;
   const isReview = position === reviewPosition;
@@ -43,6 +45,7 @@ export function useWizard<D, O>(steps: readonly WizardStep<D, O>[], initialDraft
   );
 
   return {
+    steps,
     draft,
     update,
     position,

@@ -37,6 +37,8 @@ export type CompanyFormDraft = {
   preventionEntity: string;
   preventionValidUntil: string;
   machinery: string[];
+  /** A material supplier: no CAE documents, workers or obras. */
+  suppliesOnly: boolean;
 };
 
 export const EMPTY_COMPANY_DRAFT: CompanyFormDraft = {
@@ -64,6 +66,7 @@ export const EMPTY_COMPANY_DRAFT: CompanyFormDraft = {
   preventionEntity: "",
   preventionValidUntil: "",
   machinery: [],
+  suppliesOnly: false,
 };
 
 /** An existing company's fields (from any object holding them, e.g. its detail) as form values. */

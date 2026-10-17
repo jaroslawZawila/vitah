@@ -12,15 +12,18 @@ import { footnote, moreLink } from "../../components/construction/classes";
 import CostTable from "../../components/construction/CostTable";
 import { FilterSelect } from "../../components/construction/Filters";
 import ObraFrame, { obraHref, type ObraHeader } from "../../components/construction/ObraFrame";
-import { Source, SourceLabel } from "../../components/construction/pills";
+import LateDeliveriesBanner from "../../components/construction/LateDeliveriesBanner";
+import { LiveBadge, Source, SourceLabel } from "../../components/construction/pills";
+import { newOrderHref, orderHref } from "../../components/purchasing/links";
 import Segmented from "../../components/construction/Segmented";
 
-type Contracting = "all" | "contracted" | "uncontracted" | "overrun";
+type Contracting = "all" | "closed" | "open" | "uncontracted" | "overrun";
 
 const MATCHES: Record<Contracting, (line: CostLine) => boolean> = {
   all: () => true,
-  contracted: (line) => line.contractedCents !== null,
-  uncontracted: (line) => line.contractedCents === null,
+  closed: (line) => line.contracting === "closed",
+  open: (line) => line.contracting === "open",
+  uncontracted: (line) => line.contracting === "none",
   overrun: (line) => (line.deviationCents ?? 0) < 0,
 };
 
@@ -30,11 +33,13 @@ export default function CostsScreen({
   header,
   costs,
   budgetNumber,
+  canManage,
 }: {
   projectId: string;
   header: ObraHeader;
   costs: ConstructionCosts;
   budgetNumber: number | null;
+  canManage: boolean;
 }) {
   const t = useTranslations("construction.costs");
   const tf = useTranslations("construction.filters");
@@ -76,11 +81,14 @@ export default function CostsScreen({
             {t("atCost")}
           </SourceLabel>
           <SourceLabel>
-            {t("contractedFrom")} <Source name={ts("purchasing")} mock={costs.sources.purchasing === "mock"} />
+            {t("contractedFrom")} <Source name={ts("purchasing")} />
+            <LiveBadge />
           </SourceLabel>
         </div>
       }
     >
+      <LateDeliveriesBanner orders={costs.lateDeliveries} orderHref={(id) => orderHref(projectId, id)} />
+
       <div className="flex flex-wrap items-center gap-x-3.5 gap-y-2.5">
         <FilterSelect
           id="costs-chapter"
@@ -93,7 +101,7 @@ export default function CostsScreen({
           label={t("contracting")}
           value={contracting}
           onChange={setContracting}
-          options={(["all", "contracted", "uncontracted", "overrun"] as const).map((key) => ({ key, label: t(`filter.${key}`) }))}
+          options={(["all", "closed", "open", "uncontracted", "overrun"] as const).map((key) => ({ key, label: t(`filter.${key}`) }))}
         />
         <Input
           type="search"
@@ -112,6 +120,8 @@ export default function CostsScreen({
         chapters={shown}
         expanded={expanded}
         onToggle={(code) => setToggled((all) => ({ ...all, [code]: !expanded(code) }))}
+        orderHref={(id) => orderHref(projectId, id)}
+        newOrderHref={canManage ? (code) => newOrderHref(projectId, code) : undefined}
       />
 
       <p className={footnote}>{t("footnote")}</p>

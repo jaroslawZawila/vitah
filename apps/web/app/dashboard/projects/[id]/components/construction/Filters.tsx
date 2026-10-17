@@ -70,21 +70,24 @@ export function StateFilterBar({
   );
 }
 
-/** From–to dates; either may be empty. */
+/** From–to dates; either may be empty. `label` names what the dates are of ("Periodo" by default). */
 export function PeriodFilter({
   from,
   to,
   onChange,
+  label,
 }: {
   from: string;
   to: string;
   onChange: (period: { from: string; to: string }) => void;
+  label?: string;
 }) {
   const t = useTranslations("construction.filters");
+  const name = label ?? t("period");
   return (
-    <div role="group" aria-label={t("period")} className={cn(filterBox, "flex-wrap")}>
+    <div role="group" aria-label={name} className={cn(filterBox, "flex-wrap")}>
       <span aria-hidden className="text-muted-foreground">
-        {t("period")}
+        {name}
       </span>
       <input
         type="date"

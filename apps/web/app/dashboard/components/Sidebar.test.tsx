@@ -54,6 +54,8 @@ describe("Sidebar", () => {
     ["/dashboard/projects/p-1/obra/avance/05", "Obra"],
     ["/dashboard/projects/p-1/obra/fotos", "Obra"],
     ["/dashboard/projects/p-1/budget", "Presupuesto"],
+    ["/dashboard/projects/p-1/compras", "Compras"],
+    ["/dashboard/projects/p-1/compras/o-1/editar", "Compras"],
     ["/dashboard/projects/p-1/payments", "Pagos"],
     ["/dashboard/projects/p-1/payments/h-4", "Pagos"],
     ["/dashboard/projects/p-1/documents", "Documentos"],
@@ -65,10 +67,23 @@ describe("Sidebar", () => {
       ["General", "/dashboard/projects/p-1"],
       ["Obra", "/dashboard/projects/p-1/obra"],
       ["Presupuesto", "/dashboard/projects/p-1/budget"],
+      ["Compras", "/dashboard/projects/p-1/compras"],
       ["Pagos", "/dashboard/projects/p-1/payments"],
       ["Documentos", "/dashboard/projects/p-1/documents"],
     ]);
     expect(tabs.getByRole("link", { current: "page" })).toHaveTextContent(current);
+  });
+
+  it("has the company-wide Compras in the Red group for every staff member", () => {
+    renderAt("/dashboard/projects", false);
+    const link = screen.getByRole("link", { name: "Compras" });
+    expect(link).toHaveAttribute("href", "/dashboard/compras");
+    expect(link).not.toHaveAttribute("aria-current");
+  });
+
+  it("marks Compras current on its page", () => {
+    renderAt("/dashboard/compras");
+    expect(screen.getByRole("link", { name: "Compras" })).toHaveAttribute("aria-current", "page");
   });
 
   describe("Subcontratas", () => {

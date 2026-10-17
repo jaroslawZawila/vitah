@@ -44,8 +44,16 @@ describe("SummaryScreen", () => {
     expect(kpis.getByText("de 6 finalizados")).toBeInTheDocument();
     expect(kpis.getByText("+8 d")).toBeInTheDocument();
     expect(kpis.getByText("06 Envolvente térmica Thermochip: fin previsto 09/10, sigue en curso")).toBeInTheDocument();
-    // Simulated data is labelled as such.
-    expect(kpis.getAllByText("Simulado").length).toBeGreaterThan(0);
+    // Planning is still simulated (labelled so); purchasing comes from Compras.
+    expect(kpis.getAllByText("Simulado")).toHaveLength(1);
+    expect(kpis.getAllByText("Compras").length).toBeGreaterThan(0);
+  });
+
+  it("warns about late deliveries without changing anything", () => {
+    renderScreen();
+    const banner = screen.getByRole("status");
+    expect(banner).toHaveTextContent("1 entrega con retraso: PED-049 Piedra de Liébana, capítulo 06, prevista el 14 oct. Solo es un aviso");
+    expect(within(banner).getByRole("link", { name: "PED-049" })).toHaveAttribute("href", "/dashboard/projects/p-1/compras/order-49");
   });
 
   it("groups the chapters by state, with schedule and deviation", () => {

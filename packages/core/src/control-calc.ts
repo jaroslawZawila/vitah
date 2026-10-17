@@ -1,11 +1,18 @@
-import type { ChapterState, MilestoneState } from "./contract";
-import { addDays, ofBp } from "./obra-calc";
+import {
+  CONTINGENCY_CHAPTER,
+  isOpenOrder,
+  type ChapterState,
+  type MilestoneState,
+  type PurchaseKind,
+  type PurchaseStatus,
+} from "./contract";
+import { addDays } from "./obra-calc";
 import { daysBetween } from "./subcontractor-rules";
 
 // ─── Construction control arithmetic ─────────────────────────────────────────
 // Pure functions behind ./construction: a chapter's state and delays from its
-// dates, a hito's state, and the stand-ins for the modules that don't exist
-// yet (Planning's dates, Purchasing's contracted amounts). No database.
+// dates, a hito's state, a line's deviation, and the stand-in for Planning's
+// dates until that module exists. No database.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export { daysBetween };
@@ -110,30 +117,91 @@ export function plannedDates(
   return plan;
 }
 
-// ─── Purchasing (simulated) ──────────────────────────────────────────────────
-// Until Purchasing exists, a line counts as contracted once its chapter is
-// finished, and for most lines of a chapter in progress; its contracted amount
-// is its cost give or take up to 6 %, stable for the line (by its lineage).
-
-const MAX_SPREAD_BP = 600;
-
-/** A stable 32-bit hash (FNV-1a). */
-function hash(text: string) {
-  let h = 0x811c9dc5;
-  for (let i = 0; i < text.length; i++) {
-    h ^= text.charCodeAt(i);
-    h = Math.imul(h, 0x01000193);
-  }
-  return h >>> 0;
+/**
+ * The contract's chapters to build (chapter 20, the contingency reserve,
+ * aside), each one's state from its recorded dates, and the planned dates.
+ */
+export function contractSchedule<C extends { code: string }>(
+  chapters: C[],
+  hitos: { pctBp: number; chapters: { code: string }[] }[],
+  progress: (Dates & { chapterCode: string })[],
+  works: { startDate: string | null; completionDate: string | null },
+) {
+  const items = chapters.filter((c) => c.code !== CONTINGENCY_CHAPTER);
+  const dates = new Map(progress.map((row) => [row.chapterCode, row]));
+  const states = new Map(items.map((c) => [c.code, chapterState(dates.get(c.code))]));
+  const plan = plannedDates(
+    works,
+    hitos.map((h) => ({ pctBp: h.pctBp, chapterCodes: h.chapters.map((c) => c.code) })),
+    items.map((c) => c.code),
+  );
+  return { items, dates, states, plan };
 }
 
-/** What a line was contracted for; null when it isn't contracted (yet). */
-export function contractedCents(line: { lineageId: string; costCents: number }, state: ChapterState): number | null {
-  if (state === "pending" || line.costCents <= 0) return null;
-  const h = hash(line.lineageId);
-  if (state === "in_progress" && h % 3 === 0) return null;
-  const spreadBp = (h % (2 * MAX_SPREAD_BP + 1)) - MAX_SPREAD_BP;
-  return line.costCents + ofBp(line.costCents, spreadBp);
+// ─── Purchasing ──────────────────────────────────────────────────────────────
+
+/** A material order past its expected delivery and not delivered: days late on `today`; else null. */
+export function lateDays(
+  order: { kind: PurchaseKind; status: PurchaseStatus; expectedOn: string | null },
+  today: string,
+): number | null {
+  if (order.kind !== "material" || !isOpenOrder(order.status) || !order.expectedOn || order.expectedOn >= today) return null;
+  return daysBetween(order.expectedOn, today);
+}
+
+/** What a budget line (by lineage) has contracted: its counting orders' sum, and whether one closes it. */
+export type LineContract = {
+  contractedCents: number;
+  closed: boolean;
+  orders: { id: string; number: number; supplierName: string; lateDays: number | null }[];
+};
+
+/**
+ * Budget lines' contracting summed up: what is contracted (closed lines or
+ * not), how many lines are closed, open or not ordered (those costing
+ * something), and the deviation
+ * over the closed ones only, so a line with more still to order never counts
+ * as a saving.
+ */
+export function contractTotals(
+  lines: { lineageId: string; amountCents: number }[],
+  contracts: ReadonlyMap<string, Pick<LineContract, "contractedCents" | "closed">>,
+) {
+  let contractedCents = 0;
+  let closedLines = 0;
+  let openLines = 0;
+  let closedCostCents = 0;
+  let closedContractedCents = 0;
+  let uncontractedLines = 0;
+  let uncontractedCostCents = 0;
+  for (const line of lines) {
+    const contract = contracts.get(line.lineageId);
+    if (!contract) {
+      // A line that costs nothing (or deducts) has nothing to order.
+      if (line.amountCents > 0) {
+        uncontractedLines++;
+        uncontractedCostCents += line.amountCents;
+      }
+      continue;
+    }
+    contractedCents += contract.contractedCents;
+    if (!contract.closed) {
+      openLines++;
+      continue;
+    }
+    closedLines++;
+    closedCostCents += line.amountCents;
+    closedContractedCents += contract.contractedCents;
+  }
+  return {
+    contractedCents,
+    closedLines,
+    openLines,
+    closedCostCents,
+    uncontractedLines,
+    uncontractedCostCents,
+    ...deviation(closedCostCents, closedLines > 0 ? closedContractedCents : null),
+  };
 }
 
 /** Cost − contracted (a saving is positive), and as bp of the cost; nulls when not contracted. */

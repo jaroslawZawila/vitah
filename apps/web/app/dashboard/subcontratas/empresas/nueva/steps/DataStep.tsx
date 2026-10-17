@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { provinceForPostalCode } from "@repo/core/contract";
+import { companyType, provinceForPostalCode } from "@repo/core/contract";
 import SummaryList from "../../../../components/wizard/SummaryList";
 import CompanyDataFields from "../../../components/fields/CompanyDataFields";
 import type { CompanyFlowDraft, CompanyStepProps } from "../draft";
@@ -19,7 +19,7 @@ export function DataSummary({ draft }: { draft: CompanyFlowDraft }) {
   return (
     <SummaryList
       items={[
-        { label: t("kind"), value: tr(`kinds.${draft.kind}`) },
+        { label: t("kind"), value: t(`types.${companyType(draft)}.label`) },
         { label: selfEmployed ? t("fullName") : t("legalName"), value: draft.legalName },
         { label: selfEmployed ? t("nif") : t("cif"), value: draft.taxId.toUpperCase() },
         {

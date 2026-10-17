@@ -39,6 +39,8 @@ export const COMPANY_STEPS: readonly WizardStep<CompanyFlowDraft, CompanyFlowOpt
     Summary: DocumentsSummary,
     isComplete: documentsComplete,
     errorCodes: ["not_optional", "missing_reason", "invalid_requirement"],
+    // A material supplier has no CAE documents.
+    when: (_, draft) => !draft.suppliesOnly,
   },
   {
     id: "obra",
@@ -48,5 +50,8 @@ export const COMPANY_STEPS: readonly WizardStep<CompanyFlowDraft, CompanyFlowOpt
     // Optional: the company can be put on an obra later from its ficha.
     isComplete: obraComplete,
     errorCodes: ["project_not_found", "invalid_chapter"],
+    // Nor does it work on an obra.
+    when: (_, draft) => !draft.suppliesOnly,
   },
 ];
+

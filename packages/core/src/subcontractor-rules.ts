@@ -9,6 +9,11 @@
 export const SUBCONTRACTOR_KINDS = ["company", "self_employed"] as const;
 export type SubcontractorKind = (typeof SUBCONTRACTOR_KINDS)[number];
 
+/** What a company is to the user: a subcontracting company, a self-employed worker, or a material supplier (no CAE). */
+export type CompanyType = SubcontractorKind | "supplier";
+export const companyType = (c: { kind: SubcontractorKind; suppliesOnly: boolean }): CompanyType =>
+  c.suppliesOnly ? "supplier" : c.kind;
+
 export const PREVENTION_MODES = ["external_service", "own_service", "joint_service", "employer"] as const;
 export type PreventionMode = (typeof PREVENTION_MODES)[number];
 

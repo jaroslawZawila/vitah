@@ -9,7 +9,9 @@ export default async function WorkerPage({ params }: { params: Promise<{ id: str
   return (
     <WorkerScreen
       worker={worker}
-      companies={(companies ?? []).map(({ id, legalName, kind, status }) => ({ id, legalName, kind, status }))}
+      companies={(companies ?? [])
+        .filter((c) => !c.suppliesOnly)
+        .map(({ id, legalName, kind, status }) => ({ id, legalName, kind, status }))}
       canManage={worker.canManage}
     />
   );

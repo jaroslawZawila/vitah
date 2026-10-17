@@ -16,7 +16,9 @@ import { projectPhotoUrl } from "../components/photoUrl";
 import { FilterSelect, PeriodFilter, ReadOnlyNote, StateFilterBar, type StateFilter } from "../components/construction/Filters";
 import { useControlFormat } from "../components/construction/format";
 import ObraFrame, { chapterHref, obraHref, type ObraHeader } from "../components/construction/ObraFrame";
+import LateDeliveriesBanner from "../components/construction/LateDeliveriesBanner";
 import ReviewBanner from "../components/construction/ReviewBanner";
+import { orderHref } from "../components/purchasing/links";
 import { inPeriod } from "../components/construction/schedule";
 import { DocumentAlertsCard, MilestonesCard, OpenIssuesCard, RecentPhotosCard } from "../components/construction/SummaryCards";
 import SummaryKpis from "../components/construction/SummaryKpis";
@@ -101,6 +103,8 @@ export default function SummaryScreen({
               error={reviewState?.error}
             />
           )}
+
+          <LateDeliveriesBanner orders={control.lateDeliveries} orderHref={(id) => orderHref(projectId, id)} />
 
           <form aria-label={tf("label")} className="flex flex-wrap items-center gap-x-3.5 gap-y-2.5" onSubmit={(e) => e.preventDefault()}>
             <FilterSelect

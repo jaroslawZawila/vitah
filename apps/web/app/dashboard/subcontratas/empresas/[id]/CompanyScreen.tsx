@@ -11,6 +11,7 @@ import {
   MANDATORY_COMPANY_REQUIREMENTS,
   workerName,
   type ProjectOption,
+  type PurchaseOrderListItem,
   type SubcontractorAssignment,
   type SubcontractorDetail,
   type SubcontractorError,
@@ -29,9 +30,10 @@ import { cardVariants } from "@/components/ui/card";
 import BlockingBanner from "../../components/company/BlockingBanner";
 import CompanyHeader from "../../components/company/CompanyHeader";
 import CompanyTabs from "../../components/company/CompanyTabs";
-import type { CompanyTab } from "../../components/company/tabs";
+import { tabsOf, type CompanyTab } from "../../components/company/tabs";
 import HistoryList from "../../components/company/HistoryList";
 import ObrasTab from "../../components/company/ObrasTab";
+import OrdersTab from "../../components/company/OrdersTab";
 import type { AssignmentValues } from "../../components/fields/draft";
 import SummaryTab from "../../components/company/SummaryTab";
 import WorkersTab from "../../components/company/WorkersTab";
@@ -52,10 +54,13 @@ const MANDATORY = new Set<string>(MANDATORY_COMPANY_REQUIREMENTS.map((r) => r.id
 export default function CompanyScreen({
   company,
   projects,
+  orders,
   initialTab,
 }: {
   company: SubcontractorDetail;
   projects: ProjectOption[];
+  /** Its orders across the obras (Compras). */
+  orders: PurchaseOrderListItem[];
   initialTab: CompanyTab;
 }) {
   const t = useTranslations("subcontractors.company");
@@ -126,10 +131,12 @@ export default function CompanyScreen({
 
       <CompanyTabs
         tab={tab}
+        tabs={tabsOf(company.suppliesOnly)}
         counts={{
           documentos: company.documents.length + company.assignments.length,
           trabajadores: company.workers.length,
           obras: company.assignments.length,
+          pedidos: orders.length,
         }}
         onChange={changeTab}
       />
@@ -174,6 +181,7 @@ export default function CompanyScreen({
             onRemove={remove}
           />
         )}
+        {tab === "pedidos" && <OrdersTab company={company} orders={orders} />}
         {tab === "historial" && <HistoryList entries={company.history} kind={company.kind} />}
       </div>
     </>

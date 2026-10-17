@@ -903,6 +903,8 @@ export const subcontractors = pgTable(
     preventionEntity: text("prevention_entity"),
     preventionValidUntil: date("prevention_valid_until", { mode: "string" }),
     machinery: jsonb("machinery").$type<string[]>().default([]).notNull(),
+    // A material supplier: it only delivers, so no CAE documents, workers or obra assignments.
+    suppliesOnly: boolean("supplies_only").default(false).notNull(),
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { mode: "date" })
       .defaultNow()
@@ -1097,6 +1099,122 @@ export const subcontractorAudit = pgTable(
       table.subcontractorId,
       table.createdAt,
     ),
+  }),
+);
+
+// --- Purchasing (Compras) ---
+
+// The orders of material and the subcontracts of a project, each split across
+// budget lines (by lineage, so they outlive a budget revision). What they
+// contract is what the Obra tab compares with the budget's cost. Staff only.
+
+export type PurchaseOrderKind = "material" | "subcontract";
+// material: pending → ordered → confirmed → in_transit → delivered;
+// subcontract: pending → contracted → finished; either may be cancelled.
+export type PurchaseOrderStatus =
+  | "pending"
+  | "ordered"
+  | "confirmed"
+  | "in_transit"
+  | "delivered"
+  | "contracted"
+  | "finished"
+  | "cancelled";
+
+export const purchaseOrders = pgTable(
+  "purchase_orders",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    // Numbered per project (PED-001).
+    number: integer("number").notNull(),
+    kind: text("kind").$type<PurchaseOrderKind>().notNull(),
+    subcontractorId: text("subcontractor_id")
+      .notNull()
+      // Not cascaded (a company with orders is never deleted), yet a deleted tenant takes both.
+      .references(() => subcontractors.id),
+    description: text("description").notNull(),
+    status: text("status").$type<PurchaseOrderStatus>().default("pending").notNull(),
+    orderedOn: date("ordered_on", { mode: "string" }),
+    // A material order's expected delivery; a subcontract's works period.
+    expectedOn: date("expected_on", { mode: "string" }),
+    workStart: date("work_start", { mode: "string" }),
+    workEnd: date("work_end", { mode: "string" }),
+    // Delivered (material) or finished (subcontract).
+    completedOn: date("completed_on", { mode: "string" }),
+    notes: text("notes"),
+    // The order or signed contract (PDF, private Blob store).
+    fileName: text("file_name"),
+    filePathname: text("file_pathname"),
+    fileSizeBytes: integer("file_size_bytes"),
+    createdById: text("created_by_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date" })
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => ({
+    projectNumberUnique: unique("purchase_orders_project_number_unique").on(table.projectId, table.number),
+    tenantIdx: index("purchase_orders_tenant_idx").on(table.tenantId),
+    subcontractorIdx: index("purchase_orders_subcontractor_idx").on(table.subcontractorId),
+  }),
+);
+
+// How much of an order goes to a budget line, and whether it closes the line
+// (nothing else is left to contract for it).
+export const purchaseOrderLines = pgTable(
+  "purchase_order_lines",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    orderId: text("order_id")
+      .notNull()
+      .references(() => purchaseOrders.id, { onDelete: "cascade" }),
+    // budget_lines.lineage_id: the same line in every revision.
+    lineageId: text("lineage_id").notNull(),
+    chapterCode: text("chapter_code").notNull(),
+    amountCents: integer("amount_cents").notNull(),
+    closesLine: boolean("closes_line").default(true).notNull(),
+  },
+  (table) => ({
+    orderLineageUnique: unique("purchase_order_lines_order_lineage_unique").on(table.orderId, table.lineageId),
+  }),
+);
+
+// Every change to an order: its creation, status, dates, amounts and lines.
+export const purchaseOrderEvents = pgTable(
+  "purchase_order_events",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    orderId: text("order_id")
+      .notNull()
+      .references(() => purchaseOrders.id, { onDelete: "cascade" }),
+    // created | status | updated | lines | file_added | file_removed
+    action: text("action").notNull(),
+    detail: jsonb("detail").$type<Record<string, unknown>>().default({}).notNull(),
+    note: text("note"),
+    userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => ({
+    orderCreatedIdx: index("purchase_order_events_order_created_idx").on(table.orderId, table.createdAt),
   }),
 );
 

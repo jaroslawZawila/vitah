@@ -33,7 +33,7 @@ import {
   oneOf,
   optional,
   phone,
-  requireCompany,
+  requireCaeCompany,
   requireWorker,
   str,
   toDoc,
@@ -63,7 +63,7 @@ async function parseFields(ctx: Ctx, input: Record<string, unknown>, base?: Work
   if (!subcontractorId || !firstName || !surnames || !idDocument) fail("missing_fields");
   if (!isValidPersonalId(idDocument)) fail("invalid_id_document");
 
-  await requireCompany(ctx, subcontractorId);
+  await requireCaeCompany(ctx, subcontractorId);
   const ssNumber = optional(get("ssNumber"));
   if (ssNumber !== null && !SS_PATTERN.test(ssNumber)) fail("invalid_number");
 

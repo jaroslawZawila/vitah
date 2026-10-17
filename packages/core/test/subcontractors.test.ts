@@ -507,6 +507,48 @@ describe("assignments", () => {
   });
 });
 
+describe("material suppliers", () => {
+  const supplier = () => company({ legalName: "Piedra de Liébana S.L.", taxId: "B39654322", suppliesOnly: true });
+
+  it("are apta with no CAE: no documents asked, nothing to attend to", async () => {
+    const { ctx } = await setup();
+    const { id } = await svc.createSubcontractor(ctx, supplier());
+
+    const overview = await svc.getOverview(ctx);
+    expect(overview.companies.find((c) => c.id === id)).toMatchObject({ suppliesOnly: true, status: "apta", docsTotal: 0, docsValid: 0 });
+    expect(overview.attention.some((a) => a.subcontractorId === id)).toBe(false);
+    // The subcontractor of setup() still counts as pending; the supplier counts nowhere.
+    expect(overview.counts).toEqual({ apta: 0, pendiente: 1, bloqueada: 0 });
+    expect((await svc.getSubcontractor(ctx, id)).suppliesOnly).toBe(true);
+  });
+
+  it("have no workers, obras or documents", async () => {
+    const { ctx, tenant } = await setup();
+    const { id } = await svc.createSubcontractor(ctx, supplier());
+    const project = await createTestProject(tenant.id);
+
+    await expect(workers.createWorker(ctx, workerInput(id))).rejects.toMatchObject({ code: "supplies_only" });
+    await expect(svc.assignToProject(ctx, id, project.id, {})).rejects.toMatchObject({ code: "supplies_only" });
+    await expect(svc.requestDocuments(ctx, id, { requirementIds: ["cert_tgss"] })).rejects.toMatchObject({ code: "supplies_only" });
+    await expect(
+      svc.uploadDocument(ctx, id, { requirementId: "cert_tgss", issuedAt: inDays(-1), file: pdf() }),
+    ).rejects.toMatchObject({ code: "supplies_only" });
+    await expect(
+      svc.createSubcontractor(ctx, company({ taxId: "B39777719", suppliesOnly: true, assignment: { projectId: project.id } })),
+    ).rejects.toMatchObject({ code: "supplies_only" });
+  });
+
+  it("can't be a company that already has workers or obras", async () => {
+    const { ctx, id } = await setup();
+    await workers.createWorker(ctx, workerInput(id));
+    await expect(svc.updateSubcontractor(ctx, id, { suppliesOnly: true })).rejects.toMatchObject({ code: "supplies_only" });
+
+    const { id: plain } = await svc.createSubcontractor(ctx, company({ taxId: "B39777719" }));
+    await svc.updateSubcontractor(ctx, plain, { suppliesOnly: true });
+    expect((await svc.getSubcontractor(ctx, plain)).suppliesOnly).toBe(true);
+  });
+});
+
 describe("overview", () => {
   it("counts statuses, access, expiries and who is on site today", async () => {
     const { ctx, id, tenant } = await setup();

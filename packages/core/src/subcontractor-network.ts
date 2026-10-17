@@ -66,6 +66,7 @@ const STATUS: Record<SubcontractorError, number> = {
   permanent_exceeds_headcount: 400,
   self_employed_cannot_subcontract: 400,
   chain_too_deep: 400,
+  supplies_only: 409,
   tax_id_exists: 409,
   id_document_exists: 409,
   not_optional: 400,
@@ -143,6 +144,13 @@ export async function requireCompany(ctx: Ctx, subcontractorId: string) {
     .from(subcontractors)
     .where(and(eq(subcontractors.id, subcontractorId), eq(subcontractors.tenantId, ctx.tenantId)));
   if (!row) fail("not_found");
+  return row;
+}
+
+/** A company that works on site: CAE documents, workers and obras; never a material supplier. */
+export async function requireCaeCompany(ctx: Ctx, subcontractorId: string) {
+  const row = await requireCompany(ctx, subcontractorId);
+  if (row.suppliesOnly) fail("supplies_only");
   return row;
 }
 
@@ -287,6 +295,7 @@ export class Network {
   private readonly assignmentsBySubcontractor: Map<string, AssignmentRow[]>;
   readonly projectsById: Map<string, ProjectRow>;
   readonly workersById: Map<string, WorkerRow>;
+  private readonly suppliers: Set<string>;
 
   constructor(
     readonly companies: CompanyRow[],
@@ -306,6 +315,7 @@ export class Network {
       this.factsByOwner.set(owner, facts);
     }
     this.projectsById = new Map(projects.map((p) => [p.id, p]));
+    this.suppliers = new Set(companies.filter((c) => c.suppliesOnly).map((c) => c.id));
     this.workersById = new Map(workers.map((w) => [w.id, w]));
     this.workersBySubcontractor = groupBy(workers, (w) => w.subcontractorId);
     this.assignmentsBySubcontractor = groupBy(assignments, (a) => a.subcontractorId);
@@ -338,7 +348,10 @@ export class Network {
   status(subcontractorId: string): CompanyStatusResult {
     let result = this.statusCache.get(subcontractorId);
     if (!result) {
-      result = companyStatus(this.factsOf(subcontractorId, null), this.today);
+      // A material supplier never comes on site: no CAE documents to miss.
+      result = this.suppliers.has(subcontractorId)
+        ? { status: "apta", expired: [], pending: [] }
+        : companyStatus(this.factsOf(subcontractorId, null), this.today);
       this.statusCache.set(subcontractorId, result);
     }
     return result;

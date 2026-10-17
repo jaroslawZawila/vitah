@@ -4,21 +4,23 @@ import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 import { COMPANY_TABS, type CompanyTab } from "./tabs";
 
-
 /** Presentational: the ficha's sections, with optional counts. */
 export default function CompanyTabs({
   tab,
+  tabs = COMPANY_TABS,
   counts,
   onChange,
 }: {
   tab: CompanyTab;
+  /** The ficha's tabs (fewer for a material supplier). */
+  tabs?: readonly CompanyTab[];
   counts: Partial<Record<CompanyTab, number>>;
   onChange: (tab: CompanyTab) => void;
 }) {
   const t = useTranslations("subcontractors.company.tabs");
   return (
     <div role="tablist" aria-label={t("label")} className="-mx-1 flex gap-0.5 overflow-x-auto border-b px-1">
-      {COMPANY_TABS.map((key) => {
+      {tabs.map((key) => {
         const on = key === tab;
         return (
           <button

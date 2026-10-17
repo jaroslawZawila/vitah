@@ -91,7 +91,7 @@ export default function SummaryTable({
             {t("actualDates")} <Source name={ts("progress")} />
           </SourceLabel>
           <SourceLabel>
-            {t("contractedFrom")} <Source name={ts("purchasing")} mock={sources.purchasing === "mock"} />
+            {t("contractedFrom")} <Source name={ts("purchasing")} />
           </SourceLabel>
           <Link href={progressHref} className={moreLink}>
             {t("recordProgress")} →

@@ -9,17 +9,21 @@ export default function Kpi({
   label,
   value,
   pct,
+  barTone,
   hints = [],
   href,
   highlight = false,
+  className,
 }: {
   label: string;
   value: React.ReactNode;
   pct?: number;
+  barTone?: "progress" | "brand";
   hints?: React.ReactNode[];
   href?: string;
   /** The page's headline figure, on dark ink. */
   highlight?: boolean;
+  className?: string;
 }) {
   const body = (
     <>
@@ -34,7 +38,7 @@ export default function Kpi({
         {value}
       </span>
       {pct !== undefined && (
-        <ProgressBar pct={pct} className={cn("my-1 flex-none", highlight && "border-white/15 bg-white/10")} />
+        <ProgressBar pct={pct} tone={barTone} className={cn("my-1 flex-none", highlight && "border-white/15 bg-white/10")} />
       )}
       {hints.map((hint, index) => (
         <span
@@ -49,6 +53,7 @@ export default function Kpi({
   const tile = cn(
     cardVariants({ size: "kpi" }),
     highlight && "border-rail bg-rail text-white",
+    className,
   );
   return href ? (
     <Link href={href} className={cn(tile, "transition-colors hover:border-primary")}>

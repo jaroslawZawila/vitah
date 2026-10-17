@@ -177,7 +177,8 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
 - Schema in `packages/db/src/schema.ts` — tables: `tenants`, `users`, `client_profiles`, `client_settings`, `push_tokens`, `accounts`, `sessions`, `verification_tokens`, `projects`, `project_documents`, `project_photos`, the construction control's `obra_chapter_progress`, `obra_progress_events`,
   `obra_invoice_requests`, `obra_issues`, `obra_issue_files`, and the obra's `budget_revisions`, `budget_chapters`, `budget_lines`, `obra_hitos`, `obra_hito_chapters`, `obra_hito_checks`, `obra_hito_photos`, plus `budget_generations` (AI runs) and `ai_usage` (one row per Claude call, with its cost), and the
   Subcontratas tables `subcontractors`, `subcontractor_workers`, `subcontractor_documents`, `subcontractor_document_versions`,
-  `subcontractor_assignments`, `subcontractor_audit`. A project is deliberately minimal — exactly what the mobile app shows: `ref`, `address`, `start_date`, `completion_date`, plus `client_user_id` linking it to its mobile app client
+  `subcontractor_assignments`, `subcontractor_audit`, and Compras' `purchase_orders`, `purchase_order_lines`,
+  `purchase_order_events`. A project is deliberately minimal — exactly what the mobile app shows: `ref`, `address`, `start_date`, `completion_date`, plus `client_user_id` linking it to its mobile app client
 - Prod migrations are additive SQL files in `packages/db/sql/`, applied by hand (no plain `db:push` on prod)
 
 ### Obra (construction process)
@@ -209,9 +210,10 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
   never a second one, whatever is corrected); hito states pending → reached → requested → invoiced → collected follow
   the Pagos tab's invoice and payment. `Hito.invoiceRequestedAt` shows it on Pagos. A finished chapter counts as 100 %
   built for the hitos and the client's app (`loadObra`), so start/finish/correct call `markChanged(["obra"])`
-- Planning and Purchasing don't exist yet: planned dates (hitos in turn, each a share of the works' time like its share
-  of the price) and contracted amounts (lines of started chapters, cost ± 6 %) are **simulated** in `control-calc.ts`
-  (`sources: "mock"`, shown as "Simulado"). Sales is the hitos' invoices/payments. Swap the real modules in there
+- Planning doesn't exist yet: planned dates (hitos in turn, each a share of the works' time like its share of the
+  price) are **simulated** in `control-calc.ts` (`sources.planning: "mock"`, shown as "Simulado"); swap Planning in
+  there. Contracted amounts are real, from Compras (`lineContracts` in `purchasing.ts`, below); a late delivery is a
+  warning only. Sales is the hitos' invoices/payments
 - Issues and changes log (`obra_issues`, numbered per kind INC-/CAM-, files in `obra_issue_files`, private Blob,
   served as downloads): history only, never changes dates, amounts or invoices. Document warnings come from
   Subcontratas (`listProjectAttention`). Photos have a `taken_on` day. Staff only; viewers read
@@ -219,6 +221,27 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
   `fotos` (the old project Fotos tab redirects there); views in `components/construction/`. API: `/api/v1/projects/:id/obra/`
   `control`, `header`, `costs`, `review`, `chapters/:code/{control,start,finish}` (`PATCH …/control` corrects), `issues`,
   `issues/:issueId`, `issues/:issueId/files[/:fileId]`. Prod SQL: `packages/db/sql/2026-10-construction-control.sql`
+
+### Purchasing (Compras)
+
+- Design canvas https://claude.ai/code/artifact/4ce3f46d-d759-45c5-9dda-cc9828f77222. Service
+  `packages/core/src/purchasing.ts` (`purchasingService`); web-only and staff-only (admins/managers write, viewers read):
+  the client never sees it, so no `/api/mobile` route and no `markChanged`
+- A project's orders (`purchase_orders`, numbered per project PED-001, retried on conflict): `material` (pending →
+  ordered → confirmed → in_transit → delivered) or `subcontract` (pending → contracted → finished); any may be cancelled
+  except a completed one; any status of its kind can be set again (corrections), dates ≤ today. Each order splits its
+  amount across budget lines by **lineage** (`purchase_order_lines`, so it outlives a revision) and may close a line
+  (`closes_line`: nothing more to order for it). Every change goes to `purchase_order_events`; one PDF per order
+- A line's contracted amount = its orders from ordered/contracted on (pending and cancelled don't count); its
+  deviation (cost − contracted) counts only once it is closed, so an open line never shows as a saving. The Obra tab's
+  Costes/Resumen read it; a material order past its expected date and not delivered is a late delivery (warning only)
+- Suppliers are the Subcontratas companies; a material supplier is `subcontractors.supplies_only` (no CAE documents,
+  workers or obras: always apta; it can't take a subcontract)
+- Portal: project tab Compras (`dashboard/projects/[id]/compras/`: list, `nuevo`, `[orderId]`, `[orderId]/editar`) and the
+  rail's company-wide Compras (`dashboard/compras/`, every order of the tenant for Administration). API: `/api/v1/purchases`
+  (`?projectId`, `?subcontractorId`), `/api/v1/purchases/:orderId` (GET, PATCH), `…/status` (POST), `…/file`;
+  `/api/v1/projects/:id/purchases` (GET, POST) and `…/purchases/form`. `pnpm db:seed` gives VTH-26-001 its orders
+  (`seed/purchasing.ts`). Prod SQL: `packages/db/sql/2026-10-purchasing.sql`
 
 ### Budget (Presupuesto)
 
@@ -264,6 +287,8 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
 - Documents are versioned: an upload adds an immutable version (private Blob store); validate / reject (with reason)
   act on the current one. Every write goes to `subcontractor_audit` (the ficha's Historial)
 - Admins and managers (contractor, jefe de obra) write; viewers read with masked CIF/DNI. No subcontractor portal login yet
+- A material supplier (`supplies_only`, for Compras) has no CAE: no documents, workers or obra assignments
+  (`supplies_only` error), never in the attention list or the status counts
 - Portal: rail group "Red" › Subcontratas (`dashboard/subcontratas/`: `empresas`, `empresas/nueva` wizard,
   `empresas/[id]` ficha + `editar`, `trabajadores`, `trabajadores/nuevo`, `trabajadores/[id]`); API `/api/v1/subcontractors/**`.
   `pnpm db:seed` adds eight fictional companies on VTH-26-001. Prod SQL: `packages/db/sql/2026-10-subcontractors.sql`
@@ -288,7 +313,7 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
 - Uploading a photo or document pushes a notification to the project's client (`packages/core/src/notifications.ts`, via Expo's push service), if their Perfil toggle is on; a failed push never fails the upload. Push needs an EAS project id (`npx eas init`) and, on Android, a development/store build
 - Tests swap storage for an in-memory one: `vi.mock("@repo/core/storage", () => import("@repo/core/testing"))`
 - Drizzle Kit for migrations: `pnpm db:generate`, `pnpm db:migrate`, `pnpm db:push`
-- Seed script: `pnpm db:seed` creates the tenant, the admin user, project VTH-26-001 (with the Caviedes budget, accepted, and its obra half built) and its mobile app client
+- Seed script: `pnpm db:seed` creates the tenant, the admin user, project VTH-26-001 (with the Caviedes budget, accepted, its obra half built, subcontractors and orders) and its mobile app client
 - Local dev: Docker Compose with PostgreSQL 16 (`docker-compose.yml` at root)
 - Vercel: `POSTGRES_URL` injected automatically from linked Vercel Postgres store
 

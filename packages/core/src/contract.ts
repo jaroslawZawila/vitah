@@ -636,6 +636,9 @@ export type ObraError =
   | "invalid_state"
   | "duplicate_code"
   | "unknown_chapter"
+  | "unknown_line"
+  | "unknown_supplier"
+  | "supplies_only"
   | "budget_exists"
   | "draft_exists"
   | "no_budget"
@@ -653,8 +656,8 @@ export type ObraError =
 // (a "main budget item") moves pending → in progress → finished only by the
 // actual dates staff record; finishing a hito's last chapter asks
 // Administration for its invoice, once. Costs compare each line's budgeted
-// cost with what was contracted. Planning and Purchasing don't exist yet:
-// their data is simulated (`sources`), and the portal says so.
+// cost with what was contracted (Compras). Planning doesn't exist yet: its
+// dates are simulated (`sources`), and the portal says so.
 
 export const CHAPTER_STATES = ["pending", "in_progress", "finished"] as const;
 export type ChapterState = (typeof CHAPTER_STATES)[number];
@@ -671,7 +674,7 @@ export const ISSUE_STATUSES = ["pending", "review", "resolved"] as const;
 export type IssueStatus = (typeof ISSUE_STATUSES)[number];
 
 /** Where data owned by other modules comes from: "mock" until the module exists. */
-export type ControlSources = { planning: "mock"; purchasing: "mock" };
+export type ControlSources = { planning: "mock"; purchasing: "live" };
 
 export type ControlChapter = {
   code: string;
@@ -694,12 +697,15 @@ export type ControlChapter = {
   /** Budgeted cost (never the sale price), from the accepted budget. */
   costCents: number;
   lineCount: number;
+  /** Lines whose contracting is closed (nothing left to order for them). */
   contractedLines: number;
-  /** What its contracted lines were contracted for (Purchasing); null when none are. */
+  /** Lines with something contracted but more still to order. */
+  openLines: number;
+  /** What its lines were contracted for so far (Compras), closed or open; null when nothing is. */
   contractedCents: number | null;
-  /** The budgeted cost of those same lines. */
+  /** The budgeted cost of the closed lines: what the deviation is measured on. */
   contractedCostCents: number;
-  /** Cost − contracted over the contracted lines (saving > 0), and as bp of their cost; null when none are. */
+  /** Cost − contracted over the closed lines (saving > 0), and as bp of their cost; null when none are closed. */
   deviationCents: number | null;
   deviationBp: number | null;
   openIssues: number;
@@ -790,8 +796,9 @@ export type ConstructionControl = {
   reviewPending: boolean;
   cost: {
     budgetedCents: number;
+    /** Everything contracted so far, closed lines or not. */
     contractedCents: number;
-    /** The budgeted cost of the contracted lines: what the deviation is measured on. */
+    /** The budgeted cost of the closed lines: what the deviation is measured on. */
     contractedCostCents: number;
     deviationCents: number;
     deviationBp: number;
@@ -807,6 +814,8 @@ export type ConstructionControl = {
   };
   milestones: ControlMilestone[];
   documentAlerts: AttentionItem[];
+  /** Material orders past their expected delivery: a warning only. */
+  lateDeliveries: PurchaseOrderListItem[];
   issues: ObraIssue[];
   events: (ProgressEvent & { chapterName: string | null })[];
   photos: ProjectPhoto[];
@@ -834,6 +843,8 @@ export type ControlChapterDetail = {
   photos: ProjectPhoto[];
   /** Its lines' executed %: what the client's app shows as the chapter's progress. */
   lines: { id: string; code: string; description: string; unit: string; executedPct: number }[];
+  /** The orders with a line in this chapter. */
+  orders: PurchaseOrderListItem[];
   today: string;
   sources: ControlSources;
 };
@@ -847,6 +858,11 @@ export type CostLine = {
   costCents: number;
   /** Null: not contracted yet (never 0). */
   contractedCents: number | null;
+  /** none: nothing ordered; open: more is still to order; closed: fully contracted. */
+  contracting: LineContracting;
+  /** The orders that contract it. */
+  orders: { id: string; number: number; supplierName: string; lateDays: number | null }[];
+  /** Only for a closed line: an open one never counts as a saving. */
   deviationCents: number | null;
   deviationBp: number | null;
 };
@@ -854,6 +870,8 @@ export type CostLine = {
 /** GET /api/v1/projects/:id/obra/costs: cost control per budget line. */
 export type ConstructionCosts = {
   chapters: { code: string; name: string; state: ChapterState; lines: CostLine[] }[];
+  /** Material orders past their expected delivery: a warning only. */
+  lateDeliveries: PurchaseOrderListItem[];
   sources: ControlSources;
 };
 
@@ -893,6 +911,234 @@ export function amountCents(quantityMilli: number, unitPriceCents: number): numb
 export const lineAmountCents = (quantity: number, unitPriceCents: number) =>
   amountCents(Math.round(quantity * 1000), unitPriceCents);
 
+// ─── Purchasing (Compras) ─────────────────────────────────────────────────────
+// A project's orders of material and subcontracts, each split across budget
+// lines. What they contract is the Obra tab's "contracted" amount. Staff only:
+// the client's app never sees purchasing.
+
+export const PURCHASE_KINDS = ["material", "subcontract"] as const;
+export type PurchaseKind = (typeof PURCHASE_KINDS)[number];
+
+/** Each kind's statuses in order; either may also be cancelled. */
+export const PURCHASE_FLOWS = {
+  material: ["pending", "ordered", "confirmed", "in_transit", "delivered"],
+  subcontract: ["pending", "contracted", "finished"],
+} as const;
+export type PurchaseStatus = (typeof PURCHASE_FLOWS)[PurchaseKind][number] | "cancelled";
+
+/** Every status an order of `kind` can be set to (its flow, or cancelled). */
+export const statusesOf = (kind: PurchaseKind): readonly PurchaseStatus[] => [...PURCHASE_FLOWS[kind], "cancelled"];
+/** The status that places an order of `kind`: ordered (material) or contracted (subcontract). */
+export const placedStatus = (kind: PurchaseKind): PurchaseStatus => PURCHASE_FLOWS[kind][1];
+/** The status after `status` along its kind's flow; null once completed or cancelled. */
+export function nextStatus(kind: PurchaseKind, status: PurchaseStatus): PurchaseStatus | null {
+  const flow: readonly PurchaseStatus[] = PURCHASE_FLOWS[kind];
+  const index = flow.indexOf(status);
+  return index >= 0 && index < flow.length - 1 ? flow[index + 1]! : null;
+}
+/** The statuses that don't contract anything. */
+export const UNCONTRACTED_STATUSES = ["pending", "cancelled"] as const;
+/** An order contracts its amount from ordered (material) or contracted (subcontract) on. */
+export const countsAsContracted = (status: PurchaseStatus) => !(UNCONTRACTED_STATUSES as readonly string[]).includes(status);
+/** Delivered or finished. */
+export const isCompletedOrder = (status: PurchaseStatus) => status === "delivered" || status === "finished";
+/** Contracted and not completed yet. */
+export const isOpenOrder = (status: PurchaseStatus) => countsAsContracted(status) && !isCompletedOrder(status);
+/** Anything not completed (or cancelled already) may be cancelled. */
+export const canCancel = (status: PurchaseStatus) => status !== "cancelled" && !isCompletedOrder(status);
+/** A material supplier only delivers: it never takes a subcontract. */
+export const canTakeOrder = (supplier: { suppliesOnly: boolean }, kind: PurchaseKind) =>
+  !(supplier.suppliesOnly && kind === "subcontract");
+/** "PED-007". */
+export const orderLabel = (number: number) => `PED-${String(number).padStart(3, "0")}`;
+
+export type LineContracting = "none" | "open" | "closed";
+
+export const MAX_ORDER_LINES = 200;
+
+export type PurchaseOrderListItem = {
+  id: string;
+  projectId: string;
+  projectRef: string;
+  number: number;
+  kind: PurchaseKind;
+  subcontractorId: string;
+  supplierName: string;
+  suppliesOnly: boolean;
+  /** The supplier's CAE status (apta for a material supplier); null where it isn't loaded (the Obra tab). */
+  caeStatus: CompanyStatus | null;
+  description: string;
+  status: PurchaseStatus;
+  orderedOn: string | null;
+  expectedOn: string | null;
+  workStart: string | null;
+  workEnd: string | null;
+  completedOn: string | null;
+  /** The sum of its lines, without VAT. */
+  amountCents: number;
+  chapterCodes: string[];
+  /** A material order past its expected delivery and not delivered: days late today. */
+  lateDays: number | null;
+  hasFile: boolean;
+  createdAt: string;
+};
+
+export type PurchaseOrderLine = {
+  id: string;
+  lineageId: string;
+  chapterCode: string;
+  /** The budget line now; null when the accepted budget no longer has it. */
+  code: string | null;
+  description: string | null;
+  unit: string | null;
+  quantity: number | null;
+  costCents: number | null;
+  amountCents: number;
+  closesLine: boolean;
+  /** What the line's other contracted orders add to it. */
+  otherCents: number;
+  /** Only once the line is closed (by this order or another): cost − all its contracted. */
+  deviationCents: number | null;
+  deviationBp: number | null;
+};
+
+export type PurchaseOrderEvent = {
+  id: string;
+  /** created | status | updated | lines | file_added | file_removed */
+  action: string;
+  detail: Record<string, unknown>;
+  note: string | null;
+  by: string | null;
+  at: string;
+};
+
+/** GET /api/v1/purchases/:orderId */
+export type PurchaseOrderDetail = PurchaseOrderListItem & {
+  notes: string | null;
+  lines: PurchaseOrderLine[];
+  file: { name: string; sizeBytes: number } | null;
+  /** Its chapters and where they stand on the obra. */
+  chapters: { code: string; name: string; state: ChapterState }[];
+  createdBy: string | null;
+  events: PurchaseOrderEvent[];
+  /** The day it last reached each status of its flow (cancelled too). */
+  reached: Partial<Record<PurchaseStatus, string>>;
+  /** The accepted budget revision its lines' costs come from. */
+  budgetNumber: number | null;
+  today: string;
+};
+
+/** A chapter starting soon with lines nobody has ordered yet. */
+export type PurchaseUpcoming = {
+  code: string;
+  name: string;
+  state: ChapterState;
+  /** Planned (simulated until Planning exists). */
+  plannedStart: string | null;
+  uncontractedLines: number;
+  uncontractedCostCents: number;
+  /** Orders for it still pending, not sent. */
+  pendingOrders: { id: string; number: number }[];
+};
+
+/** GET /api/v1/projects/:id/purchases: the project's Compras tab. */
+export type ProjectPurchases = {
+  ref: string;
+  orders: PurchaseOrderListItem[];
+  summary: {
+    /** The contract's lines at cost, chapter 20 aside. */
+    costCents: number;
+    contractedCents: number;
+    closedLines: number;
+    /** Cost − contracted over the closed lines; null when none is closed. */
+    deviationCents: number | null;
+    deviationBp: number | null;
+    /** The cost of the lines nothing is contracted for yet. */
+    toContractCents: number;
+    uncontractedLines: number;
+    pendingOrders: number;
+    lateDeliveries: number;
+  };
+  /** Chapters starting in the next `UPCOMING_DAYS` days (or started) with lines not ordered. */
+  upcoming: PurchaseUpcoming[];
+  today: string;
+  sources: { planning: "mock" };
+};
+
+export const UPCOMING_DAYS = 45;
+
+/** GET /api/v1/purchases: every order of the tenant (GET /api/v1/subcontractors/:id/purchases: one supplier's). */
+export type TenantPurchases = {
+  orders: PurchaseOrderListItem[];
+  projects: { id: string; ref: string; address: string }[];
+  summary: {
+    /** Contracted this calendar year (by order date). */
+    yearContractedCents: number;
+    yearOrders: number;
+    yearProjects: number;
+    openCents: number;
+    openOrders: number;
+    pendingCents: number;
+    pendingOrders: number;
+    lateDeliveries: number;
+  };
+  today: string;
+};
+
+/** A budget line to order, with what is already contracted for it. */
+export type PurchaseFormLine = {
+  lineageId: string;
+  code: string;
+  description: string;
+  unit: string;
+  quantity: number;
+  costCents: number;
+  /** Contracted by the project's orders (other than the one edited). */
+  contractedCents: number;
+  closed: boolean;
+};
+
+/** GET /api/v1/projects/:id/purchases/form: what a new (or edited) order picks from. */
+export type PurchaseForm = {
+  ref: string;
+  nextNumber: number;
+  /** With `?orderId=`: that order as it stands, to edit. */
+  editing: {
+    id: string;
+    number: number;
+    kind: PurchaseKind;
+    status: PurchaseStatus;
+    subcontractorId: string;
+    description: string;
+    orderedOn: string | null;
+    expectedOn: string | null;
+    workStart: string | null;
+    workEnd: string | null;
+    notes: string | null;
+    lines: { lineageId: string; amountCents: number; closesLine: boolean }[];
+  } | null;
+  suppliers: {
+    id: string;
+    legalName: string;
+    taxIdMasked: string;
+    kind: SubcontractorKind;
+    suppliesOnly: boolean;
+    status: CompanyStatus;
+    /** Mandatory CAE documents missing or expired. */
+    missing: RequirementId[];
+    trades: string[];
+  }[];
+  chapters: {
+    code: string;
+    name: string;
+    state: ChapterState;
+    plannedStart: string | null;
+    plannedEnd: string | null;
+    lines: PurchaseFormLine[];
+  }[];
+  today: string;
+};
+
 // ─── Subcontratas ─────────────────────────────────────────────────────────────
 // Companies working on the tenant's obras, their workers and CAE documents
 // (packages/core/src/subcontractors.ts). Staff only.
@@ -929,6 +1175,7 @@ export type SubcontractorError =
   | "permanent_exceeds_headcount"
   | "self_employed_cannot_subcontract"
   | "chain_too_deep"
+  | "supplies_only"
   | "tax_id_exists"
   | "id_document_exists"
   | "not_optional"
@@ -990,6 +1237,8 @@ export type SubcontractorListItem = {
   reaRegion: Region;
   trades: string[];
   status: CompanyStatus;
+  /** A material supplier: no CAE (its status is always apta). */
+  suppliesOnly: boolean;
   pillars: Record<DocPillar, DocBadge>;
   /** Mandatory company documents valid, of how many. */
   docsValid: number;
@@ -1092,6 +1341,8 @@ export type SubcontractorFields = {
   preventionEntity: string | null;
   preventionValidUntil: string | null;
   machinery: string[];
+  /** A material supplier: it only delivers, so no CAE documents, workers or obra assignments. */
+  suppliesOnly: boolean;
 };
 
 /** `taxId` is in full for admins and managers, masked for viewers. */

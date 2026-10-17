@@ -26,11 +26,14 @@ export type WizardStep<D, O = undefined> = {
   isComplete: (draft: D) => boolean;
   /** Server error codes caused by this step's fields: the flow jumps back here. */
   errorCodes?: readonly string[];
-  /** Include the step only when this returns true (e.g. by role). Default: always. */
-  when?: (options: O) => boolean;
+  /**
+   * Include the step only when this returns true: by role (`options`), or by
+   * a choice made in an earlier step (`draft`). Default: always.
+   */
+  when?: (options: O, draft: D) => boolean;
 };
 
-/** The steps of a flow that apply, given its options. */
-export function activeSteps<D, O>(steps: readonly WizardStep<D, O>[], options: O) {
-  return steps.filter((step) => step.when?.(options) ?? true);
+/** The steps of a flow that apply, given its options and the draft so far. */
+export function activeSteps<D, O>(steps: readonly WizardStep<D, O>[], options: O, draft: D) {
+  return steps.filter((step) => step.when?.(options, draft) ?? true);
 }

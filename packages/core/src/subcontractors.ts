@@ -13,6 +13,7 @@ import {
   subcontractorAudit,
   subcontractorDocumentVersions,
   subcontractorDocuments,
+  purchaseOrders,
   subcontractors,
   subcontractorWorkers,
   users,
@@ -77,6 +78,7 @@ import {
   optional,
   phone,
   projectOptions,
+  requireCaeCompany,
   requireCompany,
   requireWorker,
   str,
@@ -121,6 +123,7 @@ function parseFields(input: Record<string, unknown>, base?: SubcontractorFields)
   }
   const subcontractsFurther = bool(get("subcontractsFurther"));
   if (subcontractsFurther && kind === "self_employed") fail("self_employed_cannot_subcontract");
+  const suppliesOnly = bool(get("suppliesOnly"));
   const chainLevel = count(get("chainLevel")) ?? 1;
   if (chainLevel < 1 || chainLevel > MAX_CHAIN_LEVEL || (subcontractsFurther && chainLevel === MAX_CHAIN_LEVEL)) {
     fail("chain_too_deep");
@@ -154,6 +157,7 @@ function parseFields(input: Record<string, unknown>, base?: SubcontractorFields)
     preventionEntity: optional(get("preventionEntity")),
     preventionValidUntil: calendarDate(get("preventionValidUntil")),
     machinery: listOf(get("machinery"), MACHINERY),
+    suppliesOnly,
   };
 }
 
@@ -175,6 +179,7 @@ export async function createSubcontractor(ctx: Ctx, input: Record<string, unknow
   requireEditor(ctx);
   const fields = parseFields(input);
   const assignment = isObject(input.assignment) ? input.assignment : null;
+  if (fields.suppliesOnly && (assignment || Array.isArray(input.notApplicable))) fail("supplies_only");
   const project = assignment ? await requireProjectRef(ctx, str(assignment.projectId)) : null;
   const assigned = assignment && assignmentValues(assignment);
   // One entry per document: the last reason given wins.
@@ -213,6 +218,21 @@ export async function updateSubcontractor(ctx: Ctx, subcontractorId: string, inp
   const { reaRegion, ...after } = parseFields(input, before);
   const diff = changes(before, after);
   if (Object.keys(diff).length === 0) return { id: subcontractorId };
+  // Only a company without workers, obras or subcontracts can become a material supplier.
+  if (after.suppliesOnly && !before.suppliesOnly) {
+    const [net, subcontracts] = await Promise.all([
+      loadNetwork(ctx.tenantId, subcontractorId),
+      db.$count(
+        purchaseOrders,
+        and(
+          eq(purchaseOrders.subcontractorId, subcontractorId),
+          eq(purchaseOrders.tenantId, ctx.tenantId),
+          eq(purchaseOrders.kind, "subcontract"),
+        ),
+      ),
+    ]);
+    if (net.workers.length > 0 || net.assignments.length > 0 || subcontracts > 0) fail("supplies_only");
+  }
   try {
     await db.transaction(async (tx) => {
       await tx
@@ -250,9 +270,11 @@ function listItem(net: Network, row: CompanyRow): SubcontractorListItem {
     reaRegion: row.reaRegion as Region,
     trades: row.trades,
     status: status.status,
+    suppliesOnly: row.suppliesOnly,
     pillars,
-    docsTotal: MANDATORY_COMPANY_REQUIREMENTS.length,
-    docsValid: MANDATORY_COMPANY_REQUIREMENTS.length - status.expired.length - status.pending.length,
+    // A material supplier is asked for no CAE documents.
+    docsTotal: row.suppliesOnly ? 0 : MANDATORY_COMPANY_REQUIREMENTS.length,
+    docsValid: row.suppliesOnly ? 0 : MANDATORY_COMPANY_REQUIREMENTS.length - status.expired.length - status.pending.length,
     workers: net.workersOf(row.id).length,
     projectIds: net.assignmentsOf(row.id).map((a) => a.projectId),
   };
@@ -284,7 +306,7 @@ function attentionItems(net: Network): AttentionItem[] {
   for (const doc of net.docs) {
     const req = requirement(doc.requirementId);
     const company = companies.get(doc.subcontractorId);
-    if (!req || !company) continue;
+    if (!req || !company || company.suppliesOnly) continue;
     const version = net.versions.get(doc.id);
     const { state, daysLeft } = docState(req.id, net.facts(doc), net.today);
     // Every row exists, so "missing" only comes from the loop below.
@@ -314,7 +336,7 @@ function attentionItems(net: Network): AttentionItem[] {
   }
 
   // Missing mandatory documents: one line per company, one per obra without its PSS adhesion.
-  for (const company of net.companies) {
+  for (const company of net.companies.filter((c) => !c.suppliesOnly)) {
     const missing = MANDATORY_COMPANY_REQUIREMENTS.filter((r) => !net.doc(company.id, null, null, r.id)).map(
       (r) => r.id,
     );
@@ -362,7 +384,7 @@ export async function getOverview(ctx: Ctx): Promise<SubcontractorsOverview> {
   const companies = net.companies.map((row) => listItem(net, row));
 
   const counts = { apta: 0, pendiente: 0, bloqueada: 0 };
-  for (const c of companies) counts[c.status]++;
+  for (const c of companies) if (!c.suppliesOnly) counts[c.status]++;
 
   const workers = { total: net.workers.length, ok: 0, pending: 0, blocked: 0 };
   for (const w of net.workers) {
@@ -624,7 +646,7 @@ function findDoc(ctx: Ctx, subcontractorId: string, own: Owner) {
  */
 export async function uploadDocument(ctx: Ctx, subcontractorId: string, input: Record<string, unknown>) {
   requireEditor(ctx);
-  const [, own] = await Promise.all([requireCompany(ctx, subcontractorId), owner(ctx, subcontractorId, input)]);
+  const [, own] = await Promise.all([requireCaeCompany(ctx, subcontractorId), owner(ctx, subcontractorId, input)]);
   const file = await requirePdf(input.file);
 
   const issuedAt = calendarDate(input.issuedAt);
@@ -758,7 +780,7 @@ export async function rejectDocument(
 /** An optional company document that doesn't apply. Body: { requirementId, reason }. */
 export async function markNotApplicable(ctx: Ctx, subcontractorId: string, input: Record<string, unknown>) {
   requireEditor(ctx);
-  await requireCompany(ctx, subcontractorId);
+  await requireCaeCompany(ctx, subcontractorId);
   const entry = notApplicableEntry(input);
   const existing = await findDoc(ctx, subcontractorId, { req: entry, workerId: null, projectId: null });
   await db.transaction((tx) => saveNotApplicable(tx, ctx, subcontractorId, entry, existing?.id));
@@ -806,7 +828,7 @@ async function saveNotApplicable(
  */
 export async function requestDocuments(ctx: Ctx, subcontractorId: string, input: Record<string, unknown>) {
   requireEditor(ctx);
-  await requireCompany(ctx, subcontractorId);
+  await requireCaeCompany(ctx, subcontractorId);
   const ids = Array.isArray(input.requirementIds) ? input.requirementIds : [input.requirementId];
   if (ids.length === 0) fail("missing_fields");
   const owners = await Promise.all(
@@ -884,7 +906,7 @@ export async function assignToProject(
   input: Record<string, unknown>,
 ) {
   requireEditor(ctx);
-  const [, project] = await Promise.all([requireCompany(ctx, subcontractorId), requireProjectRef(ctx, projectId)]);
+  const [, project] = await Promise.all([requireCaeCompany(ctx, subcontractorId), requireProjectRef(ctx, projectId)]);
   const values = assignmentValues(input);
   await db.transaction((tx) => saveAssignment(tx, ctx, subcontractorId, project, values));
   return { subcontractorId, projectId };

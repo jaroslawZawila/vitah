@@ -168,12 +168,10 @@ export function MilestoneCard({
 export function CostCard({
   chapter,
   budgetNumber,
-  purchasingMock,
   costsHref,
 }: {
   chapter: ControlChapter;
   budgetNumber: number | null;
-  purchasingMock: boolean;
   costsHref: string;
 }) {
   const t = useTranslations("construction.chapter");
@@ -196,7 +194,11 @@ export function CostCard({
       <div className={kv}>
         <span className="text-muted-foreground">
           {t("contracted")}{" "}
-          <span className="text-[12px]">· {t("contractedLines", { contracted: chapter.contractedLines, total: chapter.lineCount })}</span>
+          <span className="text-[12px]">
+            {`· ${t("contractedLines", { closed: chapter.contractedLines, total: chapter.lineCount })}${
+              chapter.openLines > 0 ? ` · ${t("openLines", { count: chapter.openLines })}` : ""
+            }`}
+          </span>
         </span>
         <span className="num">{chapter.contractedCents === null ? <span className="text-muted-foreground">{t("notContracted")}</span> : f.money(chapter.contractedCents)}</span>
       </div>
@@ -213,7 +215,7 @@ export function CostCard({
       )}
       <SourceLabel>
         {ts("budget")} {budgetNumber !== null && t("revision", { number: budgetNumber })} ·{" "}
-        <Source name={ts("purchasing")} mock={purchasingMock} />
+        <Source name={ts("purchasing")} />
       </SourceLabel>
     </section>
   );

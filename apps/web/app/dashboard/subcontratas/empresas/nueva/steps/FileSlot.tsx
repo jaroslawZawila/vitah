@@ -10,20 +10,25 @@ import FormError from "../../../../components/FormError";
 
 /**
  * Presentational: picks one PDF and keeps it until the flow submits. Files
- * over 4 MB are refused here, before anything is sent.
+ * over 4 MB are refused here, before anything is sent. `namespace` holds its
+ * `removeFile` ({name}) line and `errorNamespace` the `file_too_large` one.
  */
 export default function FileSlot({
   id,
   label,
   file,
   onChange,
+  namespace = "subcontractors.wizard.documents",
+  errorNamespace = "subcontractors.errors",
 }: {
   id: string;
   label: string;
   file: File | null;
   onChange: (file: File | null) => void;
+  namespace?: string;
+  errorNamespace?: string;
 }) {
-  const t = useTranslations("subcontractors.wizard.documents");
+  const t = useTranslations(namespace);
   const [tooLarge, setTooLarge] = useState(false);
 
   if (file) {
@@ -51,7 +56,7 @@ export default function FileSlot({
           if (picked && !large) onChange(picked);
         }}
       />
-      <FormError namespace="subcontractors.errors" error={tooLarge ? "file_too_large" : undefined} />
+      <FormError namespace={errorNamespace} error={tooLarge ? "file_too_large" : undefined} />
     </div>
   );
 }

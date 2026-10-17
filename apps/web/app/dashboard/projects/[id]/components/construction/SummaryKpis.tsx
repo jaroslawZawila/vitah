@@ -82,7 +82,7 @@ export default function SummaryKpis({ control }: { control: ConstructionControl 
             : t("nothingContracted")}
         </p>
         <SourceLabel>
-          {ts("budget")} {revision} · <Source name={ts("purchasing")} mock={sources.purchasing === "mock"} />
+          {ts("budget")} {revision} · <Source name={ts("purchasing")} />
         </SourceLabel>
       </div>
 
