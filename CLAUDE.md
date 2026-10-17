@@ -145,7 +145,10 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
 - Default locale: `es` (Spanish)
 - Supported: `es`, `en`
 - Translation files: `apps/web/messages/{locale}.json` (portal); `apps/mobile/messages/{es,en}.ts` (app — `useI18n().t("key")` from `apps/mobile/lib/i18n.tsx`; the language is picked in Perfil, stored on the phone)
-- Config: `apps/web/i18n/request.ts`
+- Config: `apps/web/i18n/request.ts`. The portal's language is a per-user setting: `users.language` (`es` | `en`, null
+  = the browser's), switched with ES | EN at the foot of the rail (`setLanguageAction`, `PATCH /api/v1/me`) and read
+  from the database on every render (`resolveLocale` in `i18n/locale.ts`), so it applies at once on every device.
+  Signed out (the login page), it follows the browser. Prod SQL: `packages/db/sql/2026-10-user-language.sql`
 - All user-facing text must use `useTranslations()` — never hardcode strings
 - Add keys to both `es` and `en` files when adding new text
 

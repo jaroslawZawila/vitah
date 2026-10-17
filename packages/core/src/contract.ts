@@ -184,6 +184,9 @@ export type PhotoError =
 
 export const APP_LANGUAGES = ["es", "en"] as const;
 export type AppLanguage = (typeof APP_LANGUAGES)[number];
+/** Also the portal's languages: each staff user picks theirs. */
+export const isAppLanguage = (value: unknown): value is AppLanguage =>
+  APP_LANGUAGES.includes(value as AppLanguage);
 
 /** Which push notifications a client wants. */
 export type NotificationPrefs = {

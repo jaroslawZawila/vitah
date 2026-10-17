@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import { useOptimistic, useTransition } from "react";
 import { useParams, usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Contact, FolderKanban, HardHat, ShoppingCart, UserCog } from "lucide-react";
-import type { SubcontractorCounts } from "@repo/core/contract";
+import { APP_LANGUAGES, type AppLanguage, type SubcontractorCounts } from "@repo/core/contract";
 import { cn } from "@/lib/utils";
 import { COMPANY_PURCHASES_HREF } from "../projects/[id]/components/purchasing/links";
 
@@ -49,12 +50,17 @@ export default function Sidebar({
   email,
   isAdmin,
   subcontractors = null,
+  language,
+  onLanguageChange,
 }: {
   name: string | null;
   email: string | null;
   isAdmin: boolean;
   /** The Subcontratas badges; null hides them. */
   subcontractors?: SubcontractorCounts | null;
+  /** The portal's language, the user's setting. */
+  language: AppLanguage;
+  onLanguageChange: (language: AppLanguage) => Promise<{ error?: string }>;
 }) {
   const pathname = usePathname();
   const t = useTranslations("sidebar");
@@ -75,7 +81,9 @@ export default function Sidebar({
             OS Platform
           </div>
         </div>
-        <SignedInUser name={name} email={email} className="ml-auto max-w-[45%] lg:hidden" />
+        <SignedInUser name={name} email={email} className="ml-auto max-w-[60%] lg:hidden">
+          <LanguageSwitch language={language} onChange={onLanguageChange} />
+        </SignedInUser>
       </div>
 
       <nav className="-mx-1 flex flex-wrap gap-0.5 lg:mx-0 lg:flex-col lg:flex-nowrap">
@@ -106,20 +114,27 @@ export default function Sidebar({
         name={name}
         email={email}
         className="mt-auto hidden border-t border-white/8 px-2 pt-4 lg:flex"
-      />
+      >
+        <LanguageSwitch language={language} onChange={onLanguageChange} />
+      </SignedInUser>
     </aside>
   );
 }
 
-/** Who is signed in: at the foot of the rail on desktop, in the top bar's corner on phones. */
+/**
+ * Who is signed in, with their language switch: at the foot of the rail on desktop, in the top
+ * bar's corner on phones (avatar only below `sm`).
+ */
 function SignedInUser({
   name,
   email,
   className,
+  children,
 }: {
   name: string | null;
   email: string | null;
   className: string;
+  children: React.ReactNode;
 }) {
   const displayName = name || email || "";
   return (
@@ -127,10 +142,49 @@ function SignedInUser({
       <div className="grid size-[30px] flex-none place-items-center rounded-full bg-verde-oliva-dark text-[13px] font-bold text-white">
         {displayName.charAt(0).toUpperCase()}
       </div>
-      <div className="min-w-0">
+      <div className="min-w-0 max-sm:hidden">
         <div className="truncate text-[13px] font-semibold text-white">{displayName}</div>
         {name && email && <div className="truncate text-[11.5px] text-rail-muted">{email}</div>}
       </div>
+      <div className="ml-auto flex-none">{children}</div>
+    </div>
+  );
+}
+
+/** ES | EN: the portal's language for this user, saved on their account. */
+function LanguageSwitch({
+  language,
+  onChange,
+}: {
+  language: AppLanguage;
+  onChange: (language: AppLanguage) => Promise<{ error?: string }>;
+}) {
+  const t = useTranslations("sidebar.language");
+  const [shown, setShown] = useOptimistic(language);
+  const [pending, startTransition] = useTransition();
+
+  return (
+    <div role="group" aria-label={t("label")} className="flex rounded-[8px] bg-white/6 p-0.5">
+      {APP_LANGUAGES.map((lang) => (
+        <button
+          key={lang}
+          type="button"
+          lang={lang}
+          aria-label={t(lang)}
+          aria-pressed={lang === shown}
+          disabled={pending}
+          onClick={() => {
+            if (lang === shown) return;
+            startTransition(async () => {
+              setShown(lang);
+              await onChange(lang);
+            });
+          }}
+          className="min-h-7 min-w-8 rounded-[6px] px-1.5 text-[11.5px] font-semibold tracking-[0.08em] text-rail-muted uppercase transition-colors hover:text-white disabled:cursor-wait aria-pressed:bg-white/12 aria-pressed:text-white pointer-coarse:min-h-11 pointer-coarse:min-w-11"
+        >
+          {lang}
+        </button>
+      ))}
     </div>
   );
 }

@@ -1,8 +1,12 @@
 import { auth } from "../../auth";
 import { redirect } from "next/navigation";
+import { getLocale } from "next-intl/server";
+import { isAppLanguage } from "@repo/core/contract";
+import { DEFAULT_LOCALE } from "../../i18n/locale";
 import Sidebar from "./components/Sidebar";
 import Topbar from "./components/Topbar";
 import { getSubcontractorCounts } from "../actions/subcontractors";
+import { setLanguageAction } from "../actions/users";
 
 export default async function DashboardLayout({
   children,
@@ -11,6 +15,7 @@ export default async function DashboardLayout({
 }) {
   const session = await auth();
   if (!session?.user) redirect("/");
+  const locale = await getLocale();
   // Only badges: a failure here (e.g. its tables not yet migrated) must not take the portal down.
   const subcontractors = await getSubcontractorCounts().catch((error: unknown) => {
     console.error(error);
@@ -24,6 +29,8 @@ export default async function DashboardLayout({
         email={session.user.email ?? null}
         isAdmin={session.user.role === "admin"}
         subcontractors={subcontractors}
+        language={isAppLanguage(locale) ? locale : DEFAULT_LOCALE}
+        onLanguageChange={setLanguageAction}
       />
       <div className="flex min-w-0 flex-col">
         <Topbar />

@@ -38,7 +38,12 @@
       "expiries": "Caducidades",
       "expiriesCount": "{count, plural, one {# documento caducado o por caducar} other {# documentos caducados o por caducar}}"
     },
-    "purchases": "Compras"
+    "purchases": "Compras",
+    "language": {
+      "label": "Idioma",
+      "es": "Español",
+      "en": "Inglés"
+    }
   },
   "topbar": {
     "titles": {

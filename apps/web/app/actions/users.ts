@@ -5,6 +5,7 @@
 import {
   CoreError,
   usersService as svc,
+  type AppLanguage,
   type Ctx,
   type UserRole,
 } from "@repo/core";
@@ -60,4 +61,18 @@ export async function updateUserRole(userId: string, role: UserRole) {
 
 export async function toggleUserActive(userId: string, active: boolean) {
   return mutate((ctx) => svc.updateUser(ctx, userId, { active }));
+}
+
+/** The caller's own portal language (any staff role); the whole portal re-renders in it. */
+export async function setLanguageAction(language: AppLanguage): Promise<{ error?: string }> {
+  const ctx = await requireAuth();
+  try {
+    await svc.updateMe(ctx, { language });
+  } catch (err) {
+    if (err instanceof CoreError) return { error: err.code };
+    throw err;
+  }
+  // i18n/request.ts reads it on every render.
+  revalidatePath("/", "layout");
+  return {};
 }

@@ -1,12 +1,13 @@
 import { db, users, and, eq, isStaffUser, STAFF_ROLES } from "@repo/db";
 import { EMAIL_PATTERN, hashPassword, isUniqueViolation } from "./accounts";
 import { requireAdmin, type Ctx, type UserRole } from "./context";
-import { MIN_PASSWORD_LENGTH } from "./contract";
+import { isAppLanguage, MIN_PASSWORD_LENGTH } from "./contract";
 import { invalid, notFound } from "./errors";
 import { MAX_TEXT, text } from "./input";
 
 // Staff management within the caller's tenant. Admin only. Clients (mobile
-// app users) are managed from their project (./project-client.ts).
+// app users) are managed from their project (./project-client.ts). Except
+// `getMe` / `updateMe`: every staff user's own settings.
 
 function role(value: unknown): UserRole | undefined {
   return STAFF_ROLES.includes(value as UserRole) ? (value as UserRole) : undefined;
@@ -133,4 +134,36 @@ export async function updateUser(
 
     return { id: userId };
   });
+}
+
+/** The caller's own row: they must still be active staff of their tenant. */
+const self = (ctx: Ctx) =>
+  and(eq(users.id, ctx.userId), eq(users.tenantId, ctx.tenantId), eq(users.active, true), isStaffUser);
+
+const ME = { id: users.id, name: users.name, email: users.email, role: users.role, language: users.language };
+
+/** The caller themselves, with their settings. */
+export async function getMe(ctx: Ctx) {
+  const [me] = await db.select(ME).from(users).where(self(ctx));
+  if (!me) throw notFound();
+  return me;
+}
+
+/**
+ * Body: { language? } — the caller's own settings, each optional: the
+ * portal's language ("es" | "en", null to follow the browser again).
+ */
+export async function updateMe(ctx: Ctx, input: Record<string, unknown>) {
+  const set: Partial<typeof users.$inferInsert> = { updatedAt: new Date() };
+  if (input.language !== undefined) {
+    if (input.language !== null && !isAppLanguage(input.language)) throw invalid("invalid_language");
+    set.language = input.language;
+  }
+  const [me] = await db
+    .update(users)
+    .set(set)
+    .where(self(ctx))
+    .returning(ME);
+  if (!me) throw notFound();
+  return me;
 }

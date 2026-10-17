@@ -1,33 +1,25 @@
+import { usersService } from "@repo/core";
+import { getSessionContext } from "@repo/auth/context";
 import { getRequestConfig } from "next-intl/server";
 import { headers } from "next/headers";
+import { resolveLocale } from "./locale";
 
-const locales = ["es", "en"] as const;
-const defaultLocale = "es";
-
-function getPreferredLocale(acceptLanguage: string | null): string {
-  if (!acceptLanguage) return defaultLocale;
-
-  const preferred = acceptLanguage
-    .split(",")
-    .map((part) => {
-      const [lang, q] = part.trim().split(";q=");
-      return { lang: lang?.split("-")[0] ?? "", q: q ? parseFloat(q) : 1 };
-    })
-    .sort((a, b) => b.q - a.q);
-
-  for (const { lang } of preferred) {
-    if (locales.includes(lang as (typeof locales)[number])) {
-      return lang;
-    }
+/** The signed-in staff member's language setting, read fresh: a change shows at once. */
+async function userLanguage() {
+  const ctx = await getSessionContext();
+  if (!ctx) return undefined;
+  try {
+    return (await usersService.getMe(ctx)).language ?? undefined;
+  } catch (error) {
+    // The page still renders, in the browser's language.
+    console.error(error);
+    return undefined;
   }
-
-  return defaultLocale;
 }
 
 export default getRequestConfig(async () => {
-  const reqHeaders = await headers();
-  const acceptLanguage = reqHeaders.get("accept-language");
-  const locale = getPreferredLocale(acceptLanguage);
+  const [language, reqHeaders] = await Promise.all([userLanguage(), headers()]);
+  const locale = resolveLocale(language, reqHeaders.get("accept-language"));
 
   return {
     locale,

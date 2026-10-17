@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useActionState } from "react";
-import { useTranslations } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -52,6 +52,7 @@ export function UsersClient({
   currentUserId: string | null;
 }) {
   const t = useTranslations("usersPage");
+  const format = useFormatter();
   const [showForm, setShowForm] = useState(false);
   const [formState, formAction, isPending] = useActionState(createUser, null);
   const [rowError, setRowError] = useState<string | null>(null);
@@ -200,7 +201,13 @@ export function UsersClient({
                   </Badge>
                 </TableCell>
                 <TableCell className="num text-muted-foreground">
-                  {new Date(user.createdAt).toLocaleDateString("es-ES")}
+                  {format.dateTime(new Date(user.createdAt), {
+                    day: "numeric",
+                    month: "numeric",
+                    year: "numeric",
+                    // Server and browser must render the same text.
+                    timeZone: "Europe/Madrid",
+                  })}
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-1.5">

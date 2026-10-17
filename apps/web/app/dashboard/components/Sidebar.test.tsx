@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import { describe, expect, it, vi } from "vitest";
 import messages from "../../../messages/es.json";
@@ -11,6 +11,7 @@ vi.mock("next/navigation", () => ({
   usePathname: () => navigation.pathname,
   useParams: () => navigation.params,
 }));
+const onLanguageChange = vi.fn(async () => ({}));
 
 /** Next only sets `id` on `projects/[id]` routes. */
 function renderAt(pathname: string, isAdmin = true, subcontractors: SubcontractorCounts | null = null) {
@@ -20,7 +21,14 @@ function renderAt(pathname: string, isAdmin = true, subcontractors: Subcontracto
     : {};
   return render(
     <NextIntlClientProvider locale="es" messages={messages}>
-      <Sidebar name="Laura" email="laura@vitah.es" isAdmin={isAdmin} subcontractors={subcontractors} />
+      <Sidebar
+        name="Laura"
+        email="laura@vitah.es"
+        isAdmin={isAdmin}
+        subcontractors={subcontractors}
+        language="es"
+        onLanguageChange={onLanguageChange}
+      />
     </NextIntlClientProvider>,
   );
 }
@@ -116,5 +124,20 @@ describe("Sidebar", () => {
       renderAt("/dashboard/subcontratas/empresas", true, { ...counts, expiries: 0 });
       expect(within(sections()!).getByRole("link", { name: "Caducidades" })).toBeInTheDocument();
     });
+  });
+
+  it("switches the portal's language from the rail", async () => {
+    onLanguageChange.mockClear();
+    renderAt("/dashboard/projects");
+    // One switch at the foot of the rail (desktop), one in the top bar (phones).
+    const [spanish] = screen.getAllByRole("button", { name: "Español" });
+    const [english] = screen.getAllByRole("button", { name: "Inglés" });
+    expect(spanish).toHaveAttribute("aria-pressed", "true");
+    expect(english).toHaveAttribute("aria-pressed", "false");
+
+    fireEvent.click(spanish!);
+    expect(onLanguageChange).not.toHaveBeenCalled();
+    fireEvent.click(english!);
+    await waitFor(() => expect(onLanguageChange).toHaveBeenCalledWith("en"));
   });
 });

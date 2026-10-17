@@ -86,6 +86,9 @@ export const users = pgTable(
     passwordHash: text("password_hash"),
     role: userRoleEnum("role").default("viewer").notNull(),
     active: boolean("active").default(true).notNull(),
+    // The portal's language for staff ("es" | "en"), picked in the rail; null
+    // follows the browser. The mobile app keeps its own, on the phone.
+    language: text("language").$type<"es" | "en">(),
     // Mobile tokens issued before this are revoked (password changed or reset).
     passwordChangedAt: timestamp("password_changed_at", { mode: "date" }),
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),

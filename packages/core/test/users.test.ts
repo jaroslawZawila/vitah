@@ -125,3 +125,47 @@ describe("createUser emails", () => {
     ).rejects.toMatchObject({ code: "too_long" });
   });
 });
+
+describe("usersService: the caller's own settings", () => {
+  it("lets any staff user change their own language, and only theirs", async () => {
+    const { tenant, admin } = await setup();
+    const viewer = await createTestUser(tenant.id, { role: "viewer" });
+    const ctx: Ctx = { tenantId: tenant.id, userId: viewer.id, role: "viewer" };
+
+    // Not chosen yet: the portal follows their browser.
+    expect(await svc.getMe(ctx)).toMatchObject({ id: viewer.id, role: "viewer", language: null });
+    expect(await svc.updateMe(ctx, { language: "en" })).toMatchObject({ id: viewer.id, language: "en" });
+    expect((await reload(viewer.id))?.language).toBe("en");
+    expect((await reload(admin.id))?.language).toBeNull();
+    // Each setting is optional; null goes back to the browser's.
+    expect(await svc.updateMe(ctx, {})).toMatchObject({ language: "en" });
+    expect(await svc.updateMe(ctx, { language: null })).toMatchObject({ language: null });
+  });
+
+  it("refuses a language the portal doesn't have", async () => {
+    const { admin, ctx } = await setup();
+
+    await expect(svc.updateMe(ctx, { language: "fr" })).rejects.toMatchObject({ code: "invalid_language" });
+    expect((await reload(admin.id))?.language).toBeNull();
+  });
+
+  it("is not for a deactivated user", async () => {
+    const { tenant } = await setup();
+    const viewer = await createTestUser(tenant.id, { role: "viewer" });
+    await db.update(users).set({ active: false }).where(eq(users.id, viewer.id));
+    const ctx: Ctx = { tenantId: tenant.id, userId: viewer.id, role: "viewer" };
+
+    await expect(svc.getMe(ctx)).rejects.toMatchObject({ code: "not_found" });
+    await expect(svc.updateMe(ctx, { language: "en" })).rejects.toMatchObject({ code: "not_found" });
+  });
+
+  it("finds no one for a context of another tenant", async () => {
+    const { admin } = await setup();
+    const other = await createTestTenant();
+    const ctx: Ctx = { tenantId: other.id, userId: admin.id, role: "admin" };
+
+    await expect(svc.getMe(ctx)).rejects.toMatchObject({ code: "not_found" });
+    await expect(svc.updateMe(ctx, { language: "en" })).rejects.toMatchObject({ code: "not_found" });
+    expect((await reload(admin.id))?.language).toBeNull();
+  });
+});

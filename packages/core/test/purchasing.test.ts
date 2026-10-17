@@ -7,6 +7,7 @@ import {
   subcontractorsService,
   type Ctx,
 } from "../src";
+import { todayInSpain } from "../src/obra-calc";
 import { files } from "../src/testing";
 import { framerDraft } from "./budget-fixture";
 
@@ -216,12 +217,14 @@ describe("setPurchaseStatus", () => {
 
     const order = await svc.getPurchase(s.ctx, orderId);
     expect(order).toMatchObject({ status: "delivered", orderedOn: "2026-10-03", completedOn: "2026-10-16", budgetNumber: 0 });
-    // Placing and delivering on the days they happened; the steps between on the day recorded.
+    // Placing and delivering on the days they happened; the steps between on the day recorded
+    // (the database's clock: only the app's Date is faked).
+    const recorded = todayInSpain(new Date(vi.getRealSystemTime()));
     expect(order.reached).toEqual({
-      pending: "2026-10-17",
+      pending: recorded,
       ordered: "2026-10-03",
-      confirmed: "2026-10-17",
-      in_transit: "2026-10-17",
+      confirmed: recorded,
+      in_transit: recorded,
       delivered: "2026-10-16",
     });
     expect(order.events.map((e) => [e.action, e.detail.to ?? null])).toEqual([

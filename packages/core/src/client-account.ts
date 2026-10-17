@@ -12,10 +12,9 @@ import {
 } from "@repo/db";
 import { replacePassword } from "./accounts";
 import {
-  APP_LANGUAGES,
+  isAppLanguage,
   isStrongPassword,
   type AccountError,
-  type AppLanguage,
   type MobileSettings,
 } from "./contract";
 import { CoreError } from "./errors";
@@ -149,9 +148,6 @@ export async function updateSettings(
   return settingsOf(row);
 }
 
-const isLanguage = (value: unknown): value is AppLanguage =>
-  APP_LANGUAGES.includes(value as AppLanguage);
-
 const EXPO_TOKEN = /^Expo(nent)?PushToken\[[^\]]{1,200}\]$/;
 
 /** Phones a client may get pushes on; registering another forgets the least recent. */
@@ -169,7 +165,7 @@ export async function registerPushToken(
 ) {
   const { token, language = "es" } = input;
   if (typeof token !== "string" || !EXPO_TOKEN.test(token)) fail("invalid_token");
-  if (!isLanguage(language)) fail("invalid_settings");
+  if (!isAppLanguage(language)) fail("invalid_settings");
   await db
     .insert(pushTokens)
     .values({ token, language, userId: clientUserId, tenantId })
