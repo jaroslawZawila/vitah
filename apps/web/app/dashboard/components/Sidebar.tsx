@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useParams, usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Contact, FolderKanban, UserCog } from "lucide-react";
+import { Contact, FolderKanban, HardHat, UserCog } from "lucide-react";
+import type { SubcontractorCounts } from "@repo/core/contract";
 import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
@@ -22,6 +23,22 @@ const PROJECT_TABS = [
   { key: "photos", path: "/photos" },
 ] as const;
 
+const SUBCONTRACTORS_HREF = "/dashboard/subcontratas";
+
+/** The Subcontratas section's pages, nested under it in the rail's "Red" group. */
+const SUBCONTRACTOR_TABS = [
+  { key: "companies", href: `${SUBCONTRACTORS_HREF}/empresas` },
+  { key: "workers", href: `${SUBCONTRACTORS_HREF}/trabajadores` },
+  { key: "expiries", href: `${SUBCONTRACTORS_HREF}/empresas#caducidades` },
+] as const;
+
+const navLinkClass = (active: boolean) =>
+  cn(
+    "relative flex min-h-11 items-center gap-2 rounded-[9px] px-2.5 text-[13.5px] font-medium text-rail-foreground transition-colors hover:bg-white/6 lg:min-h-10 lg:gap-[11px] lg:px-3 lg:text-[14.5px]",
+    active &&
+      "bg-white/8 text-white lg:before:absolute lg:before:inset-y-2 lg:before:-left-3.5 lg:before:w-[3px] lg:before:rounded-r-[3px] lg:before:bg-rail-accent",
+  );
+
 /**
  * The grafito rail. From `lg` up it is a sticky column; below, a top bar whose sections and
  * project tabs scroll sideways.
@@ -30,10 +47,13 @@ export default function Sidebar({
   name,
   email,
   isAdmin,
+  subcontractors = null,
 }: {
   name: string | null;
   email: string | null;
   isAdmin: boolean;
+  /** The Subcontratas badges; null hides them. */
+  subcontractors?: SubcontractorCounts | null;
 }) {
   const pathname = usePathname();
   const t = useTranslations("sidebar");
@@ -63,14 +83,7 @@ export default function Sidebar({
           const Icon = item.icon;
           return (
             <div key={item.key} className="max-lg:contents">
-              <Link
-                href={item.href}
-                className={cn(
-                  "relative flex min-h-11 items-center gap-2 rounded-[9px] px-2.5 text-[13.5px] font-medium text-rail-foreground transition-colors hover:bg-white/6 lg:min-h-10 lg:gap-[11px] lg:px-3 lg:text-[14.5px]",
-                  active &&
-                    "bg-white/8 text-white lg:before:absolute lg:before:inset-y-2 lg:before:-left-3.5 lg:before:w-[3px] lg:before:rounded-r-[3px] lg:before:bg-rail-accent",
-                )}
-              >
+              <Link href={item.href} className={navLinkClass(active)}>
                 <Icon
                   aria-hidden
                   className={cn("size-[19px] flex-none opacity-85", active && "text-rail-accent opacity-100")}
@@ -84,6 +97,7 @@ export default function Sidebar({
             </div>
           );
         })}
+        <SubcontractorsNav pathname={pathname} counts={subcontractors} />
       </nav>
 
       <SignedInUser
@@ -115,6 +129,72 @@ function SignedInUser({
         <div className="truncate text-[13px] font-semibold text-white">{displayName}</div>
         {name && email && <div className="truncate text-[11.5px] text-rail-muted">{email}</div>}
       </div>
+    </div>
+  );
+}
+
+function SubcontractorsNav({ pathname, counts }: { pathname: string; counts: SubcontractorCounts | null }) {
+  const t = useTranslations("sidebar");
+  const active = pathname.startsWith(SUBCONTRACTORS_HREF);
+  const expiries = counts?.expiries ?? 0;
+
+  return (
+    <div className="max-lg:contents">
+      <p className="hidden px-3 pt-3 pb-1 text-[10.5px] font-semibold tracking-[0.14em] text-rail-muted uppercase lg:block">
+        {t("network")}
+      </p>
+      <Link href={`${SUBCONTRACTORS_HREF}/empresas`} className={navLinkClass(active)} aria-expanded={active}>
+        <HardHat
+          aria-hidden
+          className={cn("size-[19px] flex-none opacity-85", active && "text-rail-accent opacity-100")}
+          strokeWidth={1.8}
+        />
+        {t("subcontractors")}
+        {!active && expiries > 0 && (
+          <span className="ml-auto rounded-full bg-bad px-1.5 font-mono text-[11px] text-white">
+            {expiries}
+            <span className="sr-only"> · {t("subcontractorTabs.expiriesCount", { count: expiries })}</span>
+          </span>
+        )}
+      </Link>
+      {active && (
+        <ul
+          className="order-last -mx-3 flex basis-full gap-1 overflow-x-auto px-3 lg:mx-0 lg:mt-0.5 lg:mb-1.5 lg:ml-[21px] lg:flex-col lg:gap-0 lg:overflow-visible lg:border-l lg:border-white/10 lg:px-0"
+          aria-label={t("subcontractorTabs.label")}
+        >
+          {SUBCONTRACTOR_TABS.map((tab) => {
+            const current = tab.key !== "expiries" && pathname.startsWith(tab.href);
+            const count = counts?.[tab.key];
+            return (
+              <li key={tab.key} className="flex-none">
+                <Link
+                  href={tab.href}
+                  className={cn(
+                    "flex min-h-11 items-center gap-2 rounded-full px-3 text-[13px] whitespace-nowrap text-rail-muted transition-colors hover:text-rail-foreground lg:-ml-px lg:min-h-9 lg:rounded-none lg:border-l-2 lg:border-transparent lg:px-3.5 lg:text-[13.5px]",
+                    current && "bg-white/10 font-semibold text-white lg:border-rail-accent lg:bg-transparent",
+                  )}
+                  aria-current={current ? "page" : undefined}
+                >
+                  {t(`subcontractorTabs.${tab.key}`)}
+                  {count !== undefined && (tab.key !== "expiries" || count > 0) && (
+                    <span
+                      className={cn(
+                        "ml-auto rounded-full px-1.5 font-mono text-[11px]",
+                        tab.key === "expiries" ? "bg-bad text-white" : "bg-white/9 text-rail-foreground",
+                      )}
+                    >
+                      {count}
+                      {tab.key === "expiries" && (
+                        <span className="sr-only"> · {t("subcontractorTabs.expiriesCount", { count })}</span>
+                      )}
+                    </span>
+                  )}
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </div>
   );
 }

@@ -28,6 +28,15 @@
       "payments": "Payments",
       "documents": "Documents",
       "photos": "Photos"
+    },
+    "network": "Network",
+    "subcontractors": "Subcontractors",
+    "subcontractorTabs": {
+      "label": "Subcontractor sections",
+      "companies": "Companies",
+      "workers": "Workers",
+      "expiries": "Expiries",
+      "expiriesCount": "{count, plural, one {# document expired or expiring} other {# documents expired or expiring}}"
     }
   },
   "topbar": {
@@ -36,7 +45,8 @@
       "users": "User Management",
       "projectDetail": "Project Detail",
       "clients": "App Clients",
-      "newProject": "New project"
+      "newProject": "New project",
+      "subcontractors": "Subcontractors"
     }
   },
   "projectsPage": {
@@ -1096,6 +1106,829 @@
       "draftHint": "Draft: it carries the “BORRADOR” (draft) mark until it is issued",
       "issuedHint": "What was sent to the client",
       "download": "Download PDF"
+    }
+  },
+  "subcontractors": {
+    "status": {
+      "apta": "Cleared",
+      "pendiente": "Pending",
+      "bloqueada": "Blocked"
+    },
+    "access": {
+      "ok": "Has access",
+      "pending": "Pending",
+      "blocked": "Blocked"
+    },
+    "docState": {
+      "missing": "Missing",
+      "requested": "Requested",
+      "uploaded": "To validate",
+      "rejected": "Rejected",
+      "not_applicable": "Not applicable",
+      "validated": "Validated",
+      "expiring": "Expiring soon",
+      "expired": "Expired"
+    },
+    "short": {
+      "ok": "OK",
+      "missing": "Missing",
+      "requested": "Asked",
+      "uploaded": "Validate",
+      "rejected": "Rejected",
+      "not_applicable": "N/A",
+      "expired": "Expired"
+    },
+    "daysLeft": "{count, plural, =0 {Today} one {# day} other {# days}}",
+    "noExpiry": "No expiry",
+    "kinds": {
+      "company": "Company",
+      "self_employed": "Self-employed"
+    },
+    "requirements": {
+      "rea_subcontrata": {
+        "name": "REA registration",
+        "legal": "Ley 32/2006"
+      },
+      "cert_aeat_contratistas": {
+        "name": "AEAT contractors certificate",
+        "legal": "Art. 43.1.f LGT"
+      },
+      "cert_tgss": {
+        "name": "Social Security clearance certificate",
+        "legal": "Art. 42 ET"
+      },
+      "poliza_rc_subcontrata": {
+        "name": "Liability policy and current receipt",
+        "legal": "Subcontract"
+      },
+      "concierto_spa": {
+        "name": "Prevention service contract",
+        "legal": "LPRL art. 31"
+      },
+      "evaluacion_riesgos": {
+        "name": "Risk assessment and preventive planning",
+        "legal": "LPRL art. 16"
+      },
+      "rnt_mensual": {
+        "name": "Last month's RNT",
+        "legal": "Payroll list of workers",
+        "selfEmployed": "Last month's RETA receipt"
+      },
+      "doc_maquinaria": {
+        "name": "Machinery documents",
+        "legal": "CE, manual, maintenance, MOT · RD 1215/1997"
+      },
+      "habilitacion_instalador": {
+        "name": "Installer licence",
+        "legal": "REBT / RITE"
+      },
+      "escrituras_036": {
+        "name": "Deeds and form 036",
+        "legal": "Incorporation and tax registration"
+      },
+      "adhesion_pss": {
+        "name": "Adherence to the Health & Safety Plan",
+        "legal": "RD 1627/1997, art. 7"
+      },
+      "alta_ss": {
+        "name": "Social Security registration",
+        "legal": "IDC / TA.2",
+        "selfEmployed": "RETA registration"
+      },
+      "tpc": {
+        "name": "Construction Professional Card (TPC)",
+        "legal": "CGSC · 5 years"
+      },
+      "formacion_prl_inicial": {
+        "name": "Initial H&S training (8 h)",
+        "legal": "CGSC"
+      },
+      "formacion_prl_oficio": {
+        "name": "Trade H&S training (20 h)",
+        "legal": "CGSC"
+      },
+      "formacion_nivel_basico_60h": {
+        "name": "Basic prevention level (60 h)",
+        "legal": "RD 39/1997"
+      },
+      "formacion_altura": {
+        "name": "Work at height",
+        "legal": "RD 2177/2004"
+      },
+      "formacion_andamios": {
+        "name": "Scaffold erection",
+        "legal": "RD 2177/2004"
+      },
+      "formacion_pemp": {
+        "name": "Mobile elevating work platforms (MEWP)",
+        "legal": "UNE 58923"
+      },
+      "formacion_maquinaria": {
+        "name": "Machine operator licence",
+        "legal": "RD 1215/1997"
+      },
+      "info_riesgos": {
+        "name": "Signed risk information",
+        "legal": "LPRL art. 18"
+      },
+      "aptitud_medica": {
+        "name": "Medical fitness",
+        "legal": "LPRL art. 22"
+      },
+      "renuncia_vigilancia_salud": {
+        "name": "Health surveillance waiver",
+        "legal": "LPRL art. 22"
+      },
+      "entrega_epis": {
+        "name": "PPE delivery receipt",
+        "legal": "RD 773/1997"
+      }
+    },
+    "validity": {
+      "none": "No expiry",
+      "monthly": "Checked monthly",
+      "months": "{count, plural, one {Valid # month} other {Valid # months}}",
+      "years": "{count, plural, one {Valid # year} other {Valid # years}}"
+    },
+    "trades": {
+      "earthworks": "Earthworks",
+      "foundations": "Foundations",
+      "steel_frame": "Steel frame structure",
+      "roofing": "Roofing",
+      "insulation": "Envelope and insulation",
+      "masonry": "Masonry",
+      "plastering": "Linings and ceilings",
+      "flooring": "Flooring and tiling",
+      "carpentry": "Carpentry",
+      "metalwork": "Metalwork and locksmithing",
+      "plumbing": "Plumbing",
+      "hvac": "HVAC",
+      "electrical": "Electrical",
+      "telecom": "Telecoms",
+      "painting": "Painting",
+      "landscaping": "External works"
+    },
+    "regions": {
+      "andalucia": "Andalusia",
+      "aragon": "Aragon",
+      "asturias": "Asturias",
+      "baleares": "Balearic Islands",
+      "canarias": "Canary Islands",
+      "cantabria": "Cantabria",
+      "castilla_la_mancha": "Castile-La Mancha",
+      "castilla_y_leon": "Castile and León",
+      "cataluna": "Catalonia",
+      "ceuta": "Ceuta",
+      "extremadura": "Extremadura",
+      "galicia": "Galicia",
+      "la_rioja": "La Rioja",
+      "madrid": "Community of Madrid",
+      "melilla": "Melilla",
+      "murcia": "Region of Murcia",
+      "navarra": "Navarre",
+      "pais_vasco": "Basque Country",
+      "valencia": "Valencian Community"
+    },
+    "preventionModes": {
+      "external_service": {
+        "label": "External prevention service",
+        "hint": "Contract with an accredited SPA"
+      },
+      "own_service": {
+        "label": "Own prevention service",
+        "hint": "Required above 500 workers"
+      },
+      "joint_service": {
+        "label": "Joint service",
+        "hint": "Shared between companies of the sector"
+      },
+      "employer": {
+        "label": "Employer in person",
+        "hint": "The employer, up to 25 workers"
+      }
+    },
+    "roles": {
+      "preventive_resource": "Preventive resource",
+      "machine_operator": "Machine operator"
+    },
+    "categories": {
+      "site_manager": "Site manager",
+      "foreman": "Foreman",
+      "officer_1": "Tradesman, 1st class",
+      "officer_2": "Tradesman, 2nd class",
+      "specialist_labourer": "Specialist labourer",
+      "labourer": "Labourer",
+      "self_employed": "Self-employed"
+    },
+    "contractTypes": {
+      "permanent": "Permanent",
+      "permanent_site": "Permanent, site-bound",
+      "temporary": "Temporary",
+      "self_employed": "Self-employed (RETA)"
+    },
+    "ppe": {
+      "helmet": "Helmet",
+      "boots": "S3 boots",
+      "harness": "Fall-arrest harness",
+      "gloves": "Gloves",
+      "goggles": "Goggles",
+      "hearing": "Hearing protection",
+      "hi_vis": "Hi-vis vest"
+    },
+    "machinery": {
+      "mewp": "Mobile elevating work platform",
+      "welding": "Welding equipment",
+      "crane": "Lorry-mounted crane",
+      "scaffold": "Own scaffold",
+      "excavator": "Excavator / backhoe",
+      "forklift": "Forklift"
+    },
+    "accessRules": {
+      "company": {
+        "title": "Company cleared",
+        "detail": "All its mandatory documents validated and in date; on the site, its H&S Plan adherence and subcontracting book entry."
+      },
+      "social_security": {
+        "title": "Social Security registration",
+        "detail": "Registered and on the last RNT (RETA if self-employed)."
+      },
+      "training": {
+        "title": "TPC or trade H&S training",
+        "detail": "A valid Construction Professional Card, or initial 8 h + 20 h trade training."
+      },
+      "medical": {
+        "title": "Medical fitness",
+        "detail": "Fit for work, or a signed waiver where the law allows it."
+      },
+      "ppe": {
+        "title": "PPE and risk information",
+        "detail": "Signed PPE receipt and risk information."
+      },
+      "tasks": {
+        "title": "Training for their tasks and roles",
+        "detail": "Height, scaffolding… for the site's chapters; 60 h basic level if a preventive resource; licence if operating machinery."
+      }
+    },
+    "accessReasons": {
+      "company_pending": "Company has pending documents",
+      "company_blocked": "Company blocked",
+      "book_missing": "No entry in the subcontracting book",
+      "tpc_or_training": "Needs a valid TPC or initial 8 h + 20 h trade training",
+      "missing": "Missing: {document}",
+      "not_validated": "To validate: {document}",
+      "expired": "Expired: {document}"
+    },
+    "documents": {
+      "document": "Document",
+      "state": "Status",
+      "issued": "Issued",
+      "expires": "Expires",
+      "version": "Version",
+      "validatedBy": "Validated by",
+      "actions": "Actions",
+      "view": "View",
+      "upload": "Upload PDF",
+      "newVersion": "New version",
+      "validate": "Validate",
+      "reject": "Reject",
+      "request": "Request",
+      "remind": "Remind",
+      "notApplicable": "Not applicable",
+      "versions": "Versions",
+      "versionLine": "v{version} uploaded on {date} by {user}",
+      "versionLineAnonymous": "v{version} uploaded on {date}",
+      "validatedLine": "validated on {date} by {user}",
+      "rejectedLine": "rejected on {date} by {user}: “{reason}”",
+      "reasonLine": "Reason: “{reason}”",
+      "requestedOn": "Requested on {date}",
+      "uploadTitle": "Upload “{document}”",
+      "file": "PDF file",
+      "fileHint": "A PDF of up to 4 MB. Saved as a new version; earlier ones are kept.",
+      "issuedAt": "Issue date",
+      "expiresAt": "Expiry date",
+      "expiresHint": "Leave it empty to work it out: {validity}.",
+      "expiresHintNone": "Leave it empty if it doesn't expire.",
+      "rejectTitle": "Reject “{document}”",
+      "rejectReason": "Reason for rejecting",
+      "rejectHint": "Kept with the version so the company uploads a correct one.",
+      "notApplicableTitle": "“{document}” doesn't apply",
+      "notApplicableReason": "Reason",
+      "cancel": "Cancel",
+      "save": "Save",
+      "uploading": "Uploading…",
+      "saving": "Saving…",
+      "noExpiry": "No expiry"
+    },
+    "errors": {
+      "missing_fields": "Some required fields are missing.",
+      "missing_dates": "Give the issue date or the expiry date.",
+      "missing_reason": "Give a reason.",
+      "invalid_tax_id": "The CIF/NIF isn't valid (check digit).",
+      "invalid_id_document": "The DNI/NIE isn't valid (check letter).",
+      "invalid_postal_code": "The postal code isn't valid.",
+      "invalid_email": "The email isn't valid.",
+      "invalid_phone": "The phone number isn't valid.",
+      "invalid_date": "The date isn't valid.",
+      "invalid_number": "The number isn't valid.",
+      "invalid_option": "An option isn't valid.",
+      "invalid_requirement": "Unknown document.",
+      "invalid_chapter": "Invalid chapter.",
+      "permanent_exceeds_headcount": "More permanent staff than the whole workforce.",
+      "self_employed_cannot_subcontract": "The self-employed can't subcontract (Ley 32/2006, art. 5.2.e).",
+      "chain_too_deep": "More than the maximum of 3 subcontracting levels.",
+      "tax_id_exists": "There already is a company with that CIF/NIF.",
+      "id_document_exists": "There already is a worker with that DNI/NIE.",
+      "not_optional": "This document is mandatory.",
+      "nothing_to_review": "There is no version to review.",
+      "missing_file": "Choose a file.",
+      "file_too_large": "The file is larger than 4 MB.",
+      "invalid_file_type": "The file isn't a PDF.",
+      "project_not_found": "The site doesn't exist.",
+      "worker_not_found": "The worker doesn't exist.",
+      "not_found": "Not found.",
+      "forbidden": "You aren't allowed to do this."
+    },
+    "audit": {
+      "system": "System",
+      "created": "Registered the company",
+      "updated": "Edited: {fields}",
+      "document_uploaded": "Uploaded “{document}” v{version}",
+      "document_validated": "Validated “{document}” v{version}",
+      "document_rejected": "Rejected “{document}” v{version}: “{reason}”",
+      "document_not_applicable": "Marked “{document}” as not applicable: “{reason}”",
+      "document_requested": "Requested “{document}”",
+      "document_reminded": "Sent a reminder for “{document}”",
+      "document_expired": "“{document}” expired → company blocked; {count, plural, one {# worker} other {# workers}} without access",
+      "assigned": "Assigned to {project}",
+      "unassigned": "Removed from a site",
+      "worker_created": "Registered worker {name}",
+      "worker_updated": "Edited the worker: {fields}"
+    },
+    "fieldNames": {
+      "kind": "type",
+      "legalName": "legal name",
+      "taxId": "CIF/NIF",
+      "address": "address",
+      "postalCode": "postal code",
+      "city": "town",
+      "province": "province",
+      "reaNumber": "REA number",
+      "phone": "phone",
+      "email": "email",
+      "legalRep": "legal representative",
+      "siteContact": "site contact",
+      "siteContactPhone": "site contact phone",
+      "trades": "trades",
+      "isInstaller": "licensed installer",
+      "installerReg": "Industry registration",
+      "headcount": "workforce",
+      "permanentCount": "permanent staff",
+      "subcontractsFurther": "subcontracts",
+      "chainLevel": "level",
+      "preventionMode": "prevention arrangement",
+      "preventionEntity": "prevention provider",
+      "preventionValidUntil": "prevention valid until",
+      "machinery": "machinery",
+      "subcontractorId": "company",
+      "firstName": "first name",
+      "surnames": "surnames",
+      "idDocument": "DNI/NIE",
+      "category": "category",
+      "trade": "trade",
+      "ssNumber": "Social Security number",
+      "contractType": "contract type",
+      "startDate": "start date",
+      "tpcNumber": "TPC number",
+      "roles": "roles",
+      "ppeItems": "PPE"
+    },
+    "companies": {
+      "eyebrow": "Network · Subcontractors",
+      "title": "Subcontractor companies",
+      "intro": "Coordination of business activities (RD 171/2004) and the subcontracting register (Ley 32/2006).",
+      "exportDossier": "Export CAE dossier",
+      "register": "Register company",
+      "kpis": {
+        "label": "Summary",
+        "companies": "Companies",
+        "apta": "{count} cleared",
+        "pendiente": "{count} pending",
+        "bloqueada": "{count} blocked",
+        "workersWithAccess": "Workers with access",
+        "workersDetail": "{pending} pending · {blocked} blocked",
+        "expiring": "Expiring within 30 days",
+        "expired": "{count} already expired",
+        "noneExpired": "None expired",
+        "onSite": "On site today",
+        "onSiteRefs": "On site today · {refs}",
+        "companiesUnit": "{count, plural, one {company} other {companies}}",
+        "workersUnit": "{count, plural, one {worker} other {workers}}",
+        "blocked": "{names}: access blocked",
+        "noneOnSite": "No site under construction today"
+      },
+      "attention": {
+        "title": "Needs attention",
+        "hint": "Expired, rejected, missing, to validate and expiring soon",
+        "empty": "All in order: nothing pending.",
+        "missingDocs": "{count, plural, one {# mandatory document missing} other {# mandatory documents missing}}",
+        "expiredOn": "Expired on {date}",
+        "expiresOn": "Expires on {date}",
+        "uploadedOn": "Uploaded on {date}",
+        "requestedOn": "Requested on {date}",
+        "affected": "{count, plural, one {# worker without access} other {# workers without access}}",
+        "obra": "Site {ref}",
+        "request": "Request",
+        "remind": "Remind",
+        "validate": "Validate"
+      },
+      "filters": {
+        "status": "Status",
+        "all": "All",
+        "apta": "Cleared",
+        "pendiente": "Pending",
+        "bloqueada": "Blocked",
+        "search": "Search company or CIF",
+        "trade": "Trade",
+        "allTrades": "All trades",
+        "project": "Site",
+        "allProjects": "All sites"
+      },
+      "table": {
+        "title": "Company register",
+        "hint": "Status worked out from the mandatory documents",
+        "company": "Company",
+        "trade": "Trade",
+        "rea": "REA",
+        "aeat": "AEAT",
+        "ss": "Soc. Security",
+        "rc": "Liability",
+        "prl": "H&S",
+        "docs": "Docs",
+        "workers": "Workers",
+        "status": "Status",
+        "open": "Record",
+        "openFor": "Open {name}'s record",
+        "reaIn": "REA {region}",
+        "empty": "No company matches the filter.",
+        "none": "No companies registered yet."
+      }
+    },
+    "company": {
+      "back": "← Companies",
+      "dossier": "CAE dossier",
+      "edit": "Edit details",
+      "meta": {
+        "taxId": "CIF",
+        "nif": "NIF",
+        "trades": "Trade",
+        "rea": "REA",
+        "kind": "Type"
+      },
+      "banner": {
+        "title": "Site access blocked since {date}",
+        "reason": "Expired documents: {documents}.",
+        "workers": "{count, plural, =0 {No workers affected.} one {Worker affected: {names}.} other {Workers affected: {names}.}}",
+        "request": "Request document"
+      },
+      "tabs": {
+        "label": "Record sections",
+        "resumen": "Summary",
+        "documentos": "Documents",
+        "trabajadores": "Workers",
+        "obras": "Sites",
+        "historial": "History"
+      },
+      "summary": {
+        "data": "Company details",
+        "legalName": "Legal name",
+        "address": "Registered office",
+        "region": "REA region",
+        "reaNumber": "REA number",
+        "phone": "Phone",
+        "email": "Email",
+        "legalRep": "Legal representative",
+        "siteContact": "Site contact",
+        "activity": "Activity and prevention",
+        "trades": "Trades",
+        "installer": "Licensed installer",
+        "yes": "Yes",
+        "no": "No",
+        "headcount": "Workforce",
+        "headcountValue": "{headcount} workers · {permanent} permanent",
+        "share": "{share} % permanent",
+        "lowShare": "Under 30 % permanent (Ley 32/2006)",
+        "subcontracts": "Subcontracts",
+        "subcontractsYes": "Yes · level {level}",
+        "level": "Level {level}",
+        "prevention": "Prevention arrangement",
+        "preventionUntil": "Valid until {date}",
+        "machinery": "Own machinery",
+        "docs": "Documents",
+        "mandatory": "Mandatory",
+        "validCount": "validated and in date",
+        "valid": "{count} validated",
+        "expired": "{count} expired",
+        "pending": "{count} pending"
+      },
+      "documents": {
+        "title": "Documents",
+        "hint": "Each upload creates a new, immutable version",
+        "mandatory": "Company · mandatory",
+        "optional": "Company · optional",
+        "obra": "Site {ref}"
+      },
+      "workers": {
+        "title": "Workers",
+        "register": "Register worker",
+        "name": "Worker",
+        "trade": "Trade · category",
+        "tpc": "TPC",
+        "roles": "Roles",
+        "access": "Site access",
+        "empty": "No workers registered yet."
+      },
+      "obras": {
+        "title": "Sites",
+        "empty": "Not assigned to any site.",
+        "assignTitle": "Assign to a site",
+        "editTitle": "Edit the assignment to {ref}",
+        "project": "Site",
+        "chooseProject": "Choose a site",
+        "chapters": "Chapters it will carry out",
+        "noChapters": "No chapters",
+        "dates": "Planned dates",
+        "book": "Subcontracting book",
+        "bookEntry": "Entry no. {order} · {date}",
+        "noBook": "No entry",
+        "cssYes": "Coordinator informed",
+        "cssNo": "Coordinator not informed",
+        "pss": "H&S Plan adherence",
+        "workersAccess": "{ok} with access · {pending} pending · {blocked} blocked",
+        "workersLabel": "Workers",
+        "edit": "Edit",
+        "remove": "Remove from site",
+        "confirmRemove": "Remove the company from {ref}?",
+        "save": "Save",
+        "saving": "Saving…",
+        "cancel": "Cancel"
+      },
+      "history": {
+        "title": "History",
+        "hint": "Every registration, change, validation and rejection",
+        "empty": "No changes recorded.",
+        "worker": "Worker: {name}"
+      }
+    },
+    "fields": {
+      "kind": "Type",
+      "fullName": "Full name",
+      "legalName": "Legal name",
+      "nif": "NIF",
+      "cif": "CIF",
+      "taxIdHint": "Its check character is verified.",
+      "taxIdValid": "✓ Check digit correct",
+      "legalRep": "Legal representative",
+      "address": "Registered office",
+      "postalCode": "Postal code",
+      "city": "Town",
+      "province": "Province",
+      "reaRegion": "REA region",
+      "reaRegionPending": "Worked out from the postal code",
+      "reaRegionHint": "Comes from the registered office. The REA registration is checked in this region's register.",
+      "reaNumber": "REA registration number",
+      "phone": "Phone",
+      "email": "Email",
+      "siteContact": "Site contact",
+      "siteContactPhone": "Site contact phone",
+      "trades": "Trades",
+      "tradesHint": "Everything it does on site",
+      "installer": "Licensed installer",
+      "installerHint": "REBT / RITE — for electrical or heating installations",
+      "isInstaller": "Is a licensed installer",
+      "installerReg": "Industry registration number",
+      "workforce": "Workforce",
+      "workforceHint": "Ley 32/2006, art. 4.4: at least 30 % on permanent contracts",
+      "workforceSummary": "{headcount} workers · {permanent} permanent",
+      "headcount": "Total workforce",
+      "permanentCount": "Permanent staff",
+      "permanentShare": "Share",
+      "lowPermanentShare": "Less than 30 % of the workforce is permanent. It can be registered, but the warning stays on its record.",
+      "subcontracts": "Will it subcontract part of its work?",
+      "subcontractsHint": "At most {max} subcontracting levels",
+      "yes": "Yes",
+      "no": "No",
+      "chainLevel": "This company's level",
+      "chainLevels": {
+        "1": "1st level (hired by the contractor)",
+        "2": "2nd level (subcontractor of a subcontractor)",
+        "3": "3rd level (the last allowed)"
+      },
+      "chainLevelHint": "A 3rd-level company can't subcontract any further.",
+      "prevention": "Prevention arrangement",
+      "preventionHint": "LPRL art. 30–31 · RD 39/1997",
+      "preventionEntity": "Provider",
+      "preventionValidUntil": "Valid until",
+      "machinery": "Own machinery",
+      "machineryHint": "Its documents will be asked for (RD 1215/1997)",
+      "assignment": {
+        "chapters": "Chapters it will carry out",
+        "chaptersHint": "From the site's accepted budget",
+        "plannedStart": "Planned start",
+        "plannedEnd": "Planned end",
+        "book": "Entry in the subcontracting book",
+        "bookHint": "Ley 32/2006, art. 8 · RD 1109/2007",
+        "bookOrder": "Entry number",
+        "bookDate": "Entry date",
+        "cssInformed": "H&S coordinator informed"
+      }
+    },
+    "wizard": {
+      "title": "Register company",
+      "steps": {
+        "data": "Company details",
+        "activity": "Activity and prevention",
+        "documents": "Documents",
+        "obra": "Site and access",
+        "review": "Review"
+      },
+      "errors": {
+        "generic": "The company couldn't be registered. Try again."
+      },
+      "register": "Register company",
+      "registering": "Registering…",
+      "goToCompany": "Go to the record",
+      "partial": "The company is registered, but this wasn't saved. You can finish it from its record:",
+      "documents": {
+        "intro": "PDFs of up to 4 MB. Each file goes up as version 1, awaiting validation; nothing is ever overwritten.",
+        "mandatory": "Mandatory · {chosen} of {total} chosen",
+        "optional": "Optional · can be marked “Not applicable” with a reason",
+        "notApplicable": "Not applicable",
+        "willUpload": "Will upload",
+        "missing": "Missing",
+        "file": "File",
+        "fileFor": "File for “{document}”",
+        "removeFile": "Remove {name}",
+        "issuedAt": "Issued",
+        "expiresAt": "Expires",
+        "automatic": "Automatic",
+        "needsDate": "Give the issue date or the expiry date.",
+        "markNotApplicable": "Doesn't apply to this company",
+        "reason": "Reason",
+        "toUpload": "To upload"
+      },
+      "obra": {
+        "intro": "Optional: it can be assigned later from its record.",
+        "project": "Site",
+        "noProject": "Not assigned yet",
+        "chapters": "Chapters it will carry out",
+        "dates": "Planned dates",
+        "documents": "This site's documents",
+        "pss": "H&S Plan adherence",
+        "book": "Entry in the subcontracting book",
+        "bookSummary": "No. {order} · {date}"
+      },
+      "status": {
+        "title": "Registration status",
+        "data": "Company details",
+        "dataOk": "Valid CIF/NIF · REA in {region}",
+        "dataPending": "Required details missing",
+        "activity": "Activity and prevention",
+        "activityInvalid": "Some details aren't allowed by law",
+        "activityLowShare": "Less than 30 % permanent",
+        "activityPending": "No trades yet",
+        "documents": "Mandatory documents",
+        "documentsDetail": "{chosen} of {total} chosen · validated afterwards",
+        "obra": "Site and access",
+        "obraChapters": "{ref} · ch. {chapters}",
+        "obraNone": "Not assigned (optional)",
+        "whenApta": "When it will be cleared",
+        "whenAptaDetail": "Once its {total} mandatory documents are validated. Its workers get site access when the H&S Plan adherence and the subcontracting book entry are there too."
+      },
+      "reviewIntro": "Check the details before registering the company."
+    },
+    "edit": {
+      "title": "Edit details",
+      "intro": "Every change is kept in the company's history.",
+      "data": "Company details",
+      "activity": "Activity and prevention",
+      "cancel": "Cancel",
+      "save": "Save changes",
+      "saving": "Saving…"
+    },
+    "workers": {
+      "eyebrow": "Subcontractors",
+      "title": "Workers",
+      "intro": "The subcontractors' staff and their site access, worked out from their documents and their company's.",
+      "checkAccess": "Check access (DNI/TPC)",
+      "register": "Register worker",
+      "kpis": {
+        "label": "Summary",
+        "registered": "Registered",
+        "registeredDetail": "{count, plural, one {in # company} other {in # companies}}",
+        "ok": "Have access",
+        "okDetail": "Meet all 6 rules",
+        "pending": "Pending",
+        "pendingDetail": "Something left to upload or validate",
+        "blocked": "Blocked",
+        "blockedDetail": "By an expired document",
+        "preventive": "Preventive resources",
+        "preventiveDetail": "Need the 60 h basic level"
+      },
+      "check": {
+        "title": "Check access",
+        "query": "DNI, NIE or TPC number",
+        "project": "Site",
+        "anyProject": "Any site",
+        "submit": "Check",
+        "checking": "Checking…",
+        "notFound": "No worker is registered with that DNI/NIE or TPC."
+      },
+      "rulesTitle": "What site access checks",
+      "rulesHint": "Worked out again whenever a document is uploaded, validated or expires",
+      "listTitle": "Worker register",
+      "showing": "Showing {shown} of {total}",
+      "filterLabel": "Access",
+      "filters": {
+        "all": "All",
+        "ok": "Have access",
+        "pending": "Pending",
+        "blocked": "Blocked"
+      },
+      "search": "Search name or company",
+      "company": "Company",
+      "allCompanies": "All companies",
+      "project": "Site",
+      "allProjects": "All sites",
+      "empty": "No workers match these filters.",
+      "noTpc": "No TPC",
+      "waiver": "Waiver",
+      "table": {
+        "worker": "Worker",
+        "company": "Company",
+        "trade": "Trade · category",
+        "ss": "Social Security",
+        "tpc": "TPC",
+        "training": "H&S training",
+        "medical": "Medical",
+        "ppe": "PPE",
+        "roles": "Roles",
+        "access": "Site access"
+      }
+    },
+    "worker": {
+      "newTitle": "Register worker",
+      "back": "Workers",
+      "save": "Save changes",
+      "create": "Register worker",
+      "saved": "Changes saved.",
+      "unsaved": "There are unsaved changes: the access above already counts them.",
+      "documentsAfter": "Once registered you can upload their registration, TPC, training, medical and PPE receipt.",
+      "access": {
+        "title": "Site access",
+        "obra": "Check on",
+        "anywhere": "Any site (company and own documents)",
+        "passed": "Met",
+        "failed": "Not met"
+      },
+      "form": {
+        "label": "Worker details",
+        "choose": "Choose…",
+        "personal": "Personal details",
+        "firstName": "First name",
+        "surnames": "Surnames",
+        "idDocument": "DNI / NIE",
+        "idDocumentHint": "Its check letter is verified.",
+        "idDocumentValid": "✓ Check letter correct",
+        "phone": "Phone",
+        "company": "Company",
+        "chooseCompany": "Choose the company",
+        "category": "Category",
+        "trade": "Trade (collective agreement)",
+        "tradeHint": "The trade decides which 20 h trade training is asked for.",
+        "contract": "Registration and contract",
+        "ssNumber": "Social Security number",
+        "contractType": "Contract type",
+        "startDate": "Start date",
+        "tpc": "Construction Professional Card",
+        "tpcNumber": "TPC number",
+        "tpcHint": "An alternative to proving the trade's H&S training. Its copy and expiry are uploaded as a document.",
+        "ppe": "PPE handed over",
+        "ppeHint": "RD 773/1997. The signed receipt is uploaded as a document.",
+        "roles": "Roles",
+        "roleNeeds": "needs {document}",
+        "saving": "Saving…"
+      },
+      "documents": {
+        "title": "Documents",
+        "hint": "Each upload is a new version; nothing is overwritten",
+        "groups": {
+          "tpc": "TPC",
+          "training": "H&S training",
+          "health": "Information and health",
+          "ppe": "PPE",
+          "hiring": "Registration and contract"
+        }
+      }
     }
   }
 }

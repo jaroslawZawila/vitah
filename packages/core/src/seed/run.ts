@@ -1,10 +1,11 @@
 // `pnpm db:seed` (after @repo/db's seed): gives the local dev project VTH-26-001
-// the real Caviedes budget (004/2026) part built (./seed-obra). Skips a project that
-// already has a budget. Acta and invoice PDFs need a Blob store
-// (BLOB_READ_WRITE_TOKEN); without one they're left out.
+// the real Caviedes budget (004/2026) part built (./seed-obra), and fictional
+// subcontractors working on it (./subcontractors). Skips what is already there.
+// PDFs need a Blob store (BLOB_READ_WRITE_TOKEN); without one they're left out.
 
 import { and, budgetRevisions, db, eq, projects, seedConfig, tenants, users } from "@repo/db";
 import { seedObra } from "./seed-obra";
+import { seedSubcontractors } from "./subcontractors";
 
 const { tenantSlug, email, projectRef } = seedConfig();
 
@@ -27,17 +28,21 @@ async function run() {
     }));
   if (!tenant || !admin || !project) throw new Error("Run @repo/db's seed first");
 
+  const ctx = { tenantId: tenant.id, userId: admin.id, role: "admin" } as const;
+  const files = Boolean(process.env.BLOB_READ_WRITE_TOKEN);
   const budget = await db.query.budgetRevisions.findFirst({
     where: eq(budgetRevisions.projectId, project.id),
     columns: { id: true },
   });
   if (budget) {
     console.log(`${projectRef} already has a budget, skipping the obra`);
-    return;
+  } else {
+    await seedObra(ctx, project.id, { files });
+    console.log(`Seeded the obra of ${projectRef} (budget 004/2026)`);
   }
-  const ctx = { tenantId: tenant.id, userId: admin.id, role: "admin" } as const;
-  await seedObra(ctx, project.id, { files: Boolean(process.env.BLOB_READ_WRITE_TOKEN) });
-  console.log(`Seeded the obra of ${projectRef} (budget 004/2026)`);
+
+  const companies = await seedSubcontractors(ctx, project.id, { files });
+  console.log(companies ? `Seeded ${companies} subcontractors on ${projectRef}` : "Subcontractors already seeded");
 }
 
 run()

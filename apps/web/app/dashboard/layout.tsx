@@ -2,6 +2,7 @@ import { auth } from "../../auth";
 import { redirect } from "next/navigation";
 import Sidebar from "./components/Sidebar";
 import Topbar from "./components/Topbar";
+import { getSubcontractorCounts } from "../actions/subcontractors";
 
 export default async function DashboardLayout({
   children,
@@ -10,6 +11,11 @@ export default async function DashboardLayout({
 }) {
   const session = await auth();
   if (!session?.user) redirect("/");
+  // Only badges: a failure here (e.g. its tables not yet migrated) must not take the portal down.
+  const subcontractors = await getSubcontractorCounts().catch((error: unknown) => {
+    console.error(error);
+    return null;
+  });
 
   return (
     <div className="min-h-svh lg:grid lg:grid-cols-[236px_minmax(0,1fr)]">
@@ -17,6 +23,7 @@ export default async function DashboardLayout({
         name={session.user.name ?? null}
         email={session.user.email ?? null}
         isAdmin={session.user.role === "admin"}
+        subcontractors={subcontractors}
       />
       <div className="flex min-w-0 flex-col">
         <Topbar />

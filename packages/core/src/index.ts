@@ -21,3 +21,5 @@ export { searchPriceBase } from "./price-base";
 export * as hitosService from "./hitos";
 export * as obraService from "./obra";
 export * as changesService from "./changes";
+export * as subcontractorsService from "./subcontractors";
+export * as subcontractorWorkersService from "./subcontractor-workers";

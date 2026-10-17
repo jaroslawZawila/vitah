@@ -3,6 +3,9 @@ import { invalid } from "./errors";
 // Input parsing shared by the services: API bodies and form values arrive as
 // unknown / strings.
 
+/** A phone number as staff type it: digits, spaces, brackets and dashes, an optional leading +. */
+export const PHONE_PATTERN = /^\+?[0-9][0-9 ()-]{5,19}$/;
+
 /** The usual cap for a name, email, title or address. */
 export const MAX_TEXT = 200;
 

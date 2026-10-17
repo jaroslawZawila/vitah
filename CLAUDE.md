@@ -174,7 +174,9 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
 ### Database
 
 - **Driver:** `postgres` (postgres.js) — works with any PostgreSQL (local Docker, Vercel Postgres, AWS RDS, etc.)
-- Schema in `packages/db/src/schema.ts` — tables: `tenants`, `users`, `client_profiles`, `client_settings`, `push_tokens`, `accounts`, `sessions`, `verification_tokens`, `projects`, `project_documents`, `project_photos`, and the obra's `budget_revisions`, `budget_chapters`, `budget_lines`, `obra_hitos`, `obra_hito_chapters`, `obra_hito_checks`, `obra_hito_photos`, plus `budget_generations` (AI runs) and `ai_usage` (one row per Claude call, with its cost). A project is deliberately minimal — exactly what the mobile app shows: `ref`, `address`, `start_date`, `completion_date`, plus `client_user_id` linking it to its mobile app client
+- Schema in `packages/db/src/schema.ts` — tables: `tenants`, `users`, `client_profiles`, `client_settings`, `push_tokens`, `accounts`, `sessions`, `verification_tokens`, `projects`, `project_documents`, `project_photos`, and the obra's `budget_revisions`, `budget_chapters`, `budget_lines`, `obra_hitos`, `obra_hito_chapters`, `obra_hito_checks`, `obra_hito_photos`, plus `budget_generations` (AI runs) and `ai_usage` (one row per Claude call, with its cost), and the
+  Subcontratas tables `subcontractors`, `subcontractor_workers`, `subcontractor_documents`, `subcontractor_document_versions`,
+  `subcontractor_assignments`, `subcontractor_audit`. A project is deliberately minimal — exactly what the mobile app shows: `ref`, `address`, `start_date`, `completion_date`, plus `client_user_id` linking it to its mobile app client
 - Prod migrations are additive SQL files in `packages/db/sql/`, applied by hand (no plain `db:push` on prod)
 
 ### Obra (construction process)
@@ -222,6 +224,23 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
 - Portal: Budget tab pages under `dashboard/projects/[id]/budget/` (summary, lines, options, texts, conditions,
   pdf; `?revision=` shows an older one, picked from the menu on the revision pill); `BudgetScreen` / `BudgetStartScreen` are the containers, views in
   `components/budget/`. Web-only: the app only sees the general PDF (Documentos) and the contract via the obra
+
+### Subcontratas (CAE)
+
+- Companies (and self-employed) working on the obras, their workers and the CAE documents asked of them (RD 171/2004,
+  Ley 32/2006). Web-only and staff-only: the client never sees it, so no `/api/mobile` route and no `markChanged`
+- Pure rules in `packages/core/src/subcontractor-rules.ts` (re-exported by `@repo/core/contract`, also run in the
+  browser): the document template `SUBCONTRACTOR_REQUIREMENTS` (stable ids, validity), expiry (`docState`; alert 30
+  days before, 7 for monthly documents), company status (`companyStatus`: apta / pendiente / bloqueada — computed, never
+  stored), worker access (`workerAccess`: the six rules, with reasons), CIF/NIF/NIE check digits, masking, REA region
+  from the postal code. Services: `subcontractors.ts` (companies, documents, obra assignments, overview, CAE dossier
+  ZIP) and `subcontractor-workers.ts`; both load the tenant's whole network at once (`subcontractor-network.ts`)
+- Documents are versioned: an upload adds an immutable version (private Blob store); validate / reject (with reason)
+  act on the current one. Every write goes to `subcontractor_audit` (the ficha's Historial)
+- Admins and managers (contractor, jefe de obra) write; viewers read with masked CIF/DNI. No subcontractor portal login yet
+- Portal: rail group "Red" › Subcontratas (`dashboard/subcontratas/`: `empresas`, `empresas/nueva` wizard,
+  `empresas/[id]` ficha + `editar`, `trabajadores`, `trabajadores/nuevo`, `trabajadores/[id]`); API `/api/v1/subcontractors/**`.
+  `pnpm db:seed` adds eight fictional companies on VTH-26-001. Prod SQL: `packages/db/sql/2026-10-subcontractors.sql`
 
 ### Live updates (app open)
 

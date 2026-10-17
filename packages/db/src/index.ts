@@ -28,6 +28,12 @@ export {
   obraHitoPhotos,
   budgetGenerations,
   aiUsage,
+  subcontractors,
+  subcontractorWorkers,
+  subcontractorDocuments,
+  subcontractorDocumentVersions,
+  subcontractorAssignments,
+  subcontractorAudit,
 } from "./schema";
 export { seedConfig, seedPassword } from "./seed-config";
 export type { AnyColumn } from "drizzle-orm";

@@ -10,7 +10,7 @@ import { isCalendarDate } from "./calendar";
 import { requireAdmin, type Ctx } from "./context";
 import { MIN_PASSWORD_LENGTH, type ClientError, type ClientListItem } from "./contract";
 import { CoreError } from "./errors";
-import { clippedText, MAX_TEXT } from "./input";
+import { clippedText, MAX_TEXT, PHONE_PATTERN } from "./input";
 
 // ─── Clients ──────────────────────────────────────────────────────────────────
 // Homeowners who use the mobile app. Each is a `users` row with role "client"
@@ -42,8 +42,6 @@ const text = (value: unknown) => clippedText(value, MAX_TEXT);
 function optional(value: unknown): string | null {
   return text(value) || null;
 }
-
-const PHONE_PATTERN = /^\+?[0-9][0-9 ()-]{5,19}$/;
 
 /** YYYY-MM-DD that is a real calendar date, not in the future. */
 function dateOfBirth(value: unknown): string | null {

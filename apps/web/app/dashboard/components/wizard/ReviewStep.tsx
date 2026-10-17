@@ -16,8 +16,11 @@ export default function ReviewStep<D, O>({
   draft,
   options,
   onEdit,
+  intro,
 }: {
   sections: ReviewSection<D, O>[];
+  /** The line above the summaries; the new-project one by default. */
+  intro?: string;
   draft: D;
   options: O;
   onEdit: (index: number) => void;
@@ -26,7 +29,7 @@ export default function ReviewStep<D, O>({
 
   return (
     <div className="flex flex-col gap-3.5">
-      <p className="text-[13px] text-muted-foreground">{t("reviewIntro")}</p>
+      <p className="text-[13px] text-muted-foreground">{intro ?? t("reviewIntro")}</p>
       {sections.map(({ id, title, Summary }, index) => (
         <section
           key={id}

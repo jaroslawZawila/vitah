@@ -102,17 +102,19 @@ export async function readForm(request: Request): Promise<Record<string, unknown
 /**
  * Streams a stored file to the caller. Never cached by shared caches;
  * `immutable` files (photos: new id per upload) may stay in the caller's own,
- * for a day only (the device may be shared).
+ * for a day only (the device may be shared). A file built on the fly (no
+ * `sizeBytes`, e.g. a ZIP) streams without a length; `download` saves it
+ * instead of opening it.
  */
 export function fileResponse(
-  { filename, contentType, sizeBytes, body }: StoredFile,
-  { immutable = false } = {},
+  { filename, contentType, sizeBytes, body }: Omit<StoredFile, "sizeBytes"> & { sizeBytes?: number },
+  { immutable = false, download = false } = {},
 ) {
   return new Response(body, {
     headers: {
       "Content-Type": contentType,
-      "Content-Length": String(sizeBytes),
-      "Content-Disposition": `inline; filename*=UTF-8''${encodeURIComponent(filename)}`,
+      ...(sizeBytes === undefined ? {} : { "Content-Length": String(sizeBytes) }),
+      "Content-Disposition": `${download ? "attachment" : "inline"}; filename*=UTF-8''${encodeURIComponent(filename)}`,
       "Cache-Control": immutable ? "private, max-age=86400, immutable" : "private, no-store",
       "X-Content-Type-Options": "nosniff",
     },

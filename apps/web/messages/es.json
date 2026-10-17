@@ -28,6 +28,15 @@
       "payments": "Pagos",
       "documents": "Documentos",
       "photos": "Fotos"
+    },
+    "network": "Red",
+    "subcontractors": "Subcontratas",
+    "subcontractorTabs": {
+      "label": "Secciones de subcontratas",
+      "companies": "Empresas",
+      "workers": "Trabajadores",
+      "expiries": "Caducidades",
+      "expiriesCount": "{count, plural, one {# documento caducado o por caducar} other {# documentos caducados o por caducar}}"
     }
   },
   "topbar": {
@@ -36,7 +45,8 @@
       "users": "Gestión de Usuarios",
       "projectDetail": "Detalle de Proyecto",
       "clients": "Clientes de la app",
-      "newProject": "Nuevo proyecto"
+      "newProject": "Nuevo proyecto",
+      "subcontractors": "Subcontratas"
     }
   },
   "projectsPage": {
@@ -1096,6 +1106,829 @@
       "draftHint": "Borrador: lleva la marca «BORRADOR» hasta que se emite",
       "issuedHint": "Lo que se envió al cliente",
       "download": "Descargar PDF"
+    }
+  },
+  "subcontractors": {
+    "status": {
+      "apta": "Apta",
+      "pendiente": "Pendiente",
+      "bloqueada": "Bloqueada"
+    },
+    "access": {
+      "ok": "Con acceso",
+      "pending": "Pendiente",
+      "blocked": "Bloqueado"
+    },
+    "docState": {
+      "missing": "Falta",
+      "requested": "Solicitado",
+      "uploaded": "Por validar",
+      "rejected": "Rechazado",
+      "not_applicable": "No aplica",
+      "validated": "Validado",
+      "expiring": "Caduca pronto",
+      "expired": "Caducado"
+    },
+    "short": {
+      "ok": "OK",
+      "missing": "Falta",
+      "requested": "Pedido",
+      "uploaded": "Validar",
+      "rejected": "Rechazado",
+      "not_applicable": "N/A",
+      "expired": "Caducado"
+    },
+    "daysLeft": "{count, plural, =0 {Hoy} one {# día} other {# días}}",
+    "noExpiry": "Sin caducidad",
+    "kinds": {
+      "company": "Sociedad",
+      "self_employed": "Autónomo"
+    },
+    "requirements": {
+      "rea_subcontrata": {
+        "name": "Inscripción en el REA",
+        "legal": "Ley 32/2006"
+      },
+      "cert_aeat_contratistas": {
+        "name": "Certificado AEAT de contratistas",
+        "legal": "Art. 43.1.f LGT"
+      },
+      "cert_tgss": {
+        "name": "Certificado TGSS al corriente",
+        "legal": "Art. 42 ET"
+      },
+      "poliza_rc_subcontrata": {
+        "name": "Póliza RC y recibo vigente",
+        "legal": "Contrato de subcontratación"
+      },
+      "concierto_spa": {
+        "name": "Concierto con el servicio de prevención",
+        "legal": "LPRL art. 31"
+      },
+      "evaluacion_riesgos": {
+        "name": "Evaluación de riesgos y planificación preventiva",
+        "legal": "LPRL art. 16"
+      },
+      "rnt_mensual": {
+        "name": "RNT del último mes",
+        "legal": "Relación nominal de trabajadores",
+        "selfEmployed": "Recibo RETA del último mes"
+      },
+      "doc_maquinaria": {
+        "name": "Documentación de maquinaria",
+        "legal": "CE, manual, mantenimiento, ITV · RD 1215/1997"
+      },
+      "habilitacion_instalador": {
+        "name": "Habilitación de instalador",
+        "legal": "REBT / RITE"
+      },
+      "escrituras_036": {
+        "name": "Escrituras y modelo 036",
+        "legal": "Constitución y alta censal"
+      },
+      "adhesion_pss": {
+        "name": "Adhesión al Plan de Seguridad y Salud",
+        "legal": "RD 1627/1997, art. 7"
+      },
+      "alta_ss": {
+        "name": "Alta en la Seguridad Social",
+        "legal": "IDC / TA.2",
+        "selfEmployed": "Alta en el RETA"
+      },
+      "tpc": {
+        "name": "Tarjeta Profesional de la Construcción",
+        "legal": "CGSC · 5 años"
+      },
+      "formacion_prl_inicial": {
+        "name": "Formación inicial PRL (8 h)",
+        "legal": "CGSC"
+      },
+      "formacion_prl_oficio": {
+        "name": "2º ciclo del oficio (20 h)",
+        "legal": "CGSC"
+      },
+      "formacion_nivel_basico_60h": {
+        "name": "Nivel básico de prevención (60 h)",
+        "legal": "RD 39/1997"
+      },
+      "formacion_altura": {
+        "name": "Trabajos en altura",
+        "legal": "RD 2177/2004"
+      },
+      "formacion_andamios": {
+        "name": "Montaje de andamios",
+        "legal": "RD 2177/2004"
+      },
+      "formacion_pemp": {
+        "name": "Plataformas elevadoras (PEMP)",
+        "legal": "UNE 58923"
+      },
+      "formacion_maquinaria": {
+        "name": "Carné de operador de maquinaria",
+        "legal": "RD 1215/1997"
+      },
+      "info_riesgos": {
+        "name": "Información de riesgos firmada",
+        "legal": "LPRL art. 18"
+      },
+      "aptitud_medica": {
+        "name": "Aptitud médica",
+        "legal": "LPRL art. 22"
+      },
+      "renuncia_vigilancia_salud": {
+        "name": "Renuncia a la vigilancia de la salud",
+        "legal": "LPRL art. 22"
+      },
+      "entrega_epis": {
+        "name": "Recibo de entrega de EPIs",
+        "legal": "RD 773/1997"
+      }
+    },
+    "validity": {
+      "none": "Sin caducidad",
+      "monthly": "Revisión mensual",
+      "months": "{count, plural, one {Validez # mes} other {Validez # meses}}",
+      "years": "{count, plural, one {Validez # año} other {Validez # años}}"
+    },
+    "trades": {
+      "earthworks": "Movimiento de tierras",
+      "foundations": "Cimentación",
+      "steel_frame": "Estructura steel frame",
+      "roofing": "Cubiertas",
+      "insulation": "Envolvente y aislamiento",
+      "masonry": "Albañilería",
+      "plastering": "Revestimientos y falsos techos",
+      "flooring": "Solados y alicatados",
+      "carpentry": "Carpintería",
+      "metalwork": "Carpintería metálica y cerrajería",
+      "plumbing": "Fontanería",
+      "hvac": "Climatización",
+      "electrical": "Electricidad",
+      "telecom": "Telecomunicaciones",
+      "painting": "Pinturas",
+      "landscaping": "Urbanización"
+    },
+    "regions": {
+      "andalucia": "Andalucía",
+      "aragon": "Aragón",
+      "asturias": "Asturias",
+      "baleares": "Illes Balears",
+      "canarias": "Canarias",
+      "cantabria": "Cantabria",
+      "castilla_la_mancha": "Castilla-La Mancha",
+      "castilla_y_leon": "Castilla y León",
+      "cataluna": "Cataluña",
+      "ceuta": "Ceuta",
+      "extremadura": "Extremadura",
+      "galicia": "Galicia",
+      "la_rioja": "La Rioja",
+      "madrid": "Comunidad de Madrid",
+      "melilla": "Melilla",
+      "murcia": "Región de Murcia",
+      "navarra": "Navarra",
+      "pais_vasco": "País Vasco",
+      "valencia": "Comunitat Valenciana"
+    },
+    "preventionModes": {
+      "external_service": {
+        "label": "Servicio de prevención ajeno",
+        "hint": "Concierto con un SPA acreditado"
+      },
+      "own_service": {
+        "label": "Servicio de prevención propio",
+        "hint": "Obligatorio con más de 500 trabajadores"
+      },
+      "joint_service": {
+        "label": "Servicio mancomunado",
+        "hint": "Compartido entre empresas del sector"
+      },
+      "employer": {
+        "label": "Asunción personal",
+        "hint": "El empresario, hasta 25 trabajadores"
+      }
+    },
+    "roles": {
+      "preventive_resource": "Recurso preventivo",
+      "machine_operator": "Operador de maquinaria"
+    },
+    "categories": {
+      "site_manager": "Jefe de obra",
+      "foreman": "Encargado",
+      "officer_1": "Oficial 1ª",
+      "officer_2": "Oficial 2ª",
+      "specialist_labourer": "Peón especialista",
+      "labourer": "Peón",
+      "self_employed": "Autónomo"
+    },
+    "contractTypes": {
+      "permanent": "Indefinido",
+      "permanent_site": "Indefinido adscrito a obra",
+      "temporary": "Temporal",
+      "self_employed": "Autónomo (RETA)"
+    },
+    "ppe": {
+      "helmet": "Casco",
+      "boots": "Calzado S3",
+      "harness": "Arnés anticaídas",
+      "gloves": "Guantes",
+      "goggles": "Gafas",
+      "hearing": "Protección auditiva",
+      "hi_vis": "Chaleco alta visibilidad"
+    },
+    "machinery": {
+      "mewp": "Plataforma elevadora (PEMP)",
+      "welding": "Equipos de soldadura",
+      "crane": "Grúa autocargante",
+      "scaffold": "Andamio propio",
+      "excavator": "Excavadora / retro",
+      "forklift": "Carretilla elevadora"
+    },
+    "accessRules": {
+      "company": {
+        "title": "Empresa apta",
+        "detail": "Toda su documentación obligatoria validada y vigente; en la obra, adhesión al PSS y asiento en el libro de subcontratación."
+      },
+      "social_security": {
+        "title": "Alta en la Seguridad Social",
+        "detail": "Alta vigente y en la última RNT (RETA para autónomos)."
+      },
+      "training": {
+        "title": "TPC o formación PRL del oficio",
+        "detail": "Tarjeta Profesional vigente, o formación inicial 8 h + 2º ciclo del oficio 20 h."
+      },
+      "medical": {
+        "title": "Aptitud médica",
+        "detail": "Apto vigente, o renuncia firmada cuando la ley la permite."
+      },
+      "ppe": {
+        "title": "EPIs e información de riesgos",
+        "detail": "Recibo de entrega de EPIs e información de riesgos firmados."
+      },
+      "tasks": {
+        "title": "Formación de sus tareas y funciones",
+        "detail": "Altura, andamios… según los capítulos de la obra; nivel básico 60 h si es recurso preventivo; carné si opera maquinaria."
+      }
+    },
+    "accessReasons": {
+      "company_pending": "Empresa pendiente de documentación",
+      "company_blocked": "Empresa bloqueada",
+      "book_missing": "Sin asiento en el Libro de Subcontratación",
+      "tpc_or_training": "Necesita TPC vigente o formación inicial 8 h + oficio 20 h",
+      "missing": "Falta: {document}",
+      "not_validated": "Por validar: {document}",
+      "expired": "Caducado: {document}"
+    },
+    "documents": {
+      "document": "Documento",
+      "state": "Estado",
+      "issued": "Emitido",
+      "expires": "Caduca",
+      "version": "Versión",
+      "validatedBy": "Validado por",
+      "actions": "Acciones",
+      "view": "Ver",
+      "upload": "Subir PDF",
+      "newVersion": "Nueva versión",
+      "validate": "Validar",
+      "reject": "Rechazar",
+      "request": "Solicitar",
+      "remind": "Recordar",
+      "notApplicable": "No aplica",
+      "versions": "Versiones",
+      "versionLine": "v{version} subida el {date} por {user}",
+      "versionLineAnonymous": "v{version} subida el {date}",
+      "validatedLine": "validada el {date} por {user}",
+      "rejectedLine": "rechazada el {date} por {user}: «{reason}»",
+      "reasonLine": "Motivo: «{reason}»",
+      "requestedOn": "Solicitado el {date}",
+      "uploadTitle": "Subir «{document}»",
+      "file": "Archivo PDF",
+      "fileHint": "PDF de hasta 4 MB. Se guarda como una versión nueva; las anteriores se conservan.",
+      "issuedAt": "Fecha de emisión",
+      "expiresAt": "Fecha de caducidad",
+      "expiresHint": "Si la dejas vacía se calcula: {validity}.",
+      "expiresHintNone": "Déjala vacía si no caduca.",
+      "rejectTitle": "Rechazar «{document}»",
+      "rejectReason": "Motivo del rechazo",
+      "rejectHint": "Se guarda con la versión para que la empresa suba una correcta.",
+      "notApplicableTitle": "«{document}» no aplica",
+      "notApplicableReason": "Motivo",
+      "cancel": "Cancelar",
+      "save": "Guardar",
+      "uploading": "Subiendo…",
+      "saving": "Guardando…",
+      "noExpiry": "Sin caducidad"
+    },
+    "errors": {
+      "missing_fields": "Faltan campos obligatorios.",
+      "missing_dates": "Indica la fecha de emisión o la de caducidad.",
+      "missing_reason": "Indica el motivo.",
+      "invalid_tax_id": "El CIF/NIF no es válido (dígito de control).",
+      "invalid_id_document": "El DNI/NIE no es válido (letra de control).",
+      "invalid_postal_code": "El código postal no es válido.",
+      "invalid_email": "El email no es válido.",
+      "invalid_phone": "El teléfono no es válido.",
+      "invalid_date": "La fecha no es válida.",
+      "invalid_number": "El número no es válido.",
+      "invalid_option": "Hay una opción no válida.",
+      "invalid_requirement": "Documento desconocido.",
+      "invalid_chapter": "Capítulo no válido.",
+      "permanent_exceeds_headcount": "Hay más indefinidos que plantilla.",
+      "self_employed_cannot_subcontract": "Un autónomo no puede subcontratar (Ley 32/2006, art. 5.2.e).",
+      "chain_too_deep": "Se supera el máximo de 3 niveles de subcontratación.",
+      "tax_id_exists": "Ya hay una empresa con ese CIF/NIF.",
+      "id_document_exists": "Ya hay un trabajador con ese DNI/NIE.",
+      "not_optional": "Este documento es obligatorio.",
+      "nothing_to_review": "No hay ninguna versión por revisar.",
+      "missing_file": "Elige un archivo.",
+      "file_too_large": "El archivo supera los 4 MB.",
+      "invalid_file_type": "El archivo no es un PDF.",
+      "project_not_found": "La obra no existe.",
+      "worker_not_found": "El trabajador no existe.",
+      "not_found": "No encontrado.",
+      "forbidden": "No tienes permiso para hacer esto."
+    },
+    "audit": {
+      "system": "Sistema",
+      "created": "Registró la empresa",
+      "updated": "Editó datos: {fields}",
+      "document_uploaded": "Subió «{document}» v{version}",
+      "document_validated": "Validó «{document}» v{version}",
+      "document_rejected": "Rechazó «{document}» v{version}: «{reason}»",
+      "document_not_applicable": "Marcó «{document}» como no aplica: «{reason}»",
+      "document_requested": "Solicitó «{document}»",
+      "document_reminded": "Recordó «{document}»",
+      "document_expired": "«{document}» caducado → empresa bloqueada; {count, plural, one {# trabajador} other {# trabajadores}} sin acceso",
+      "assigned": "Asignó a {project}",
+      "unassigned": "Quitó de una obra",
+      "worker_created": "Registró al trabajador {name}",
+      "worker_updated": "Editó al trabajador: {fields}"
+    },
+    "fieldNames": {
+      "kind": "tipo",
+      "legalName": "razón social",
+      "taxId": "CIF/NIF",
+      "address": "domicilio",
+      "postalCode": "código postal",
+      "city": "municipio",
+      "province": "provincia",
+      "reaNumber": "nº REA",
+      "phone": "teléfono",
+      "email": "email",
+      "legalRep": "representante legal",
+      "siteContact": "contacto en obra",
+      "siteContactPhone": "teléfono del contacto",
+      "trades": "oficios",
+      "isInstaller": "instalador habilitado",
+      "installerReg": "nº de registro de Industria",
+      "headcount": "plantilla",
+      "permanentCount": "indefinidos",
+      "subcontractsFurther": "subcontrata",
+      "chainLevel": "nivel",
+      "preventionMode": "modalidad preventiva",
+      "preventionEntity": "entidad preventiva",
+      "preventionValidUntil": "vigencia preventiva",
+      "machinery": "maquinaria",
+      "subcontractorId": "empresa",
+      "firstName": "nombre",
+      "surnames": "apellidos",
+      "idDocument": "DNI/NIE",
+      "category": "categoría",
+      "trade": "oficio",
+      "ssNumber": "nº de afiliación",
+      "contractType": "tipo de contrato",
+      "startDate": "fecha de alta",
+      "tpcNumber": "nº TPC",
+      "roles": "funciones",
+      "ppeItems": "EPIs"
+    },
+    "companies": {
+      "eyebrow": "Red · Subcontratas",
+      "title": "Empresas subcontratistas",
+      "intro": "Coordinación de actividades empresariales (RD 171/2004) y registro de subcontratación (Ley 32/2006).",
+      "exportDossier": "Exportar dossier CAE",
+      "register": "Registrar empresa",
+      "kpis": {
+        "label": "Resumen",
+        "companies": "Empresas",
+        "apta": "{count, plural, one {# apta} other {# aptas}}",
+        "pendiente": "{count, plural, one {# pendiente} other {# pendientes}}",
+        "bloqueada": "{count, plural, one {# bloqueada} other {# bloqueadas}}",
+        "workersWithAccess": "Trabajadores con acceso",
+        "workersDetail": "{pending} pendientes · {blocked} bloqueados",
+        "expiring": "Caducan en 30 días",
+        "expired": "{count, plural, one {# ya caducado} other {# ya caducados}}",
+        "noneExpired": "Ninguno caducado",
+        "onSite": "En obra hoy",
+        "onSiteRefs": "En obra hoy · {refs}",
+        "companiesUnit": "{count, plural, one {empresa} other {empresas}}",
+        "workersUnit": "{count, plural, one {trabajador} other {trabajadores}}",
+        "blocked": "{names}: acceso bloqueado",
+        "noneOnSite": "Ninguna obra en ejecución hoy"
+      },
+      "attention": {
+        "title": "Requiere atención",
+        "hint": "Caducados, rechazados, que faltan, por validar y que caducan pronto",
+        "empty": "Todo en orden: no hay nada pendiente.",
+        "missingDocs": "{count, plural, one {Falta # documento obligatorio} other {Faltan # documentos obligatorios}}",
+        "expiredOn": "Caducó el {date}",
+        "expiresOn": "Caduca el {date}",
+        "uploadedOn": "Subido el {date}",
+        "requestedOn": "Solicitado el {date}",
+        "affected": "{count, plural, one {# trabajador sin acceso} other {# trabajadores sin acceso}}",
+        "obra": "Obra {ref}",
+        "request": "Solicitar",
+        "remind": "Recordar",
+        "validate": "Validar"
+      },
+      "filters": {
+        "status": "Estado",
+        "all": "Todas",
+        "apta": "Aptas",
+        "pendiente": "Pendientes",
+        "bloqueada": "Bloqueadas",
+        "search": "Buscar empresa o CIF",
+        "trade": "Oficio",
+        "allTrades": "Todos los oficios",
+        "project": "Obra",
+        "allProjects": "Todas las obras"
+      },
+      "table": {
+        "title": "Registro de empresas",
+        "hint": "Estado calculado a partir de la documentación obligatoria",
+        "company": "Empresa",
+        "trade": "Oficio",
+        "rea": "REA",
+        "aeat": "AEAT",
+        "ss": "Seg. Social",
+        "rc": "RC",
+        "prl": "PRL",
+        "docs": "Docs",
+        "workers": "Trab.",
+        "status": "Estado",
+        "open": "Ficha",
+        "openFor": "Abrir la ficha de {name}",
+        "reaIn": "REA {region}",
+        "empty": "Ninguna empresa coincide con el filtro.",
+        "none": "Aún no hay empresas registradas."
+      }
+    },
+    "company": {
+      "back": "← Empresas",
+      "dossier": "Dossier CAE",
+      "edit": "Editar datos",
+      "meta": {
+        "taxId": "CIF",
+        "nif": "NIF",
+        "trades": "Oficio",
+        "rea": "REA",
+        "kind": "Tipo"
+      },
+      "banner": {
+        "title": "Acceso a obra bloqueado desde el {date}",
+        "reason": "Documentos caducados: {documents}.",
+        "workers": "{count, plural, =0 {Sin trabajadores afectados.} one {Trabajador afectado: {names}.} other {Trabajadores afectados: {names}.}}",
+        "request": "Solicitar documento"
+      },
+      "tabs": {
+        "label": "Secciones de la ficha",
+        "resumen": "Resumen",
+        "documentos": "Documentos",
+        "trabajadores": "Trabajadores",
+        "obras": "Obras",
+        "historial": "Historial"
+      },
+      "summary": {
+        "data": "Datos de la empresa",
+        "legalName": "Razón social",
+        "address": "Domicilio social",
+        "region": "CCAA del REA",
+        "reaNumber": "Nº REA",
+        "phone": "Teléfono",
+        "email": "Email",
+        "legalRep": "Representante legal",
+        "siteContact": "Contacto en obra",
+        "activity": "Actividad y prevención",
+        "trades": "Oficios",
+        "installer": "Instalador habilitado",
+        "yes": "Sí",
+        "no": "No",
+        "headcount": "Plantilla",
+        "headcountValue": "{headcount} trabajadores · {permanent} indefinidos",
+        "share": "{share} % indefinidos",
+        "lowShare": "Menos del 30 % indefinidos (Ley 32/2006)",
+        "subcontracts": "Subcontrata",
+        "subcontractsYes": "Sí · nivel {level}",
+        "level": "Nivel {level}",
+        "prevention": "Modalidad preventiva",
+        "preventionUntil": "Vigente hasta {date}",
+        "machinery": "Maquinaria propia",
+        "docs": "Documentación",
+        "mandatory": "Obligatorios",
+        "validCount": "validados y vigentes",
+        "valid": "{count, plural, one {# validado} other {# validados}}",
+        "expired": "{count, plural, one {# caducado} other {# caducados}}",
+        "pending": "{count, plural, one {# pendiente} other {# pendientes}}"
+      },
+      "documents": {
+        "title": "Documentos",
+        "hint": "Cada subida crea una versión nueva e inmutable",
+        "mandatory": "Empresa · obligatorios",
+        "optional": "Empresa · opcionales",
+        "obra": "Obra {ref}"
+      },
+      "workers": {
+        "title": "Trabajadores",
+        "register": "Registrar trabajador",
+        "name": "Trabajador",
+        "trade": "Oficio · categoría",
+        "tpc": "TPC",
+        "roles": "Funciones",
+        "access": "Acceso a obra",
+        "empty": "Aún no tiene trabajadores registrados."
+      },
+      "obras": {
+        "title": "Obras",
+        "empty": "No está asignada a ninguna obra.",
+        "assignTitle": "Asignar a una obra",
+        "editTitle": "Editar la asignación a {ref}",
+        "project": "Obra",
+        "chooseProject": "Elige una obra",
+        "chapters": "Capítulos que ejecutará",
+        "noChapters": "Sin capítulos",
+        "dates": "Fechas previstas",
+        "book": "Libro de subcontratación",
+        "bookEntry": "Asiento nº {order} · {date}",
+        "noBook": "Sin asiento",
+        "cssYes": "CSS informado",
+        "cssNo": "CSS sin informar",
+        "pss": "Adhesión al PSS",
+        "workersAccess": "{ok} con acceso · {pending} pendientes · {blocked} bloqueados",
+        "workersLabel": "Trabajadores",
+        "edit": "Editar",
+        "remove": "Quitar de la obra",
+        "confirmRemove": "¿Quitar a la empresa de {ref}?",
+        "save": "Guardar",
+        "saving": "Guardando…",
+        "cancel": "Cancelar"
+      },
+      "history": {
+        "title": "Historial",
+        "hint": "Registro de cada alta, cambio, validación y rechazo",
+        "empty": "Sin cambios registrados.",
+        "worker": "Trabajador: {name}"
+      }
+    },
+    "fields": {
+      "kind": "Tipo de empresa",
+      "fullName": "Nombre y apellidos",
+      "legalName": "Razón social",
+      "nif": "NIF",
+      "cif": "CIF",
+      "taxIdHint": "Se comprueba el dígito de control.",
+      "taxIdValid": "✓ Dígito de control correcto",
+      "legalRep": "Representante legal",
+      "address": "Domicilio social",
+      "postalCode": "Código postal",
+      "city": "Municipio",
+      "province": "Provincia",
+      "reaRegion": "CCAA del REA",
+      "reaRegionPending": "Se calcula con el código postal",
+      "reaRegionHint": "Se deriva del domicilio social. La inscripción en el REA se comprueba en el registro de esta comunidad.",
+      "reaNumber": "Nº de inscripción en el REA",
+      "phone": "Teléfono",
+      "email": "Email",
+      "siteContact": "Contacto en obra",
+      "siteContactPhone": "Teléfono del contacto",
+      "trades": "Oficios",
+      "tradesHint": "Todos los que realiza en obra",
+      "installer": "Instalador habilitado",
+      "installerHint": "REBT / RITE — para instalaciones eléctricas o térmicas",
+      "isInstaller": "Es instalador habilitado",
+      "installerReg": "Nº de registro de Industria",
+      "workforce": "Plantilla",
+      "workforceHint": "Ley 32/2006, art. 4.4: al menos un 30 % con contrato indefinido",
+      "workforceSummary": "{headcount} trabajadores · {permanent} indefinidos",
+      "headcount": "Plantilla total",
+      "permanentCount": "Nº de indefinidos",
+      "permanentShare": "Porcentaje",
+      "lowPermanentShare": "Menos del 30 % de la plantilla es indefinida. Puede registrarse, pero queda anotado como advertencia en la ficha.",
+      "subcontracts": "¿Subcontratará parte de su trabajo?",
+      "subcontractsHint": "Máximo {max} niveles de subcontratación",
+      "yes": "Sí",
+      "no": "No",
+      "chainLevel": "Nivel que ocupa esta empresa",
+      "chainLevels": {
+        "1": "1er nivel (contratada por el contratista)",
+        "2": "2º nivel (subcontrata de una subcontrata)",
+        "3": "3er nivel (último permitido)"
+      },
+      "chainLevelHint": "Una empresa del 3er nivel ya no puede subcontratar.",
+      "prevention": "Modalidad preventiva",
+      "preventionHint": "LPRL art. 30–31 · RD 39/1997",
+      "preventionEntity": "Entidad",
+      "preventionValidUntil": "Vigente hasta",
+      "machinery": "Maquinaria propia",
+      "machineryHint": "Se pedirá su documentación (RD 1215/1997)",
+      "assignment": {
+        "chapters": "Capítulos que ejecutará",
+        "chaptersHint": "Del presupuesto aceptado de la obra",
+        "plannedStart": "Inicio previsto",
+        "plannedEnd": "Fin previsto",
+        "book": "Asiento en el Libro de Subcontratación",
+        "bookHint": "Ley 32/2006, art. 8 · RD 1109/2007",
+        "bookOrder": "Nº de orden",
+        "bookDate": "Fecha del asiento",
+        "cssInformed": "Coordinador de SyS informado"
+      }
+    },
+    "wizard": {
+      "title": "Registrar empresa",
+      "steps": {
+        "data": "Datos de la empresa",
+        "activity": "Actividad y prevención",
+        "documents": "Documentación",
+        "obra": "Obra y acceso",
+        "review": "Revisión"
+      },
+      "errors": {
+        "generic": "No se ha podido registrar la empresa. Inténtalo de nuevo."
+      },
+      "register": "Registrar empresa",
+      "registering": "Registrando…",
+      "goToCompany": "Ir a la ficha",
+      "partial": "La empresa se ha registrado, pero esto no se ha guardado. Puedes completarlo desde su ficha:",
+      "documents": {
+        "intro": "PDF de hasta 4 MB. Cada archivo se sube como versión 1, pendiente de validar; nunca se sobrescribe.",
+        "mandatory": "Obligatorios · {chosen} de {total} elegidos",
+        "optional": "Opcionales · se pueden marcar como «No aplica» con motivo",
+        "notApplicable": "No aplica",
+        "willUpload": "Se subirá",
+        "missing": "Falta",
+        "file": "Archivo",
+        "fileFor": "Archivo de «{document}»",
+        "removeFile": "Quitar {name}",
+        "issuedAt": "Emitido",
+        "expiresAt": "Caduca",
+        "automatic": "Automático",
+        "needsDate": "Indica la fecha de emisión o la de caducidad.",
+        "markNotApplicable": "No aplica a esta empresa",
+        "reason": "Motivo",
+        "toUpload": "Se subirán"
+      },
+      "obra": {
+        "intro": "Opcional: se puede asignar más tarde desde la ficha.",
+        "project": "Obra",
+        "noProject": "Sin asignar todavía",
+        "chapters": "Capítulos que ejecutará",
+        "dates": "Fechas previstas",
+        "documents": "Documentos de esta obra",
+        "pss": "Adhesión al PSS",
+        "book": "Asiento en el Libro de Subcontratación",
+        "bookSummary": "Nº {order} · {date}"
+      },
+      "status": {
+        "title": "Estado del alta",
+        "data": "Datos de la empresa",
+        "dataOk": "CIF/NIF válido · REA en {region}",
+        "dataPending": "Faltan datos obligatorios",
+        "activity": "Actividad y prevención",
+        "activityInvalid": "Hay datos que la ley no permite",
+        "activityLowShare": "Menos del 30 % de indefinidos",
+        "activityPending": "Sin oficios todavía",
+        "documents": "Documentación obligatoria",
+        "documentsDetail": "{chosen} de {total} elegidos · se validan después",
+        "obra": "Obra y acceso",
+        "obraChapters": "{ref} · cap. {chapters}",
+        "obraNone": "Sin asignar (opcional)",
+        "whenApta": "Cuándo será apta",
+        "whenAptaDetail": "Al validar los {total} documentos obligatorios. Sus trabajadores tendrán acceso a una obra cuando además estén la adhesión al PSS y el asiento en el libro de subcontratación."
+      },
+      "reviewIntro": "Revisa los datos antes de registrar la empresa."
+    },
+    "edit": {
+      "title": "Editar datos",
+      "intro": "Cada cambio queda en el historial de la empresa.",
+      "data": "Datos de la empresa",
+      "activity": "Actividad y prevención",
+      "cancel": "Cancelar",
+      "save": "Guardar cambios",
+      "saving": "Guardando…"
+    },
+    "workers": {
+      "eyebrow": "Subcontratas",
+      "title": "Trabajadores",
+      "intro": "Personal de las subcontratas y su acceso a obra, calculado a partir de su documentación y la de su empresa.",
+      "checkAccess": "Comprobar acceso (DNI/TPC)",
+      "register": "Registrar trabajador",
+      "kpis": {
+        "label": "Resumen",
+        "registered": "Registrados",
+        "registeredDetail": "{count, plural, one {en # empresa} other {en # empresas}}",
+        "ok": "Con acceso",
+        "okDetail": "Cumplen las 6 reglas",
+        "pending": "Pendientes",
+        "pendingDetail": "Les falta algo por subir o validar",
+        "blocked": "Bloqueados",
+        "blockedDetail": "Por un documento caducado",
+        "preventive": "Recursos preventivos",
+        "preventiveDetail": "Necesitan el nivel básico 60 h"
+      },
+      "check": {
+        "title": "Comprobar acceso",
+        "query": "DNI, NIE o nº de TPC",
+        "project": "Obra",
+        "anyProject": "Cualquier obra",
+        "submit": "Comprobar",
+        "checking": "Comprobando…",
+        "notFound": "No hay ningún trabajador registrado con ese DNI/NIE o TPC."
+      },
+      "rulesTitle": "Qué comprueba el acceso a obra",
+      "rulesHint": "Se recalcula al subir, validar o caducar cualquier documento",
+      "listTitle": "Registro de trabajadores",
+      "showing": "Mostrando {shown} de {total}",
+      "filterLabel": "Acceso",
+      "filters": {
+        "all": "Todos",
+        "ok": "Con acceso",
+        "pending": "Pendientes",
+        "blocked": "Bloqueados"
+      },
+      "search": "Buscar nombre o empresa",
+      "company": "Empresa",
+      "allCompanies": "Todas las empresas",
+      "project": "Obra",
+      "allProjects": "Todas las obras",
+      "empty": "No hay trabajadores con estos filtros.",
+      "noTpc": "Sin TPC",
+      "waiver": "Renuncia",
+      "table": {
+        "worker": "Trabajador",
+        "company": "Empresa",
+        "trade": "Oficio · categoría",
+        "ss": "Alta SS",
+        "tpc": "TPC",
+        "training": "Formación PRL",
+        "medical": "Aptitud médica",
+        "ppe": "EPIs",
+        "roles": "Funciones",
+        "access": "Acceso a obra"
+      }
+    },
+    "worker": {
+      "newTitle": "Registrar trabajador",
+      "back": "Trabajadores",
+      "save": "Guardar cambios",
+      "create": "Registrar trabajador",
+      "saved": "Cambios guardados.",
+      "unsaved": "Hay cambios sin guardar: el acceso ya los tiene en cuenta.",
+      "documentsAfter": "Una vez registrado podrás subir su alta, TPC, formación, aptitud médica y recibo de EPIs.",
+      "access": {
+        "title": "Acceso a obra",
+        "obra": "Comprobar en",
+        "anywhere": "Cualquier obra (empresa y documentos propios)",
+        "passed": "Cumple",
+        "failed": "No cumple"
+      },
+      "form": {
+        "label": "Datos del trabajador",
+        "choose": "Elige…",
+        "personal": "Datos personales",
+        "firstName": "Nombre",
+        "surnames": "Apellidos",
+        "idDocument": "DNI / NIE",
+        "idDocumentHint": "Se comprueba la letra de control.",
+        "idDocumentValid": "✓ Letra de control correcta",
+        "phone": "Teléfono",
+        "company": "Empresa",
+        "chooseCompany": "Elige la empresa",
+        "category": "Categoría",
+        "trade": "Oficio según convenio",
+        "tradeHint": "El oficio decide la formación de 2º ciclo (20 h) que se le pide.",
+        "contract": "Alta y contratación",
+        "ssNumber": "Nº de afiliación SS",
+        "contractType": "Tipo de contrato",
+        "startDate": "Fecha de alta",
+        "tpc": "Tarjeta Profesional de la Construcción",
+        "tpcNumber": "Nº de TPC",
+        "tpcHint": "Alternativa a acreditar la formación PRL del oficio. La copia y su caducidad se suben como documento.",
+        "ppe": "EPIs entregados",
+        "ppeHint": "RD 773/1997. El recibo firmado se sube como documento.",
+        "roles": "Funciones",
+        "roleNeeds": "requiere {document}",
+        "saving": "Guardando…"
+      },
+      "documents": {
+        "title": "Documentos",
+        "hint": "Cada subida es una versión nueva; nunca se sobrescribe",
+        "groups": {
+          "tpc": "TPC",
+          "training": "Formación PRL",
+          "health": "Información y salud",
+          "ppe": "EPIs",
+          "hiring": "Alta y contratación"
+        }
+      }
     }
   }
 }

@@ -7,7 +7,9 @@ export default function Topbar() {
   const pathname = usePathname();
   const t = useTranslations("topbar");
 
-  const titleKey = pathname.startsWith("/dashboard/users")
+  const titleKey = pathname.startsWith("/dashboard/subcontratas")
+    ? "subcontractors"
+    : pathname.startsWith("/dashboard/users")
     ? "users"
     : pathname.startsWith("/dashboard/clients")
       ? "clients"
