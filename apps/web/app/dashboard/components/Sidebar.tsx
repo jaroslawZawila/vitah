@@ -1,11 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { useOptimistic, useTransition } from "react";
+import { useTransition } from "react";
 import { useParams, usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Contact, FolderKanban, HardHat, ShoppingCart, UserCog } from "lucide-react";
+import { Contact, FolderKanban, HardHat, Settings, ShoppingCart, UserCog } from "lucide-react";
 import { APP_LANGUAGES, type AppLanguage, type SubcontractorCounts } from "@repo/core/contract";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { COMPANY_PURCHASES_HREF } from "../projects/[id]/components/purchasing/links";
 
@@ -81,9 +90,13 @@ export default function Sidebar({
             OS Platform
           </div>
         </div>
-        <SignedInUser name={name} email={email} className="ml-auto max-w-[60%] lg:hidden">
-          <LanguageSwitch language={language} onChange={onLanguageChange} />
-        </SignedInUser>
+        <SettingsMenu
+          name={name}
+          email={email}
+          language={language}
+          onLanguageChange={onLanguageChange}
+          className="ml-auto max-w-[60%] lg:hidden"
+        />
       </div>
 
       <nav className="-mx-1 flex flex-wrap gap-0.5 lg:mx-0 lg:flex-col lg:flex-nowrap">
@@ -110,82 +123,81 @@ export default function Sidebar({
         <PurchasesNav pathname={pathname} />
       </nav>
 
-      <SignedInUser
-        name={name}
-        email={email}
-        className="mt-auto hidden border-t border-white/8 px-2 pt-4 lg:flex"
-      >
-        <LanguageSwitch language={language} onChange={onLanguageChange} />
-      </SignedInUser>
+      <div className="mt-auto hidden border-t border-white/8 pt-3 lg:block">
+        <SettingsMenu
+          name={name}
+          email={email}
+          language={language}
+          onLanguageChange={onLanguageChange}
+          className="w-full"
+        />
+      </div>
     </aside>
   );
 }
 
 /**
- * Who is signed in, with their language switch: at the foot of the rail on desktop, in the top
- * bar's corner on phones (avatar only below `sm`).
+ * Who is signed in, opening their settings (the portal's language, saved on their account): at
+ * the foot of the rail on desktop, in the top bar's corner on phones (avatar only below `sm`).
  */
-function SignedInUser({
+function SettingsMenu({
   name,
   email,
+  language,
+  onLanguageChange,
   className,
-  children,
 }: {
   name: string | null;
   email: string | null;
-  className: string;
-  children: React.ReactNode;
-}) {
-  const displayName = name || email || "";
-  return (
-    <div className={cn("flex min-w-0 items-center gap-2.5", className)}>
-      <div className="grid size-[30px] flex-none place-items-center rounded-full bg-verde-oliva-dark text-[13px] font-bold text-white">
-        {displayName.charAt(0).toUpperCase()}
-      </div>
-      <div className="min-w-0 max-sm:hidden">
-        <div className="truncate text-[13px] font-semibold text-white">{displayName}</div>
-        {name && email && <div className="truncate text-[11.5px] text-rail-muted">{email}</div>}
-      </div>
-      <div className="ml-auto flex-none">{children}</div>
-    </div>
-  );
-}
-
-/** ES | EN: the portal's language for this user, saved on their account. */
-function LanguageSwitch({
-  language,
-  onChange,
-}: {
   language: AppLanguage;
-  onChange: (language: AppLanguage) => Promise<{ error?: string }>;
+  onLanguageChange: (language: AppLanguage) => Promise<{ error?: string }>;
+  className: string;
 }) {
-  const t = useTranslations("sidebar.language");
-  const [shown, setShown] = useOptimistic(language);
+  const t = useTranslations("sidebar");
   const [pending, startTransition] = useTransition();
+  const displayName = name || email || "";
 
   return (
-    <div role="group" aria-label={t("label")} className="flex rounded-[8px] bg-white/6 p-0.5">
-      {APP_LANGUAGES.map((lang) => (
-        <button
-          key={lang}
-          type="button"
-          lang={lang}
-          aria-label={t(lang)}
-          aria-pressed={lang === shown}
-          disabled={pending}
-          onClick={() => {
-            if (lang === shown) return;
-            startTransition(async () => {
-              setShown(lang);
-              await onChange(lang);
-            });
-          }}
-          className="min-h-7 min-w-8 rounded-[6px] px-1.5 text-[11.5px] font-semibold tracking-[0.08em] text-rail-muted uppercase transition-colors hover:text-white disabled:cursor-wait aria-pressed:bg-white/12 aria-pressed:text-white pointer-coarse:min-h-11 pointer-coarse:min-w-11"
-        >
-          {lang}
-        </button>
-      ))}
-    </div>
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        className={cn(
+          "flex min-h-11 min-w-0 items-center gap-2.5 rounded-[9px] px-2 text-left transition-colors hover:bg-white/6 data-popup-open:bg-white/8",
+          className,
+        )}
+      >
+        <span className="grid size-[30px] flex-none place-items-center rounded-full bg-verde-oliva-dark text-[13px] font-bold text-white">
+          {displayName.charAt(0).toUpperCase()}
+        </span>
+        <span className="min-w-0 max-sm:hidden">
+          <span className="block truncate text-[13px] font-semibold text-white">{displayName}</span>
+          {name && email && <span className="block truncate text-[11.5px] text-rail-muted">{email}</span>}
+        </span>
+        <Settings aria-hidden className="ml-auto size-4 flex-none text-rail-muted" strokeWidth={1.8} />
+        <span className="sr-only">{t("settings")}</span>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuGroup>
+          <DropdownMenuLabel>{t("language.label")}</DropdownMenuLabel>
+          <DropdownMenuRadioGroup
+            value={language}
+            disabled={pending}
+            onValueChange={(lang: AppLanguage) => {
+              // Base UI reports a click on the current value too.
+              if (lang === language) return;
+              startTransition(async () => {
+                await onLanguageChange(lang);
+              });
+            }}
+          >
+            {APP_LANGUAGES.map((lang) => (
+              <DropdownMenuRadioItem key={lang} value={lang} lang={lang}>
+                {t(`language.${lang}`)}
+              </DropdownMenuRadioItem>
+            ))}
+          </DropdownMenuRadioGroup>
+        </DropdownMenuGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 

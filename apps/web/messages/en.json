@@ -39,6 +39,7 @@
       "expiriesCount": "{count, plural, one {# document expired or expiring} other {# documents expired or expiring}}"
     },
     "purchases": "Purchasing",
+    "settings": "Settings",
     "language": {
       "label": "Language",
       "es": "Spanish",

@@ -126,18 +126,22 @@ describe("Sidebar", () => {
     });
   });
 
-  it("switches the portal's language from the rail", async () => {
+  it("switches the portal's language from the settings menu", async () => {
     onLanguageChange.mockClear();
     renderAt("/dashboard/projects");
-    // One switch at the foot of the rail (desktop), one in the top bar (phones).
-    const [spanish] = screen.getAllByRole("button", { name: "Español" });
-    const [english] = screen.getAllByRole("button", { name: "Inglés" });
-    expect(spanish).toHaveAttribute("aria-pressed", "true");
-    expect(english).toHaveAttribute("aria-pressed", "false");
+    // One menu at the foot of the rail (desktop), one in the top bar (phones).
+    expect(screen.queryByRole("menuitemradio")).not.toBeInTheDocument();
+    const [settings] = screen.getAllByRole("button", { name: /Ajustes/ });
+    fireEvent.click(settings!);
 
-    fireEvent.click(spanish!);
+    const spanish = await screen.findByRole("menuitemradio", { name: "Español" });
+    expect(spanish).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByRole("menuitemradio", { name: "Inglés" })).toHaveAttribute("aria-checked", "false");
+
+    fireEvent.click(spanish);
     expect(onLanguageChange).not.toHaveBeenCalled();
-    fireEvent.click(english!);
+    fireEvent.click(settings!);
+    fireEvent.click(await screen.findByRole("menuitemradio", { name: "Inglés" }));
     await waitFor(() => expect(onLanguageChange).toHaveBeenCalledWith("en"));
   });
 });
