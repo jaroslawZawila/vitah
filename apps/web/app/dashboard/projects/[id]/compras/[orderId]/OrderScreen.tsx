@@ -104,10 +104,10 @@ export default function OrderScreen({
 
       <StatusSteps order={order} />
 
+      {/* Full width: the lines table needs ~760px, more than a two-thirds column has on a laptop. */}
+      <OrderLines order={order} />
+
       <div className="grid items-start gap-[18px] lg:grid-cols-3">
-        <div className="min-w-0 lg:col-span-2">
-          <OrderLines order={order} />
-        </div>
         <div className="flex min-w-0 flex-col gap-2">
           <OrderData
             order={order}
@@ -126,9 +126,10 @@ export default function OrderScreen({
           />
           <FormError namespace="purchasing.errors" error={file.state?.error} />
         </div>
+        <div className="min-w-0 lg:col-span-2">
+          <OrderHistory events={order.events} />
+        </div>
       </div>
-
-      <OrderHistory events={order.events} />
     </div>
   );
 }

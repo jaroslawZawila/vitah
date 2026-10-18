@@ -56,7 +56,7 @@ export default function OrdersTab({
 }) {
   const t = useTranslations("subcontractors.company.orders");
   const list = (
-    <section className={cn(cardVariants({ size: "flush" }), "pt-4 pb-1.5", company.suppliesOnly && "lg:col-span-2")} aria-labelledby="orders-title">
+    <section className={cn(cardVariants({ size: "flush" }), "pt-4 pb-1.5")} aria-labelledby="orders-title">
       <h2 id="orders-title" className="px-[18px] pb-2.5">
         {t("title")}
       </h2>
@@ -70,10 +70,11 @@ export default function OrdersTab({
     </section>
   );
   if (!company.suppliesOnly) return list;
+  // The list takes the full width: its table needs ~980px, more than a two-thirds column has on a laptop.
   return (
-    <div className="grid items-start gap-4 lg:grid-cols-3">
+    <div className="flex flex-col gap-4">
       {list}
-      <div className="flex min-w-0 flex-col gap-4">
+      <div className="grid items-start gap-4 lg:grid-cols-2">
         <NoCaeCard />
         <ContactCard company={company} />
       </div>

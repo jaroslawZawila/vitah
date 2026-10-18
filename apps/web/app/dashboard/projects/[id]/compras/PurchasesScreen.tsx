@@ -69,47 +69,46 @@ export default function PurchasesScreen({
 
       <ProjectKpis summary={purchases.summary} late={late} orderHref={href} />
 
-      <div className="grid items-start gap-[18px] lg:grid-cols-3">
-        <section className={cn(cardVariants({ size: "flush" }), "pt-4 pb-1.5 lg:col-span-2")} aria-labelledby="orders-title">
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-2.5 px-[18px] pb-3.5">
-            <h2 id="orders-title" className="mr-1.5 text-[22px]">
-              {t("orders")}
-            </h2>
-            <GroupFilter value={filter.group} onChange={(group) => set({ group })} groups={GROUPS} counts={counts} />
-            <FilterSelect
-              id="orders-supplier"
-              label={tl("supplier")}
-              value={filter.supplierId}
-              onChange={(supplierId) => set({ supplierId })}
-              options={[{ value: "", label: tl("all") }, ...suppliersOf(orders).map((s) => ({ value: s.id, label: s.name }))]}
-            />
-            <FilterSelect
-              id="orders-chapter"
-              label={tl("chapterFilter")}
-              value={filter.chapter}
-              onChange={(chapter) => set({ chapter })}
-              options={[
-                { value: "", label: tl("all") },
-                ...chapterCodes.map((code) => ({ value: code, label: names.has(code) ? `${code} ${names.get(code)}` : code })),
-              ]}
-            />
-            <CheckFilter id="orders-late" label={tl("lateOnly")} checked={filter.lateOnly} onChange={(lateOnly) => set({ lateOnly })} />
-          </div>
-          <OrderList
-            orders={shown}
-            variant="project"
-            orderHref={href}
-            empty={orders.length === 0 ? t("none") : tl("noMatch")}
+      {/* Full width: the orders table needs ~860px, more than a two-thirds column has on a laptop. */}
+      <section className={cn(cardVariants({ size: "flush" }), "pt-4 pb-1.5")} aria-labelledby="orders-title">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2.5 px-[18px] pb-3.5">
+          <h2 id="orders-title" className="mr-1.5 text-[22px]">
+            {t("orders")}
+          </h2>
+          <GroupFilter value={filter.group} onChange={(group) => set({ group })} groups={GROUPS} counts={counts} />
+          <FilterSelect
+            id="orders-supplier"
+            label={tl("supplier")}
+            value={filter.supplierId}
+            onChange={(supplierId) => set({ supplierId })}
+            options={[{ value: "", label: tl("all") }, ...suppliersOf(orders).map((s) => ({ value: s.id, label: s.name }))]}
           />
-        </section>
-
-        <UpcomingCard
-          upcoming={purchases.upcoming}
-          planningMock={purchases.sources.planning === "mock"}
-          orderHref={(orderId) => orderHref(projectId, orderId)}
-          newOrderHref={canManage ? (code) => newOrderHref(projectId, code) : undefined}
+          <FilterSelect
+            id="orders-chapter"
+            label={tl("chapterFilter")}
+            value={filter.chapter}
+            onChange={(chapter) => set({ chapter })}
+            options={[
+              { value: "", label: tl("all") },
+              ...chapterCodes.map((code) => ({ value: code, label: names.has(code) ? `${code} ${names.get(code)}` : code })),
+            ]}
+          />
+          <CheckFilter id="orders-late" label={tl("lateOnly")} checked={filter.lateOnly} onChange={(lateOnly) => set({ lateOnly })} />
+        </div>
+        <OrderList
+          orders={shown}
+          variant="project"
+          orderHref={href}
+          empty={orders.length === 0 ? t("none") : tl("noMatch")}
         />
-      </div>
+      </section>
+
+      <UpcomingCard
+        upcoming={purchases.upcoming}
+        planningMock={purchases.sources.planning === "mock"}
+        orderHref={(orderId) => orderHref(projectId, orderId)}
+        newOrderHref={canManage ? (code) => newOrderHref(projectId, code) : undefined}
+      />
 
       <p className="max-w-[860px] text-[12.5px] leading-normal text-muted-foreground">
         {t.rich("footnote", { b: (chunks) => <b className="text-foreground">{chunks}</b> })}
