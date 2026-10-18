@@ -3,7 +3,6 @@
 // Container for a hito (P-Hito): the only part that knows about server
 // actions. The views in ../../components/obra take props only.
 
-import Link from "next/link";
 import { useActionState, useState } from "react";
 import { useTranslations } from "next-intl";
 import type { Hito, HitoFileKind, ProjectPhoto } from "@repo/core/contract";
@@ -22,7 +21,7 @@ import { Button } from "@/components/ui/button";
 import type { ObraState } from "../../../../../actions/run";
 import FormError from "../../../../components/FormError";
 import Modal from "../../components/Modal";
-import { muted, textLink } from "../../components/obra/classes";
+import { muted } from "../../components/obra/classes";
 import FieldsForm from "../../components/obra/FieldsForm";
 import { useObraFormat } from "../../components/obra/format";
 import {
@@ -38,6 +37,7 @@ import PhotoStrip from "../../components/obra/PhotoStrip";
 import { useObraAction } from "../../components/obra/useObraAction";
 import { projectPhotoUrl } from "../../components/photoUrl";
 import TabHeader from "../../components/TabHeader";
+import BackLink from "../../../../components/BackLink";
 
 type Dialog = "photos" | "edit" | HitoFileKind;
 
@@ -83,9 +83,7 @@ export default function HitoScreen({
 
   return (
     <div className="flex flex-col gap-5">
-      <Link href={`/dashboard/projects/${projectId}/payments`} className={`w-fit text-[13px] ${textLink}`}>
-        ← {t("back")}
-      </Link>
+      <BackLink href={`/dashboard/projects/${projectId}/payments`} />
       <TabHeader
         projectRef={t("label", { ref: projectRef, code: hito.code, pct: f.share(hito.pctBp) })}
         title={hito.name}

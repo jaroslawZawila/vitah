@@ -31,6 +31,7 @@ import {
 } from "../../../actions/subcontractors";
 import { Card } from "@/components/ui/card";
 import { FormMessage } from "@/components/ui/field";
+import BackLink from "../../components/BackLink";
 import FormError from "../../components/FormError";
 import { AccessBadge } from "../components/Badges";
 import DocumentList, { type DocumentGroup } from "../components/DocumentList";
@@ -110,9 +111,7 @@ export default function WorkerScreen({
   return (
     <>
       <header className="flex flex-col gap-1.5">
-        <Link className="text-[12.5px] text-muted-foreground hover:text-foreground" href="/dashboard/subcontratas/trabajadores">
-          ← {t("back")}
-        </Link>
+        <BackLink href="/dashboard/subcontratas/trabajadores" />
         <div className="flex flex-wrap items-center gap-x-3.5 gap-y-2">
           <h1>{name}</h1>
           {headerAccess && <AccessBadge status={headerAccess.status} />}

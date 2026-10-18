@@ -56,6 +56,9 @@
       "subcontractors": "Subcontractors"
     }
   },
+  "navigation": {
+    "back": "Back"
+  },
   "projectsPage": {
     "count": "All ({count})",
     "newProject": "New Project",
@@ -396,7 +399,6 @@
       "requested": "Invoice requested · {date}"
     },
     "hito": {
-      "back": "Payments",
       "label": "{ref} · Milestone {code} · {pct}",
       "summary": "Invoiced: {moment} · {amount} + VAT {vat} = {total}",
       "registerPayment": "Record payment",
@@ -812,7 +814,6 @@
       "saveCorrection": "Save correction"
     },
     "chapter": {
-      "back": "Progress · {ref}",
       "label": "Chapter {code}",
       "labelWithHito": "Chapter {code} · Milestone {hito}",
       "recordIssue": "Log an issue",
@@ -2374,7 +2375,6 @@
     },
     "worker": {
       "newTitle": "Register worker",
-      "back": "Workers",
       "save": "Save changes",
       "create": "Register worker",
       "saved": "Changes saved.",
@@ -2515,7 +2515,6 @@
       "footnote": "An order counts as contracted from <b>Ordered</b> (material) or <b>Contracted</b> (subcontract). Pending and cancelled ones don't count. A late delivery is only a warning: it never changes the works' status or dates."
     },
     "order": {
-      "back": "Purchasing",
       "subcontractor": "Subcontractor",
       "steps": "Order status",
       "plannedOn": "planned {date}",
@@ -2623,7 +2622,6 @@
       "fileRemoved": "Document removed: {name}"
     },
     "form": {
-      "back": "Purchasing",
       "numbered": "{ref} · will be numbered {number}",
       "newTitle": "New order",
       "editTitle": "Edit order",

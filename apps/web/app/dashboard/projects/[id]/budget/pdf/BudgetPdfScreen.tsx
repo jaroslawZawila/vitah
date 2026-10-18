@@ -6,6 +6,7 @@ import { useTranslations } from "next-intl";
 import type { BudgetPdfKind } from "@repo/core/contract";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import BackLink from "../../../../components/BackLink";
 
 /**
  * Presentational: a revision's PDF in the browser's viewer, with the
@@ -30,7 +31,9 @@ export default function BudgetPdfScreen({
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-[14px] bg-rail px-4 py-2.5 text-rail-foreground">
-        <Link href={backHref} className="text-sm font-semibold hover:underline">← {t("back")}</Link>
+        <BackLink href={backHref} className="text-sm font-semibold text-rail-foreground hover:text-rail-foreground hover:underline">
+          {t("back")}
+        </BackLink>
         <div className="inline-flex rounded-[10px] bg-white/10 p-0.5" role="tablist" aria-label={t("kind")}>
           {(["general", "detailed"] as const).map((key) => (
             <Link

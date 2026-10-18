@@ -43,7 +43,7 @@ describe("ChapterScreen", () => {
     expect(screen.getByRole("heading", { level: 1, name: "Envolvente térmica Thermochip" })).toBeInTheDocument();
     expect(screen.getByText("Capítulo 06 · Hito H4")).toBeInTheDocument();
     expect(screen.getByText("Fin previsto superado · +8 d")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "← Avance · VTH-26-001" })).toHaveAttribute("href", "/dashboard/projects/p-1/obra/avance");
+    expect(screen.getByRole("link", { name: "← Volver" })).toHaveAttribute("href", "/dashboard/projects/p-1/obra/avance");
 
     const dates = within(screen.getByRole("region", { name: "Fechas" }));
     expect(dates.getByText("14/09/2026")).toBeInTheDocument();

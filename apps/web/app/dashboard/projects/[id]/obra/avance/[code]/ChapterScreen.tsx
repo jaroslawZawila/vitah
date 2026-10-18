@@ -4,7 +4,6 @@
 // that knows about server actions (with ChapterProgress, IssueEditor and
 // UploadPhotos). The views in ../../../components/construction take props only.
 
-import Link from "next/link";
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import type { ConstructionControl, ControlChapterDetail } from "@repo/core/contract";
@@ -29,6 +28,7 @@ import { SchedulePill } from "../../../components/construction/SummaryTable";
 import ChapterProgress, { type ProgressRequest } from "../../ChapterProgress";
 import { UploadPhotos } from "../../fotos/PhotosScreen";
 import { IssueEditor, issueFileUrl } from "../../incidencias/IssuesScreen";
+import BackLink from "../../../../../components/BackLink";
 
 /** One chapter: its dates, hito, cost, issues, photos, lines' % and history. */
 export default function ChapterScreen({
@@ -60,9 +60,7 @@ export default function ChapterScreen({
 
   return (
     <div className="flex flex-col gap-[18px]">
-      <Link href={obraHref(projectId, "progress")} className="w-fit text-[13px] text-muted-foreground transition-colors hover:text-primary pointer-coarse:min-h-11">
-        ← {t("back", { ref: control.project.ref })}
-      </Link>
+      <BackLink href={obraHref(projectId, "progress")} />
 
       <header className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4">
         <div className="min-w-0">

@@ -18,6 +18,7 @@ import { useObraFormat } from "../components/obra/format";
 import { newOrderDraft, orderComplete, orderDraftFrom, orderInput, type OrderDraft } from "../components/purchasing/draft";
 import { orderHref, purchasesHref } from "../components/purchasing/links";
 import OrderForm from "../components/purchasing/OrderForm";
+import BackLink from "../../../components/BackLink";
 
 export default function OrderFormScreen({
   projectId,
@@ -71,12 +72,7 @@ export default function OrderFormScreen({
 
   return (
     <div className="flex flex-col gap-[18px] pb-4">
-      <Link
-        href={order ? orderHref(projectId, order.id) : purchasesHref(projectId)}
-        className="w-fit text-[13px] text-muted-foreground transition-colors hover:text-primary pointer-coarse:min-h-11"
-      >
-        ← {order ? orderLabel(order.number) : t("back")}
-      </Link>
+      <BackLink href={order ? orderHref(projectId, order.id) : purchasesHref(projectId)} />
       <header className="min-w-0">
         <StageEyebrow
           label={

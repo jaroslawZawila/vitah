@@ -21,6 +21,7 @@ import { obraHref } from "../../components/construction/ObraFrame";
 import { useObraAction } from "../../components/obra/useObraAction";
 import { editOrderHref, orderFileUrl, purchasesHref } from "../../components/purchasing/links";
 import { LateBanner, OrderData, OrderHeading, OrderHistory, OrderLines, StatusForm, StatusSteps } from "../../components/purchasing/OrderViews";
+import BackLink from "../../../../components/BackLink";
 
 /** One order: where it stands, its lines against the budget, its data and history. */
 export default function OrderScreen({
@@ -74,9 +75,7 @@ export default function OrderScreen({
 
   return (
     <div className="flex flex-col gap-[18px]">
-      <Link href={purchasesHref(projectId)} className="w-fit text-[13px] text-muted-foreground transition-colors hover:text-primary pointer-coarse:min-h-11">
-        ← {t("back")}
-      </Link>
+      <BackLink href={purchasesHref(projectId)} />
 
       <OrderHeading order={order} actions={actions || undefined} />
       {!dated && <FormError namespace="purchasing.errors" error={status.state?.error} />}

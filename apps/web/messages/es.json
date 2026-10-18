@@ -56,6 +56,9 @@
       "subcontractors": "Subcontratas"
     }
   },
+  "navigation": {
+    "back": "Volver"
+  },
   "projectsPage": {
     "count": "Todos ({count})",
     "newProject": "Nuevo Proyecto",
@@ -396,7 +399,6 @@
       "requested": "Factura solicitada · {date}"
     },
     "hito": {
-      "back": "Pagos",
       "label": "{ref} · Hito {code} · {pct}",
       "summary": "Se factura: {moment} · {amount} + IVA {vat} = {total}",
       "registerPayment": "Registrar pago",
@@ -812,7 +814,6 @@
       "saveCorrection": "Guardar corrección"
     },
     "chapter": {
-      "back": "Avance · {ref}",
       "label": "Capítulo {code}",
       "labelWithHito": "Capítulo {code} · Hito {hito}",
       "recordIssue": "Registrar incidencia",
@@ -2374,7 +2375,6 @@
     },
     "worker": {
       "newTitle": "Registrar trabajador",
-      "back": "Trabajadores",
       "save": "Guardar cambios",
       "create": "Registrar trabajador",
       "saved": "Cambios guardados.",
@@ -2515,7 +2515,6 @@
       "footnote": "Un pedido cuenta como contratado desde <b>Pedido</b> (material) o <b>Contratado</b> (subcontrato). Los pendientes y cancelados no suman. Una entrega pasada de fecha solo avisa: nunca cambia el estado ni las fechas de la obra."
     },
     "order": {
-      "back": "Compras",
       "subcontractor": "Subcontrata",
       "steps": "Estado del pedido",
       "plannedOn": "previsto {date}",
@@ -2623,7 +2622,6 @@
       "fileRemoved": "Documento quitado: {name}"
     },
     "form": {
-      "back": "Compras",
       "numbered": "{ref} · se numerará {number}",
       "newTitle": "Nuevo pedido",
       "editTitle": "Editar pedido",

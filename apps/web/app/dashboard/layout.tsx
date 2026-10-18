@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getLocale } from "next-intl/server";
 import { isAppLanguage } from "@repo/core/contract";
 import { DEFAULT_LOCALE } from "../../i18n/locale";
+import { NavigationTracker } from "./components/BackLink";
 import Sidebar from "./components/Sidebar";
 import Topbar from "./components/Topbar";
 import { getSubcontractorCounts } from "../actions/subcontractors";
@@ -24,6 +25,7 @@ export default async function DashboardLayout({
 
   return (
     <div className="min-h-svh lg:grid lg:grid-cols-[236px_minmax(0,1fr)]">
+      <NavigationTracker />
       <Sidebar
         name={session.user.name ?? null}
         email={session.user.email ?? null}
