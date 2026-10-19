@@ -8,6 +8,7 @@ import {
   resetDatabase,
 } from "@repo/db/testing";
 import { clientAccountService, documentsService, photosService, type Ctx } from "../src";
+import { notifyProjectClient } from "../src/notifications";
 import { files, testImage } from "../src/testing";
 
 vi.mock("../src/storage", () => import("../src/testing"));
@@ -49,6 +50,25 @@ const addDocument = (ctx: Ctx, projectId: string) =>
   });
 
 describe("notifying the client", () => {
+  it("pushes a moved handover date, opening the Obra tab, unless progress notices are off", async () => {
+    const { tenant, client, project } = await setup();
+
+    await notifyProjectClient(tenant.id, project.id, { kind: "delivery", date: "2026-12-23" });
+    expect(sendPush).toHaveBeenCalledWith([
+      {
+        to: TOKEN,
+        title: "Nueva fecha de entrega",
+        body: "La entrega prevista de tu vivienda es ahora el 23 de diciembre de 2026.",
+        data: { screen: "obra" },
+      },
+    ]);
+
+    vi.mocked(sendPush).mockClear();
+    await clientAccountService.updateSettings(tenant.id, client.id, { notifications: { progress: false } });
+    await notifyProjectClient(tenant.id, project.id, { kind: "delivery", date: "2027-01-15" });
+    expect(sendPush).not.toHaveBeenCalled();
+  });
+
   it("pushes new photos and documents to the client's phones", async () => {
     const { project, ctx } = await setup();
 

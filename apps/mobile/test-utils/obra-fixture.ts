@@ -48,6 +48,7 @@ const phase = (overrides: Partial<MobilePhase>): MobilePhase => ({
   status: "active",
   progressPct: 69,
   finishedOn: null,
+  plannedEnd: null,
   hitoIds: ["h4"],
   chapters: hitos[3]!.chapters,
   checks: [{ id: "c1", label: "Prueba de estanqueidad provisional", done: false }],

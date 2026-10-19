@@ -5,6 +5,8 @@ import { markChanged } from "./changes";
 import { requireAdmin, type Ctx } from "./context";
 import { CHANGE_AREAS, type ClientOption, type MobileProject, type ProjectClientError } from "./contract";
 import { CoreError } from "./errors";
+import { clientDates } from "./planning-calc";
+import { approvedPlanDates } from "./planning-data";
 
 // ─── Project client access ────────────────────────────────────────────────────
 // A "client" is the homeowner of a project. They sign in to the mobile app
@@ -42,7 +44,9 @@ export function clientProjectWhere(tenantId: string, clientUserId: string) {
 
 /**
  * The project attached to a client, in the mobile app's shape. Called with the
- * client's own identity (from their mobile token), not a staff `Ctx`.
+ * client's own identity (from their mobile token), not a staff `Ctx`. Its
+ * dates are the ones the client is told: the approved plan's start and end
+ * (the handover), else the dates staff set on the project.
  */
 export async function getClientProject(
   tenantId: string,
@@ -58,8 +62,10 @@ export async function getClientProject(
     id: project.id,
     ref: project.ref,
     address: project.address,
-    startDate: toCalendarDate(project.startDate),
-    completionDate: toCalendarDate(project.completionDate),
+    ...clientDates(await approvedPlanDates(tenantId, project.id), {
+      startDate: toCalendarDate(project.startDate),
+      completionDate: toCalendarDate(project.completionDate),
+    }),
   };
 }
 

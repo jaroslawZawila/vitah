@@ -130,7 +130,7 @@ export async function notificationsAllowed() {
   return status === "granted";
 }
 
-const SCREENS = { photos: "/photos", documents: "/documents" } as const;
+const SCREENS = { photos: "/photos", documents: "/documents", obra: "/obra" } as const;
 
 /**
  * The last tapped notification stays "last" until another is tapped; this
@@ -159,6 +159,6 @@ export function usePushNotifications(authToken: string | null, language: AppLang
     if (identifier === handledNotification) return;
     handledNotification = identifier;
     const screen = content.data?.screen;
-    if (screen === "photos" || screen === "documents") router.navigate(SCREENS[screen]);
+    if (screen === "photos" || screen === "documents" || screen === "obra") router.navigate(SCREENS[screen]);
   }, [authToken, response, router]);
 }

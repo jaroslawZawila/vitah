@@ -20,6 +20,7 @@ import {
   hitosService,
   obraService,
   photosService,
+  planningService,
   projectClientService,
   projectsService,
   type ChangeArea,
@@ -303,6 +304,14 @@ const cases: Case[] = [
       return () => hitosService.cancelPayment(ctx, project.id, hito.id);
     },
   ],
+  [
+    "approvePlanningDraft",
+    ["project", "obra"],
+    async ({ ctx, project }) => {
+      await planningService.createPlanningDraft(ctx, project.id, { from: "template", startDate: "2026-06-01" });
+      return () => planningService.approvePlanningDraft(ctx, project.id, {});
+    },
+  ],
 ];
 
 describe("writes the client sees", () => {
@@ -326,6 +335,10 @@ describe("writes the client sees", () => {
   // its id (createProject, deleteProject, unassignProjectClient); createBudget
   // marks for createDefaultHitos; the client never sees a budget draft.
   const UNMARKED = new Set([
+    // Planning drafts: the app only sees an approved plan.
+    "createPlanningDraft",
+    "updatePlanningDraft",
+    "discardPlanningDraft",
     "createProject",
     "deleteProject",
     "unassignProjectClient",
@@ -391,6 +404,7 @@ describe("writes the client sees", () => {
       budgetGenerationsService,
       hitosService,
       constructionService,
+      planningService,
     ];
     const covered = new Set([...cases.map(([name]) => name), "createBudget"]);
     const unchecked = services

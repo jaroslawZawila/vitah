@@ -249,6 +249,21 @@ export function planEnd(dates: ReadonlyMap<string, Dates>): string | null {
 }
 
 /**
+ * The works' dates the client is told: the approved plan's first start and
+ * last end (the handover), else the project's own dates.
+ */
+export function clientDates(
+  approved: ReadonlyMap<string, Dates> | null,
+  project: { startDate: string | null; completionDate: string | null },
+) {
+  const start = approved ? [...approved.values()].map((d) => d.start).sort()[0] : undefined;
+  return {
+    startDate: start ?? project.startDate,
+    completionDate: (approved && planEnd(approved)) ?? project.completionDate,
+  };
+}
+
+/**
  * The chapters still to finish that set the end: from the latest-ending
  * chapter back through what each waits for.
  */

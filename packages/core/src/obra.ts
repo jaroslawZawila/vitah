@@ -20,6 +20,7 @@ import {
   type ObraProject,
 } from "./obra-data";
 import { buildPhases, obraTerm, shareBp, todayInSpain } from "./obra-calc";
+import { clientDates } from "./planning-calc";
 import { listPhotos, photosByChapter } from "./photos";
 
 // ─── Obra ────────────────────────────────────────────────────────────────────
@@ -134,13 +135,18 @@ export async function getClientObra(
   const project = await clientProject(tenantId, clientUserId);
   if (!project) return null;
   const stage = asStage(project.obraStage);
-  const [{ progress, vatRateBp, hitos }, photos] = await Promise.all([
+  const [{ progress, vatRateBp, hitos, planDates }, photos] = await Promise.all([
     loadObra(tenantId, project.id),
     photosByChapter(tenantId, project.id),
   ]);
-  // The client sees the calendar, not the contract penalty.
-  const { penaltyCents: _, ...term } = termOf(project, progress.totalCents) ?? {};
-  const phases = hitos.length > 0 ? buildPhases(stage, hitos, photos) : [];
+  // The client sees the calendar of the dates they're told (the approved plan's,
+  // else the project's), not the contract penalty.
+  const { startDate: start, completionDate: handover } = clientDates(planDates, {
+    startDate: toCalendarDate(project.startDate),
+    completionDate: toCalendarDate(project.completionDate),
+  });
+  const { penaltyCents: _, ...term } = (start && handover ? obraTerm(start, handover, todayInSpain(), progress.totalCents) : null) ?? {};
+  const phases = hitos.length > 0 ? buildPhases(stage, hitos, photos, planDates) : [];
 
   return {
     stage,

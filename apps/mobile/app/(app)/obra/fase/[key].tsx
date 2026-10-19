@@ -5,6 +5,7 @@ import {
   Bar,
   BigPct,
   CheckMark,
+  Figure,
   LinkCard,
   SectionHeader,
   SectionLabel,
@@ -13,7 +14,7 @@ import {
 import { PhotoImage } from "../../../../components/photo-image";
 import { PushedScreen } from "../../../../components/pushed-screen";
 import { colors, radius, type } from "../../../../constants/theme";
-import { formatMoney, formatShortDate } from "../../../../lib/format";
+import { formatMediumDate, formatMoney, formatShortDate } from "../../../../lib/format";
 import { useI18n } from "../../../../lib/i18n";
 import { phaseName } from "../../../../lib/obra";
 import { useObra } from "../../../../lib/use-obra";
@@ -62,7 +63,12 @@ export default function FaseScreen() {
       </View>
 
       <View style={{ gap: 14 }}>
-        <BigPct value={phase.progressPct} />
+        <View style={styles.hero}>
+          <BigPct value={phase.progressPct} />
+          {phase.status !== "done" && phase.plannedEnd && (
+            <Figure label={t("phase.plannedEnd")} value={formatMediumDate(phase.plannedEnd, language)} />
+          )}
+        </View>
         <Bar pct={phase.progressPct} style={{ height: 3 }} />
       </View>
 
@@ -152,6 +158,7 @@ function PaymentCard({ hito, onPress }: { hito: Hito; onPress: () => void }) {
 }
 
 const styles = StyleSheet.create({
+  hero: { flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", gap: 16 },
   pct: { fontSize: 15, color: colors.verdeOlivaLight },
   photos: { flexDirection: "row", flexWrap: "wrap", gap: 6, height: 182 },
   photoBig: { width: "64%", height: "100%", borderRadius: radius.lg },

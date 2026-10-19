@@ -143,6 +143,12 @@ describe("usePushNotifications", () => {
 
     expect(mockNavigate).toHaveBeenCalledTimes(1);
   });
+
+  it("opens the Obra tab for a new handover date", () => {
+    jest.mocked(Notifications.useLastNotificationResponse).mockReturnValue(tapped("n-obra", "obra"));
+    renderHook(() => usePushNotifications("tok", "es"));
+    expect(mockNavigate).toHaveBeenCalledWith("/obra");
+  });
 });
 
 describe("in Expo Go on Android", () => {

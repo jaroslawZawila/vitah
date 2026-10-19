@@ -1,18 +1,22 @@
 import { and, clientSettings, db, eq, inArray, projects, pushTokens, users } from "@repo/db";
+import { fromCalendarDate } from "./calendar";
 import { settingsOf } from "./client-account";
 import type { AppLanguage } from "./contract";
 import { projectInTenant } from "./project-client";
 import { sendPush } from "./push";
 
 // ─── Client notifications ────────────────────────────────────────────────────
-// Tells a project's client, on their phones, that staff shared something new.
+// Tells a project's client, on their phones, that staff shared something new
+// or moved the handover date.
 // Respects the client's Perfil settings and never fails the caller: a push is
 // a courtesy, the upload has already succeeded.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export type ClientEvent =
   | { kind: "photo" }
-  | { kind: "document"; title: string };
+  | { kind: "document"; title: string }
+  /** A new Planning baseline moved the handover the client is told. */
+  | { kind: "delivery"; date: string };
 
 /** The notification's title and body, in the client's language. */
 function text(language: AppLanguage, event: ClientEvent): [string, string] {
@@ -22,13 +26,24 @@ function text(language: AppLanguage, event: ClientEvent): [string, string] {
       ? ["Nuevas fotos de tu obra", "Tu equipo de ViTAH ha compartido fotos nuevas."]
       : ["New photos of your home", "Your ViTAH team has shared new photos."];
   }
+  if (event.kind === "delivery") {
+    const date = fromCalendarDate(event.date).toLocaleDateString(es ? "es-ES" : "en-GB", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+      timeZone: "UTC",
+    });
+    return es
+      ? ["Nueva fecha de entrega", `La entrega prevista de tu vivienda es ahora el ${date}.`]
+      : ["New handover date", `Your home is now due to be handed over on ${date}.`];
+  }
   return es
     ? ["Nuevo documento", `«${event.title}» ya está en la app.`]
     : ["New document", `“${event.title}” is now in the app.`];
 }
 
 /** The app tab a tapped notification opens. */
-const SCREEN: Record<ClientEvent["kind"], string> = { photo: "photos", document: "documents" };
+const SCREEN: Record<ClientEvent["kind"], string> = { photo: "photos", document: "documents", delivery: "obra" };
 
 export async function notifyProjectClient(tenantId: string, projectId: string, event: ClientEvent) {
   try {
@@ -49,7 +64,7 @@ export async function notifyProjectClient(tenantId: string, projectId: string, e
     const first = phones[0];
     if (!first) return;
     const { notifications } = settingsOf(first);
-    if (!(event.kind === "photo" ? notifications.progress : notifications.documents)) return;
+    if (!(event.kind === "document" ? notifications.documents : notifications.progress)) return;
 
     const unregistered = await sendPush(
       phones.map(({ token, language }) => {

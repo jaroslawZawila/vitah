@@ -200,6 +200,8 @@ export function buildPhases(
   stage: ObraStage,
   hitos: Hito[],
   photos: PhotosByChapter,
+  /** The approved Planning baseline's dates by chapter code, if any. */
+  plan: ReadonlyMap<string, { end: string }> | null = null,
 ): MobilePhase[] {
   const firstWorks = hitos.findIndex((h) => h.chapters.length > 0);
   const leading = firstWorks === -1 ? hitos : hitos.slice(0, firstWorks);
@@ -215,6 +217,7 @@ export function buildPhases(
       status: done ? "done" : "active",
       progressPct: done ? 100 : Math.round((paid.length * 100) / leading.length),
       finishedOn: done && finished.length > 0 ? finished.sort().at(-1)! : null,
+      plannedEnd: null,
       hitoIds: leading.map((h) => h.id),
       chapters: [],
       checks: [],
@@ -236,6 +239,8 @@ export function buildPhases(
       status: done ? "done" : hito.readyPct > 0 || hito.status === "active" ? "active" : "pending",
       progressPct: hito.readyPct,
       finishedOn: done ? (hito.actaSignedOn ?? hito.paidOn) : null,
+      // Its last chapter's planned end (a chapter the plan leaves out, like 20, has none).
+      plannedEnd: hito.chapters.flatMap((c) => plan?.get(c.code)?.end ?? []).sort().at(-1) ?? null,
       hitoIds: [hito.id],
       chapters: hito.chapters,
       checks: hito.checks,

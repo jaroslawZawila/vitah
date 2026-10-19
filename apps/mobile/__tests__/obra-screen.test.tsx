@@ -63,6 +63,15 @@ describe("ObraScreen", () => {
     expect(screen.getByText("feb 2027")).toBeOnTheScreen();
   });
 
+  it("dates the phases still to come by the plan", async () => {
+    const coming = { ...obra.phases[2]!, key: "H5", name: "Fontanería", status: "pending" as const, progressPct: 0, plannedEnd: "2026-11-27" };
+    const phases = [...obra.phases.slice(0, 3), coming, obra.phases[3]!];
+    getObra.mockResolvedValue({ ok: true, data: { obra: { ...obra, phases } } });
+    render(<Obra />);
+    expect(await screen.findByRole("button", { name: "Fontanería, previsto para nov 2026" })).toBeOnTheScreen();
+    expect(screen.getByText("nov")).toBeOnTheScreen();
+  });
+
   it("opens a phase and the payments", async () => {
     render(<Obra />);
 

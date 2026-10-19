@@ -9,6 +9,7 @@ export type MobileProject = {
   id: string;
   ref: string;
   address: string;
+  /** The works' start and handover the client is told: the approved Planning baseline's, else the project's dates. */
   startDate: string | null;
   completionDate: string | null;
 };
@@ -600,6 +601,8 @@ export type MobilePhase = {
   status: ProgressStatus;
   progressPct: number;
   finishedOn: string | null;
+  /** When its chapters are planned to be done (the approved Planning baseline); null without one, or for "pre". */
+  plannedEnd: string | null;
   /** The hitos it stands for: its own, or for "pre" the ones before the works. */
   hitoIds: string[];
   chapters: { code: string; name: string; totalCents: number; progressPct: number }[];
@@ -616,6 +619,7 @@ export type MobileObra = {
   totalCents: number;
   vatRateBp: number;
   paidCents: number;
+  /** Between the dates the client is told: the approved plan's start and end, else the project's dates. */
   term: Pick<ObraTerm, "startDate" | "completionDate" | "week" | "totalWeeks" | "lateDays"> | null;
   phases: MobilePhase[];
   /** The phase under way: the first one not done; null once all are. */

@@ -249,8 +249,11 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
 ### Planning (Planificación)
 
 - Design canvas https://claude.ai/artifact/JtbTern7qQ7gT7rcBWsLD6. Service `packages/core/src/planning.ts`
-  (`planningService`), arithmetic in `planning-calc.ts` (pure, also run by the portal as staff type); web-only and
-  staff-only (admins/managers write, viewers read): the client's app doesn't show it yet, so no `/api/mobile` route
+  (`planningService`), arithmetic in `planning-calc.ts` (pure, also run by the portal as staff type); staff-only
+  (admins/managers write, viewers read). The client's app sees only the approved baseline: its first start and last end
+  are the dates the client is told (`startDate`/`completionDate` of `/api/mobile/project` and of `/api/mobile/obra`'s
+  `term`; else the project's dates, `clientDates` in `planning-calc.ts`) and each phase's `plannedEnd`. Approving marks `obra` + `project`, and pushes "Nueva fecha de entrega"
+  (progress toggle, opens Obra) when the handover moves. Drafts never reach the app
 - A project's schedule by version (`planning_versions`: one `draft` and one `approved` at most, the older ones
   `superseded`). Each contract chapter (20 aside) is a `planning_items` row: it starts the working day after the chapter
   it waits for ends (`after_code` + `lag_days`, negative to overlap), else on `fixed_start` or the works' start, and lasts

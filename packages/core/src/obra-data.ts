@@ -14,8 +14,6 @@ import {
   users,
   obraChapterProgress,
   obraInvoiceRequests,
-  planningItems,
-  planningVersions,
   sql,
   type AnyColumn,
   type PgTable,
@@ -33,6 +31,7 @@ import {
 import { CoreError } from "./errors";
 import { hitoStatus, ofBp, paymentDueOn, priceLines, progressOf, todayInSpain, type Margins, type Progress } from "./obra-calc";
 import { requireProject as requireProjectRow } from "./project-files";
+import { approvedPlanDates } from "./planning-data";
 import { clientProjectWhere } from "./project-client";
 
 // ─── Obra: shared loading and checks ─────────────────────────────────────────
@@ -407,30 +406,6 @@ export async function loadProgressRows(tenantId: string, projectId: string) {
     .select()
     .from(obraChapterProgress)
     .where(and(eq(obraChapterProgress.projectId, projectId), eq(obraChapterProgress.tenantId, tenantId)));
-}
-
-/** The approved Planning baseline's dates and lead times by chapter code (./planning); null without one. */
-export async function approvedPlanDates(
-  tenantId: string,
-  projectId: string,
-): Promise<Map<string, { start: string; end: string; leadDays: number }> | null> {
-  const rows = await db
-    .select({
-      code: planningItems.chapterCode,
-      start: planningItems.plannedStart,
-      end: planningItems.plannedEnd,
-      leadDays: planningItems.leadDays,
-    })
-    .from(planningItems)
-    .innerJoin(planningVersions, eq(planningVersions.id, planningItems.versionId))
-    .where(
-      and(
-        eq(planningVersions.projectId, projectId),
-        eq(planningVersions.tenantId, tenantId),
-        eq(planningVersions.status, "approved"),
-      ),
-    );
-  return rows.length > 0 ? new Map(rows.map(({ code, ...dates }) => [code, dates])) : null;
 }
 
 /**

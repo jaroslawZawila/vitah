@@ -146,6 +146,16 @@ export function CheckMark({ done }: { done: boolean }) {
   );
 }
 
+/** A small label over a figure, aligned right (the Obra tab's week and handover, a phase's end). */
+export function Figure({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={{ alignItems: "flex-end", gap: 2 }}>
+      <Text style={obraStyles.smallLabel}>{label}</Text>
+      <Text style={type.body}>{value}</Text>
+    </View>
+  );
+}
+
 export const obraStyles = StyleSheet.create({
   between: { flexDirection: "row", justifyContent: "space-between", alignItems: "baseline", gap: 8 },
   checkRow: {

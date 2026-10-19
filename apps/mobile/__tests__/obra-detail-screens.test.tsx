@@ -82,6 +82,15 @@ describe("FaseScreen", () => {
     expect(mockPush).toHaveBeenCalledWith({ pathname: "/obra/pago/[id]", params: { id: "h1" } });
   });
 
+  it("shows when a phase still under way is due to finish", async () => {
+    mockParams = { key: "H4" };
+    const phases = obra.phases.map((p) => (p.key === "H4" ? { ...p, plannedEnd: "2026-11-27" } : p));
+    jest.mocked(api.getObra).mockResolvedValue({ ok: true, data: { obra: { ...obra, phases } } });
+    render(wrap(<FaseScreen />));
+    expect(await screen.findByText("Fin previsto")).toBeOnTheScreen();
+    expect(screen.getByText("27 nov 2026")).toBeOnTheScreen();
+  });
+
   it("says when the phase doesn't exist", async () => {
     mockParams = { key: "H7" };
     render(wrap(<FaseScreen />));

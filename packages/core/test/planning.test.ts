@@ -11,6 +11,8 @@ import { files } from "../src/testing";
 import { framerDraft } from "./budget-fixture";
 
 vi.mock("../src/storage", () => import("../src/testing"));
+vi.mock("../src/notifications", () => ({ notifyProjectClient: vi.fn() }));
+const { notifyProjectClient } = await import("../src/notifications");
 
 /**
  * A project starting Monday 1 June 2026 (contract to 31 March 2027) with an
@@ -42,6 +44,7 @@ const datesOf = (rows: { code: string; plannedStart: string; plannedEnd: string 
 beforeEach(async () => {
   await resetDatabase();
   files.clear();
+  vi.mocked(notifyProjectClient).mockClear();
   vi.useFakeTimers({ toFake: ["Date"], now: new Date("2026-05-15T10:00:00Z") });
 });
 
@@ -75,8 +78,9 @@ describe("a first plan", () => {
     expect(draft.version.endDate).toBe("2026-08-26");
     expect(draft.baseline).toBeNull();
 
-    // A first plan needs no reason.
+    // A first plan needs no reason. It moves the handover from the project's 31 March to the plan's end.
     await svc.approvePlanningDraft(ctx, project.id, {});
+    expect(notifyProjectClient).toHaveBeenCalledWith(ctx.tenantId, project.id, { kind: "delivery", date: "2026-08-26" });
     const planning = await svc.getPlanning(ctx, project.id);
     expect(planning.draft).toBeNull();
     expect(planning.baseline).toMatchObject({ number: 1, status: "approved", approvedBy: "Jorge Ruiz", endDate: "2026-08-26" });
@@ -190,9 +194,13 @@ describe("changing the plan", () => {
     await expect(svc.approvePlanningDraft(ctx, project.id, { reason: " ", items: longer })).rejects.toMatchObject({
       code: "change_reason_required",
     });
+    vi.mocked(notifyProjectClient).mockClear();
     expect((await svc.getPlanningDraft(ctx, project.id)).rows[2]!.durationDays).toBe(28);
     // Approved with them, they are saved and approved together.
     await svc.approvePlanningDraft(ctx, project.id, { reason: "Lluvias de septiembre", items: items.map((i) => (i.code === "02" ? { ...i, durationDays: 30 } : i)) });
+
+    // 02 takes five more days: the client hears of the new handover.
+    expect(notifyProjectClient).toHaveBeenCalledWith(ctx.tenantId, project.id, { kind: "delivery", date: "2026-09-02" });
 
     const { versions } = await svc.getPlanningVersions(ctx, project.id);
     expect(versions.map((v) => [v.number, v.status, v.reason, v.endDate])).toEqual([
@@ -222,6 +230,14 @@ describe("changing the plan", () => {
     // A new draft starts from where the works are now.
     await svc.createPlanningDraft(ctx, project.id, { from: "baseline" });
     expect((await svc.getPlanningDraft(ctx, project.id)).rows[1]).toMatchObject({ plannedStart: "2026-06-17" });
+  });
+
+  it("tells the client nothing when the handover doesn't move", async () => {
+    const { ctx, project } = await approved();
+    vi.mocked(notifyProjectClient).mockClear();
+    await svc.createPlanningDraft(ctx, project.id, { from: "baseline" });
+    await svc.approvePlanningDraft(ctx, project.id, { reason: "Mismo plan, otro desfase" });
+    expect(notifyProjectClient).not.toHaveBeenCalled();
   });
 
   it("throws a draft away and keeps the baseline", async () => {

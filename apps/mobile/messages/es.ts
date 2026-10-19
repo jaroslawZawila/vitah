@@ -73,6 +73,7 @@ export const es = {
     phases: "Fases · {current} de {total}",
     prePhase: "Proyecto y licencia",
     phaseHint: "Abre la fase: capítulos, fotos y pago",
+    plannedBy: "previsto para {month}",
   },
   hitoStatus: {
     pending: "Pendiente",
@@ -97,6 +98,7 @@ export const es = {
     withActa: "Con el acta fotográfica de conformidad",
     payments: "Pagos de esta fase",
     notFound: "No encontramos esta fase.",
+    plannedEnd: "Fin previsto",
   },
   pagos: {
     back: "Obra",

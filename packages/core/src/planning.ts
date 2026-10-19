@@ -1,5 +1,6 @@
 import { and, asc, budgetChapters, budgetRevisions, db, desc, eq, inArray, ne, planningItems, planningVersions, projects } from "@repo/db";
 import { isUniqueViolation } from "./accounts";
+import { markChanged } from "./changes";
 import { requireEditor, type Ctx } from "./context";
 import {
   CONTINGENCY_CHAPTER,
@@ -16,6 +17,7 @@ import {
 } from "./contract";
 import { toCalendarDate } from "./calendar";
 import { chapterState } from "./control-calc";
+import { notifyProjectClient } from "./notifications";
 import { todayInSpain } from "./obra-calc";
 import {
   calendarDate,
@@ -29,6 +31,7 @@ import {
   userNamesById,
 } from "./obra-data";
 import {
+  clientDates,
   criticalPath,
   planCheck,
   planEnd,
@@ -38,6 +41,7 @@ import {
   type Dates,
   type Recorded,
 } from "./planning-calc";
+import { approvedPlanDates } from "./planning-data";
 
 // ─── Planning ────────────────────────────────────────────────────────────────
 // The works schedule (the Obra tab's Planificación): per version, each contract
@@ -47,7 +51,8 @@ import {
 // Avance, Compras and the Obra tab measure against (read by ./obra-data's
 // loadObra). What Avance records always wins over a rule. The arithmetic is in
 // ./planning-calc. Staff only (admins and managers write); the client's app
-// doesn't see it yet.
+// shows the approved plan's handover and phase dates, and approving one that
+// moves the handover pushes it to the client.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const MAX_REASON = 500;
@@ -453,7 +458,15 @@ async function editedDraft(ctx: Ctx, projectId: string, input: Record<string, un
   }
   const calendar = parseCalendar(input, calendarOf(draft));
   const startDate = input.startDate === undefined ? draft.startDate : calendarDate(input.startDate);
-  return { draft, approved, rules, calendar, startDate, dates: scheduleNow(loaded, startDate, calendar, rules) };
+  return {
+    draft,
+    approved,
+    rules,
+    calendar,
+    startDate,
+    dates: scheduleNow(loaded, startDate, calendar, rules),
+    completionDate: loaded.completionDate,
+  };
 }
 
 /** Saves the draft's rules and calendar, and stores the dates they give as of today. */
@@ -476,7 +489,12 @@ export async function updatePlanningDraft(ctx: Ctx, projectId: string, input: un
 export async function approvePlanningDraft(ctx: Ctx, projectId: string, input: unknown) {
   requireEditor(ctx);
   const body = isObject(input) ? input : {};
-  const { draft, approved, rules, calendar, startDate, dates } = await editedDraft(ctx, projectId, body);
+  // Before it changes: the handover the client was told.
+  const [{ draft, approved, rules, calendar, startDate, dates, completionDate }, baseline] = await Promise.all([
+    editedDraft(ctx, projectId, body),
+    approvedPlanDates(ctx.tenantId, projectId),
+  ]);
+  const toldBefore = clientDates(baseline, { startDate: null, completionDate }).completionDate;
   let reason: string | null;
   if (approved) {
     if (typeof body.reason !== "string" || !body.reason.trim()) fail("change_reason_required");
@@ -493,6 +511,13 @@ export async function approvePlanningDraft(ctx: Ctx, projectId: string, input: u
       .where(eq(planningVersions.id, draft.id));
     await writeItems(tx, ctx.tenantId, draft.id, rules, dates);
   });
+
+  // The app shows the phases' dates and the handover (on Obra and Inicio).
+  await markChanged(ctx.tenantId, projectId, ["obra", "project"]);
+  const handover = clientDates(dates, { startDate: null, completionDate }).completionDate;
+  if (handover && handover !== toldBefore) {
+    await notifyProjectClient(ctx.tenantId, projectId, { kind: "delivery", date: handover });
+  }
 }
 
 /** Throws the draft away; the baseline stays as it is. */

@@ -75,6 +75,7 @@ export const en: Messages = {
     phases: "Phases · {current} of {total}",
     prePhase: "Project and licence",
     phaseHint: "Opens the phase: chapters, photos and payment",
+    plannedBy: "due {month}",
   },
   hitoStatus: {
     pending: "Pending",
@@ -99,6 +100,7 @@ export const en: Messages = {
     withActa: "With the signed photo acta of conformity",
     payments: "Payments of this phase",
     notFound: "We couldn't find this phase.",
+    plannedEnd: "Due to finish",
   },
   pagos: {
     back: "Works",

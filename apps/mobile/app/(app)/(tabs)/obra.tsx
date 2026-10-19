@@ -2,9 +2,9 @@ import Feather from "@react-native-vector-icons/feather";
 import { useRouter } from "expo-router";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import type { MobileObra, MobilePhase } from "@repo/core/contract";
+import type { AppLanguage, MobileObra, MobilePhase } from "@repo/core/contract";
 import { LoadState } from "../../../components/load-state";
-import { Bar, BigPct, Marker, obraStyles } from "../../../components/obra-parts";
+import { Bar, BigPct, Figure, Marker } from "../../../components/obra-parts";
 import { card, colors, radius, spacing, type } from "../../../constants/theme";
 import {
   formatDayMonth,
@@ -145,14 +145,27 @@ function Progress({ obra }: { obra: MobileObra }) {
   );
 }
 
-/** A small label over a figure, aligned right. */
-function Figure({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={{ alignItems: "flex-end", gap: 2 }}>
-      <Text style={obraStyles.smallLabel}>{label}</Text>
-      <Text style={type.body}>{value}</Text>
-    </View>
-  );
+/**
+ * What a phase row shows on its right, and how it reads aloud: done, the month
+ * it closed; the handover, its date; under way, its %; not started yet, the
+ * month the plan has it done by.
+ */
+function phaseDate(
+  phase: MobilePhase,
+  last: boolean,
+  completionDate: string | null,
+  language: AppLanguage,
+  t: ReturnType<typeof useI18n>["t"],
+): { text: string; label: string } | null {
+  const same = (text: string) => ({ text, label: text });
+  if (phase.status === "done") return phase.finishedOn ? same(formatShortMonth(phase.finishedOn, language)) : null;
+  if (last && completionDate) return same(formatMonthYear(completionDate, language));
+  if (phase.progressPct > 0) return same(`${phase.progressPct} %`);
+  if (!phase.plannedEnd) return null;
+  return {
+    text: formatShortMonth(phase.plannedEnd, language),
+    label: t("obra.plannedBy", { month: formatMonthYear(phase.plannedEnd, language) }),
+  };
 }
 
 function PhaseRow({
@@ -171,19 +184,12 @@ function PhaseRow({
   const { t, language } = useI18n();
   const name = phaseName(phase, t);
   const done = phase.status === "done";
-  // Done: the month it closed. The handover: its date. Otherwise: its %.
-  const right = done
-    ? phase.finishedOn && formatShortMonth(phase.finishedOn, language)
-    : last && completionDate
-      ? formatMonthYear(completionDate, language)
-      : phase.progressPct > 0
-        ? `${phase.progressPct} %`
-        : null;
+  const right = phaseDate(phase, last, completionDate, language, t);
 
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={[name, right].filter(Boolean).join(", ")}
+      accessibilityLabel={[name, right?.label].filter(Boolean).join(", ")}
       accessibilityHint={t("obra.phaseHint")}
       onPress={onPress}
       style={({ pressed }) => [current ? styles.currentRow : styles.row, pressed && { opacity: 0.7 }]}
@@ -196,7 +202,7 @@ function PhaseRow({
         >
           {name}
         </Text>
-        {right && <Text style={current ? styles.currentPct : type.meta}>{right}</Text>}
+        {right && <Text style={current ? styles.currentPct : type.meta}>{right.text}</Text>}
         {current && <Feather name="chevron-right" size={16} color={colors.muted} />}
       </View>
       {current && <Bar pct={phase.progressPct} style={{ marginLeft: 34, marginRight: 30 }} />}

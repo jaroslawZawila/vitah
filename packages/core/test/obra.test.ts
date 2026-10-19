@@ -6,7 +6,7 @@ import {
   createTestUser,
   resetDatabase,
 } from "@repo/db/testing";
-import { budgetService, hitosService, obraService as svc, type Ctx } from "../src";
+import { budgetService, hitosService, obraService as svc, planningService, projectClientService, type Ctx } from "../src";
 import { framerDraft } from "./budget-fixture";
 
 /** The seed's overall progress (seed-obra.ts PROGRESS), weighted by amount. */
@@ -148,6 +148,33 @@ describe("getClientObra", () => {
     expect(obra.phases[3]).toMatchObject({ name: "Envolvente estanca: Thermochip, cubierta y carpintería exterior", photoCount: 1 });
     expect(obra.currentPhaseKey).toBe("H4");
     expect(obra.hitos).toHaveLength(10);
+  });
+
+  it("measures to the approved plan's handover and dates its phases by it", async () => {
+    const { tenant, client, project, ctx } = await setup("admin");
+    await seedObra(ctx, project.id);
+    const before = (await svc.getClientObra(tenant.id, client.id))!;
+    expect(before.term?.completionDate).toBe("2027-02-05");
+    expect(before.phases.every((p) => p.plannedEnd === null)).toBe(true);
+
+    // Re-planned to start two weeks after the project's 4 May.
+    await planningService.createPlanningDraft(ctx, project.id, { from: "template", startDate: "2026-05-18" });
+    await planningService.approvePlanningDraft(ctx, project.id, {});
+    const { baseline } = await planningService.getPlanning(ctx, project.id);
+    const endOf = new Map(baseline!.rows.map((r) => [r.code, r.plannedEnd]));
+
+    const obra = (await svc.getClientObra(tenant.id, client.id))!;
+    expect(obra.term).toMatchObject({ startDate: "2026-05-18", completionDate: baseline!.endDate, week: 19 });
+    expect(obra.term?.totalWeeks).not.toBe(before.term?.totalWeeks);
+    expect(await projectClientService.getClientProject(tenant.id, client.id)).toMatchObject({
+      startDate: "2026-05-18",
+      completionDate: baseline!.endDate,
+    });
+    for (const phase of obra.phases) {
+      // Its planned chapters' last end (a hito may hold one the plan leaves out, like 20).
+      const ends = phase.chapters.flatMap((c) => endOf.get(c.code) ?? []).sort();
+      expect(phase.plannedEnd).toBe(phase.key === "pre" ? null : (ends.at(-1) ?? null));
+    }
   });
 
   it("shows nothing of a budget that is still a draft", async () => {
