@@ -409,13 +409,18 @@ export async function loadProgressRows(tenantId: string, projectId: string) {
     .where(and(eq(obraChapterProgress.projectId, projectId), eq(obraChapterProgress.tenantId, tenantId)));
 }
 
-/** The approved Planning baseline's dates by chapter code (./planning); null without one. */
+/** The approved Planning baseline's dates and lead times by chapter code (./planning); null without one. */
 export async function approvedPlanDates(
   tenantId: string,
   projectId: string,
-): Promise<Map<string, { start: string; end: string }> | null> {
+): Promise<Map<string, { start: string; end: string; leadDays: number }> | null> {
   const rows = await db
-    .select({ code: planningItems.chapterCode, start: planningItems.plannedStart, end: planningItems.plannedEnd })
+    .select({
+      code: planningItems.chapterCode,
+      start: planningItems.plannedStart,
+      end: planningItems.plannedEnd,
+      leadDays: planningItems.leadDays,
+    })
     .from(planningItems)
     .innerJoin(planningVersions, eq(planningVersions.id, planningItems.versionId))
     .where(
@@ -425,7 +430,7 @@ export async function approvedPlanDates(
         eq(planningVersions.status, "approved"),
       ),
     );
-  return rows.length > 0 ? new Map(rows.map((r) => [r.code, { start: r.start, end: r.end }])) : null;
+  return rows.length > 0 ? new Map(rows.map(({ code, ...dates }) => [code, dates])) : null;
 }
 
 /**

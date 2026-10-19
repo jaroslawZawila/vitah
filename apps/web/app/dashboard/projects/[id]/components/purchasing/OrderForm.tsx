@@ -166,6 +166,7 @@ function ConceptAndDates({
   showOrderedOn: boolean;
 }) {
   const t = useTranslations("purchasing.form");
+  const tp = useTranslations("planning");
   const f = usePurchaseFormat();
   const chapter = form.chapters.find((c) => c.code === draft.chapter);
   const date = (key: "orderedOn" | "expectedOn" | "workStart" | "workEnd", props: React.ComponentProps<typeof Input> = {}) => (
@@ -206,6 +207,7 @@ function ConceptAndDates({
         {chapter?.plannedStart && chapter.plannedEnd && (
           <>
             {t("chapterPlanned", { code: chapter.code, range: f.range(chapter.plannedStart, chapter.plannedEnd) })}
+            {chapter.orderBy && <> · {tp("orderBy", { date: f.shortDay(chapter.orderBy) })}</>}
             {form.sources.planning === "mock" && <MockBadge />}
           </>
         )}

@@ -1036,13 +1036,19 @@ export type PurchaseOrderDetail = PurchaseOrderListItem & {
   today: string;
 };
 
-/** A chapter starting soon with lines nobody has ordered yet. */
+/** A chapter whose orders are due soon (or overdue) with lines nobody has ordered yet. */
 export type PurchaseUpcoming = {
   code: string;
   name: string;
   state: ChapterState;
   /** Planned (the Planning baseline, else simulated). */
   plannedStart: string | null;
+  /** Its suppliers' lead time, calendar days (the plan's, else the standard one). */
+  leadDays: number;
+  /** The day its orders must be placed by: planned start − lead time. */
+  orderBy: string | null;
+  /** Days past `orderBy` today; null while there is still time. */
+  orderLateDays: number | null;
   uncontractedLines: number;
   uncontractedCostCents: number;
   /** Orders for it still pending, not sent. */
@@ -1067,13 +1073,14 @@ export type ProjectPurchases = {
     pendingOrders: number;
     lateDeliveries: number;
   };
-  /** Chapters starting in the next `UPCOMING_DAYS` days (or started) with lines not ordered. */
+  /** Chapters to order within `UPCOMING_DAYS` days (or overdue, or started) with lines not ordered, soonest first. */
   upcoming: PurchaseUpcoming[];
   today: string;
   sources: { planning: PlanningSource };
 };
 
-export const UPCOMING_DAYS = 45;
+/** How far ahead "Por contratar pronto" looks at the order-by dates. */
+export const UPCOMING_DAYS = 30;
 
 /** GET /api/v1/purchases: every order of the tenant (GET /api/v1/subcontractors/:id/purchases: one supplier's). */
 export type TenantPurchases = {
@@ -1142,6 +1149,8 @@ export type PurchaseForm = {
     state: ChapterState;
     plannedStart: string | null;
     plannedEnd: string | null;
+    /** The day its orders must be placed by (planned start − lead time). */
+    orderBy: string | null;
     lines: PurchaseFormLine[];
   }[];
   today: string;
@@ -1179,6 +1188,8 @@ export type PlanningRule = {
   fixedStart: string | null;
   /** Runs from the works' start to the last chapter's end (17, 18, 19). */
   spansWorks: boolean;
+  /** Calendar days before its start its orders must be placed (the suppliers' lead time). */
+  leadDays: number;
 };
 
 export type PlanningItemInput = PlanningRule & { code: string };

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import type { PlanningCalendar, PlanningRow, PlanningRule, ProjectPlanning } from "@repo/core/contract";
+import { orderByDate } from "@repo/core/planning-calc";
 import { Badge } from "@/components/ui/badge";
 import { cardVariants } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -151,9 +152,10 @@ export function PlanBar({
   );
 }
 
-/** What a chapter waits for, its hito, and whether it is critical or late. */
+/** What a chapter waits for, its hito, when to order it, and whether it is critical or late. */
 function RowNotes({ row }: { row: PlanningRow }) {
   const t = useTranslations("planning.table");
+  const tp = useTranslations("planning");
   const ruleText = useRuleText();
   const f = useControlFormat();
   const slip = slipDays(row);
@@ -163,6 +165,10 @@ function RowNotes({ row }: { row: PlanningRow }) {
         {ruleText(row)}
         {row.hitoCode && <> · {row.hitoCode}</>}
       </span>
+      {row.state === "pending" && row.leadDays > 0 && (
+        // From the baseline's start, as Compras does: the date orders were planned to go out by.
+        <span className={muted}>· {tp("orderBy", { date: f.day(orderByDate(row.plannedStart, row.leadDays)) })}</span>
+      )}
       {row.critical && <Badge variant="warn">{t("critical")}</Badge>}
       {slip > 0 && <Badge variant="yel">{t("late", { days: f.signedDays(slip) })}</Badge>}
     </div>

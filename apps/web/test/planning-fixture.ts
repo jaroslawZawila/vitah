@@ -13,6 +13,7 @@ const row = (r: Partial<PlanningRow> & Pick<PlanningRow, "code" | "name">): Plan
   durationDays: 10,
   fixedStart: null,
   spansWorks: false,
+  leadDays: 14,
   plannedStart: "2026-03-02",
   plannedEnd: "2026-03-13",
   forecastStart: "2026-03-02",

@@ -114,37 +114,47 @@ export function workCalendar(calendar: PlanningCalendar): WorkCalendar {
 /** Quality control, health and safety and waste management run through the whole works. */
 export const SPANS_WORKS = new Set(["17", "18", "19"]);
 
-/** A chapter the template doesn't know: with the works, two weeks. */
-const UNKNOWN: Omit<PlanningRule, "fixedStart" | "spansWorks"> = { after: null, lagDays: 0, durationDays: 10 };
+type TemplateRule = Omit<PlanningRule, "fixedStart" | "spansWorks">;
+
+/** A chapter the template doesn't know: with the works, two weeks, ordered two weeks ahead. */
+const UNKNOWN: TemplateRule = { after: null, lagDays: 0, durationDays: 10, leadDays: 14 };
 
 /**
- * ViTAH's steel-frame house, by chapter code: what each waits for and how many
- * working days it takes (about 180 in all). Staff adjust it per project.
+ * ViTAH's steel-frame house, by chapter code: what each waits for, how many
+ * working days it takes (about 180 in all) and how many calendar days ahead
+ * its orders go out (fabricated steel, Thermochip and the heat pump six weeks,
+ * carpentry eight). Staff adjust it per project.
  */
-export const PLAN_TEMPLATE: Record<string, Omit<PlanningRule, "fixedStart" | "spansWorks">> = {
-  "01": { after: null, lagDays: 0, durationDays: 10 },
-  "02": { after: "01", lagDays: 0, durationDays: 25 },
-  "03": { after: "02", lagDays: 0, durationDays: 28 },
-  "05": { after: "03", lagDays: 0, durationDays: 15 },
-  "06": { after: "03", lagDays: 5, durationDays: 30 },
-  "04": { after: "05", lagDays: 0, durationDays: 30 },
-  "10": { after: "05", lagDays: 5, durationDays: 50 },
-  "11": { after: "04", lagDays: 0, durationDays: 15 },
-  "13": { after: "04", lagDays: 0, durationDays: 20 },
-  "14": { after: "13", lagDays: -15, durationDays: 15 },
-  "12": { after: "11", lagDays: 0, durationDays: 24 },
-  "07": { after: "12", lagDays: 0, durationDays: 20 },
-  "09": { after: "12", lagDays: 0, durationDays: 25 },
-  "08": { after: "07", lagDays: -10, durationDays: 19 },
-  "15": { after: "07", lagDays: 0, durationDays: 5 },
-  "16": { after: "07", lagDays: 0, durationDays: 13 },
+export const PLAN_TEMPLATE: Record<string, TemplateRule> = {
+  "01": { after: null, lagDays: 0, durationDays: 10, leadDays: 7 },
+  "02": { after: "01", lagDays: 0, durationDays: 25, leadDays: 14 },
+  "03": { after: "02", lagDays: 0, durationDays: 28, leadDays: 42 },
+  "05": { after: "03", lagDays: 0, durationDays: 15, leadDays: 21 },
+  "06": { after: "03", lagDays: 5, durationDays: 30, leadDays: 42 },
+  "04": { after: "05", lagDays: 0, durationDays: 30, leadDays: 14 },
+  "10": { after: "05", lagDays: 5, durationDays: 50, leadDays: 56 },
+  "11": { after: "04", lagDays: 0, durationDays: 15, leadDays: 21 },
+  "13": { after: "04", lagDays: 0, durationDays: 20, leadDays: 14 },
+  "14": { after: "13", lagDays: -15, durationDays: 15, leadDays: 14 },
+  "12": { after: "11", lagDays: 0, durationDays: 24, leadDays: 42 },
+  "07": { after: "12", lagDays: 0, durationDays: 20, leadDays: 14 },
+  "09": { after: "12", lagDays: 0, durationDays: 25, leadDays: 14 },
+  "08": { after: "07", lagDays: -10, durationDays: 19, leadDays: 21 },
+  "15": { after: "07", lagDays: 0, durationDays: 5, leadDays: 14 },
+  "16": { after: "07", lagDays: 0, durationDays: 13, leadDays: 7 },
 };
+
+/** A chapter's standard lead time: what a project without its own plan orders by. */
+export const templateLeadDays = (code: string) => (SPANS_WORKS.has(code) ? 0 : (PLAN_TEMPLATE[code] ?? UNKNOWN).leadDays);
+
+/** The day a chapter starting on `start` must have its orders placed by. */
+export const orderByDate = (start: string, leadDays: number) => addDays(start, -leadDays);
 
 /** The standard plan for these chapter codes; a dependency on a chapter not in the contract is dropped. */
 export function templateItems(codes: string[]): PlanningItemInput[] {
   const present = new Set(codes);
   return codes.map((code) => {
-    if (SPANS_WORKS.has(code)) return { code, after: null, lagDays: 0, durationDays: 1, fixedStart: null, spansWorks: true };
+    if (SPANS_WORKS.has(code)) return { code, after: null, lagDays: 0, durationDays: 1, fixedStart: null, spansWorks: true, leadDays: 0 };
     const rule = PLAN_TEMPLATE[code] ?? UNKNOWN;
     const after = rule.after && present.has(rule.after) ? rule.after : null;
     return { code, ...rule, after, lagDays: after ? rule.lagDays : 0, fixedStart: null, spansWorks: false };
@@ -155,6 +165,7 @@ export function templateItems(codes: string[]): PlanningItemInput[] {
 
 export const MAX_DURATION_DAYS = 600;
 export const MAX_LAG_DAYS = 250;
+export const MAX_LEAD_DAYS = 365;
 
 /** What is wrong with a set of rules, or null: a dependency on itself, on a missing or spanning chapter, or a cycle. */
 export function planProblem(items: PlanningItemInput[]): "invalid_input" | "dependency_cycle" | null {
@@ -163,6 +174,7 @@ export function planProblem(items: PlanningItemInput[]): "invalid_input" | "depe
   for (const item of items) {
     if (!Number.isInteger(item.durationDays) || item.durationDays < 1 || item.durationDays > MAX_DURATION_DAYS) return "invalid_input";
     if (!Number.isInteger(item.lagDays) || Math.abs(item.lagDays) > MAX_LAG_DAYS) return "invalid_input";
+    if (!Number.isInteger(item.leadDays) || item.leadDays < 0 || item.leadDays > MAX_LEAD_DAYS) return "invalid_input";
     if (item.after === null) continue;
     const target = byCode.get(item.after);
     if (!target || target.code === item.code || target.spansWorks || item.spansWorks) return "invalid_input";

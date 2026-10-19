@@ -260,6 +260,10 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
 - What Avance records wins: a finished chapter keeps its real dates, a started one its real start; nothing still to
   happen is placed before today. The baseline view adds that forecast and the critical path; both, and the draft, are
   checked against `projects.completion_date` with the contract's delay penalty (`delayPenaltyCents` in `obra-calc.ts`)
+- Each chapter also has a lead time (`lead_days`, calendar days): its orders must go out by planned start − lead
+  time. Compras' "Por contratar pronto" lists the chapters with lines not ordered whose order-by date falls within
+  `UPCOMING_DAYS` (30) or has passed (`orderLateDays`), soonest first; without a baseline the template's lead times
+  (`templateLeadDays`) apply to the simulated dates. Prod SQL: `packages/db/sql/2026-10-planning-lead-times.sql`
 - A first plan comes from the standard steel-frame template (`PLAN_TEMPLATE`) or another project's baseline; a change
   copies the baseline into a draft and needs a reason to approve. Approving recomputes the dates as of that day
 - Portal: Obra tab Planificación (`dashboard/projects/[id]/obra/planificacion/`: the baseline or the generate form,

@@ -11,8 +11,9 @@ import { MockBadge } from "../construction/pills";
 import { usePurchaseFormat } from "./format";
 
 /**
- * Presentational: chapters starting soon (or started) with lines nobody has
- * ordered yet. Their dates come from Planning, simulated for now.
+ * Presentational: chapters whose orders must go out soon (or are late) with
+ * lines nobody has ordered yet: planned start less the lead time, from
+ * Planning (simulated without a baseline).
  */
 export default function UpcomingCard({
   upcoming,
@@ -27,6 +28,7 @@ export default function UpcomingCard({
   newOrderHref?: (chapterCode?: string) => string;
 }) {
   const t = useTranslations("purchasing.upcoming");
+  const tp = useTranslations("planning");
   const f = usePurchaseFormat();
 
   return (
@@ -63,6 +65,14 @@ export default function UpcomingCard({
                       ? t("starts", { date: f.shortDay(chapter.plannedStart) })
                       : t("noDate")}
                   {" · "}
+                  {chapter.orderLateDays !== null ? (
+                    <>
+                      <span className="font-semibold text-warn">{t("orderLate", { days: chapter.orderLateDays })}</span>
+                      {" · "}
+                    </>
+                  ) : (
+                    chapter.orderBy && `${tp("orderBy", { date: f.shortDay(chapter.orderBy) })} · `
+                  )}
                   {chapter.pendingOrders.length > 0 ? (
                     chapter.pendingOrders.map((order, index) => (
                       <span key={order.id}>

@@ -40,7 +40,8 @@ import {
   type PurchaseUpcoming,
   type TenantPurchases,
 } from "./contract";
-import { contractSchedule, contractTotals, deviation, lateDays, type LineContract } from "./control-calc";
+import { contractSchedule, contractTotals, daysPast, deviation, lateDays, type LineContract } from "./control-calc";
+import { orderByDate, templateLeadDays } from "./planning-calc";
 import { requirePdf } from "./documents";
 import { addDays, todayInSpain } from "./obra-calc";
 import {
@@ -200,8 +201,9 @@ export const contractingOf = (contract: LineContract | undefined): LineContracti
   !contract ? "none" : contract.closed ? "closed" : "open";
 
 /**
- * The project's contract at cost, chapter 20 aside, with each chapter's state
- * and planned dates (the Planning baseline, else simulated).
+ * The project's contract at cost, chapter 20 aside, with each chapter's state,
+ * planned dates (the Planning baseline, else simulated) and the day its orders
+ * must go out by.
  */
 async function contractPlan(tenantId: string, projectId: string) {
   const [project, obra] = await Promise.all([
@@ -214,12 +216,19 @@ async function contractPlan(tenantId: string, projectId: string) {
   if (!project) fail("project_not_found");
   const works = { startDate: toCalendarDate(project.startDate), completionDate: toCalendarDate(project.completionDate) };
   const { items, states, plan, planSource } = contractSchedule(obra.costChapters, obra.hitos, obra.progressRows, works, obra.planDates);
-  const chapters = items.map((item) => ({
-    ...item,
-    state: states.get(item.code)!,
-    plannedStart: plan.get(item.code)?.start ?? null,
-    plannedEnd: plan.get(item.code)?.end ?? null,
-  }));
+  const chapters = items.map((item) => {
+    const plannedStart = plan.get(item.code)?.start ?? null;
+    // A chapter the baseline lacks has no dates: the standard lead time stands in.
+    const leadDays = plan.get(item.code)?.leadDays ?? templateLeadDays(item.code);
+    return {
+      ...item,
+      state: states.get(item.code)!,
+      plannedStart,
+      plannedEnd: plan.get(item.code)?.end ?? null,
+      leadDays,
+      orderBy: plannedStart ? orderByDate(plannedStart, leadDays) : null,
+    };
+  });
   return { ref: project.ref, budgetNumber: obra.revision?.number ?? null, chapters, planSource };
 }
 
@@ -300,13 +309,17 @@ export async function getProjectPurchases(ctx: Ctx, projectId: string): Promise<
   const upcoming: PurchaseUpcoming[] = [];
   for (const chapter of plan.chapters) {
     const { uncontractedLines, uncontractedCostCents } = contractTotals(chapter.lines, contracts);
-    const soon = chapter.state === "in_progress" || (chapter.plannedStart !== null && chapter.plannedStart <= horizon);
+    const { orderBy } = chapter;
+    const soon = chapter.state === "in_progress" || (orderBy !== null && orderBy <= horizon);
     if (uncontractedLines === 0 || chapter.state === "finished" || !soon) continue;
     upcoming.push({
       code: chapter.code,
       name: chapter.name,
       state: chapter.state,
       plannedStart: chapter.plannedStart,
+      leadDays: chapter.leadDays,
+      orderBy,
+      orderLateDays: daysPast(orderBy, today),
       uncontractedLines,
       uncontractedCostCents,
       pendingOrders: pendingOrders
@@ -314,7 +327,8 @@ export async function getProjectPurchases(ctx: Ctx, projectId: string): Promise<
         .map((o) => ({ id: o.id, number: o.number })),
     });
   }
-  upcoming.sort((a, b) => (a.plannedStart ?? "").localeCompare(b.plannedStart ?? "") || a.code.localeCompare(b.code));
+  // What must go out first, first.
+  upcoming.sort((a, b) => (a.orderBy ?? "").localeCompare(b.orderBy ?? "") || a.code.localeCompare(b.code));
 
   const lines = plan.chapters.flatMap((c) => c.lines);
   const totals = contractTotals(lines, contracts);
@@ -390,6 +404,7 @@ export async function getPurchaseForm(ctx: Ctx, projectId: string, orderId?: str
       state: chapter.state,
       plannedStart: chapter.plannedStart,
       plannedEnd: chapter.plannedEnd,
+      orderBy: chapter.orderBy,
       lines: chapter.lines.map((line) => {
         const contract = contracts.get(line.lineageId);
         return {

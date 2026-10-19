@@ -22,13 +22,14 @@ import { useObraAction } from "../../../components/obra/useObraAction";
 import { ApproveCard, CalendarCard, DraftCheck, DraftTable, type RuleChange } from "../../../components/planning/DraftViews";
 import { planningHref } from "../../../components/planning/links";
 
-const toRule = ({ code, after, lagDays, durationDays, fixedStart, spansWorks }: PlanningItemInput): PlanningItemInput => ({
+const toRule = ({ code, after, lagDays, durationDays, fixedStart, spansWorks, leadDays }: PlanningItemInput): PlanningItemInput => ({
   code,
   after,
   lagDays,
   durationDays,
   fixedStart,
   spansWorks,
+  leadDays,
 });
 
 /** Edit the draft's rules and calendar, see the dates they give, then approve it as the baseline. */

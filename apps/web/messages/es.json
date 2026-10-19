@@ -1059,6 +1059,7 @@
     "reason": "motivo: «{reason}»",
     "footnote": "Las fechas reales vienen de Avance: cuando un capítulo termina tarde, los que dependen de él se mueven en la previsión, nunca en la línea base. Días = días laborables ({calendar}).",
     "margin": "{count, plural, =0 {Justo en plazo} one {# día de margen} other {# días de margen}}",
+    "orderBy": "pedir antes del {date}",
     "rule": {
       "spans": "Toda la obra",
       "after": "Tras {code}",
@@ -1211,7 +1212,10 @@
         "who": "Al aprobar, Avance, Compras y el resumen de la obra pasan a esta versión; la anterior queda en Versiones.",
         "discard": "Descartar borrador",
         "confirmDiscard": "¿Descartar el borrador v{number}? Se pierden sus cambios."
-      }
+      },
+      "lead": "Pedido",
+      "leadLabel": "Días de antelación del pedido del capítulo {code}",
+      "orderBy": "antes del {date}"
     },
     "versions": {
       "eyebrow": "{ref} · Planificación",
@@ -2707,14 +2711,15 @@
     },
     "upcoming": {
       "title": "Por contratar pronto",
-      "text": "Capítulos que empiezan en los próximos {days} días con partidas sin pedido.",
-      "empty": "Nada pendiente de pedir para los próximos días.",
+      "text": "Capítulos con partidas sin pedir cuyo pedido debe salir en los próximos {days} días: el inicio previsto menos el plazo de entrega.",
+      "empty": "Ningún pedido tiene que salir en los próximos días.",
       "started": "En curso",
       "starts": "Inicio {date}",
       "noDate": "Sin fecha",
       "lines": "{count, plural, one {# partida} other {# partidas}}",
       "notSent": "sin enviar",
-      "order": "Pedir partidas de un capítulo"
+      "order": "Pedir partidas de un capítulo",
+      "orderLate": "pedir ya: {days, plural, one {# día tarde} other {# días tarde}}"
     },
     "project": {
       "title": "Compras",

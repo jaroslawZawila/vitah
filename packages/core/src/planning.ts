@@ -68,6 +68,7 @@ const toInput = (row: ItemRow): PlanningItemInput => ({
   durationDays: row.durationDays,
   fixedStart: row.fixedStart,
   spansWorks: row.spansWorks,
+  leadDays: row.leadDays,
 });
 
 /** The project, its contract's chapters (chapter 20 aside) and what Avance recorded. */
@@ -335,6 +336,7 @@ async function writeItems(tx: Tx, tenantId: string, versionId: string, rules: Pl
       durationDays: rule.durationDays,
       fixedStart: rule.fixedStart,
       spansWorks: rule.spansWorks,
+      leadDays: rule.leadDays,
       plannedStart: dates.get(rule.code)!.start,
       plannedEnd: dates.get(rule.code)!.end,
     })),
@@ -407,8 +409,9 @@ export async function createPlanningDraft(
   }
 }
 
-/** A rule as staff sent it: `spansWorks` stays as the draft has it. */
-function parseItem(value: unknown, spansWorks: boolean): PlanningItemInput {
+/** A rule as staff sent it: `spansWorks` stays as the draft has it, and so does a lead time not sent. */
+function parseItem(value: unknown, current: PlanningItemInput): PlanningItemInput {
+  const { spansWorks } = current;
   if (!isObject(value) || typeof value.code !== "string") fail("invalid_input");
   const after = value.after === null || value.after === undefined || value.after === "" ? null : value.after;
   if (after !== null && typeof after !== "string") fail("invalid_input");
@@ -420,6 +423,7 @@ function parseItem(value: unknown, spansWorks: boolean): PlanningItemInput {
     durationDays: spansWorks ? 1 : integer(value.durationDays, 1, 600),
     fixedStart: spansWorks || after !== null ? null : fixedStart,
     spansWorks,
+    leadDays: spansWorks ? 0 : value.leadDays === undefined ? current.leadDays : integer(value.leadDays, 0, 365),
   };
 }
 
@@ -438,11 +442,11 @@ async function editedDraft(ctx: Ctx, projectId: string, input: Record<string, un
   let rules = current;
   if (input.items !== undefined) {
     if (!Array.isArray(input.items) || input.items.length !== current.length) fail("invalid_input");
-    const spans = new Map(current.map((rule) => [rule.code, rule.spansWorks]));
+    const byCode = new Map(current.map((rule) => [rule.code, rule]));
     rules = input.items.map((item: unknown) => {
-      const code = isObject(item) && typeof item.code === "string" ? item.code : null;
-      if (code === null || !spans.has(code)) fail("invalid_input");
-      return parseItem(item, spans.get(code)!);
+      const rule = isObject(item) && typeof item.code === "string" ? byCode.get(item.code) : undefined;
+      if (!rule) fail("invalid_input");
+      return parseItem(item, rule);
     });
     const problem = planProblem(rules);
     if (problem) fail(problem);

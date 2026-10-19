@@ -81,6 +81,24 @@ describe("EditPlanScreen", () => {
     expect(router.push).toHaveBeenCalledWith(PLAN);
   });
 
+  it("sets how far ahead a chapter is ordered, showing the order-by date", async () => {
+    renderScreen();
+    const lead = row(/Pinturas/).getByLabelText("Días de antelación del pedido del capítulo 04");
+    expect(lead).toHaveValue(14);
+    const orderBy = () => row(/Pinturas/).getByText(/^antes del /).textContent;
+    const before = orderBy();
+    await userEvent.clear(lead);
+    await userEvent.type(lead, "42");
+    expect(orderBy()).not.toBe(before);
+    await userEvent.click(screen.getByRole("button", { name: "Guardar borrador" }));
+    expect(actions.updatePlanningDraftAction).toHaveBeenCalledWith(
+      "p-1",
+      expect.objectContaining({ items: expect.arrayContaining([expect.objectContaining({ code: "04", leadDays: 42 })]) }),
+    );
+    // A finished chapter's orders are history.
+    expect(row(/Actuaciones previas/).getByLabelText("Días de antelación del pedido del capítulo 01")).toBeDisabled();
+  });
+
   it("refuses chapters that wait for each other", async () => {
     renderScreen();
     await userEvent.selectOptions(row(/Revestimientos/).getByLabelText("Cuándo empieza el capítulo 03"), "04");

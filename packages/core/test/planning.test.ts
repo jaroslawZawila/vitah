@@ -160,13 +160,21 @@ describe("changing the plan", () => {
 
     const draft = await svc.getPlanningDraft(ctx, project.id);
     expect(draft.baseline).toEqual({ number: 1, ends: { "01": "2026-06-12", "02": "2026-07-17", "03": "2026-08-26" } });
-    const items = draft.rows.map(({ code, after, lagDays, durationDays, fixedStart }) => ({ code, after, lagDays, durationDays, fixedStart }));
+    const items = draft.rows.map(({ code, after, lagDays, durationDays, fixedStart, leadDays }) => ({ code, after, lagDays, durationDays, fixedStart, leadDays }));
     await svc.updatePlanningDraft(ctx, project.id, {
       region: "md",
       items: items.map((i) => (i.code === "02" ? { ...i, durationDays: 30 } : i)),
     });
     const changed = await svc.getPlanningDraft(ctx, project.id);
-    expect(changed.rows[1]).toMatchObject({ code: "02", durationDays: 30, plannedEnd: "2026-07-24" });
+    expect(changed.rows[1]).toMatchObject({ code: "02", durationDays: 30, plannedEnd: "2026-07-24", leadDays: 14 });
+    await svc.updatePlanningDraft(ctx, project.id, { items: items.map((i) => (i.code === "03" ? { ...i, leadDays: 60 } : i)) });
+    expect((await svc.getPlanningDraft(ctx, project.id)).rows[2]!.leadDays).toBe(60);
+    // A client that doesn't send lead times (an older one) keeps them.
+    await svc.updatePlanningDraft(ctx, project.id, { items: items.map(({ leadDays: _, ...rest }) => rest) });
+    expect((await svc.getPlanningDraft(ctx, project.id)).rows[2]!.leadDays).toBe(60);
+    await expect(
+      svc.updatePlanningDraft(ctx, project.id, { items: items.map((i) => (i.code === "03" ? { ...i, leadDays: 400 } : i)) }),
+    ).rejects.toMatchObject({ code: "invalid_input" });
     expect(changed.calendar.region).toBe("md");
 
     await expect(

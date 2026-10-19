@@ -52,6 +52,8 @@ describe("PlanningScreen", () => {
     expect(finishes.getByText("Crítica")).toBeInTheDocument();
     expect(finishes.getByText("+7 d vs. línea base")).toBeInTheDocument();
     expect(finishes.getByText("02/11 – 27/11")).toBeInTheDocument();
+    // Pending: its orders go out 14 days before its baseline start (26/10).
+    expect(finishes.getByText("· pedir antes del 12/10")).toBeInTheDocument();
     expect(table().getByText("Toda la obra")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Versiones" })).toHaveAttribute("href", "/dashboard/projects/p-1/obra/planificacion/versiones");
   });

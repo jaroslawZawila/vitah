@@ -8,6 +8,7 @@ import {
   type PurchaseStatus,
 } from "./contract";
 import { addDays } from "./obra-calc";
+import { templateLeadDays } from "./planning-calc";
 import { daysBetween } from "./subcontractor-rules";
 
 // ─── Construction control arithmetic ─────────────────────────────────────────
@@ -120,7 +121,7 @@ export function plannedDates(
 
 /**
  * The contract's chapters to build (chapter 20, the contingency reserve,
- * aside), each one's state from its recorded dates, and the planned dates:
+ * aside), each one's state from its recorded dates, and the planned dates and lead time:
  * the approved Planning baseline's (`approved`), else simulated. A chapter the
  * baseline lacks (added to the contract since) has no planned dates.
  */
@@ -129,17 +130,22 @@ export function contractSchedule<C extends { code: string }>(
   hitos: { pctBp: number; chapters: { code: string }[] }[],
   progress: (Dates & { chapterCode: string })[],
   works: { startDate: string | null; completionDate: string | null },
-  approved: ReadonlyMap<string, { start: string; end: string }> | null = null,
+  approved: ReadonlyMap<string, { start: string; end: string; leadDays: number }> | null = null,
 ) {
   const items = chapters.filter((c) => c.code !== CONTINGENCY_CHAPTER);
   const dates = new Map(progress.map((row) => [row.chapterCode, row]));
   const states = new Map(items.map((c) => [c.code, chapterState(dates.get(c.code))]));
+  // With each chapter's lead time: the baseline's, or the standard one with the simulated dates.
   const plan = approved
     ? new Map(items.flatMap((c) => (approved.has(c.code) ? [[c.code, approved.get(c.code)!] as const] : [])))
-    : plannedDates(
-        works,
-        hitos.map((h) => ({ pctBp: h.pctBp, chapterCodes: h.chapters.map((c) => c.code) })),
-        items.map((c) => c.code),
+    : new Map(
+        [
+          ...plannedDates(
+            works,
+            hitos.map((h) => ({ pctBp: h.pctBp, chapterCodes: h.chapters.map((c) => c.code) })),
+            items.map((c) => c.code),
+          ),
+        ].map(([code, dates]) => [code, { ...dates, leadDays: templateLeadDays(code) }] as const),
       );
   const planSource: PlanningSource = approved ? "live" : "mock";
   return { items, dates, states, plan, planSource };
@@ -147,13 +153,16 @@ export function contractSchedule<C extends { code: string }>(
 
 // ─── Purchasing ──────────────────────────────────────────────────────────────
 
+/** Days `today` is past `date`; null when there is no date or it hasn't passed. */
+export const daysPast = (date: string | null, today: string): number | null =>
+  date !== null && date < today ? daysBetween(date, today) : null;
+
 /** A material order past its expected delivery and not delivered: days late on `today`; else null. */
 export function lateDays(
   order: { kind: PurchaseKind; status: PurchaseStatus; expectedOn: string | null },
   today: string,
 ): number | null {
-  if (order.kind !== "material" || !isOpenOrder(order.status) || !order.expectedOn || order.expectedOn >= today) return null;
-  return daysBetween(order.expectedOn, today);
+  return order.kind === "material" && isOpenOrder(order.status) ? daysPast(order.expectedOn, today) : null;
 }
 
 /** What a budget line (by lineage) has contracted: its counting orders' sum, and whether one closes it. */

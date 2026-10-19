@@ -92,14 +92,16 @@ describe("PurchasesScreen", () => {
     expect(screen.getAllByText("Ningún pedido con estos filtros.").length).toBeGreaterThan(0);
   });
 
-  it("shows the chapters to contract soon, with simulated dates", () => {
+  it("shows the chapters to contract soon by their order-by dates, with simulated dates", () => {
     renderScreen();
 
     const soon = within(screen.getByRole("region", { name: "Por contratar pronto" }));
     expect(soon.getByText("Simulado")).toBeInTheDocument();
     expect(soon.getByRole("link", { name: "Climatización" })).toHaveAttribute("href", "/dashboard/projects/p-1/compras/nuevo?capitulo=12");
     expect(soon.getByRole("link", { name: "PED-055" })).toHaveAttribute("href", "/dashboard/projects/p-1/compras/order-55");
-    expect(soon.getByText(/Inicio 2 nov · 4 partidas/)).toBeInTheDocument();
+    expect(soon.getByText(/Inicio 2 nov · pedir antes del 19 oct · 4 partidas/)).toBeInTheDocument();
+    // Climatización's orders should have gone out on 21 September.
+    expect(soon.getByText("pedir ya: 26 días tarde")).toBeInTheDocument();
     expect(soon.getByText("23.410 €")).toBeInTheDocument();
   });
 

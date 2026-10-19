@@ -1059,6 +1059,7 @@
     "reason": "reason: “{reason}”",
     "footnote": "Actual dates come from Progress: when a chapter finishes late, the ones waiting for it move in the forecast, never in the baseline. Days = working days ({calendar}).",
     "margin": "{count, plural, =0 {Right on time} one {# day to spare} other {# days to spare}}",
+    "orderBy": "order by {date}",
     "rule": {
       "spans": "Whole works",
       "after": "After {code}",
@@ -1211,7 +1212,10 @@
         "who": "Once approved, Progress, Purchasing and the works summary use this version; the previous one stays in Versions.",
         "discard": "Discard draft",
         "confirmDiscard": "Discard draft v{number}? Its changes will be lost."
-      }
+      },
+      "lead": "Order",
+      "leadLabel": "Days ahead to order chapter {code}",
+      "orderBy": "by {date}"
     },
     "versions": {
       "eyebrow": "{ref} · Planning",
@@ -2707,14 +2711,15 @@
     },
     "upcoming": {
       "title": "To contract soon",
-      "text": "Chapters starting in the next {days} days with lines nobody has ordered.",
-      "empty": "Nothing left to order for the coming days.",
+      "text": "Chapters with lines not yet ordered whose orders must go out in the next {days} days: the planned start less the lead time.",
+      "empty": "No orders need to go out in the next few days.",
       "started": "In progress",
       "starts": "Starts {date}",
       "noDate": "No date",
       "lines": "{count, plural, one {# line} other {# lines}}",
       "notSent": "not sent",
-      "order": "Order a chapter's lines"
+      "order": "Order a chapter's lines",
+      "orderLate": "order now: {days, plural, one {# day late} other {# days late}}"
     },
     "project": {
       "title": "Purchasing",

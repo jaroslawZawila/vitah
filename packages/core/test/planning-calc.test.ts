@@ -4,24 +4,27 @@ import {
   criticalPath,
   easterSunday,
   holidaysOf,
+  orderByDate,
   planCheck,
   planEnd,
   planProblem,
   schedulePlan,
   templateItems,
+  templateLeadDays,
   workCalendar,
   type Recorded,
 } from "../src/planning-calc";
 
 const PLAIN: PlanningCalendar = { region: null, augustClosure: false, christmasClosure: false };
 
-const item = (code: string, after: string | null, durationDays: number, lagDays = 0): PlanningItemInput => ({
+const item = (code: string, after: string | null, durationDays: number, lagDays = 0, leadDays = 0): PlanningItemInput => ({
   code,
   after,
   lagDays,
   durationDays,
   fixedStart: null,
   spansWorks: false,
+  leadDays,
 });
 const spanning = (code: string): PlanningItemInput => ({ ...item(code, null, 1), spansWorks: true });
 
@@ -67,14 +70,23 @@ describe("working calendar", () => {
 describe("templateItems", () => {
   it("gives each contract chapter the standard rule, dropping dependencies on missing chapters", () => {
     expect(templateItems(["01", "02", "17", "99"])).toEqual([
-      item("01", null, 10),
-      item("02", "01", 25),
+      item("01", null, 10, 0, 7),
+      item("02", "01", 25, 0, 14),
       spanning("17"),
-      item("99", null, 10),
+      item("99", null, 10, 0, 14),
     ]);
     // Without 01, cimentación starts with the works.
     expect(templateItems(["02"])[0]).toMatchObject({ code: "02", after: null, lagDays: 0 });
     expect(planProblem(templateItems(["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19"]))).toBeNull();
+  });
+});
+
+describe("lead times", () => {
+  it("gives each chapter its standard lead time and the day its orders must go out", () => {
+    expect([templateLeadDays("03"), templateLeadDays("10"), templateLeadDays("17"), templateLeadDays("99")]).toEqual([42, 56, 0, 14]);
+    expect(orderByDate("2026-12-07", 42)).toBe("2026-10-26");
+    expect(planProblem([item("01", null, 5, 0, 366)])).toBe("invalid_input");
+    expect(planProblem([item("01", null, 5, 0, -1)])).toBe("invalid_input");
   });
 });
 

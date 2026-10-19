@@ -1288,6 +1288,8 @@ export const planningItems = pgTable(
     fixedStart: date("fixed_start", { mode: "string" }),
     // Runs through the whole works (quality control, health and safety, waste).
     spansWorks: boolean("spans_works").default(false).notNull(),
+    // Calendar days before its start its orders must be placed (suppliers' lead time).
+    leadDays: integer("lead_days").default(0).notNull(),
     plannedStart: date("planned_start", { mode: "string" }).notNull(),
     plannedEnd: date("planned_end", { mode: "string" }).notNull(),
   },

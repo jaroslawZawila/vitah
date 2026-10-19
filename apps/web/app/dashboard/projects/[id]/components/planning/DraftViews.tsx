@@ -2,7 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import type { PlanningCalendar, PlanningCheck, PlanningItemInput, PlanningRow } from "@repo/core/contract";
-import type { Dates } from "@repo/core/planning-calc";
+import { orderByDate, type Dates } from "@repo/core/planning-calc";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cardVariants } from "@/components/ui/card";
@@ -25,7 +25,7 @@ import CalendarFields from "./CalendarFields";
 const FROM_START = "";
 const FIXED = "fixed";
 
-export type RuleChange = Partial<Pick<PlanningItemInput, "after" | "lagDays" | "durationDays" | "fixedStart">>;
+export type RuleChange = Partial<Pick<PlanningItemInput, "after" | "lagDays" | "durationDays" | "fixedStart" | "leadDays">>;
 
 /** The draft's chapters: their rules (editable), and the dates and change against the baseline those give. */
 export function DraftTable({
@@ -59,7 +59,7 @@ export function DraftTable({
 
   return (
     <section className={cn(cardVariants({ size: "flush" }), "min-w-0 py-1.5")} aria-label={t("tableLabel")}>
-      <Table className="min-w-[760px] text-[13px]">
+      <Table className="min-w-[860px] text-[13px]">
         <TableHeader>
           <TableRow>
             <TableHead className="pl-[18px]">{t("code")}</TableHead>
@@ -68,6 +68,7 @@ export function DraftTable({
             <TableHead>{t("lagOrDate")}</TableHead>
             <TableHead>{t("days")}</TableHead>
             <TableHead>{t("dates")}</TableHead>
+            <TableHead>{t("lead")}</TableHead>
             {baseline && <TableHead className="pr-[18px] text-right">{t("vs", { number: baseline.number })}</TableHead>}
           </TableRow>
         </TableHeader>
@@ -153,6 +154,24 @@ export function DraftTable({
                   />
                 </TableCell>
                 <TableCell className="num whitespace-nowrap">{d ? `${f.day(d.start)} – ${f.day(d.end)}` : "—"}</TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number"
+                      min={0}
+                      aria-label={t("leadLabel", { code: rule.code })}
+                      className="w-[68px] font-mono"
+                      value={rule.leadDays}
+                      disabled={readOnly || finished}
+                      onChange={(e) => onChange(rule.code, { leadDays: Math.trunc(Number(e.target.value)) })}
+                    />
+                    {d && !finished && !started && (
+                      <span className="num text-[12px] whitespace-nowrap text-muted-foreground">
+                        {t("orderBy", { date: f.day(orderByDate(d.start, rule.leadDays)) })}
+                      </span>
+                    )}
+                  </div>
+                </TableCell>
                 {baseline && (
                   <TableCell
                     className={cn(
@@ -168,7 +187,7 @@ export function DraftTable({
           })}
           {spanning.length > 0 && (
             <TableRow className="hover:bg-transparent">
-              <TableCell colSpan={baseline ? 7 : 6} className={cn(muted, "pl-[18px] whitespace-normal")}>
+              <TableCell colSpan={baseline ? 8 : 7} className={cn(muted, "pl-[18px] whitespace-normal")}>
                 {t("spans", {
                   codes: spanning.map((r) => `${r.code} ${rowOf.get(r.code)?.name ?? ""}`.trim()).join(" · "),
                   date: end ? f.day(end) : "—",
