@@ -3,6 +3,7 @@ import {
   isOpenOrder,
   type ChapterState,
   type MilestoneState,
+  type PlanningSource,
   type PurchaseKind,
   type PurchaseStatus,
 } from "./contract";
@@ -12,7 +13,7 @@ import { daysBetween } from "./subcontractor-rules";
 // ─── Construction control arithmetic ─────────────────────────────────────────
 // Pure functions behind ./construction: a chapter's state and delays from its
 // dates, a hito's state, a line's deviation, and the stand-in for Planning's
-// dates until that module exists. No database.
+// dates while a project has no approved baseline. No database.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export { daysBetween };
@@ -77,10 +78,10 @@ export function finishRequestsInvoice(
 }
 
 // ─── Planning (simulated) ────────────────────────────────────────────────────
-// Until Planning exists, each chapter's planned dates come from the project's
-// start and completion dates: the hitos follow one another, each taking a
-// share of the time equal to its share of the price, and their chapters run
-// through it. Quality control, health and safety and waste management run
+// Until a project's Planning baseline is approved, each chapter's planned
+// dates come from the project's start and completion dates: the hitos follow
+// one another, each taking a share of the time equal to its share of the
+// price, and their chapters run through it. Quality control, health and safety and waste management run
 // through the whole works.
 
 const WHOLE_WORKS = new Set(["17", "18", "19"]);
@@ -119,23 +120,29 @@ export function plannedDates(
 
 /**
  * The contract's chapters to build (chapter 20, the contingency reserve,
- * aside), each one's state from its recorded dates, and the planned dates.
+ * aside), each one's state from its recorded dates, and the planned dates:
+ * the approved Planning baseline's (`approved`), else simulated. A chapter the
+ * baseline lacks (added to the contract since) has no planned dates.
  */
 export function contractSchedule<C extends { code: string }>(
   chapters: C[],
   hitos: { pctBp: number; chapters: { code: string }[] }[],
   progress: (Dates & { chapterCode: string })[],
   works: { startDate: string | null; completionDate: string | null },
+  approved: ReadonlyMap<string, { start: string; end: string }> | null = null,
 ) {
   const items = chapters.filter((c) => c.code !== CONTINGENCY_CHAPTER);
   const dates = new Map(progress.map((row) => [row.chapterCode, row]));
   const states = new Map(items.map((c) => [c.code, chapterState(dates.get(c.code))]));
-  const plan = plannedDates(
-    works,
-    hitos.map((h) => ({ pctBp: h.pctBp, chapterCodes: h.chapters.map((c) => c.code) })),
-    items.map((c) => c.code),
-  );
-  return { items, dates, states, plan };
+  const plan = approved
+    ? new Map(items.flatMap((c) => (approved.has(c.code) ? [[c.code, approved.get(c.code)!] as const] : [])))
+    : plannedDates(
+        works,
+        hitos.map((h) => ({ pctBp: h.pctBp, chapterCodes: h.chapters.map((c) => c.code) })),
+        items.map((c) => c.code),
+      );
+  const planSource: PlanningSource = approved ? "live" : "mock";
+  return { items, dates, states, plan, planSource };
 }
 
 // ─── Purchasing ──────────────────────────────────────────────────────────────

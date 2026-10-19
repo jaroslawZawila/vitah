@@ -79,12 +79,11 @@ import { listProjectAttention } from "./subcontractors";
 // finishing the last chapter of a hito asks Administration to invoice it,
 // once. The budget, the hitos' invoices and payments, the subcontractors'
 // documents, the photos and what Compras contracted are read from their own
-// services, never copied. Planning doesn't exist yet: ./control-calc stands
-// in for it.
+// services, never copied. Planned dates are Planning's approved baseline;
+// without one ./control-calc stands in for it.
 // Staff only; the client's app sees the result as the obra's progress.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const SOURCES: ControlSources = { planning: "mock", purchasing: "live" };
 const MAX_NOTE = 500;
 const RECENT_PHOTOS = 6;
 const RECENT_EVENTS = 5;
@@ -175,7 +174,7 @@ async function loadControl(ctx: Ctx, projectId: string) {
   const today = todayInSpain();
   const works = { startDate: toCalendarDate(project.startDate), completionDate: toCalendarDate(project.completionDate) };
   // The main budget items: the contract's chapters at cost, but not the contingency.
-  const { items, dates, states, plan } = contractSchedule(costChapters, hitos, progressRows, works);
+  const { items, dates, states, plan, planSource } = contractSchedule(costChapters, hitos, progressRows, works, obra.planDates);
   const hitoOf = new Map(hitos.flatMap((h) => h.chapters.map((c) => [c.code, h] as const)));
   const requestOf = new Map(requests.map((r) => [r.hitoId, toRequest(r, hitos)]));
 
@@ -195,6 +194,7 @@ async function loadControl(ctx: Ctx, projectId: string) {
     states,
     hitoOf,
     plan,
+    sources: { planning: planSource, purchasing: "live" } satisfies ControlSources,
     requestOf,
     contracts: purchases.contracts,
     orders: purchases.orders,
@@ -429,7 +429,7 @@ export async function getControl(ctx: Ctx, projectId: string): Promise<Construct
     events: events.map((e) => ({ ...e, chapterName: names.get(e.chapterCode) ?? null })),
     photos,
     photoCount,
-    sources: SOURCES,
+    sources: control.sources,
   };
 }
 
@@ -480,13 +480,13 @@ export async function getControlChapter(ctx: Ctx, projectId: string, code: strin
     })),
     orders: control.orders.filter((o) => o.chapterCodes.includes(code)),
     today: control.today,
-    sources: SOURCES,
+    sources: control.sources,
   };
 }
 
 /** Cost control per budget line: its budgeted cost against what was contracted. */
 export async function getCosts(ctx: Ctx, projectId: string): Promise<ConstructionCosts> {
-  const { items, states, contracts, lateDeliveries } = await loadControl(ctx, projectId);
+  const { items, states, contracts, lateDeliveries, sources } = await loadControl(ctx, projectId);
   return {
     chapters: items.map((item) => ({
       code: item.code,
@@ -510,7 +510,7 @@ export async function getCosts(ctx: Ctx, projectId: string): Promise<Constructio
       }),
     })),
     lateDeliveries,
-    sources: SOURCES,
+    sources,
   };
 }
 

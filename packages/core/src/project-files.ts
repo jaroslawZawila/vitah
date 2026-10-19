@@ -43,7 +43,7 @@ export const projectFolder = (tenantId: string, projectId: string) =>
 export async function requireProject(tenantId: string, projectId: string) {
   const project = await db.query.projects.findFirst({
     where: projectInTenant(tenantId, projectId),
-    columns: { id: true, obraStage: true, startDate: true, completionDate: true },
+    columns: { id: true, ref: true, obraStage: true, startDate: true, completionDate: true },
   });
   if (!project) fail("project_not_found");
   return project;

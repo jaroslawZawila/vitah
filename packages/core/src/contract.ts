@@ -651,6 +651,7 @@ export type ObraError =
   | "invalid_file_type"
   | "file_too_large"
   | "project_not_found"
+  | "dependency_cycle"
   | "not_found"
   | "forbidden";
 
@@ -659,8 +660,9 @@ export type ObraError =
 // (a "main budget item") moves pending → in progress → finished only by the
 // actual dates staff record; finishing a hito's last chapter asks
 // Administration for its invoice, once. Costs compare each line's budgeted
-// cost with what was contracted (Compras). Planning doesn't exist yet: its
-// dates are simulated (`sources`), and the portal says so.
+// cost with what was contracted (Compras). Planned dates come from the
+// approved Planning baseline; without one they are simulated (`sources`), and
+// the portal says so.
 
 export const CHAPTER_STATES = ["pending", "in_progress", "finished"] as const;
 export type ChapterState = (typeof CHAPTER_STATES)[number];
@@ -676,8 +678,11 @@ export type IssueParty = (typeof ISSUE_PARTIES)[number];
 export const ISSUE_STATUSES = ["pending", "review", "resolved"] as const;
 export type IssueStatus = (typeof ISSUE_STATUSES)[number];
 
-/** Where data owned by other modules comes from: "mock" until the module exists. */
-export type ControlSources = { planning: "mock"; purchasing: "live" };
+/** Planned dates: the approved Planning baseline ("live"), or simulated without one ("mock"). */
+export type PlanningSource = "mock" | "live";
+
+/** Where data owned by other modules comes from. */
+export type ControlSources = { planning: PlanningSource; purchasing: "live" };
 
 export type ControlChapter = {
   code: string;
@@ -1036,7 +1041,7 @@ export type PurchaseUpcoming = {
   code: string;
   name: string;
   state: ChapterState;
-  /** Planned (simulated until Planning exists). */
+  /** Planned (the Planning baseline, else simulated). */
   plannedStart: string | null;
   uncontractedLines: number;
   uncontractedCostCents: number;
@@ -1065,7 +1070,7 @@ export type ProjectPurchases = {
   /** Chapters starting in the next `UPCOMING_DAYS` days (or started) with lines not ordered. */
   upcoming: PurchaseUpcoming[];
   today: string;
-  sources: { planning: "mock" };
+  sources: { planning: PlanningSource };
 };
 
 export const UPCOMING_DAYS = 45;
@@ -1140,6 +1145,129 @@ export type PurchaseForm = {
     lines: PurchaseFormLine[];
   }[];
   today: string;
+  sources: { planning: PlanningSource };
+};
+
+// ─── Planning (the works schedule) ───────────────────────────────────────────
+// Each contract chapter's planned dates (packages/core/src/planning.ts): it
+// starts after another chapter ends (plus a lag, negative to overlap), at a
+// fixed day or with the works, and lasts a number of working days of the
+// project's calendar. A draft is edited freely; approving it makes it the
+// baseline Avance, Compras and the Obra tab measure against. A change is a new
+// version with its reason; the old ones are kept. Staff only, portal only.
+
+/** Autonomous communities whose holidays the calendar knows (ISO 3166-2:ES); none = national only. */
+export const PLANNING_REGIONS = ["as", "cb", "cl", "ga", "md"] as const;
+export type PlanningRegion = (typeof PLANNING_REGIONS)[number];
+
+export type PlanningCalendar = {
+  region: PlanningRegion | null;
+  /** The four weeks of August off (Monday of the first full week). */
+  augustClosure: boolean;
+  /** 24 December to 6 January off. */
+  christmasClosure: boolean;
+};
+
+export type PlanningStatus = "draft" | "approved" | "superseded";
+
+/** How a chapter's start is set. */
+export type PlanningRule = {
+  /** Starts the working day after this chapter ends, plus `lagDays`; null = at `fixedStart`, else with the works. */
+  after: string | null;
+  lagDays: number;
+  durationDays: number;
+  fixedStart: string | null;
+  /** Runs from the works' start to the last chapter's end (17, 18, 19). */
+  spansWorks: boolean;
+};
+
+export type PlanningItemInput = PlanningRule & { code: string };
+
+/** One chapter of a version: its rule, its dates, and where it stands on site. */
+export type PlanningRow = PlanningRule & {
+  code: string;
+  name: string;
+  hitoCode: string | null;
+  /** The version's dates (a baseline's never move). */
+  plannedStart: string;
+  plannedEnd: string;
+  /** Where it is heading now, from what Avance recorded and today. */
+  forecastStart: string;
+  forecastEnd: string;
+  state: ChapterState;
+  actualStart: string | null;
+  actualEnd: string | null;
+  progressPct: number;
+  /** On the chain of chapters that sets the end. */
+  critical: boolean;
+};
+
+export type PlanningVersionSummary = {
+  id: string;
+  number: number;
+  status: PlanningStatus;
+  reason: string | null;
+  startDate: string;
+  endDate: string;
+  createdBy: string | null;
+  createdAt: string;
+  approvedBy: string | null;
+  approvedAt: string | null;
+};
+
+/** How a plan's end compares with the contract (delay penalty: 150 €/day from day 15, capped at 5 %). */
+export type PlanningCheck = {
+  endDate: string;
+  /** The contract's completion date; null when the project has none. */
+  contractEnd: string | null;
+  /** End − contract, calendar days (late > 0); null without a contract date. */
+  delayDays: number | null;
+  penaltyCents: number;
+};
+
+/** GET /api/v1/projects/:id/planning: the Obra tab's Planificación. */
+export type ProjectPlanning = {
+  ref: string;
+  stage: ObraStage;
+  /** The acta de inicio and contract dates on the project. */
+  startDate: string | null;
+  completionDate: string | null;
+  baseline:
+    | (PlanningVersionSummary & {
+        calendar: PlanningCalendar;
+        rows: PlanningRow[];
+        /** Where the works are heading, from the baseline and what happened. */
+        forecast: PlanningCheck;
+        planned: PlanningCheck;
+      })
+    | null;
+  draft: PlanningVersionSummary | null;
+  /** The contract's chapters (chapter 20 aside), to generate a first plan from. */
+  chapters: { code: string; name: string }[];
+  /** Other projects with a baseline, to copy one from. */
+  copyFrom: { projectId: string; ref: string }[];
+  today: string;
+};
+
+/** GET /api/v1/projects/:id/planning/draft (the portal checks it against the contract as staff edit). */
+export type PlanningDraft = {
+  ref: string;
+  version: PlanningVersionSummary;
+  calendar: PlanningCalendar;
+  rows: PlanningRow[];
+  /** The baseline's ends by chapter, to show what the draft moves; null for a first plan. */
+  baseline: { number: number; ends: Record<string, string> } | null;
+  completionDate: string | null;
+  contractCents: number;
+  today: string;
+};
+
+/** GET /api/v1/projects/:id/planning/versions: every version, newest first, with its dates. */
+export type PlanningVersions = {
+  ref: string;
+  versions: (PlanningVersionSummary & {
+    rows: { code: string; name: string; plannedStart: string; plannedEnd: string }[];
+  })[];
 };
 
 // ─── Subcontratas ─────────────────────────────────────────────────────────────

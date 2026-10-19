@@ -206,7 +206,7 @@ function ConceptAndDates({
         {chapter?.plannedStart && chapter.plannedEnd && (
           <>
             {t("chapterPlanned", { code: chapter.code, range: f.range(chapter.plannedStart, chapter.plannedEnd) })}
-            <MockBadge />
+            {form.sources.planning === "mock" && <MockBadge />}
           </>
         )}
         {t("datesNote")}

@@ -6,6 +6,7 @@ import {
   budgetRevisions,
   db,
   eq,
+  inArray,
   obraHitoChapters,
   obraHitoChecks,
   obraHitoPhotos,
@@ -13,6 +14,8 @@ import {
   users,
   obraChapterProgress,
   obraInvoiceRequests,
+  planningItems,
+  planningVersions,
   sql,
   type AnyColumn,
   type PgTable,
@@ -64,6 +67,7 @@ const STATUS: Record<ObraError, number> = {
   not_accepted: 409,
   no_budget: 404,
   project_not_found: 404,
+  dependency_cycle: 400,
   not_found: 404,
   forbidden: 403,
 };
@@ -153,6 +157,17 @@ export const isObject = (value: unknown): value is Record<string, unknown> =>
 
 /** Who did something: their name, else their email. */
 export const userName = sql<string | null>`coalesce(${users.name}, ${users.email})`;
+
+/** The tenant's users among `ids`: their name, or their email without one. */
+export async function userNamesById(tenantId: string, ids: (string | null)[]): Promise<Map<string, string>> {
+  const unique = [...new Set(ids.filter((id): id is string => !!id))];
+  if (unique.length === 0) return new Map();
+  const rows = await db
+    .select({ id: users.id, name: userName })
+    .from(users)
+    .where(and(eq(users.tenantId, tenantId), inArray(users.id, unique)));
+  return new Map(rows.map((u) => [u.id, u.name ?? ""]));
+}
 
 /**
  * The columns a partial update sets: each parser runs only for the keys
@@ -394,16 +409,37 @@ export async function loadProgressRows(tenantId: string, projectId: string) {
     .where(and(eq(obraChapterProgress.projectId, projectId), eq(obraChapterProgress.tenantId, tenantId)));
 }
 
+/** The approved Planning baseline's dates by chapter code (./planning); null without one. */
+export async function approvedPlanDates(
+  tenantId: string,
+  projectId: string,
+): Promise<Map<string, { start: string; end: string }> | null> {
+  const rows = await db
+    .select({ code: planningItems.chapterCode, start: planningItems.plannedStart, end: planningItems.plannedEnd })
+    .from(planningItems)
+    .innerJoin(planningVersions, eq(planningVersions.id, planningItems.versionId))
+    .where(
+      and(
+        eq(planningVersions.projectId, projectId),
+        eq(planningVersions.tenantId, tenantId),
+        eq(planningVersions.status, "approved"),
+      ),
+    );
+  return rows.length > 0 ? new Map(rows.map((r) => [r.code, { start: r.start, end: r.end }])) : null;
+}
+
 /**
- * The project's accepted budget and hitos, computed. A chapter recorded as
+ * The project's accepted budget and hitos, computed, with the Planning
+ * baseline's dates (null without one). A chapter recorded as
  * finished on the Obra tab counts as built in full, whatever its lines' %:
  * the hitos and the client's app follow it.
  */
 export async function loadObra(tenantId: string, projectId: string) {
-  const [budget, hitoRows, progressRows] = await Promise.all([
+  const [budget, hitoRows, progressRows, planDates] = await Promise.all([
     loadBudget(tenantId, projectId),
     loadHitoRows(tenantId, projectId),
     loadProgressRows(tenantId, projectId),
+    approvedPlanDates(tenantId, projectId),
   ]);
   const { revision, costChapters } = budget;
   let { chapters, progress } = budget;
@@ -418,5 +454,5 @@ export async function loadObra(tenantId: string, projectId: string) {
   }
   const vatRateBp = revision?.vatRateBp ?? 1000;
   const hitos = toHitos(hitoRows, chapters, progress.totalCents, vatRateBp);
-  return { revision, chapters, costChapters, progress, vatRateBp, hitos, progressRows, requests: hitoRows.requests };
+  return { revision, chapters, costChapters, progress, vatRateBp, hitos, progressRows, planDates, requests: hitoRows.requests };
 }

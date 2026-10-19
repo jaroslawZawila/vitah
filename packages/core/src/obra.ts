@@ -28,7 +28,7 @@ import { listPhotos, photosByChapter } from "./photos";
 // portal's Obra page and the app's Obra tab read from here.
 // ─────────────────────────────────────────────────────────────────────────────
 
-function termOf(project: ObraProject, totalCents: number) {
+function termOf(project: Pick<ObraProject, "startDate" | "completionDate">, totalCents: number) {
   const start = toCalendarDate(project.startDate);
   const end = toCalendarDate(project.completionDate);
   return start && end ? obraTerm(start, end, todayInSpain(), totalCents) : null;

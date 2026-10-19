@@ -141,6 +141,12 @@ export function progressOf(lines: { amountCents: number; executedPct: number }[]
   };
 }
 
+/** The delay penalty for finishing `lateDays` calendar days after the contract's date. */
+export function delayPenaltyCents(lateDays: number, totalCents: number): number {
+  const penaltyDays = Math.max(0, lateDays - PENALTY_FREE_DAYS);
+  return Math.min(penaltyDays * PENALTY_PER_DAY_CENTS, ofBp(totalCents, PENALTY_CAP_BP));
+}
+
 /** Where the works stand against their dates, and the delay penalty so far. */
 export function obraTerm(
   startDate: string,
@@ -154,12 +160,7 @@ export function obraTerm(
   const week = now < start ? 0 : Math.floor((now - start) / (7 * DAY_MS)) + 1;
   const totalWeeks = Math.max(1, Math.ceil((end - start) / (7 * DAY_MS)));
   const lateDays = Math.max(0, Math.round((now - end) / DAY_MS));
-  const penaltyDays = Math.max(0, lateDays - PENALTY_FREE_DAYS);
-  const penaltyCents = Math.min(
-    penaltyDays * PENALTY_PER_DAY_CENTS,
-    ofBp(totalCents, PENALTY_CAP_BP),
-  );
-  return { startDate, completionDate, week, totalWeeks, lateDays, penaltyCents };
+  return { startDate, completionDate, week, totalWeeks, lateDays, penaltyCents: delayPenaltyCents(lateDays, totalCents) };
 }
 
 /**

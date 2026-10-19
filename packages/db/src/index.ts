@@ -44,6 +44,9 @@ export {
   purchaseOrderEvents,
   type PurchaseOrderKind,
   type PurchaseOrderStatus,
+  planningVersions,
+  planningItems,
+  type PlanningVersionStatus,
 } from "./schema";
 export { seedConfig, seedPassword } from "./seed-config";
 export type { AnyColumn } from "drizzle-orm";

@@ -94,6 +94,7 @@ function DateField({
 /** Pending → in progress: the day work really started (may be before today). */
 export function StartDialog({
   chapter,
+  planningMock,
   today,
   pending,
   error,
@@ -101,6 +102,8 @@ export function StartDialog({
   onCancel,
 }: {
   chapter: ControlChapter;
+  /** The planned dates are simulated (no Planning baseline yet). */
+  planningMock: boolean;
   today: string;
   pending: boolean;
   error?: ObraError;
@@ -127,9 +130,11 @@ export function StartDialog({
           {date && chapter.plannedStart && daysBetween(chapter.plannedStart, date) !== 0 && (
             <span className="num ml-1.5">· {f.signedDays(daysBetween(chapter.plannedStart, date))}</span>
           )}
-          <span className="ml-2 inline-flex align-middle">
-            <MockBadge />
-          </span>
+          {planningMock && (
+            <span className="ml-2 inline-flex align-middle">
+              <MockBadge />
+            </span>
+          )}
         </div>
       )}
       <p className="text-[13px] text-muted-foreground">{t("startEffect")}</p>
@@ -152,6 +157,7 @@ export type FinishContext = {
 /** In progress → finished: the day work really finished; may complete its hito. */
 export function FinishDialog({
   chapter,
+  planningMock,
   context,
   today,
   pending,
@@ -160,6 +166,7 @@ export function FinishDialog({
   onCancel,
 }: {
   chapter: ControlChapter;
+  planningMock: boolean;
   context: FinishContext;
   today: string;
   pending: boolean;
@@ -200,7 +207,7 @@ export function FinishDialog({
                     · {delay > 0 ? f.signedDays(delay) : t("onTime")}
                   </span>
                 )}
-                <MockBadge />
+                {planningMock && <MockBadge />}
               </span>
             )}
           </div>
@@ -252,12 +259,14 @@ export function FinishDialog({
 /** After finishing: what was recorded and what happens next. */
 export function FinishedNotice({
   chapter,
+  planningMock,
   date,
   context,
   avanceHref,
   onClose,
 }: {
   chapter: ControlChapter;
+  planningMock: boolean;
   date: string;
   context: FinishContext;
   /** Set on pages other than Avance, to go back to it. */
@@ -291,7 +300,7 @@ export function FinishedNotice({
         )}
         <Row label={t("planning")}>
           <span className="inline-flex items-center gap-1.5">
-            {t("planningGets")} <MockBadge />
+            {t("planningGets")} {planningMock && <MockBadge />}
           </span>
         </Row>
       </div>

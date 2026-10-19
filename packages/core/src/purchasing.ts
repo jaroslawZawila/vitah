@@ -201,7 +201,7 @@ export const contractingOf = (contract: LineContract | undefined): LineContracti
 
 /**
  * The project's contract at cost, chapter 20 aside, with each chapter's state
- * and planned dates (simulated until Planning exists).
+ * and planned dates (the Planning baseline, else simulated).
  */
 async function contractPlan(tenantId: string, projectId: string) {
   const [project, obra] = await Promise.all([
@@ -212,17 +212,15 @@ async function contractPlan(tenantId: string, projectId: string) {
     loadObra(tenantId, projectId),
   ]);
   if (!project) fail("project_not_found");
-  const { items, states, plan } = contractSchedule(obra.costChapters, obra.hitos, obra.progressRows, {
-    startDate: toCalendarDate(project.startDate),
-    completionDate: toCalendarDate(project.completionDate),
-  });
+  const works = { startDate: toCalendarDate(project.startDate), completionDate: toCalendarDate(project.completionDate) };
+  const { items, states, plan, planSource } = contractSchedule(obra.costChapters, obra.hitos, obra.progressRows, works, obra.planDates);
   const chapters = items.map((item) => ({
     ...item,
     state: states.get(item.code)!,
     plannedStart: plan.get(item.code)?.start ?? null,
     plannedEnd: plan.get(item.code)?.end ?? null,
   }));
-  return { ref: project.ref, budgetNumber: obra.revision?.number ?? null, chapters };
+  return { ref: project.ref, budgetNumber: obra.revision?.number ?? null, chapters, planSource };
 }
 
 /** The contract's budget lines by lineage, for checking an order's lines. */
@@ -336,7 +334,7 @@ export async function getProjectPurchases(ctx: Ctx, projectId: string): Promise<
     },
     upcoming,
     today,
-    sources: { planning: "mock" },
+    sources: { planning: plan.planSource },
   };
 }
 
@@ -407,6 +405,7 @@ export async function getPurchaseForm(ctx: Ctx, projectId: string, orderId?: str
       }),
     })),
     today: todayInSpain(),
+    sources: { planning: plan.planSource },
   };
 }
 

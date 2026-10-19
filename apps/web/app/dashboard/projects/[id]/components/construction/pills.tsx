@@ -67,7 +67,7 @@ export function IssueStatusPill({ status }: { status: IssueStatus }) {
   );
 }
 
-/** Marks a figure that comes from a module that doesn't exist yet. */
+/** Marks a simulated figure: a planned date while the project has no Planning baseline. */
 export function MockBadge() {
   const t = useTranslations("construction.sources");
   return (

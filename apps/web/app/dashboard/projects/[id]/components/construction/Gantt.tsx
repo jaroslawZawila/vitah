@@ -14,11 +14,16 @@ export function timelineOf(
   project: { startDate: string | null; completionDate: string | null },
   today: string,
 ): Timeline | null {
-  const dates = [
+  return timelineSpanning([
     project.startDate,
     project.completionDate,
     ...chapters.flatMap((c) => [c.plannedStart, c.plannedEnd, c.actualStart, c.actualEnd]),
-  ].filter((d): d is string => !!d);
+  ], today);
+}
+
+/** The timeline from the first to the last of `days` (and today), month by month; null without any. */
+export function timelineSpanning(days: (string | null)[], today: string): Timeline | null {
+  const dates = days.filter((d): d is string => !!d);
   if (dates.length === 0) return null;
   dates.push(today);
   dates.sort();
@@ -42,13 +47,13 @@ export function timelineOf(
 }
 
 /** A day's position on the timeline, 0–100 (%). */
-function at(timeline: Timeline, day: string) {
+export function at(timeline: Timeline, day: string) {
   const total = spanDays(timeline.start, timeline.end);
   return Math.min(100, Math.max(0, (daysBetween(timeline.start, day) / total) * 100));
 }
 
 /** From `from` to the end of `to`, as left/width styles. */
-function bar(timeline: Timeline, from: string, to: string) {
+export function bar(timeline: Timeline, from: string, to: string) {
   const left = at(timeline, from);
   const total = spanDays(timeline.start, timeline.end);
   const right = Math.min(100, (spanDays(timeline.start, to) / total) * 100);

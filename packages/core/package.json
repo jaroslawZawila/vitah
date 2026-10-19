@@ -8,6 +8,7 @@
     "./contract": "./src/contract.ts",
     "./obra-calc": "./src/obra-calc.ts",
     "./control-calc": "./src/control-calc.ts",
+    "./planning-calc": "./src/planning-calc.ts",
     "./projects": "./src/projects.ts",
     "./users": "./src/users.ts",
     "./storage": "./src/storage.ts",

@@ -8,11 +8,12 @@ import { cn } from "@/lib/utils";
 import { Dot } from "./pills";
 
 /** The Obra tab's pages, in the order of its sub-navigation. */
-export const OBRA_TABS = ["summary", "progress", "costs", "milestones", "issues", "photos"] as const;
+export const OBRA_TABS = ["summary", "planning", "progress", "costs", "milestones", "issues", "photos"] as const;
 export type ObraTab = (typeof OBRA_TABS)[number];
 
 const TAB_PATH: Record<ObraTab, string> = {
   summary: "",
+  planning: "/planificacion",
   progress: "/avance",
   costs: "/costes",
   milestones: "/hitos",
@@ -49,7 +50,7 @@ export function StageEyebrow({ label, stage }: { label: string; stage?: ObraStag
 /**
  * Presentational: an Obra page's header (ref and stage, title, what the page
  * is for, and its sources or actions on the right) above the sub-navigation
- * Resumen · Avance · Costes · Hitos · Incidencias · Fotos.
+ * Resumen · Planificación · Avance · Costes · Hitos · Incidencias · Fotos.
  */
 export default function ObraFrame({
   projectId,

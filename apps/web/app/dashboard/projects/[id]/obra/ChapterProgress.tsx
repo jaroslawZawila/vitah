@@ -22,7 +22,7 @@ import { completesMilestone } from "../components/construction/schedule";
 export type ProgressRequest = { kind: "start" | "finish" | "correct"; code: string } | null;
 
 /** What the dialogs need of the project's control. */
-export type ProgressControl = Pick<ConstructionControl, "chapters" | "milestones" | "project" | "today">;
+export type ProgressControl = Pick<ConstructionControl, "chapters" | "milestones" | "project" | "today" | "sources">;
 
 export default function ChapterProgress({
   projectId,
@@ -85,6 +85,7 @@ function Dialog({
     return (
       <StartDialog
         chapter={chapter}
+        planningMock={control.sources.planning === "mock"}
         today={control.today}
         pending={pending}
         error={state?.error}
@@ -120,6 +121,7 @@ function Dialog({
     return (
       <FinishedNotice
         chapter={chapter}
+        planningMock={control.sources.planning === "mock"}
         date={finished.date}
         context={finished.context}
         avanceHref={avanceHref}
@@ -130,6 +132,7 @@ function Dialog({
   return (
     <FinishDialog
       chapter={chapter}
+      planningMock={control.sources.planning === "mock"}
       context={context}
       today={control.today}
       pending={pending}

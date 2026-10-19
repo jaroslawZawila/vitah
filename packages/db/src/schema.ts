@@ -1221,6 +1221,81 @@ export const purchaseOrderEvents = pgTable(
   }),
 );
 
+// --- Planning (the works schedule) ---
+
+export type PlanningVersionStatus = "draft" | "approved" | "superseded";
+
+// A project's schedule, by version: a draft is edited freely; approving it makes
+// it the baseline (the previous one superseded). One draft and one baseline at most.
+export const planningVersions = pgTable(
+  "planning_versions",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    number: integer("number").notNull(),
+    status: text("status").$type<PlanningVersionStatus>().default("draft").notNull(),
+    // The day the works start (acta de inicio) and the working calendar.
+    startDate: date("start_date", { mode: "string" }).notNull(),
+    // An autonomous community's holidays (as, cb, cl, ga, md); null = national only.
+    region: text("region"),
+    augustClosure: boolean("august_closure").default(true).notNull(),
+    christmasClosure: boolean("christmas_closure").default(true).notNull(),
+    // Why it changed: required to approve a version after the first.
+    reason: text("reason"),
+    createdById: text("created_by_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    approvedById: text("approved_by_id").references(() => users.id, { onDelete: "set null" }),
+    approvedAt: timestamp("approved_at", { mode: "date" }),
+  },
+  (table) => ({
+    projectNumberUnique: unique("planning_versions_project_number_unique").on(table.projectId, table.number),
+    oneDraft: uniqueIndex("planning_versions_one_draft")
+      .on(table.projectId)
+      .where(sql`${table.status} = 'draft'`),
+    oneApproved: uniqueIndex("planning_versions_one_approved")
+      .on(table.projectId)
+      .where(sql`${table.status} = 'approved'`),
+  }),
+);
+
+// One row per contract chapter: what it waits for, how long it takes in working
+// days, and the dates that gives (stored, so a baseline never moves).
+export const planningItems = pgTable(
+  "planning_items",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    versionId: text("version_id")
+      .notNull()
+      .references(() => planningVersions.id, { onDelete: "cascade" }),
+    chapterCode: text("chapter_code").notNull(),
+    position: integer("position").notNull(),
+    // Starts the working day after this chapter ends (+ lag); null = at `fixed_start` or the works' start.
+    afterCode: text("after_code"),
+    lagDays: integer("lag_days").default(0).notNull(),
+    durationDays: integer("duration_days").notNull(),
+    fixedStart: date("fixed_start", { mode: "string" }),
+    // Runs through the whole works (quality control, health and safety, waste).
+    spansWorks: boolean("spans_works").default(false).notNull(),
+    plannedStart: date("planned_start", { mode: "string" }).notNull(),
+    plannedEnd: date("planned_end", { mode: "string" }).notNull(),
+  },
+  (table) => ({
+    versionChapterUnique: unique("planning_items_version_chapter_unique").on(table.versionId, table.chapterCode),
+  }),
+);
+
 // --- Relations ---
 
 export const tenantsRelations = relations(tenants, ({ many }) => ({

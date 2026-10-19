@@ -180,8 +180,8 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
 - Schema in `packages/db/src/schema.ts` — tables: `tenants`, `users`, `client_profiles`, `client_settings`, `push_tokens`, `accounts`, `sessions`, `verification_tokens`, `projects`, `project_documents`, `project_photos`, the construction control's `obra_chapter_progress`, `obra_progress_events`,
   `obra_invoice_requests`, `obra_issues`, `obra_issue_files`, and the obra's `budget_revisions`, `budget_chapters`, `budget_lines`, `obra_hitos`, `obra_hito_chapters`, `obra_hito_checks`, `obra_hito_photos`, plus `budget_generations` (AI runs) and `ai_usage` (one row per Claude call, with its cost), and the
   Subcontratas tables `subcontractors`, `subcontractor_workers`, `subcontractor_documents`, `subcontractor_document_versions`,
-  `subcontractor_assignments`, `subcontractor_audit`, and Compras' `purchase_orders`, `purchase_order_lines`,
-  `purchase_order_events`. A project is deliberately minimal — exactly what the mobile app shows: `ref`, `address`, `start_date`, `completion_date`, plus `client_user_id` linking it to its mobile app client
+  `subcontractor_assignments`, `subcontractor_audit`, Compras' `purchase_orders`, `purchase_order_lines`,
+  `purchase_order_events`, and Planning's `planning_versions`, `planning_items`. A project is deliberately minimal — exactly what the mobile app shows: `ref`, `address`, `start_date`, `completion_date`, plus `client_user_id` linking it to its mobile app client
 - Prod migrations are additive SQL files in `packages/db/sql/`, applied by hand (no plain `db:push` on prod)
 
 ### Obra (construction process)
@@ -213,14 +213,14 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
   never a second one, whatever is corrected); hito states pending → reached → requested → invoiced → collected follow
   the Pagos tab's invoice and payment. `Hito.invoiceRequestedAt` shows it on Pagos. A finished chapter counts as 100 %
   built for the hitos and the client's app (`loadObra`), so start/finish/correct call `markChanged(["obra"])`
-- Planning doesn't exist yet: planned dates (hitos in turn, each a share of the works' time like its share of the
-  price) are **simulated** in `control-calc.ts` (`sources.planning: "mock"`, shown as "Simulado"); swap Planning in
-  there. Contracted amounts are real, from Compras (`lineContracts` in `purchasing.ts`, below); a late delivery is a
-  warning only. Sales is the hitos' invoices/payments
+- Planned dates are the approved Planning baseline (`loadObra`'s `planDates`, below; `sources.planning: "live"`). A
+  project without one has them **simulated** in `control-calc.ts` (hitos in turn, each a share of the works' time like
+  its share of the price; `"mock"`, shown as "Simulado"). Contracted amounts are real, from Compras (`lineContracts` in
+  `purchasing.ts`, below); a late delivery is a warning only. Sales is the hitos' invoices/payments
 - Issues and changes log (`obra_issues`, numbered per kind INC-/CAM-, files in `obra_issue_files`, private Blob,
   served as downloads): history only, never changes dates, amounts or invoices. Document warnings come from
   Subcontratas (`listProjectAttention`). Photos have a `taken_on` day. Staff only; viewers read
-- Portal: `dashboard/projects/[id]/obra/` (Resumen) + `avance`, `avance/[code]`, `costes`, `hitos`, `incidencias`,
+- Portal: `dashboard/projects/[id]/obra/` (Resumen) + `planificacion` (Planning, below), `avance`, `avance/[code]`, `costes`, `hitos`, `incidencias`,
   `fotos` (the old project Fotos tab redirects there); views in `components/construction/`. API: `/api/v1/projects/:id/obra/`
   `control`, `header`, `costs`, `review`, `chapters/:code/{control,start,finish}` (`PATCH …/control` corrects), `issues`,
   `issues/:issueId`, `issues/:issueId/files[/:fileId]`. Prod SQL: `packages/db/sql/2026-10-construction-control.sql`
@@ -245,6 +245,28 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
   (`?projectId`, `?subcontractorId`), `/api/v1/purchases/:orderId` (GET, PATCH), `…/status` (POST), `…/file`;
   `/api/v1/projects/:id/purchases` (GET, POST) and `…/purchases/form`. `pnpm db:seed` gives VTH-26-001 its orders
   (`seed/purchasing.ts`). Prod SQL: `packages/db/sql/2026-10-purchasing.sql`
+
+### Planning (Planificación)
+
+- Design canvas https://claude.ai/artifact/JtbTern7qQ7gT7rcBWsLD6. Service `packages/core/src/planning.ts`
+  (`planningService`), arithmetic in `planning-calc.ts` (pure, also run by the portal as staff type); web-only and
+  staff-only (admins/managers write, viewers read): the client's app doesn't show it yet, so no `/api/mobile` route
+- A project's schedule by version (`planning_versions`: one `draft` and one `approved` at most, the older ones
+  `superseded`). Each contract chapter (20 aside) is a `planning_items` row: it starts the working day after the chapter
+  it waits for ends (`after_code` + `lag_days`, negative to overlap), else on `fixed_start` or the works' start, and lasts
+  `duration_days` working days; 17–19 span the works (`spans_works`). The dates are stored, so a baseline never moves
+- Working days: weekends, national holidays (Good Friday too), the region's (`as cb cl ga md`, plus Holy Thursday),
+  and the optional August (4 weeks from its first Monday) and Christmas (24/12–6/1) closures, chosen per version
+- What Avance records wins: a finished chapter keeps its real dates, a started one its real start; nothing still to
+  happen is placed before today. The baseline view adds that forecast and the critical path; both, and the draft, are
+  checked against `projects.completion_date` with the contract's delay penalty (`delayPenaltyCents` in `obra-calc.ts`)
+- A first plan comes from the standard steel-frame template (`PLAN_TEMPLATE`) or another project's baseline; a change
+  copies the baseline into a draft and needs a reason to approve. Approving recomputes the dates as of that day
+- Portal: Obra tab Planificación (`dashboard/projects/[id]/obra/planificacion/`: the baseline or the generate form,
+  `editar` the draft, `versiones` the history); views in `components/planning/`. API: `/api/v1/projects/:id/planning`
+  (GET), `…/planning/versions` (GET), `…/planning/draft` (GET, POST create, PUT save, DELETE discard) and
+  `…/planning/draft/approve` (POST). `pnpm db:seed` approves VTH-26-001's first plan (`seed/planning.ts`). Prod SQL:
+  `packages/db/sql/2026-10-planning.sql`
 
 ### Budget (Presupuesto)
 

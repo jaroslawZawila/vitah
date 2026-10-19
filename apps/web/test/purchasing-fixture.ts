@@ -305,6 +305,7 @@ export const purchaseForm: PurchaseForm = {
     },
   ],
   today: TODAY,
+  sources: { planning: "mock" },
 };
 
 /** The form for editing PED-049 (getPurchaseForm with its id). */

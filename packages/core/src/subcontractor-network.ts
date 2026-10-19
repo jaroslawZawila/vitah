@@ -40,6 +40,7 @@ import {
   type WorkerAccess,
 } from "./contract";
 import { CoreError } from "./errors";
+import { userNamesById } from "./obra-data";
 import { clippedText, MAX_TEXT, PHONE_PATTERN } from "./input";
 
 // ─── Subcontractor network ────────────────────────────────────────────────────
@@ -402,17 +403,8 @@ export const hasBookEntry = (a: Pick<AssignmentRow, "bookOrder" | "bookDate">) =
 // ─── Documents as the API shows them ─────────────────────────────────────────
 
 /** Names of the users who uploaded or reviewed `versions`. */
-export async function userNames(tenantId: string, versions: VersionRow[]) {
-  const ids = [
-    ...new Set(versions.flatMap((v) => [v.uploadedById, v.reviewedById]).filter((id): id is string => !!id)),
-  ];
-  if (ids.length === 0) return new Map<string, string>();
-  const rows = await db
-    .select({ id: users.id, name: users.name, email: users.email })
-    .from(users)
-    .where(and(eq(users.tenantId, tenantId), inArray(users.id, ids)));
-  return new Map(rows.map((u) => [u.id, u.name ?? u.email]));
-}
+export const userNames = (tenantId: string, versions: VersionRow[]) =>
+  userNamesById(tenantId, versions.flatMap((v) => [v.uploadedById, v.reviewedById]));
 
 export function toVersion(row: VersionRow, names: Map<string, string>): SubcontractorDocVersion {
   const name = (id: string | null) => (id ? (names.get(id) ?? null) : null);
