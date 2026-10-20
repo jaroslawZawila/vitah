@@ -998,6 +998,7 @@ export type PurchaseOrderListItem = {
   lateDays: number | null;
   /** Its suppliers' invoices' base, credit notes taken off (without VAT). */
   invoicedCents: number;
+  /** It has documents. */
   hasFile: boolean;
   createdAt: string;
 };
@@ -1031,10 +1032,22 @@ export type PurchaseOrderEvent = {
   at: string;
 };
 
+/** One of an order's documents (the order, the signed contract, an annex…), in versions. */
+export type PurchaseOrderDocument = {
+  id: string;
+  title: string;
+  /** Newest (current) first. */
+  versions: { id: string; version: number; filename: string; sizeBytes: number; note: string | null; by: string | null; at: string }[];
+  createdAt: string;
+};
+
 /** GET /api/v1/purchases/:orderId */
 export type PurchaseOrderDetail = PurchaseOrderListItem & {
   notes: string | null;
   lines: PurchaseOrderLine[];
+  /** Oldest first. */
+  documents: PurchaseOrderDocument[];
+  /** The first document's current version (kept for older clients). */
   file: { name: string; sizeBytes: number } | null;
   /** Its chapters and where they stand on the obra. */
   chapters: { code: string; name: string; state: ChapterState }[];

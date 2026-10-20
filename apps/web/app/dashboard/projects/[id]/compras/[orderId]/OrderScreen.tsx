@@ -16,12 +16,18 @@ import {
   type PurchaseStatus,
 } from "@repo/core/contract";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { deletePurchaseFileAction, setPurchaseStatusAction, uploadPurchaseFileAction } from "../../../../../actions/purchasing";
+import {
+  addOrderDocumentAction,
+  addOrderDocumentVersionAction,
+  deleteOrderDocumentAction,
+  setPurchaseStatusAction,
+} from "../../../../../actions/purchasing";
 import { setOrderMilestonesAction } from "../../../../../actions/purchase-invoices";
 import FormError from "../../../../components/FormError";
 import { obraHref } from "../../components/construction/ObraFrame";
 import { useObraAction } from "../../components/obra/useObraAction";
-import { editOrderHref, newInvoiceHref, orderFileUrl, purchasesHref } from "../../components/purchasing/links";
+import { editOrderHref, newInvoiceHref, orderDocumentUrl, purchasesHref } from "../../components/purchasing/links";
+import { OrderDocuments } from "../../components/purchasing/OrderDocumentViews";
 import { MilestonesCard, OrderInvoices } from "../../components/purchasing/OrderInvoiceViews";
 import { LateBanner, OrderData, OrderHeading, OrderHistory, OrderLines, StatusForm, StatusSteps } from "../../components/purchasing/OrderViews";
 import BackLink from "../../../../components/BackLink";
@@ -127,23 +133,36 @@ export default function OrderScreen({
       <OrderLines order={order} />
 
       <div className="grid items-start gap-[18px] lg:grid-cols-3">
-        <div className="flex min-w-0 flex-col gap-2">
+        <div className="flex min-w-0 flex-col gap-[18px]">
           <OrderData
             order={order}
-            fileUrl={orderFileUrl(order.id)}
             editHref={canManage && order.status !== "cancelled" ? editOrderHref(projectId, order.id) : undefined}
+          />
+          <OrderDocuments
+            documents={order.documents}
+            documentUrl={(documentId, versionId) => orderDocumentUrl(order.id, documentId, versionId)}
             canManage={canManage}
             pending={file.pending}
-            onUpload={(chosen) => {
+            error={file.state?.error}
+            onAdd={({ title, file: chosen }, done) => {
+              const data = new FormData();
+              data.set("title", title);
+              data.set("file", chosen);
+              file.run(() => addOrderDocumentAction(projectId, order.id, data), done);
+            }}
+            onAddVersion={(documentId, { file: chosen, note }, done) => {
               const data = new FormData();
               data.set("file", chosen);
-              file.run(() => uploadPurchaseFileAction(projectId, order.id, null, data));
+              if (note) data.set("note", note);
+              file.run(() => addOrderDocumentVersionAction(projectId, order.id, documentId, data), done);
             }}
-            onRemoveFile={() =>
-              file.confirmThen(t("confirmRemoveFile"), () => deletePurchaseFileAction(projectId, order.id))
+            onDismiss={file.reset}
+            onRemove={(document) =>
+              file.confirmThen(t("documents.confirmRemove", { title: document.title }), () =>
+                deleteOrderDocumentAction(projectId, order.id, document.id),
+              )
             }
           />
-          <FormError namespace="purchasing.errors" error={file.state?.error} />
         </div>
         <div className="min-w-0 lg:col-span-2">
           <OrderHistory events={order.events} />

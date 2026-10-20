@@ -181,7 +181,7 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
   `obra_invoice_requests`, `obra_issues`, `obra_issue_files`, and the obra's `budget_revisions`, `budget_chapters`, `budget_lines`, `obra_hitos`, `obra_hito_chapters`, `obra_hito_checks`, `obra_hito_photos`, plus `budget_generations` (AI runs) and `ai_usage` (one row per Claude call, with its cost), and the
   Subcontratas tables `subcontractors`, `subcontractor_workers`, `subcontractor_documents`, `subcontractor_document_versions`,
   `subcontractor_assignments`, `subcontractor_audit`, Compras' `purchase_orders`, `purchase_order_lines`,
-  `purchase_order_events`, `purchase_order_milestones`, `purchase_invoices`, `purchase_invoice_lines`, `purchase_invoice_files`,
+  `purchase_order_events`, `purchase_order_documents`, `purchase_order_document_versions`, `purchase_order_milestones`, `purchase_invoices`, `purchase_invoice_lines`, `purchase_invoice_files`,
   `purchase_payments`, and Planning's `planning_versions`, `planning_items`. A project is deliberately minimal — exactly what the mobile app shows: `ref`, `address`, `start_date`, `completion_date`, plus `client_user_id` linking it to its mobile app client
 - Prod migrations are additive SQL files in `packages/db/sql/`, applied by hand (no plain `db:push` on prod)
 
@@ -235,7 +235,11 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
   ordered → confirmed → in_transit → delivered) or `subcontract` (pending → contracted → finished); any may be cancelled
   except a completed one; any status of its kind can be set again (corrections), dates ≤ today. Each order splits its
   amount across budget lines by **lineage** (`purchase_order_lines`, so it outlives a revision) and may close a line
-  (`closes_line`: nothing more to order for it). Every change goes to `purchase_order_events`; one PDF per order
+  (`closes_line`: nothing more to order for it). Every change goes to `purchase_order_events`. An order has several
+  documents (the order, the signed contract, annexes…: `purchase_order_documents`), each a PDF in versions
+  (`purchase_order_document_versions`, a note says why one replaced the last; a document goes with all its versions),
+  in `purchase-documents.ts` (`purchaseDocumentsService`). `purchase_orders.file_*` is the legacy single PDF, copied
+  into a first document by the prod SQL; `/api/v1/purchases/:orderId/file` still serves the first document
 - A line's contracted amount = its orders from ordered/contracted on (pending and cancelled don't count); its
   deviation (cost − contracted) counts only once it is closed, so an open line never shows as a saving. The Obra tab's
   Costes/Resumen read it; a material order past its expected date and not delivered is a late delivery (warning only)
@@ -265,10 +269,12 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
   `/api/v1/purchases/:orderId/milestones` (PUT), `/api/v1/purchases/counts`, `/api/v1/projects/:id/purchases/lines`
 - Portal: project tab Compras (`dashboard/projects/[id]/compras/`: list, `nuevo`, `[orderId]`, `[orderId]/editar`) and the
   rail's company-wide Compras (`dashboard/compras/`, every order of the tenant for Administration). API: `/api/v1/purchases`
-  (`?projectId`, `?subcontractorId`), `/api/v1/purchases/:orderId` (GET, PATCH), `…/status` (POST), `…/file`;
+  (`?projectId`, `?subcontractorId`), `/api/v1/purchases/:orderId` (GET, PATCH), `…/status` (POST), `…/file`,
+  `…/documents` (POST), `…/documents/:documentId` (GET `?versionId`, POST a version, DELETE);
   `/api/v1/projects/:id/purchases` (GET, POST) and `…/purchases/form`. `pnpm db:seed` gives VTH-26-001 its orders
   (`seed/purchasing.ts`) and their invoices and payments (`seed/purchase-invoices.ts`). Prod SQL:
-  `packages/db/sql/2026-10-purchasing.sql`, `packages/db/sql/2026-10-purchase-invoices.sql`
+  `packages/db/sql/2026-10-purchasing.sql`, `packages/db/sql/2026-10-purchase-invoices.sql`,
+  `packages/db/sql/2026-10-purchase-documents.sql`
 
 ### Planning (Planificación)
 

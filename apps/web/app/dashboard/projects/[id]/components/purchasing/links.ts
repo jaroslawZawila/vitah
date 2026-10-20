@@ -13,8 +13,9 @@ export const newOrderHref = (projectId: string, chapterCode?: string) =>
 
 export const editOrderHref = (projectId: string, orderId: string) => `${orderHref(projectId, orderId)}/editar`;
 
-/** The order's PDF, served by /api/v1 with the session. */
-export const orderFileUrl = (orderId: string) => `/api/v1/purchases/${orderId}/file`;
+/** One of the order's documents (its current version, or `versionId`), served by /api/v1 with the session. */
+export const orderDocumentUrl = (orderId: string, documentId: string, versionId?: string) =>
+  `/api/v1/purchases/${orderId}/documents/${documentId}${versionId ? `?versionId=${encodeURIComponent(versionId)}` : ""}`;
 
 /** The company-wide list (rail › Red › Compras), for Administration. */
 export const COMPANY_PURCHASES_HREF = "/dashboard/compras";

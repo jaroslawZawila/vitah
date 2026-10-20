@@ -1,24 +1,26 @@
-import { purchasingService } from "@repo/core";
+import { purchaseDocumentsService } from "@repo/core";
 import { fileResponse, readForm, withContext } from "../../../../../../lib/api";
 
 // ─── /api/v1/purchases/:orderId/file ──────────────────────────────────────────
-// GET → the order's PDF · POST multipart { file } (PDF ≤ 4 MB, replaces the
-// one it had) → { orderId } · DELETE → { orderId }
+// The single PDF an order had, kept for older clients: its first document
+// (…/documents for all of them). GET → its current version · POST multipart
+// { file } (PDF ≤ 4 MB, a new version; the first document if none) → { orderId }
+// · DELETE → { orderId }: the first document
 // ─────────────────────────────────────────────────────────────────────────────
 
 type Params = { params: Promise<{ orderId: string }> };
 
 export async function GET(request: Request, { params }: Params) {
   const { orderId } = await params;
-  return withContext(request, async (ctx) => fileResponse(await purchasingService.openPurchaseFile(ctx, orderId)));
+  return withContext(request, async (ctx) => fileResponse(await purchaseDocumentsService.openPurchaseFile(ctx, orderId)));
 }
 
 export async function POST(request: Request, { params }: Params) {
   const { orderId } = await params;
-  return withContext(request, async (ctx) => purchasingService.uploadPurchaseFile(ctx, orderId, await readForm(request)), 201);
+  return withContext(request, async (ctx) => purchaseDocumentsService.uploadPurchaseFile(ctx, orderId, await readForm(request)), 201);
 }
 
 export async function DELETE(request: Request, { params }: Params) {
   const { orderId } = await params;
-  return withContext(request, (ctx) => purchasingService.deletePurchaseFile(ctx, orderId));
+  return withContext(request, (ctx) => purchaseDocumentsService.deletePurchaseFile(ctx, orderId));
 }

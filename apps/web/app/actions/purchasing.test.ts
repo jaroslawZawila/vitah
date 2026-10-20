@@ -5,15 +5,16 @@ import { files } from "@repo/core/testing";
 import { seedObra } from "@repo/core/seed";
 import { signInAs } from "../../test/session";
 import {
+  addOrderDocumentAction,
+  addOrderDocumentVersionAction,
   createPurchaseAction,
-  deletePurchaseFileAction,
+  deleteOrderDocumentAction,
   getProjectPurchases,
   getPurchase,
   getPurchaseForm,
   getPurchases,
   setPurchaseStatusAction,
   updatePurchaseAction,
-  uploadPurchaseFileAction,
 } from "./purchasing";
 
 // The service is covered in packages/core; these tests cover the adapter:
@@ -69,11 +70,24 @@ describe("purchasing actions", () => {
     expect(await setPurchaseStatusAction(project.id, orderId, { status: "ordered", date: "2026-10-10" })).toEqual({ success: true });
     expect(await updatePurchaseAction(project.id, orderId, { notes: "Portes incluidos" })).toEqual({ success: true });
     const form = new FormData();
+    form.set("title", "Contrato firmado");
     form.set("file", new File(["%PDF-1.7 pedido"], "pedido.pdf", { type: "application/pdf" }));
-    expect(await uploadPurchaseFileAction(project.id, orderId, null, form)).toEqual({ success: true });
+    expect(await addOrderDocumentAction(project.id, orderId, form)).toEqual({ success: true });
+    const documentId = (await getPurchase(orderId))!.order.documents[0]!.id;
+    const version = new FormData();
+    version.set("file", new File(["%PDF-1.7 v2"], "pedido v2.pdf", { type: "application/pdf" }));
+    version.set("note", "Firmado");
+    expect(await addOrderDocumentVersionAction(project.id, orderId, documentId, version)).toEqual({ success: true });
 
-    expect((await getPurchase(orderId))!.order).toMatchObject({ status: "ordered", orderedOn: "2026-10-10", notes: "Portes incluidos", hasFile: true });
-    expect(await deletePurchaseFileAction(project.id, orderId)).toEqual({ success: true });
+    expect((await getPurchase(orderId))!.order).toMatchObject({
+      status: "ordered",
+      orderedOn: "2026-10-10",
+      notes: "Portes incluidos",
+      hasFile: true,
+      documents: [{ title: "Contrato firmado", versions: [{ version: 2, note: "Firmado" }, { version: 1 }] }],
+    });
+    expect(await deleteOrderDocumentAction(project.id, orderId, documentId)).toEqual({ success: true });
+    expect(await deleteOrderDocumentAction(project.id, orderId, documentId)).toEqual({ error: "not_found" });
   });
 
   it("read the project's, the tenant's and the form, with whether the caller may edit", async () => {

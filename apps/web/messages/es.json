@@ -2745,7 +2745,6 @@
       "edit": "Editar",
       "cancelOrder": "Cancelar pedido",
       "confirmCancel": "¿Cancelar {number}? Dejará de sumar a lo contratado.",
-      "confirmRemoveFile": "¿Quitar el documento de este pedido?",
       "advance": {
         "ordered": "Marcar pedido",
         "confirmed": "Marcar confirmado",
@@ -2807,11 +2806,6 @@
         "finishedOn": "Finalizado",
         "chapter": "Capítulo",
         "chapters": "Capítulos",
-        "document": "Documento",
-        "noDocument": "Ninguno",
-        "upload": "Subir PDF",
-        "replace": "Sustituir PDF",
-        "remove": "Quitar",
         "notes": "Notas",
         "createdBy": "Creado por",
         "change": "Cambiar",
@@ -2822,7 +2816,30 @@
         "noRetention": "Sin retención",
         "vat": "IVA"
       },
-      "registerInvoice": "Registrar factura"
+      "registerInvoice": "Registrar factura",
+      "documents": {
+        "title": "Documentos",
+        "add": "+ Añadir documento",
+        "none": "Ningún documento todavía.",
+        "titleLabel": "Nombre",
+        "titlePlaceholder": "Contrato firmado, anexo, oferta…",
+        "file": "PDF",
+        "chooseFile": "Elegir archivo",
+        "removeFile": "Quitar {name}",
+        "note": "Motivo (opcional)",
+        "notePlaceholder": "Firmado por las dos partes…",
+        "save": "Subir",
+        "saving": "Subiendo…",
+        "cancel": "Cancelar",
+        "current": "v{version} · vigente",
+        "version": "v{version}",
+        "newVersion": "Nueva versión",
+        "versionOf": "Nueva versión de {title}",
+        "remove": "Quitar",
+        "removeOf": "Quitar {title}",
+        "confirmRemove": "¿Quitar «{title}» con todas sus versiones?",
+        "hint": "Cada documento guarda sus versiones; las facturas y sus justificantes están en cada factura."
+      }
     },
     "history": {
       "title": "Historial",
@@ -2865,7 +2882,10 @@
       "invoiceFileAdded": "Nueva versión del PDF de {number} (v{version})",
       "paymentAdded": "Pago de {amount} € a {number}",
       "paymentDeleted": "Pago de {amount} € a {number} quitado",
-      "milestones": "{count, plural, =0 {Hitos de pago quitados} one {Hitos de pago: # hito} other {Hitos de pago: # hitos}}"
+      "milestones": "{count, plural, =0 {Hitos de pago quitados} one {Hitos de pago: # hito} other {Hitos de pago: # hitos}}",
+      "documentAdded": "Documento añadido: {title}",
+      "documentVersionAdded": "Nueva versión de {title} (v{version})",
+      "documentRemoved": "Documento quitado: {title}"
     },
     "form": {
       "numbered": "{ref} · se numerará {number}",
@@ -2948,7 +2968,8 @@
       "retention": "Retención de garantía (%)",
       "retentionHint": "Se descuenta de cada pago hasta el fin de la garantía",
       "vatKind": "IVA de sus facturas",
-      "vatDefault": "Según el tipo ({vat})"
+      "vatDefault": "Según el tipo ({vat})",
+      "firstDocument": "Pedido o contrato"
     },
     "chapter": {
       "title": "Pedidos",

@@ -1164,7 +1164,8 @@ export const purchaseOrders = pgTable(
     paymentDays: integer("payment_days"),
     retentionBp: integer("retention_bp").default(0).notNull(),
     vatKind: text("vat_kind").$type<PurchaseVatKind>(),
-    // The order or signed contract (PDF, private Blob store).
+    // Legacy: the order's single PDF before it had documents
+    // (purchase_order_documents); copied there by 2026-10-purchase-documents.sql.
     fileName: text("file_name"),
     filePathname: text("file_pathname"),
     fileSizeBytes: integer("file_size_bytes"),
@@ -1229,6 +1230,58 @@ export const purchaseOrderEvents = pgTable(
   },
   (table) => ({
     orderCreatedIdx: index("purchase_order_events_order_created_idx").on(table.orderId, table.createdAt),
+  }),
+);
+
+// An order's documents (the order, the signed contract, its annexes, the
+// offer…), each a PDF in versions: a new upload adds one, the last is current.
+export const purchaseOrderDocuments = pgTable(
+  "purchase_order_documents",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    orderId: text("order_id")
+      .notNull()
+      .references(() => purchaseOrders.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    createdById: text("created_by_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => ({
+    orderIdx: index("purchase_order_documents_order_idx").on(table.orderId),
+  }),
+);
+
+// A document's file, immutable once stored; `note` says why it replaced the previous one.
+export const purchaseOrderDocumentVersions = pgTable(
+  "purchase_order_document_versions",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    documentId: text("document_id")
+      .notNull()
+      .references(() => purchaseOrderDocuments.id, { onDelete: "cascade" }),
+    version: integer("version").notNull(),
+    pathname: text("pathname").unique().notNull(),
+    filename: text("filename").notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    note: text("note"),
+    uploadedById: text("uploaded_by_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => ({
+    documentVersionUnique: unique("purchase_order_document_versions_document_version_unique").on(
+      table.documentId,
+      table.version,
+    ),
   }),
 );
 

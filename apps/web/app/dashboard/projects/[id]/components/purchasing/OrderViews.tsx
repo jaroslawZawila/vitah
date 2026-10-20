@@ -3,9 +3,8 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { Clock, FileText, Upload } from "lucide-react";
+import { Clock } from "lucide-react";
 import {
-  MAX_DOCUMENT_BYTES,
   PURCHASE_FLOWS,
   isCompletedOrder,
   orderLabel,
@@ -267,30 +266,18 @@ export function OrderLines({ order }: { order: PurchaseOrderDetail }) {
   );
 }
 
-/** Dates, chapters, the PDF and who created it. */
+/** Dates, chapters, payment terms and who created it. */
 export function OrderData({
   order,
-  fileUrl,
   editHref,
-  canManage,
-  pending,
-  onUpload,
-  onRemoveFile,
 }: {
   order: PurchaseOrderDetail;
-  fileUrl: string;
   /** "Cambiar" beside the dates; omitted for viewers. */
   editHref?: string;
-  canManage: boolean;
-  pending: boolean;
-  onUpload: (file: File) => void;
-  onRemoveFile: () => void;
 }) {
   const t = useTranslations("purchasing.order.data");
   const tv = useTranslations("purchasing.vat");
   const f = usePurchaseFormat();
-  // Over 4 MB is refused here, before anything is sent.
-  const [tooLarge, setTooLarge] = useState(false);
   const material = order.kind === "material";
   const date = (value: string | null) => (value ? f.date(value) : "—");
   const works =
@@ -319,53 +306,6 @@ export function OrderData({
           ))}
         </ul>
       ),
-    ],
-    [
-      t("document"),
-      <div key="file" className="flex flex-col gap-2">
-        {order.file ? (
-          <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <a href={fileUrl} download className="inline-flex items-center gap-1.5 font-medium text-brand-ink hover:text-primary">
-              <FileText aria-hidden className="size-4" />
-              {order.file.name}
-            </a>
-            <span className="num text-[12px] text-muted-foreground">{f.fileSize(order.file.sizeBytes)}</span>
-          </span>
-        ) : (
-          <span className="text-muted-foreground">{t("noDocument")}</span>
-        )}
-        {canManage && (
-          <span className="flex flex-wrap gap-2">
-            <label
-              className={cn(
-                "inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-[9px] border bg-card px-3 text-[13px] font-semibold transition-colors hover:bg-raise pointer-coarse:min-h-11",
-                pending && "pointer-events-none opacity-50",
-              )}
-            >
-              <Upload aria-hidden className="size-4" />
-              {order.file ? t("replace") : t("upload")}
-              <input
-                type="file"
-                accept="application/pdf,.pdf"
-                className="sr-only"
-                disabled={pending}
-                onChange={(event) => {
-                  const file = event.target.files?.[0];
-                  event.target.value = "";
-                  setTooLarge(!!file && file.size > MAX_DOCUMENT_BYTES);
-                  if (file && file.size <= MAX_DOCUMENT_BYTES) onUpload(file);
-                }}
-              />
-            </label>
-            {order.file && (
-              <Button type="button" variant="ghost-destructive" size="sm" className="min-h-9" disabled={pending} onClick={onRemoveFile}>
-                {t("remove")}
-              </Button>
-            )}
-          </span>
-        )}
-        <FormError namespace="purchasing.errors" error={tooLarge ? "file_too_large" : undefined} />
-      </div>,
     ],
     [t("paymentTerms"), t("paymentDays", { days: order.terms.paymentDays })],
     [t("retention"), order.terms.retentionBp > 0 ? t("retentionValue", { pct: f.share(order.terms.retentionBp) }) : t("noRetention")],
@@ -498,6 +438,12 @@ function EventText({ event }: { event: PurchaseOrderEvent }) {
       return <>{t("paymentDeleted", { number: text(d.number), amount: f.amount(num(d.amountCents)) })}</>;
     case "milestones":
       return <>{t("milestones", { count: Array.isArray(d.to) ? d.to.length : 0 })}</>;
+    case "document_added":
+      return <>{t("documentAdded", { title: text(d.title) })}</>;
+    case "document_version_added":
+      return <>{t("documentVersionAdded", { title: text(d.title), version: num(d.version) })}</>;
+    case "document_removed":
+      return <>{t("documentRemoved", { title: text(d.title) })}</>;
     case "file_added":
       return <>{t("fileAdded", { name: text(d.name) })}</>;
     case "file_removed":

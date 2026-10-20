@@ -10,8 +10,9 @@ import OrderScreen from "./OrderScreen";
 
 vi.mock("../../../../../actions/purchasing", () => ({
   setPurchaseStatusAction: vi.fn(),
-  uploadPurchaseFileAction: vi.fn(),
-  deletePurchaseFileAction: vi.fn(),
+  addOrderDocumentAction: vi.fn(),
+  addOrderDocumentVersionAction: vi.fn(),
+  deleteOrderDocumentAction: vi.fn(),
 }));
 vi.mock("../../../../../actions/purchase-invoices", () => ({ setOrderMilestonesAction: vi.fn() }));
 const actions = await import("../../../../../actions/purchasing");
@@ -27,8 +28,9 @@ function renderScreen(props: Partial<Parameters<typeof OrderScreen>[0]> = {}) {
 
 beforeEach(() => {
   vi.mocked(actions.setPurchaseStatusAction).mockReset().mockResolvedValue({ success: true });
-  vi.mocked(actions.uploadPurchaseFileAction).mockReset().mockResolvedValue({ success: true });
-  vi.mocked(actions.deletePurchaseFileAction).mockReset().mockResolvedValue({ success: true });
+  vi.mocked(actions.addOrderDocumentAction).mockReset().mockResolvedValue({ success: true });
+  vi.mocked(actions.addOrderDocumentVersionAction).mockReset().mockResolvedValue({ success: true });
+  vi.mocked(actions.deleteOrderDocumentAction).mockReset().mockResolvedValue({ success: true });
   vi.mocked(invoiceActions.setOrderMilestonesAction).mockReset().mockResolvedValue({ success: true });
   vi.spyOn(window, "confirm").mockReturnValue(true);
 });
@@ -65,7 +67,6 @@ describe("OrderScreen", () => {
 
     const data = within(screen.getByRole("region", { name: "Datos" }));
     expect(data.getByText("3 oct 2026")).toBeInTheDocument();
-    expect(data.getByRole("link", { name: "Pedido_PED-049.pdf" })).toHaveAttribute("href", "/api/v1/purchases/order-49/file");
     expect(data.getByRole("link", { name: "Cambiar" })).toHaveAttribute("href", "/dashboard/projects/p-1/compras/order-49/editar");
     expect(data.getByText("Laura Pérez · 2 oct")).toBeInTheDocument();
 
@@ -111,25 +112,61 @@ describe("OrderScreen", () => {
     expect(actions.setPurchaseStatusAction).toHaveBeenCalledWith("p-1", "order-49", { status: "cancelled" });
   });
 
-  it("replaces and removes the order's PDF", async () => {
+  it("lists the order's documents, each with its versions", () => {
     renderScreen();
-    const file = new File(["%PDF"], "contrato.pdf", { type: "application/pdf" });
-    await userEvent.upload(screen.getByLabelText("Sustituir PDF"), file);
-    const [projectId, orderId, , data] = vi.mocked(actions.uploadPurchaseFileAction).mock.calls[0]!;
-    expect([projectId, orderId]).toEqual(["p-1", "order-49"]);
-    expect((data.get("file") as File).name).toBe("contrato.pdf");
+    const documents = within(screen.getByRole("region", { name: /Documentos/ }));
+    expect(documents.getByText("Pedido PED-049")).toBeInTheDocument();
+    expect(documents.getByText("v2 · vigente")).toBeInTheDocument();
+    const [current, older] = documents.getAllByRole("link", { name: /Pedido_PED-049\.pdf/ });
+    expect(current).toHaveAttribute("href", "/api/v1/purchases/order-49/documents/doc-1");
+    expect(older).toHaveAttribute("href", "/api/v1/purchases/order-49/documents/doc-1?versionId=v-1");
+    expect(documents.getByText(/«Portes incluidos»/)).toBeInTheDocument();
+  });
 
-    await userEvent.click(screen.getByRole("button", { name: "Quitar" }));
-    expect(actions.deletePurchaseFileAction).toHaveBeenCalledWith("p-1", "order-49");
+  it("adds a document named after its file, a new version with its reason, and removes one", async () => {
+    renderScreen();
+    const documents = within(screen.getByRole("region", { name: /Documentos/ }));
+    await userEvent.click(documents.getByRole("button", { name: "+ Añadir documento" }));
+    const contract = new File(["%PDF"], "Contrato firmado.pdf", { type: "application/pdf" });
+    await userEvent.upload(documents.getByLabelText("Elegir archivo"), contract);
+    expect(documents.getByLabelText("Nombre")).toHaveValue("Contrato firmado");
+    await userEvent.click(documents.getByRole("button", { name: "Subir" }));
+    const [projectId, orderId, added] = vi.mocked(actions.addOrderDocumentAction).mock.calls[0]!;
+    expect([projectId, orderId, added.get("title"), added.get("file")]).toEqual(["p-1", "order-49", "Contrato firmado", contract]);
+
+    await userEvent.click(documents.getByRole("button", { name: "Nueva versión" }));
+    const v3 = new File(["%PDF"], "v3.pdf", { type: "application/pdf" });
+    await userEvent.upload(documents.getByLabelText("Elegir archivo"), v3);
+    await userEvent.type(documents.getByLabelText("Motivo (opcional)"), "Precio corregido");
+    await userEvent.click(documents.getByRole("button", { name: "Subir" }));
+    const [, , documentId, version] = vi.mocked(actions.addOrderDocumentVersionAction).mock.calls[0]!;
+    expect([documentId, version.get("file"), version.get("note")]).toEqual(["doc-1", v3, "Precio corregido"]);
+
+    await userEvent.click(documents.getByRole("button", { name: "Quitar Pedido PED-049" }));
+    expect(window.confirm).toHaveBeenCalledWith("¿Quitar «Pedido PED-049» con todas sus versiones?");
+    expect(actions.deleteOrderDocumentAction).toHaveBeenCalledWith("p-1", "order-49", "doc-1");
+  });
+
+  it("says why a document couldn't be removed", async () => {
+    vi.mocked(actions.deleteOrderDocumentAction).mockResolvedValue({ error: "not_found" });
+    renderScreen();
+    await userEvent.click(screen.getByRole("button", { name: "Quitar Pedido PED-049" }));
+    const documents = within(screen.getByRole("region", { name: /Documentos/ }));
+    expect(await documents.findByRole("alert")).toHaveTextContent("No se ha encontrado el pedido.");
+    // Opening a form starts clean.
+    await userEvent.click(documents.getByRole("button", { name: "+ Añadir documento" }));
+    expect(documents.queryByRole("alert")).not.toBeInTheDocument();
   });
 
   it("refuses a PDF over 4 MB before sending it", async () => {
     renderScreen();
+    await userEvent.click(screen.getByRole("button", { name: "+ Añadir documento" }));
     const big = new File(["%PDF"], "grande.pdf", { type: "application/pdf" });
     Object.defineProperty(big, "size", { value: 5 * 1024 * 1024 });
-    await userEvent.upload(screen.getByLabelText("Sustituir PDF"), big);
-    expect(actions.uploadPurchaseFileAction).not.toHaveBeenCalled();
+    await userEvent.upload(screen.getByLabelText("Elegir archivo"), big);
     expect(screen.getByRole("alert")).toHaveTextContent("El archivo supera el máximo de 4 MB.");
+    expect(screen.getByRole("button", { name: "Subir" })).toBeDisabled();
+    expect(actions.addOrderDocumentAction).not.toHaveBeenCalled();
   });
 
   it("offers nothing to change once delivered or cancelled", () => {
@@ -148,8 +185,8 @@ describe("OrderScreen", () => {
     renderScreen({ canManage: false });
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Editar" })).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("Sustituir PDF")).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Pedido_PED-049.pdf" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "+ Añadir documento" })).not.toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: /Pedido_PED-049\.pdf/ })).toHaveLength(2);
   });
 
   describe("invoices", () => {

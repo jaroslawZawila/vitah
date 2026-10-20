@@ -7,6 +7,8 @@ import { GET as listAll } from "./route";
 import { GET as getOne, PATCH as update } from "./[orderId]/route";
 import { POST as setStatus } from "./[orderId]/status/route";
 import { DELETE as deleteFile, GET as getFile, POST as uploadFile } from "./[orderId]/file/route";
+import { POST as addDocument } from "./[orderId]/documents/route";
+import { DELETE as removeDocument, GET as getDocument, POST as addVersion } from "./[orderId]/documents/[documentId]/route";
 import { GET as listProject, POST as create } from "../projects/[id]/purchases/route";
 import { GET as getForm } from "../projects/[id]/purchases/form/route";
 import { GET as supplierOrders } from "../subcontractors/[id]/purchases/route";
@@ -95,6 +97,38 @@ describe("/api/v1 purchases", () => {
     expect(download.headers.get("Content-Type")).toBe("application/pdf");
     expect(await download.text()).toBe("%PDF-1.7 pedido");
     expect(await (await deleteFile(apiRequest(token, { method: "DELETE" }), routeParams({ orderId }))).json()).toEqual({ orderId });
+  });
+
+  it("keeps several documents per order, each in versions", async () => {
+    const { tenant, project, supplierId, lineageId } = await setup();
+    const { token } = await staffToken(tenant.id);
+    const { orderId } = await (
+      await create(apiRequest(token, json({ kind: "material", subcontractorId: supplierId, description: "Piedra", lines: [{ lineageId, amountCents: 1 }] })), routeParams({ id: project.id }))
+    ).json();
+    const upload = (fields: Record<string, string>, content: string) => {
+      const form = new FormData();
+      for (const [key, value] of Object.entries(fields)) form.set(key, value);
+      form.set("file", new File([content], "doc.pdf", { type: "application/pdf" }));
+      return apiRequest(token, { method: "POST", body: form });
+    };
+
+    const added = await addDocument(upload({ title: "Contrato firmado" }, "%PDF-1.7 v1"), routeParams({ orderId }));
+    expect(added.status).toBe(201);
+    const { documentId, version } = await added.json();
+    expect(version).toBe(1);
+    expect(await (await addVersion(upload({ note: "Firmado" }, "%PDF-1.7 v2"), routeParams({ orderId, documentId }))).json()).toEqual({ documentId, version: 2 });
+    expect((await addDocument(upload({}, "%PDF-1.7 x"), routeParams({ orderId }))).status).toBe(400);
+
+    const order = await (await getOne(apiRequest(token), routeParams({ orderId }))).json();
+    expect(order.documents).toMatchObject([{ id: documentId, title: "Contrato firmado", versions: [{ version: 2, note: "Firmado" }, { version: 1 }] }]);
+    expect(await (await getDocument(apiRequest(token), routeParams({ orderId, documentId }))).text()).toBe("%PDF-1.7 v2");
+    const older = order.documents[0].versions[1].id;
+    expect(await (await getDocument(apiRequest(token, { query: `?versionId=${older}` }), routeParams({ orderId, documentId }))).text()).toBe("%PDF-1.7 v1");
+    // The single PDF older clients know is the first document.
+    expect(await (await getFile(apiRequest(token), routeParams({ orderId }))).text()).toBe("%PDF-1.7 v2");
+
+    expect(await (await removeDocument(apiRequest(token, { method: "DELETE" }), routeParams({ orderId, documentId }))).json()).toEqual({ documentId });
+    expect((await getDocument(apiRequest(token), routeParams({ orderId, documentId }))).status).toBe(404);
   });
 
   it("needs a token, lets viewers only read, and keeps tenants apart", async () => {

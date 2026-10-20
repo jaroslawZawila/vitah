@@ -11,7 +11,7 @@ import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { orderLabel, placedStatus, type PurchaseForm } from "@repo/core/contract";
 import { buttonVariants } from "@/components/ui/button";
-import { createPurchaseAction, updatePurchaseAction, uploadPurchaseFileAction } from "../../../../actions/purchasing";
+import { addOrderDocumentAction, createPurchaseAction, updatePurchaseAction } from "../../../../actions/purchasing";
 import FormError from "../../../components/FormError";
 import { StageEyebrow } from "../components/construction/ObraFrame";
 import { useObraFormat } from "../components/obra/format";
@@ -61,9 +61,11 @@ export default function OrderFormScreen({
         made = { id: state.orderId, number: state.number ?? form.nextNumber };
       }
       if (draft.file) {
+        // The order's first document, named after its file.
         const data = new FormData();
+        data.set("title", draft.file.name.replace(/\.pdf$/i, "").slice(0, 200) || t("firstDocument"));
         data.set("file", draft.file);
-        const upload = await uploadPurchaseFileAction(projectId, made.id, null, data);
+        const upload = await addOrderDocumentAction(projectId, made.id, data);
         if (!upload?.success) return setCreated({ ...made, error: upload?.error ?? "generic" });
       }
       router.push(orderHref(projectId, made.id));

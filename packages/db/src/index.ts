@@ -43,6 +43,8 @@ export {
   purchaseOrderLines,
   purchaseOrderEvents,
   purchaseOrderMilestones,
+  purchaseOrderDocuments,
+  purchaseOrderDocumentVersions,
   purchaseInvoices,
   purchaseInvoiceLines,
   purchaseInvoiceFiles,

@@ -209,6 +209,17 @@ export const orderDetail: PurchaseOrderDetail = {
       deviationBp: -590,
     },
   ],
+  documents: [
+    {
+      id: "doc-1",
+      title: "Pedido PED-049",
+      versions: [
+        { id: "v-2", version: 2, filename: "Pedido_PED-049.pdf", sizeBytes: 212 * 1024, note: "Portes incluidos", by: "Laura Pérez", at: "2026-10-06T09:00:00.000Z" },
+        { id: "v-1", version: 1, filename: "Pedido_PED-049.pdf", sizeBytes: 200 * 1024, note: null, by: "Laura Pérez", at: "2026-10-03T09:00:00.000Z" },
+      ],
+      createdAt: "2026-10-03T09:00:00.000Z",
+    },
+  ],
   file: { name: "Pedido_PED-049.pdf", sizeBytes: 212 * 1024 },
   chapters: [{ code: "06", name: "Envolvente térmica y fachada", state: "in_progress" }],
   createdBy: "Laura Pérez",

@@ -14,8 +14,6 @@ import { framerDraft } from "./budget-fixture";
 
 vi.mock("../src/storage", () => import("../src/testing"));
 
-const pdf = (content = "%PDF-1.7 pedido") => new File([content], "Pedido.pdf", { type: "application/pdf" });
-
 const company = (overrides: Record<string, unknown> = {}) => ({
   kind: "company",
   legalName: "Montajes Steel Norte S.L.",
@@ -336,28 +334,6 @@ describe("updatePurchase", () => {
   });
 });
 
-describe("the order's file", () => {
-  it("stores, replaces, downloads and removes the order's PDF", async () => {
-    const s = await setup();
-    const { orderId } = await svc.createPurchase(s.ctx, s.project.id, material(s));
-    await svc.uploadPurchaseFile(s.ctx, orderId, { file: pdf("%PDF-1.7 v1") });
-    await svc.uploadPurchaseFile(s.ctx, orderId, { file: pdf("%PDF-1.7 v2") });
-    expect(files.size).toBe(1);
-
-    const order = await svc.getPurchase(s.ctx, orderId);
-    expect(order).toMatchObject({ hasFile: true, file: { name: "Pedido.pdf" } });
-    const stored = await svc.openPurchaseFile(s.ctx, orderId);
-    expect(await new Response(stored.body).text()).toBe("%PDF-1.7 v2");
-
-    await svc.deletePurchaseFile(s.ctx, orderId);
-    expect(files.size).toBe(0);
-    await expect(svc.openPurchaseFile(s.ctx, orderId)).rejects.toMatchObject({ code: "not_found" });
-    await expect(
-      svc.uploadPurchaseFile(s.ctx, orderId, { file: new File(["hola"], "pedido.pdf") }),
-    ).rejects.toMatchObject({ code: "invalid_file_type" });
-  });
-});
-
 describe("listPurchases", () => {
   it("lists every project's orders with the year's totals, and one supplier's", async () => {
     const s = await setup();
@@ -457,7 +433,6 @@ describe("access", () => {
     await expect(svc.createPurchase(s.ctx, s.project.id, material(s))).rejects.toMatchObject({ code: "forbidden" });
     await expect(svc.setPurchaseStatus(s.ctx, orderId, { status: "ordered" })).rejects.toMatchObject({ code: "forbidden" });
     await expect(svc.updatePurchase(s.ctx, orderId, { notes: "x" })).rejects.toMatchObject({ code: "forbidden" });
-    await expect(svc.uploadPurchaseFile(s.ctx, orderId, { file: pdf() })).rejects.toMatchObject({ code: "forbidden" });
   });
 
   it("keeps tenants apart", async () => {

@@ -2745,7 +2745,6 @@
       "edit": "Edit",
       "cancelOrder": "Cancel order",
       "confirmCancel": "Cancel {number}? It will no longer count as contracted.",
-      "confirmRemoveFile": "Remove this order's document?",
       "advance": {
         "ordered": "Mark as ordered",
         "confirmed": "Mark as confirmed",
@@ -2807,11 +2806,6 @@
         "finishedOn": "Finished",
         "chapter": "Chapter",
         "chapters": "Chapters",
-        "document": "Document",
-        "noDocument": "None",
-        "upload": "Upload PDF",
-        "replace": "Replace PDF",
-        "remove": "Remove",
         "notes": "Notes",
         "createdBy": "Created by",
         "change": "Change",
@@ -2822,7 +2816,30 @@
         "noRetention": "No retention",
         "vat": "VAT"
       },
-      "registerInvoice": "Record invoice"
+      "registerInvoice": "Record invoice",
+      "documents": {
+        "title": "Documents",
+        "add": "+ Add document",
+        "none": "No documents yet.",
+        "titleLabel": "Name",
+        "titlePlaceholder": "Signed contract, annex, offer…",
+        "file": "PDF",
+        "chooseFile": "Choose file",
+        "removeFile": "Remove {name}",
+        "note": "Reason (optional)",
+        "notePlaceholder": "Signed by both parties…",
+        "save": "Upload",
+        "saving": "Uploading…",
+        "cancel": "Cancel",
+        "current": "v{version} · current",
+        "version": "v{version}",
+        "newVersion": "New version",
+        "versionOf": "New version of {title}",
+        "remove": "Remove",
+        "removeOf": "Remove {title}",
+        "confirmRemove": "Remove “{title}” with all its versions?",
+        "hint": "Each document keeps its versions; invoices and their proofs of payment are on each invoice."
+      }
     },
     "history": {
       "title": "History",
@@ -2865,7 +2882,10 @@
       "invoiceFileAdded": "New PDF version of {number} (v{version})",
       "paymentAdded": "Payment of {amount} € on {number}",
       "paymentDeleted": "Payment of {amount} € on {number} removed",
-      "milestones": "{count, plural, =0 {Payment milestones removed} one {Payment milestones: # milestone} other {Payment milestones: # milestones}}"
+      "milestones": "{count, plural, =0 {Payment milestones removed} one {Payment milestones: # milestone} other {Payment milestones: # milestones}}",
+      "documentAdded": "Document added: {title}",
+      "documentVersionAdded": "New version of {title} (v{version})",
+      "documentRemoved": "Document removed: {title}"
     },
     "form": {
       "numbered": "{ref} · will be numbered {number}",
@@ -2948,7 +2968,8 @@
       "retention": "Guarantee retention (%)",
       "retentionHint": "Taken off each payment until the guarantee ends",
       "vatKind": "Its invoices' VAT",
-      "vatDefault": "By type ({vat})"
+      "vatDefault": "By type ({vat})",
+      "firstDocument": "Order or contract"
     },
     "chapter": {
       "title": "Orders",

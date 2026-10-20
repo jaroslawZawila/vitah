@@ -3,7 +3,7 @@
 // Thin portal adapters over @repo/core's purchasing (packages/core/src/purchasing.ts):
 // the project's Compras tab, the company-wide Compras list and an order's page.
 
-import { purchasingService as svc, type ObraError } from "@repo/core";
+import { purchaseDocumentsService as documents, purchasingService as svc, type ObraError } from "@repo/core";
 import { revalidatePath } from "next/cache";
 import { mutate, read, type ObraState } from "./run";
 
@@ -76,16 +76,22 @@ export async function setPurchaseStatusAction(
   return write(projectId, (ctx) => svc.setPurchaseStatus(ctx, orderId, input));
 }
 
-/** Form action: { file } (PDF). */
-export async function uploadPurchaseFileAction(
-  projectId: string,
-  orderId: string,
-  _prevState: ObraState,
-  formData: FormData,
-): Promise<ObraState> {
-  return write(projectId, (ctx) => svc.uploadPurchaseFile(ctx, orderId, Object.fromEntries(formData)));
+/** Form data: `title`, `file` (PDF) and `note`: a new document of the order. */
+export async function addOrderDocumentAction(projectId: string, orderId: string, formData: FormData): Promise<ObraState> {
+  return write(projectId, (ctx) => documents.addOrderDocument(ctx, orderId, Object.fromEntries(formData)));
 }
 
-export async function deletePurchaseFileAction(projectId: string, orderId: string): Promise<ObraState> {
-  return write(projectId, (ctx) => svc.deletePurchaseFile(ctx, orderId));
+/** Form data: `file` (PDF) and `note` (why it replaces the last): the document's next version. */
+export async function addOrderDocumentVersionAction(
+  projectId: string,
+  orderId: string,
+  documentId: string,
+  formData: FormData,
+): Promise<ObraState> {
+  return write(projectId, (ctx) => documents.addOrderDocumentVersion(ctx, orderId, documentId, Object.fromEntries(formData)));
+}
+
+/** The document with all its versions. */
+export async function deleteOrderDocumentAction(projectId: string, orderId: string, documentId: string): Promise<ObraState> {
+  return write(projectId, (ctx) => documents.deleteOrderDocument(ctx, orderId, documentId));
 }

@@ -51,7 +51,7 @@ import {
 } from "./contract";
 import { contractSchedule, contractTotals, daysPast, deviation, lateDays, type LineContract } from "./control-calc";
 import { orderByDate, templateLeadDays } from "./planning-calc";
-import { requirePdf } from "./documents";
+import { loadDocuments, ordersWithDocuments } from "./purchase-document-data";
 import { addInvoicing, isDueSoon, purchaseProgress, termsOf } from "./purchase-calc";
 import {
   buildInvoices,
@@ -83,8 +83,6 @@ import {
   workDate,
 } from "./obra-data";
 import { projectInTenant, type Tx } from "./project-client";
-import { openStoredFile, projectFolder, removeFiles, storeFiles, uploadedName, type StoredFile } from "./project-files";
-import { deleteFile } from "./storage";
 import { loadNetwork, requireCompany, type Network } from "./subcontractor-network";
 
 // ─── Purchasing (Compras) ────────────────────────────────────────────────────
@@ -117,7 +115,8 @@ type NewLine = Pick<LineRow, "lineageId" | "chapterCode" | "amountCents" | "clos
 const inTenant = (ctx: Ctx) => eq(purchaseOrders.tenantId, ctx.tenantId);
 
 /** Orders with their supplier, project and lines, newest first. */
-export async function loadOrders(tenantId: string, where?: SQL) {
+/** `documents`: whether each has documents (the lists' `hasFile`); else false. */
+export async function loadOrders(tenantId: string, where?: SQL, { documents = false } = {}) {
   const rows = await db
     .select({
       order: purchaseOrders,
@@ -131,7 +130,7 @@ export async function loadOrders(tenantId: string, where?: SQL) {
     .where(and(eq(purchaseOrders.tenantId, tenantId), where))
     .orderBy(desc(purchaseOrders.createdAt), desc(purchaseOrders.number));
   const ids = rows.map((r) => r.order.id);
-  const [lineRows, invoiced] = await Promise.all([
+  const [lineRows, invoiced, documented] = await Promise.all([
     ids.length === 0
       ? []
       : db
@@ -139,12 +138,14 @@ export async function loadOrders(tenantId: string, where?: SQL) {
           .from(purchaseOrderLines)
           .where(and(eq(purchaseOrderLines.tenantId, tenantId), inArray(purchaseOrderLines.orderId, ids))),
     invoicedByOrder(tenantId, ids),
+    documents ? ordersWithDocuments(tenantId, ids) : new Set<string>(),
   ]);
   const lines = groupBy(lineRows, (l) => l.orderId);
   return rows.map((row) => ({
     ...row,
     lines: lines.get(row.order.id) ?? [],
     invoicedCents: invoiced.get(row.order.id) ?? 0,
+    hasFile: documented.has(row.order.id),
   }));
 }
 
@@ -174,7 +175,7 @@ function toListItem(loaded: LoadedOrder, net: Network | null, today: string): Pu
     chapterCodes: [...new Set(lines.map((l) => l.chapterCode))].sort(),
     lateDays: lateDays(order, today),
     invoicedCents: loaded.invoicedCents,
-    hasFile: order.filePathname !== null,
+    hasFile: loaded.hasFile,
     createdAt: order.createdAt.toISOString(),
   };
 }
@@ -280,7 +281,10 @@ export const projectList = (tenantId: string) =>
 
 /** Every order of the tenant, with the totals Administration watches. */
 export async function listPurchases(ctx: Ctx): Promise<TenantPurchases> {
-  const [loaded, projectRows] = await Promise.all([loadOrders(ctx.tenantId), projectList(ctx.tenantId)]);
+  const [loaded, projectRows] = await Promise.all([
+    loadOrders(ctx.tenantId, undefined, { documents: true }),
+    projectList(ctx.tenantId),
+  ]);
   // Only the suppliers with orders: not the tenant's whole network.
   const net = await networkOf(ctx.tenantId, loaded);
   const today = todayInSpain();
@@ -311,7 +315,7 @@ export async function listPurchases(ctx: Ctx): Promise<TenantPurchases> {
 /** One supplier's orders, across the tenant's projects (its Subcontratas ficha). */
 export async function listSupplierOrders(ctx: Ctx, subcontractorId: string): Promise<PurchaseOrderListItem[]> {
   const [loaded] = await Promise.all([
-    loadOrders(ctx.tenantId, eq(purchaseOrders.subcontractorId, subcontractorId)),
+    loadOrders(ctx.tenantId, eq(purchaseOrders.subcontractorId, subcontractorId), { documents: true }),
     requireCompany(ctx, subcontractorId),
   ]);
   const today = todayInSpain();
@@ -322,7 +326,7 @@ export async function listSupplierOrders(ctx: Ctx, subcontractorId: string): Pro
 export async function getProjectPurchases(ctx: Ctx, projectId: string): Promise<ProjectPurchases> {
   const [plan, loaded] = await Promise.all([
     contractPlan(ctx.tenantId, projectId),
-    loadOrders(ctx.tenantId, ofProject(projectId)),
+    loadOrders(ctx.tenantId, ofProject(projectId), { documents: true }),
   ]);
   const net = await networkOf(ctx.tenantId, loaded);
   const today = todayInSpain();
@@ -585,6 +589,12 @@ export async function requireOrder(ctx: Ctx, orderId: string) {
   return order;
 }
 
+/** The first document's current version: the single PDF older clients know. */
+function firstVersion(documents: { versions: { filename: string; sizeBytes: number }[] }[] | undefined) {
+  const current = documents?.[0]?.versions[0];
+  return current ? { name: current.filename, sizeBytes: current.sizeBytes } : null;
+}
+
 /** The day each status was last reached, from the order's history (oldest first). */
 function reachedOn(events: { action: string; detail: Record<string, unknown>; createdAt: Date }[]) {
   const reached: Partial<Record<PurchaseStatus, string>> = {};
@@ -602,7 +612,7 @@ function reachedOn(events: { action: string; detail: Record<string, unknown>; cr
 /** One order: its lines against the budget, its chapters on the obra, and its history. */
 export async function getPurchase(ctx: Ctx, orderId: string): Promise<PurchaseOrderDetail> {
   const order = await requireOrder(ctx, orderId);
-  const [plan, projectOrders, events, [creator], net, invoices, milestones] = await Promise.all([
+  const [plan, projectOrders, events, [creator], net, invoices, milestones, documents] = await Promise.all([
     contractPlan(ctx.tenantId, order.projectId),
     loadOrders(ctx.tenantId, ofProject(order.projectId)),
     db
@@ -618,6 +628,7 @@ export async function getPurchase(ctx: Ctx, orderId: string): Promise<PurchaseOr
     loadNetwork(ctx.tenantId, order.subcontractorId),
     loadInvoices(ctx.tenantId, eq(purchaseInvoices.orderId, orderId)),
     loadMilestones(ctx.tenantId, eq(purchaseOrders.id, orderId)),
+    loadDocuments(ctx.tenantId, [orderId]),
   ]);
   const today = todayInSpain();
   const loaded = projectOrders.find((o) => o.order.id === orderId)!;
@@ -656,7 +667,9 @@ export async function getPurchase(ctx: Ctx, orderId: string): Promise<PurchaseOr
     ...item,
     notes: order.notes,
     lines,
-    file: order.filePathname ? { name: order.fileName ?? "pedido.pdf", sizeBytes: order.fileSizeBytes ?? 0 } : null,
+    documents: documents.get(orderId) ?? [],
+    hasFile: (documents.get(orderId) ?? []).length > 0,
+    file: firstVersion(documents.get(orderId)),
     chapters: plan.chapters.filter((c) => codes.has(c.code)).map((c) => ({ code: c.code, name: c.name, state: c.state })),
     createdBy: creator?.by ?? null,
     events: events.map(({ event, by }) => ({
@@ -675,18 +688,6 @@ export async function getPurchase(ctx: Ctx, orderId: string): Promise<PurchaseOr
     invoicing: orderInvoicing(item.amountCents, [...built.groups.values()]),
     today,
   };
-}
-
-/** The order's PDF, for download; every staff member may read it. */
-export async function openPurchaseFile(ctx: Ctx, orderId: string): Promise<StoredFile> {
-  const order = await requireOrder(ctx, orderId);
-  if (!order.filePathname) fail("not_found");
-  return openStoredFile({
-    filename: order.fileName ?? "pedido.pdf",
-    contentType: "application/pdf",
-    sizeBytes: order.fileSizeBytes ?? 0,
-    pathname: order.filePathname,
-  });
 }
 
 // ─── Writes ──────────────────────────────────────────────────────────────────
@@ -978,41 +979,4 @@ export async function setPurchaseStatus(ctx: Ctx, orderId: string, input: Record
     await logEvent(tx, ctx, orderId, "status", { from: order.status, to: status, date: day }, note);
   });
   return { orderId, status };
-}
-
-/** Body: { file } (PDF, up to 4 MB): the order or the signed contract. Replaces the one it had. */
-export async function uploadPurchaseFile(ctx: Ctx, orderId: string, input: Record<string, unknown>) {
-  requireEditor(ctx);
-  const order = await requireOrder(ctx, orderId);
-  const file = await requirePdf(input.file);
-  const name = uploadedName(file, "pedido.pdf");
-  const pathname = `${projectFolder(ctx.tenantId, order.projectId)}purchases/${orderId}/${crypto.randomUUID()}.pdf`;
-  await storeFiles([{ pathname, body: file, contentType: "application/pdf" }], () =>
-    db.transaction(async (tx) => {
-      await tx
-        .update(purchaseOrders)
-        .set({ fileName: name, filePathname: pathname, fileSizeBytes: file.size })
-        .where(eq(purchaseOrders.id, orderId));
-      await logEvent(tx, ctx, orderId, "file_added", { name });
-    }),
-  );
-  // The old file goes once the new one is in.
-  if (order.filePathname) await deleteFile(order.filePathname).catch(() => {});
-  return { orderId };
-}
-
-export async function deletePurchaseFile(ctx: Ctx, orderId: string) {
-  requireEditor(ctx);
-  const order = await requireOrder(ctx, orderId);
-  if (!order.filePathname) fail("not_found");
-  await removeFiles([order.filePathname], () =>
-    db.transaction(async (tx) => {
-      await tx
-        .update(purchaseOrders)
-        .set({ fileName: null, filePathname: null, fileSizeBytes: null })
-        .where(eq(purchaseOrders.id, orderId));
-      await logEvent(tx, ctx, orderId, "file_removed", { name: order.fileName });
-    }),
-  );
-  return { orderId };
 }

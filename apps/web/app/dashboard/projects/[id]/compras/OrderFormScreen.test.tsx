@@ -12,7 +12,7 @@ vi.mock("next/navigation", () => ({ useRouter: () => router }));
 vi.mock("../../../../actions/purchasing", () => ({
   createPurchaseAction: vi.fn(),
   updatePurchaseAction: vi.fn(),
-  uploadPurchaseFileAction: vi.fn(),
+  addOrderDocumentAction: vi.fn(),
 }));
 const actions = await import("../../../../actions/purchasing");
 
@@ -28,7 +28,7 @@ beforeEach(() => {
   router.push.mockReset();
   vi.mocked(actions.createPurchaseAction).mockReset().mockResolvedValue({ success: true, orderId: "order-57", number: 57 });
   vi.mocked(actions.updatePurchaseAction).mockReset().mockResolvedValue({ success: true });
-  vi.mocked(actions.uploadPurchaseFileAction).mockReset().mockResolvedValue({ success: true });
+  vi.mocked(actions.addOrderDocumentAction).mockReset().mockResolvedValue({ success: true });
 });
 
 const suppliers = () => within(screen.getByRole("group", { name: "Proveedores" }));
@@ -148,9 +148,9 @@ describe("OrderFormScreen", () => {
     const input = vi.mocked(actions.createPurchaseAction).mock.calls[0]![1];
     expect(input).toMatchObject({ status: "pending" });
     expect(input).not.toHaveProperty("orderedOn");
-    const [, orderId, , data] = vi.mocked(actions.uploadPurchaseFileAction).mock.calls[0]!;
+    const [, orderId, data] = vi.mocked(actions.addOrderDocumentAction).mock.calls[0]!;
     expect(orderId).toBe("order-57");
-    expect((data.get("file") as File).name).toBe("contrato.pdf");
+    expect([data.get("title"), (data.get("file") as File).name]).toEqual(["contrato", "contrato.pdf"]);
     expect(router.push).toHaveBeenCalledWith("/dashboard/projects/p-1/compras/order-57");
   });
 
@@ -164,7 +164,7 @@ describe("OrderFormScreen", () => {
   });
 
   it("keeps the order when its PDF fails, and says so", async () => {
-    vi.mocked(actions.uploadPurchaseFileAction).mockResolvedValue({ error: "file_too_large" });
+    vi.mocked(actions.addOrderDocumentAction).mockResolvedValue({ error: "file_too_large" });
     renderScreen();
     await fillSubcontract();
     await userEvent.upload(screen.getByLabelText("Elegir archivo"), new File(["%PDF"], "grande.pdf", { type: "application/pdf" }));
