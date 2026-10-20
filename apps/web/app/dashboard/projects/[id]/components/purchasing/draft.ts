@@ -1,4 +1,4 @@
-import type { PurchaseForm, PurchaseFormLine, PurchaseKind, PurchaseVatKind } from "@repo/core/contract";
+import type { PurchaseForm, PurchaseFormLine, PurchaseKind, PurchaseRequestDetail, PurchaseVatKind } from "@repo/core/contract";
 
 // What the order form holds (amounts as typed, dates as "" when empty), and
 // how it turns into the body of createPurchaseAction / updatePurchaseAction.
@@ -33,7 +33,7 @@ export type OrderDraft = {
 export type ParseAmount = (text: string) => number;
 
 /** The chapter to start on: `wanted` if the contract has it, else the first with something left to order. */
-function startChapter(form: PurchaseForm, wanted?: string) {
+export function startChapter(form: PurchaseForm, wanted?: string) {
   const { chapters } = form;
   return (
     chapters.find((c) => c.code === wanted)?.code ??
@@ -87,6 +87,41 @@ export function orderDraftFrom(
   };
 }
 
+/**
+ * A new order from an approved purchase request: its kind, supplier, concept
+ * and lines with their estimates; a material request's needed-by day is the
+ * delivery asked for. Everything stays editable.
+ */
+export function orderDraftFromRequest(
+  request: PurchaseRequestDetail,
+  form: PurchaseForm,
+  { decimal }: { decimal: (euros: number) => string },
+): OrderDraft {
+  const { lines, chapter } = linesFromRequest(request, form, decimal);
+  return {
+    ...newOrderDraft(form, chapter),
+    kind: request.kind,
+    subcontractorId: request.subcontractorId ?? "",
+    description: request.description,
+    expectedOn: request.kind === "material" ? (request.neededBy ?? "") : "",
+    lines,
+  };
+}
+
+/**
+ * A request's lines as the form's, each closing its budget line (a request
+ * closes nothing itself), and the chapter of the first. Lines the accepted
+ * budget no longer has are left out: the form couldn't show or untick them.
+ */
+export function linesFromRequest(request: PurchaseRequestDetail, form: PurchaseForm, decimal: (euros: number) => string) {
+  const known = new Set(form.chapters.flatMap((c) => c.lines.map((l) => l.lineageId)));
+  const kept = request.lines.filter((line) => known.has(line.lineageId));
+  return {
+    lines: Object.fromEntries(kept.map((line) => [line.lineageId, { amount: decimal(line.amountCents / 100), closes: true }])) as Record<string, LineDraft>,
+    chapter: kept[0]?.chapterCode,
+  };
+}
+
 /** What a line still has to contract (never below zero): the amount a newly ticked line starts with. */
 export const remainingCents = (line: PurchaseFormLine) => Math.max(0, line.costCents - line.contractedCents);
 
@@ -101,8 +136,8 @@ export function lineFigures(line: PurchaseFormLine, draft: LineDraft | undefined
   };
 }
 
-/** The order's total, and its deviation over the lines it closes. */
-export function orderTotals(form: PurchaseForm, draft: OrderDraft, parse: ParseAmount) {
+/** The order's (or a request's) total, and its deviation over the lines it closes. */
+export function orderTotals(form: PurchaseForm, draft: Pick<OrderDraft, "lines">, parse: ParseAmount) {
   let totalCents = 0;
   let closed = 0;
   let deviationCents = 0;
@@ -119,16 +154,15 @@ export function orderTotals(form: PurchaseForm, draft: OrderDraft, parse: ParseA
   return { totalCents, closed, deviationCents: closed > 0 ? deviationCents : null };
 }
 
-/** Whether the draft has what core needs: a supplier, a concept and every ticked line with an amount above zero. */
-export function orderComplete(draft: OrderDraft, parse: ParseAmount) {
+/** A concept and every ticked line with an amount above zero: what an order and a request both need. */
+export function conceptAndLinesComplete(draft: Pick<OrderDraft, "description" | "lines">, parse: ParseAmount) {
   const lines = Object.values(draft.lines);
-  return (
-    draft.subcontractorId !== "" &&
-    draft.description.trim() !== "" &&
-    lines.length > 0 &&
-    lines.every((line) => parse(line.amount) > 0)
-  );
+  return draft.description.trim() !== "" && lines.length > 0 && lines.every((line) => parse(line.amount) > 0);
 }
+
+/** Whether the draft has what core needs: a supplier, a concept and every ticked line with an amount above zero. */
+export const orderComplete = (draft: OrderDraft, parse: ParseAmount) =>
+  draft.subcontractorId !== "" && conceptAndLinesComplete(draft, parse);
 
 const orNull = (value: string) => (value === "" ? null : value);
 

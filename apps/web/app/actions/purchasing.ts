@@ -3,9 +3,8 @@
 // Thin portal adapters over @repo/core's purchasing (packages/core/src/purchasing.ts):
 // the project's Compras tab, the company-wide Compras list and an order's page.
 
-import { purchaseDocumentsService as documents, purchasingService as svc, type ObraError } from "@repo/core";
-import { revalidatePath } from "next/cache";
-import { mutate, read, type ObraState } from "./run";
+import { purchaseDocumentsService as documents, purchasingService as svc } from "@repo/core";
+import { mutateDashboard, read, type ObraState } from "./run";
 
 // ─── Reads ───────────────────────────────────────────────────────────────────
 
@@ -44,12 +43,8 @@ export async function getPurchase(orderId: string) {
 
 // ─── Writes ──────────────────────────────────────────────────────────────────
 
-/** Runs the write, then refreshes the project's tabs, the company-wide lists and the rail's counts. */
-async function write(projectId: string, fn: Parameters<typeof mutate>[1]): Promise<ObraState> {
-  const state = await mutate<ObraError>(projectId, fn);
-  if (state?.success) revalidatePath("/dashboard", "layout");
-  return state;
-}
+/** Refreshes the project's tabs too. */
+const write = (projectId: string, fn: Parameters<typeof mutateDashboard>[1]) => mutateDashboard(projectId, fn);
 
 /** → the new order's id and number too. */
 export async function createPurchaseAction(

@@ -41,17 +41,26 @@ const dot =
 const section = cn(cardVariants(), "gap-3.5");
 const check = "size-[18px] flex-none cursor-pointer accent-primary disabled:cursor-not-allowed";
 
-/** Step 1: material or subcontract, and who from (a subcontract never goes to a material supplier). */
-function KindAndSupplier({
+/** What the kind and supplier step reads and writes: an order's or a purchase request's. */
+type KindDraft = Pick<OrderDraft, "kind" | "subcontractorId">;
+
+/**
+ * Step 1: material or subcontract, and who from (a subcontract never goes to
+ * a material supplier). With `supplierOptional` (a purchase request), picking
+ * the chosen supplier again leaves it to the office.
+ */
+export function KindAndSupplier({
   form,
   draft,
   onChange,
   kindLocked,
+  supplierOptional = false,
 }: {
   form: PurchaseForm;
-  draft: OrderDraft;
-  onChange: (patch: Partial<OrderDraft>) => void;
+  draft: KindDraft;
+  onChange: (patch: Partial<KindDraft>) => void;
   kindLocked: boolean;
+  supplierOptional?: boolean;
 }) {
   const t = useTranslations("purchasing.form");
   const ts = useTranslations("purchasing.status");
@@ -111,7 +120,7 @@ function KindAndSupplier({
           placeholder={t("supplierSearch")}
           onChange={(e) => setQuery(e.target.value)}
         />
-        <FieldDescription>{t("supplierHint")}</FieldDescription>
+        <FieldDescription>{supplierOptional ? t("supplierOptionalHint") : t("supplierHint")}</FieldDescription>
       </Field>
       <div role="group" aria-label={t("suppliers")} className="flex max-h-[340px] flex-col gap-2 overflow-y-auto">
         {suppliers.length === 0 ? (
@@ -122,7 +131,11 @@ function KindAndSupplier({
               key={s.id}
               type="button"
               aria-pressed={draft.subcontractorId === s.id}
-              onClick={() => onChange({ subcontractorId: s.id, ...(s.suppliesOnly ? { kind: "material" } : {}) })}
+              onClick={() =>
+                supplierOptional && draft.subcontractorId === s.id
+                  ? onChange({ subcontractorId: "" })
+                  : onChange({ subcontractorId: s.id, ...(s.suppliesOnly ? { kind: "material" } : {}) })
+              }
               className={cn(option, "items-center")}
             >
               <span aria-hidden className={dot} />
@@ -219,17 +232,22 @@ function ConceptAndDates({
   );
 }
 
-/** One budget line: tick it, its amount, whether it closes the line, and the deviation that leaves. */
+/**
+ * One budget line: tick it, its amount, whether it closes the line, and the
+ * deviation that leaves; an `estimate` (a purchase request) only its amount.
+ */
 function LineRow({
   line,
   draft,
   parse,
+  estimate,
   onToggle,
   onChange,
 }: {
   line: PurchaseFormLine;
   draft: LineDraft | undefined;
   parse: ParseAmount;
+  estimate: boolean;
   onToggle: () => void;
   onChange: (patch: Partial<LineDraft>) => void;
 }) {
@@ -258,7 +276,7 @@ function LineRow({
           </Badge>
         )}
       </TableCell>
-      <TableCell className="text-right">
+      <TableCell className={cn("text-right", estimate && "pr-[18px]")}>
         <Input
           inputMode="decimal"
           className="num ml-auto w-[120px] text-right"
@@ -268,37 +286,49 @@ function LineRow({
           onChange={(e) => onChange({ amount: e.target.value })}
         />
       </TableCell>
-      <TableCell>
-        <label className={cn("inline-flex min-h-10 items-center gap-2 text-[12.5px]", ticked ? "cursor-pointer" : "cursor-not-allowed")}>
-          <input
-            type="checkbox"
-            className={check}
-            checked={draft?.closes ?? false}
-            disabled={!ticked}
-            onChange={(e) => onChange({ closes: e.target.checked })}
-            aria-label={t("closesOf", { code: line.code })}
-          />
-          {ticked && (draft.closes ? t("closesYes") : t("closesNo"))}
-        </label>
-      </TableCell>
-      <TableCell className={cn("num pr-[18px] text-right", deviationTone(deviationCents))}>
-        {ticked && (draft.closes ? (deviationCents === null ? "—" : f.signedDecimal(deviationCents)) : <span className="font-sans text-muted-foreground">{t("open")}</span>)}
-      </TableCell>
+      {!estimate && (
+        <>
+          <TableCell>
+            <label className={cn("inline-flex min-h-10 items-center gap-2 text-[12.5px]", ticked ? "cursor-pointer" : "cursor-not-allowed")}>
+              <input
+                type="checkbox"
+                className={check}
+                checked={draft?.closes ?? false}
+                disabled={!ticked}
+                onChange={(e) => onChange({ closes: e.target.checked })}
+                aria-label={t("closesOf", { code: line.code })}
+              />
+              {ticked && (draft.closes ? t("closesYes") : t("closesNo"))}
+            </label>
+          </TableCell>
+          <TableCell className={cn("num pr-[18px] text-right", deviationTone(deviationCents))}>
+            {ticked && (draft.closes ? (deviationCents === null ? "—" : f.signedDecimal(deviationCents)) : <span className="font-sans text-muted-foreground">{t("open")}</span>)}
+          </TableCell>
+        </>
+      )}
     </TableRow>
   );
 }
 
-/** Step 3: one chapter's lines at a time; lines ticked elsewhere stay in the order. */
-function Lines({
+/** What the lines step reads and writes: an order's or a purchase request's. */
+type LinesDraft = Pick<OrderDraft, "chapter" | "lines">;
+
+/**
+ * Step 3: one chapter's lines at a time; lines ticked elsewhere stay in the
+ * order. An `estimate` (a purchase request) asks only for amounts.
+ */
+export function Lines({
   form,
   draft,
   parse,
   onChange,
+  estimate = false,
 }: {
   form: PurchaseForm;
-  draft: OrderDraft;
+  draft: LinesDraft;
   parse: ParseAmount;
-  onChange: (patch: Partial<OrderDraft>) => void;
+  onChange: (patch: Partial<LinesDraft>) => void;
+  estimate?: boolean;
 }) {
   const t = useTranslations("purchasing.form");
   const f = usePurchaseFormat();
@@ -326,7 +356,7 @@ function Lines({
           <h2 id="form-lines" className="text-[22px]">
             {t("linesTitle")}
           </h2>
-          <p className="mt-1 text-[12.5px] text-muted-foreground">{t("linesHint")}</p>
+          <p className="mt-1 text-[12.5px] text-muted-foreground">{estimate ? t("estimateHint") : t("linesHint")}</p>
         </div>
         <Field className="w-full sm:w-[320px]">
           <Label htmlFor="form-chapter">{t("chapter")}</Label>
@@ -353,7 +383,7 @@ function Lines({
         {!chapter || chapter.lines.length === 0 ? (
           <p className="px-[18px] py-4 text-[13px] text-muted-foreground">{t("noLines")}</p>
         ) : (
-          <Table className="min-w-[900px] text-[13px]" aria-label={t("linesOf", { code: chapter.code })}>
+          <Table className={cn("text-[13px]", estimate ? "min-w-[640px]" : "min-w-[900px]")} aria-label={t("linesOf", { code: chapter.code })}>
             <TableHeader>
               <TableRow>
                 <TableHead className="pl-[18px]">
@@ -362,9 +392,15 @@ function Lines({
                 <TableHead>{t("line")}</TableHead>
                 <TableHead className="text-right">{t("cost")}</TableHead>
                 <TableHead className="text-right">{t("contracted")}</TableHead>
-                <TableHead className="text-right">{t("thisOrder")}</TableHead>
-                <TableHead>{t("closes")}</TableHead>
-                <TableHead className="pr-[18px] text-right">{t("deviation")}</TableHead>
+                {estimate ? (
+                  <TableHead className="pr-[18px] text-right">{t("estimate")}</TableHead>
+                ) : (
+                  <>
+                    <TableHead className="text-right">{t("thisOrder")}</TableHead>
+                    <TableHead>{t("closes")}</TableHead>
+                    <TableHead className="pr-[18px] text-right">{t("deviation")}</TableHead>
+                  </>
+                )}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -374,6 +410,7 @@ function Lines({
                   line={line}
                   draft={draft.lines[line.lineageId]}
                   parse={parse}
+                  estimate={estimate}
                   onToggle={() => toggle(line)}
                   onChange={(patch) => setLine(line.lineageId, patch)}
                 />
@@ -382,7 +419,7 @@ function Lines({
           </Table>
         )}
       </div>
-      <p className="text-[12.5px] leading-normal text-muted-foreground">{t("closesNote")}</p>
+      {!estimate && <p className="text-[12.5px] leading-normal text-muted-foreground">{t("closesNote")}</p>}
     </section>
   );
 }

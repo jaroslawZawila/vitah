@@ -50,7 +50,8 @@
       "orders": "Orders",
       "invoices": "Invoices",
       "payments": "Payments",
-      "dueCount": "{count, plural, one {# invoice overdue or due soon} other {# invoices overdue or due soon}}"
+      "dueCount": "{count, plural, one {# invoice overdue or due soon} other {# invoices overdue or due soon}}",
+      "requests": "Requests"
     }
   },
   "topbar": {
@@ -2839,7 +2840,8 @@
         "removeOf": "Remove {title}",
         "confirmRemove": "Remove “{title}” with all its versions?",
         "hint": "Each document keeps its versions; invoices and their proofs of payment are on each invoice."
-      }
+      },
+      "fromRequest": "from <link>{number}</link>"
     },
     "history": {
       "title": "History",
@@ -2862,7 +2864,8 @@
         "issuedOn": "Date",
         "dueOn": "Due date",
         "baseCents": "Base",
-        "irpfBp": "IRPF"
+        "irpfBp": "IRPF",
+        "neededBy": "Needed by"
       },
       "changed": {
         "subcontractorId": "Supplier changed",
@@ -2885,7 +2888,14 @@
       "milestones": "{count, plural, =0 {Payment milestones removed} one {Payment milestones: # milestone} other {Payment milestones: # milestones}}",
       "documentAdded": "Document added: {title}",
       "documentVersionAdded": "New version of {title} (v{version})",
-      "documentRemoved": "Document removed: {title}"
+      "documentRemoved": "Document removed: {title}",
+      "request": {
+        "approved": "Approved",
+        "rejected": "Rejected",
+        "cancelled": "Cancelled",
+        "ordered": "Order {number} created",
+        "reopened": "{number} cancelled: approved again, it can be ordered again"
+      }
     },
     "form": {
       "numbered": "{ref} · will be numbered {number}",
@@ -2969,7 +2979,11 @@
       "retentionHint": "Taken off each payment until the guarantee ends",
       "vatKind": "Its invoices' VAT",
       "vatDefault": "By type ({vat})",
-      "firstDocument": "Order or contract"
+      "firstDocument": "Order or contract",
+      "supplierOptionalHint": "Optional: the supplier the site suggests. Pick it again to leave it to the office.",
+      "estimateHint": "Tick the lines needed and how much you estimate for each. Amounts excl. VAT.",
+      "estimate": "Estimate",
+      "fromRequest": "From request <b>{number}</b> by {by}: check the supplier, amounts and dates before saving. The order will be linked to it."
     },
     "chapter": {
       "title": "Orders",
@@ -3051,12 +3065,14 @@
       "has_payments": "The invoice has payments: its amounts can't change and it can't be deleted.",
       "duplicate_number": "That supplier already has an invoice with that number.",
       "milestones_mismatch": "The milestones must add up to the order's amount.",
-      "exceeds_amount": "The amount is more than what is left to pay or to credit."
+      "exceeds_amount": "The amount is more than what is left to pay or to credit.",
+      "request_not_approved": "The request is no longer approved (it was ordered or cancelled meanwhile). Go back to it to see what happened."
     },
     "views": {
       "label": "View",
       "lines": "Line items",
-      "orders": "Orders"
+      "orders": "Orders",
+      "requests": "Requests"
     },
     "progress": {
       "to_contract": "To contract",
@@ -3414,6 +3430,134 @@
       "cancel": "Cancel",
       "saving": "Saving…",
       "paidLocked": "It has payments: only its number, dates and notes can change."
+    },
+    "requests": {
+      "status": {
+        "pending": "To approve",
+        "approved": "Approved",
+        "ordered": "Ordered",
+        "rejected": "Rejected",
+        "cancelled": "Cancelled"
+      },
+      "groups": {
+        "label": "Status",
+        "all": "All",
+        "pending": "To approve",
+        "approved": "To order",
+        "closed": "Closed"
+      },
+      "kpis": {
+        "label": "Summary",
+        "pending": "To approve",
+        "approved": "Approved, not ordered",
+        "amount": "{amount} estimated"
+      },
+      "list": {
+        "title": "Requests",
+        "project": "Site",
+        "all": "All",
+        "noMatch": "No request matches these filters.",
+        "cards": "Requests",
+        "table": "Purchase requests",
+        "projectNumber": "Site · No.",
+        "number": "No.",
+        "concept": "Concept",
+        "supplier": "Suggested supplier",
+        "estimate": "Estimate",
+        "neededBy": "Needed by",
+        "requestedBy": "Requested by",
+        "status": "Status",
+        "noSupplier": "No supplier suggested",
+        "chapterShort": "ch. {codes}"
+      },
+      "project": {
+        "title": "Purchase requests",
+        "description": "What the site needs to buy or subcontract, before it is ordered. An admin approves or rejects it; once approved it becomes an order.",
+        "new": "New request",
+        "none": "No requests on this site yet.",
+        "footnote": "A request contracts nothing: Obra and Purchasing only count orders. Orders can also be made without a request."
+      },
+      "company": {
+        "eyebrow": "Purchasing · all sites",
+        "title": "Requests",
+        "description": "What the sites ask for, those waiting for approval first. Each request is decided and ordered from its site.",
+        "none": "No requests yet."
+      },
+      "form": {
+        "newLabel": "New purchase request",
+        "editLabel": "Edit purchase request",
+        "newTitle": "New request",
+        "editTitle": "Edit request",
+        "intro": "What is needed, by when and how much you estimate. An admin reviews it before the order is placed.",
+        "noBudget": "There is no accepted budget yet: requests are made on its lines.",
+        "conceptTitle": "2 · What is needed",
+        "description": "Concept",
+        "descriptionPlaceholder": "E.g. stone for the north façade",
+        "neededBy": "Needed by",
+        "neededByHint": "The day the site needs it (optional).",
+        "notes": "Notes",
+        "notesPlaceholder": "Specs, quantities, quotes received…",
+        "totalLabel": "Estimated amount",
+        "total": "Estimate (excl. VAT)",
+        "cancel": "Cancel",
+        "saving": "Saving…",
+        "saveChanges": "Save changes",
+        "send": "Send for approval"
+      },
+      "detail": {
+        "askedBy": "Requested by {name} on {date}",
+        "late": "{days, plural, one {# day} other {# days}} late",
+        "lateHint": "It was needed by {date} and there is no order yet.",
+        "lines": "Lines",
+        "line": "Line",
+        "cost": "Cost",
+        "contracted": "Already contracted",
+        "estimate": "Estimate",
+        "total": "Total estimate",
+        "notInBudget": "No longer in the accepted budget",
+        "data": "Details",
+        "neededBy": "Needed by",
+        "supplier": "Suggested supplier",
+        "noSupplier": "The office picks one",
+        "chapters": "Chapters",
+        "notes": "Notes",
+        "createOrder": "Create order",
+        "edit": "Edit",
+        "cancel": "Cancel request",
+        "confirmCancel": "Cancel request {number}? It can no longer be ordered."
+      },
+      "decision": {
+        "title": "Approval",
+        "waiting": "Waiting for an admin to approve it.",
+        "hint": "Check the lines and the estimate. Once approved, anyone on the site can turn it into an order.",
+        "approve": "Approve",
+        "reject": "Reject",
+        "reason": "Reason for rejecting",
+        "reasonPlaceholder": "E.g. there is stock on another site",
+        "back": "Back",
+        "saving": "Saving…",
+        "confirmReject": "Reject request",
+        "approvedBy": "Approved by {name} on {date}.",
+        "rejectedBy": "Rejected by {name} on {date}.",
+        "toOrder": "Ready to order.",
+        "ordered": "Ordered as",
+        "cancelled": "Cancelled: it will not be ordered."
+      }
+    },
+    "requestErrors": {
+      "generic": "Could not save. Please try again.",
+      "missing_fields": "Write the concept and tick at least one line with its amount. To reject, write the reason.",
+      "invalid_input": "Check the amounts and values entered.",
+      "invalid_date": "Check the date.",
+      "unknown_line": "One of the lines is no longer in the accepted budget. Reload the page.",
+      "unknown_supplier": "That supplier is no longer in Subcontractors.",
+      "supplies_only": "A material supplier only takes material orders, not subcontracts.",
+      "invalid_state": "The request is no longer in that state. Reload the page.",
+      "not_found": "Request not found.",
+      "forbidden": "Not allowed: only an admin approves or rejects, and admins and managers make requests.",
+      "project_not_found": "Project not found.",
+      "no_budget": "There is no accepted budget yet.",
+      "request_not_approved": "The request is no longer approved (it was ordered or cancelled meanwhile). Go back to it to see what happened."
     }
   }
 }

@@ -223,3 +223,37 @@ describe("OrderFormScreen", () => {
     expect(router.push).toHaveBeenCalledWith("/dashboard/projects/p-1/compras/order-49");
   });
 });
+
+describe("OrderFormScreen from a purchase request", () => {
+  it("starts from the approved request and links the order to it", async () => {
+    const { approvedRequest } = await import("../../../../../test/request-fixture");
+    renderScreen({ chapter: undefined, request: approvedRequest });
+    expect(screen.getByText(/Desde la solicitud/)).toHaveTextContent("Desde la solicitud SOL-003 de Laura Pérez");
+    expect(screen.getByLabelText("Concepto")).toHaveValue("Placa de yeso para trasdosados");
+    expect(screen.getByLabelText("Entrega prevista")).toHaveValue("2026-10-15");
+    expect(screen.getByRole("combobox", { name: "Capítulo" })).toHaveValue("07");
+    expect(screen.getByRole("textbox", { name: "Importe de 07.01" })).toHaveValue("6250,00");
+    expect(suppliers().getByRole("button", { name: /Yesos y Placas/ })).toHaveAttribute("aria-pressed", "true");
+
+    await userEvent.click(screen.getByRole("button", { name: "Guardar como pendiente" }));
+    expect(actions.createPurchaseAction).toHaveBeenCalledWith("p-1", expect.objectContaining({
+      requestId: "req-3",
+      subcontractorId: "sup-yesos",
+      status: "pending",
+      lines: [
+        { lineageId: "lin-0701", amountCents: 625_000, closesLine: true },
+        { lineageId: "lin-0704", amountCents: 100_000, closesLine: true },
+      ],
+    }));
+  });
+});
+
+describe("OrderFormScreen when the request changed meanwhile", () => {
+  it("says the request is no longer approved", async () => {
+    const { approvedRequest } = await import("../../../../../test/request-fixture");
+    vi.mocked(actions.createPurchaseAction).mockResolvedValue({ error: "request_not_approved" });
+    renderScreen({ chapter: undefined, request: approvedRequest });
+    await userEvent.click(screen.getByRole("button", { name: "Guardar como pendiente" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("La solicitud ya no está aprobada");
+  });
+});

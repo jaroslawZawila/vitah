@@ -5,7 +5,8 @@ import { readJson, withContext } from "../../../../../../lib/api";
 // GET → ProjectPurchases (the project's Compras tab)
 // POST { kind, subcontractorId, description, lines: [{ lineageId, amountCents,
 //   closesLine? }], status?, orderedOn?, expectedOn?, workStart?, workEnd?,
-//   notes? } → { orderId, number }
+//   notes?, paymentDays?, retentionBp?, vatKind?, requestId? (the approved
+//   purchase request it comes from) } → { orderId, number }
 // ─────────────────────────────────────────────────────────────────────────────
 
 type Params = { params: Promise<{ id: string }> };

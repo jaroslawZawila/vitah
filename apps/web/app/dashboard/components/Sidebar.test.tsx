@@ -95,10 +95,11 @@ describe("Sidebar", () => {
     expect(link).not.toHaveAttribute("aria-current");
   });
 
-  it("opens Compras on Pedidos, with Facturas and Pagos and their counts", () => {
-    renderAt("/dashboard/compras", true, null, { orders: 58, invoices: 9, payments: 4, dueAttention: 3 });
+  it("opens Compras on Pedidos, with Solicitudes (those to approve), Facturas and Pagos and their counts", () => {
+    renderAt("/dashboard/compras", true, null, { requests: 2, orders: 58, invoices: 9, payments: 4, dueAttention: 3 });
     const sections = within(screen.getByRole("list", { name: "Secciones de compras" }));
     expect(sections.getAllByRole("link").map((link) => [link.textContent, link.getAttribute("href")])).toEqual([
+      ["Solicitudes2", "/dashboard/compras/solicitudes"],
       ["Pedidos58", "/dashboard/compras"],
       ["Facturas9", "/dashboard/compras/facturas"],
       ["Pagos4", "/dashboard/compras/pagos"],
@@ -108,11 +109,18 @@ describe("Sidebar", () => {
   });
 
   it("marks the Compras section open, on an invoice too", () => {
-    renderAt("/dashboard/compras/facturas/inv-1", true, null, { orders: 1, invoices: 1, payments: 0, dueAttention: 0 });
+    renderAt("/dashboard/compras/facturas/inv-1", true, null, { requests: 0, orders: 1, invoices: 1, payments: 0, dueAttention: 0 });
     const sections = within(screen.getByRole("list", { name: "Secciones de compras" }));
     expect(sections.getByRole("link", { name: /Facturas/ })).toHaveAttribute("aria-current", "page");
     expect(sections.getByRole("link", { name: /Pedidos/ })).not.toHaveAttribute("aria-current");
     expect(screen.getByRole("link", { name: "Compras" })).toBeInTheDocument();
+  });
+
+  it("marks Solicitudes current on its page, not Pedidos", () => {
+    renderAt("/dashboard/compras/solicitudes", true, null, { requests: 1, orders: 1, invoices: 0, payments: 0, dueAttention: 0 });
+    const sections = within(screen.getByRole("list", { name: "Secciones de compras" }));
+    expect(sections.getByRole("link", { name: /Solicitudes/ })).toHaveAttribute("aria-current", "page");
+    expect(sections.getByRole("link", { name: /Pedidos/ })).not.toHaveAttribute("aria-current");
   });
 
   describe("Subcontratas", () => {

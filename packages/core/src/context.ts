@@ -26,6 +26,9 @@ export function canEdit(role: UserRole) {
   return role === "admin" || role === "manager";
 }
 
+/** Only admins approve or reject a purchase request. */
+export const canDecideRequest = (role: UserRole) => role === "admin";
+
 export function requireEditor(ctx: Ctx) {
   if (!canEdit(ctx.role)) throw forbidden();
 }

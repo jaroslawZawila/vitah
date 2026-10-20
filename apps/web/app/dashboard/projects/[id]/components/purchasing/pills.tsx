@@ -7,6 +7,7 @@ import type {
   PurchaseInvoiceState,
   PurchaseKind,
   PurchaseProgress,
+  PurchaseRequestStatus,
   PurchaseStatus,
 } from "@repo/core/contract";
 import { Badge, type badgeVariants } from "@/components/ui/badge";
@@ -32,6 +33,25 @@ export function PurchaseStatusPill({ status, className }: { status: PurchaseStat
   const t = useTranslations("purchasing.status");
   return (
     <Badge variant={PURCHASE_STATUS_TONE[status]} className={className}>
+      <Dot />
+      {t(status)}
+    </Badge>
+  );
+}
+
+const REQUEST_STATUS_TONE: Record<PurchaseRequestStatus, Variant> = {
+  pending: "yel",
+  approved: "info",
+  ordered: "good",
+  rejected: "destructive",
+  cancelled: "outline",
+};
+
+/** A purchase request's state: por aprobar, aprobada, pedida, rechazada or cancelada. */
+export function RequestStatusPill({ status, className }: { status: PurchaseRequestStatus; className?: string }) {
+  const t = useTranslations("purchasing.requests.status");
+  return (
+    <Badge variant={REQUEST_STATUS_TONE[status]} className={className}>
       <Dot />
       {t(status)}
     </Badge>

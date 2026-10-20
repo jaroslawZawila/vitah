@@ -14,6 +14,7 @@ import {
   purchaseOrderLines,
   purchaseOrderMilestones,
   purchaseOrders,
+  purchaseRequests,
   purchasePayments,
   sql,
   subcontractors,
@@ -207,15 +208,22 @@ export async function getPurchasingCounts(ctx: Ctx): Promise<PurchasingCounts> {
   const horizon = addDays(todayInSpain(), DUE_SOON_DAYS);
   const tenant = ctx.tenantId;
   // One round trip: the rail asks on every page.
-  const [row] = await db.execute<{ orders: number; invoices: number; payments: number; due: number }>(sql`
+  const [row] = await db.execute<{ requests: number; orders: number; invoices: number; payments: number; due: number }>(sql`
     select
+      (select count(*) from ${purchaseRequests} where tenant_id = ${tenant} and status = 'pending')::int as requests,
       (select count(*) from ${purchaseOrders} where tenant_id = ${tenant})::int as orders,
       (select count(*) from ${purchaseInvoices} where tenant_id = ${tenant})::int as invoices,
       (select count(*) from ${purchasePayments} where tenant_id = ${tenant})::int as payments,
       (select count(*) from ${purchaseInvoices}
         where ${purchaseInvoices.tenantId} = ${tenant} and ${purchaseInvoices.kind} = 'invoice'
           and ${purchaseInvoices.dueOn} <= ${horizon} and ${outstandingSql} > 0)::int as due`);
-  return { orders: row?.orders ?? 0, invoices: row?.invoices ?? 0, payments: row?.payments ?? 0, dueAttention: row?.due ?? 0 };
+  return {
+    requests: row?.requests ?? 0,
+    orders: row?.orders ?? 0,
+    invoices: row?.invoices ?? 0,
+    payments: row?.payments ?? 0,
+    dueAttention: row?.due ?? 0,
+  };
 }
 
 /** One invoice (or credit note): its amounts, lines, credit notes, payments, PDF versions and history. */

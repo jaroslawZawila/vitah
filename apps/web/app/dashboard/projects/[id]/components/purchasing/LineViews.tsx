@@ -32,6 +32,7 @@ import {
   invoiceHref,
   orderHref,
   ordersViewHref,
+  requestsViewHref,
   purchasesHref,
 } from "./links";
 import {
@@ -51,10 +52,10 @@ export function ViewSwitch({
   view,
 }: {
   projectId: string;
-  view: "lines" | "orders";
+  view: "lines" | "requests" | "orders";
 }) {
   const t = useTranslations("purchasing.views");
-  const tab = (key: "lines" | "orders", href: string) => (
+  const tab = (key: "lines" | "requests" | "orders", href: string) => (
     <Link
       href={href}
       aria-current={view === key ? "page" : undefined}
@@ -69,6 +70,7 @@ export function ViewSwitch({
       className="inline-flex max-w-full gap-0.5 rounded-[10px] border bg-raise p-[3px]"
     >
       {tab("lines", purchasesHref(projectId))}
+      {tab("requests", requestsViewHref(projectId))}
       {tab("orders", ordersViewHref(projectId))}
     </nav>
   );

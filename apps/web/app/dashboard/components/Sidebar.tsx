@@ -16,7 +16,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-import { COMPANY_PURCHASES_HREF, INVOICES_HREF, PAYMENTS_HREF } from "../projects/[id]/components/purchasing/links";
+import { COMPANY_PURCHASES_HREF, INVOICES_HREF, PAYMENTS_HREF, REQUESTS_HREF } from "../projects/[id]/components/purchasing/links";
 
 const NAV_ITEMS = [
   { key: "projects", href: "/dashboard/projects", icon: FolderKanban, adminOnly: false },
@@ -45,6 +45,7 @@ const SUBCONTRACTOR_TABS = [
 
 /** Compras' pages, nested under it in the rail's "Red" group. */
 const PURCHASE_TABS = [
+  { key: "requests", href: REQUESTS_HREF },
   { key: "orders", href: COMPANY_PURCHASES_HREF },
   { key: "invoices", href: INVOICES_HREF },
   { key: "payments", href: PAYMENTS_HREF },

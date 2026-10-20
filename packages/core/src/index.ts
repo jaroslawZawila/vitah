@@ -1,4 +1,4 @@
-export { canEdit, requireAdmin, requireEditor, type Ctx, type UserRole } from "./context";
+export { canDecideRequest, canEdit, requireAdmin, requireEditor, type Ctx, type UserRole } from "./context";
 export { CoreError, notFound, forbidden, invalid } from "./errors";
 export { hashPassword, normalizeEmail } from "./accounts";
 export { clearAttempts, overLimit } from "./throttle";
@@ -24,6 +24,7 @@ export * as constructionService from "./construction";
 export * as purchasingService from "./purchasing";
 export * as purchaseInvoicesService from "./purchase-invoices";
 export * as purchaseDocumentsService from "./purchase-documents";
+export * as purchaseRequestsService from "./purchase-requests";
 export * as planningService from "./planning";
 export * as changesService from "./changes";
 export * as subcontractorsService from "./subcontractors";

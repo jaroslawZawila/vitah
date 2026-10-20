@@ -11,6 +11,7 @@ import {
   purchaseOrderEvents,
   purchaseOrderLines,
   purchaseOrders,
+  purchaseRequests,
   sql,
   subcontractors,
   users,
@@ -52,6 +53,7 @@ import {
 import { contractSchedule, contractTotals, daysPast, deviation, lateDays, type LineContract } from "./control-calc";
 import { orderByDate, templateLeadDays } from "./planning-calc";
 import { loadDocuments, ordersWithDocuments } from "./purchase-document-data";
+import { orderRequest, reopenRequestOf } from "./purchase-request-data";
 import { addInvoicing, isDueSoon, purchaseProgress, termsOf } from "./purchase-calc";
 import {
   buildInvoices,
@@ -100,11 +102,11 @@ import { loadNetwork, requireCompany, type Network } from "./subcontractor-netwo
 // pending, never cancelled).
 // ─────────────────────────────────────────────────────────────────────────────
 
-const MAX_DESCRIPTION = 500;
-const MAX_NOTES = 2000;
-const MAX_NOTE = 500;
-const MAX_AMOUNT_CENTS = 2_000_000_000;
-const MAX_EVENTS = 500;
+export const MAX_DESCRIPTION = 500;
+export const MAX_NOTES = 2000;
+export const MAX_NOTE = 500;
+export const MAX_AMOUNT_CENTS = 2_000_000_000;
+export const MAX_EVENTS = 500;
 
 type OrderRow = typeof purchaseOrders.$inferSelect;
 type LineRow = typeof purchaseOrderLines.$inferSelect;
@@ -192,7 +194,7 @@ function networkOf(tenantId: string, orders: LoadedOrder[]) {
  * contracted for aren't in the map. `except` leaves an order out (the one
  * being edited).
  */
-function contractsOf(orders: LoadedOrder[], today: string, except?: string) {
+export function contractsOf(orders: LoadedOrder[], today: string, except?: string) {
   const contracts = new Map<string, LineContract>();
   const counting = orders
     .filter((o) => o.order.id !== except && countsAsContracted(o.order.status))
@@ -209,7 +211,7 @@ function contractsOf(orders: LoadedOrder[], today: string, except?: string) {
   return contracts;
 }
 
-const ofProject = (projectId: string) => eq(purchaseOrders.projectId, projectId);
+export const ofProject = (projectId: string) => eq(purchaseOrders.projectId, projectId);
 
 /**
  * A project's orders (without their suppliers' CAE status) and what each
@@ -612,7 +614,7 @@ function reachedOn(events: { action: string; detail: Record<string, unknown>; cr
 /** One order: its lines against the budget, its chapters on the obra, and its history. */
 export async function getPurchase(ctx: Ctx, orderId: string): Promise<PurchaseOrderDetail> {
   const order = await requireOrder(ctx, orderId);
-  const [plan, projectOrders, events, [creator], net, invoices, milestones, documents] = await Promise.all([
+  const [plan, projectOrders, events, [creator], net, invoices, milestones, documents, [request]] = await Promise.all([
     contractPlan(ctx.tenantId, order.projectId),
     loadOrders(ctx.tenantId, ofProject(order.projectId)),
     db
@@ -629,6 +631,10 @@ export async function getPurchase(ctx: Ctx, orderId: string): Promise<PurchaseOr
     loadInvoices(ctx.tenantId, eq(purchaseInvoices.orderId, orderId)),
     loadMilestones(ctx.tenantId, eq(purchaseOrders.id, orderId)),
     loadDocuments(ctx.tenantId, [orderId]),
+    db
+      .select({ id: purchaseRequests.id, number: purchaseRequests.number })
+      .from(purchaseRequests)
+      .where(and(eq(purchaseRequests.tenantId, ctx.tenantId), eq(purchaseRequests.orderId, orderId))),
   ]);
   const today = todayInSpain();
   const loaded = projectOrders.find((o) => o.order.id === orderId)!;
@@ -682,6 +688,7 @@ export async function getPurchase(ctx: Ctx, orderId: string): Promise<PurchaseOr
     })),
     reached: reachedOn(events.map((e) => e.event).reverse()),
     budgetNumber: plan.budgetNumber,
+    request: request ?? null,
     terms: termsOf(order),
     milestones: schedule,
     invoices: [...built.items.values()],
@@ -693,7 +700,7 @@ export async function getPurchase(ctx: Ctx, orderId: string): Promise<PurchaseOr
 // ─── Writes ──────────────────────────────────────────────────────────────────
 
 /** The tenant's company or material supplier, able to take an order of `kind`. */
-async function requireSupplier(ctx: Ctx, subcontractorId: unknown, kind: PurchaseKind) {
+export async function requireSupplier(ctx: Ctx, subcontractorId: unknown, kind: PurchaseKind) {
   if (typeof subcontractorId !== "string" || !subcontractorId) fail("missing_fields");
   const [row] = await db
     .select({ id: subcontractors.id, suppliesOnly: subcontractors.suppliesOnly })
@@ -705,7 +712,7 @@ async function requireSupplier(ctx: Ctx, subcontractorId: unknown, kind: Purchas
 }
 
 /** The order's lines: each a contract line once, with an amount; `closesLine` defaults to true. */
-function parseLines(value: unknown, contract: Awaited<ReturnType<typeof contractLines>>): NewLine[] {
+export function parseLines(value: unknown, contract: Awaited<ReturnType<typeof contractLines>>): NewLine[] {
   if (!Array.isArray(value) || value.length === 0) fail("missing_fields");
   if (value.length > MAX_ORDER_LINES) fail("invalid_input");
   const seen = new Set<string>();
@@ -796,7 +803,8 @@ export async function logEvent(
  * Body: { kind, subcontractorId, description, lines: [{ lineageId,
  * amountCents, closesLine? }], status? (pending, or ordered / contracted to
  * place it now), orderedOn?, expectedOn?, workStart?, workEnd?, notes?,
- * paymentDays?, retentionBp?, vatKind? }. → { orderId, number }
+ * paymentDays?, retentionBp?, vatKind?, requestId? (the approved purchase
+ * request it comes from) }. → { orderId, number }
  */
 export async function createPurchase(ctx: Ctx, projectId: string, input: Record<string, unknown>) {
   requireEditor(ctx);
@@ -807,6 +815,9 @@ export async function createPurchase(ctx: Ctx, projectId: string, input: Record<
     contractLines(ctx.tenantId, projectId),
   ]);
   const lines = parseLines(input.lines, contract);
+  // null or absent: an order of its own; else an approved request's id.
+  const requestId = input.requestId ?? null;
+  if (requestId !== null && (typeof requestId !== "string" || requestId === "")) fail("invalid_input");
   const status = input.status === undefined ? "pending" : pick(["pending", placedStatus(kind)])(input.status);
   const parsed = pickChanges(input, FIELD_PARSERS);
   if (parsed.description === undefined) fail("missing_fields");
@@ -842,7 +853,8 @@ export async function createPurchase(ctx: Ctx, projectId: string, input: Record<
         .returning({ id: purchaseOrders.id, number: purchaseOrders.number });
       if (!row) return null;
       await tx.insert(purchaseOrderLines).values(lines.map((l) => ({ ...l, tenantId: ctx.tenantId, orderId: row.id })));
-      await logEvent(tx, ctx, row.id, "created", { number: row.number, status, amountCents, lines: lines.length });
+      if (requestId) await orderRequest(tx, ctx, projectId, requestId, row);
+      await logEvent(tx, ctx, row.id, "created", { number: row.number, status, amountCents, lines: lines.length, ...(requestId ? { requestId } : {}) });
       return { orderId: row.id, number: row.number };
     });
     if (made) return made;
@@ -925,7 +937,8 @@ export async function updatePurchase(ctx: Ctx, orderId: string, input: Record<st
 }
 
 /** What changed between an order's lines and their new version, by budget line. */
-function diffLines(before: LineRow[], after: NewLine[], contract: Awaited<ReturnType<typeof contractLines>>) {
+/** The lines that changed, by lineage: added, removed, a new amount, or closing differently. */
+export function diffLines(before: NewLine[], after: NewLine[], contract: Awaited<ReturnType<typeof contractLines>>) {
   const old = new Map(before.map((l) => [l.lineageId, l]));
   const now = new Map(after.map((l) => [l.lineageId, l]));
   const shape = (l: NewLine | undefined) => (l ? { amountCents: l.amountCents, closesLine: l.closesLine } : null);
@@ -977,6 +990,7 @@ export async function setPurchaseStatus(ctx: Ctx, orderId: string, input: Record
     // The date it records: the day it was placed or completed (none for the steps between).
     const day = completedOn ?? (status === placedStatus(order.kind) ? orderedOn : null);
     await logEvent(tx, ctx, orderId, "status", { from: order.status, to: status, date: day }, note);
+    if (status === "cancelled") await reopenRequestOf(tx, ctx, order);
   });
   return { orderId, status };
 }

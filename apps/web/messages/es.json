@@ -50,7 +50,8 @@
       "orders": "Pedidos",
       "invoices": "Facturas",
       "payments": "Pagos",
-      "dueCount": "{count, plural, one {# factura vencida o por vencer} other {# facturas vencidas o por vencer}}"
+      "dueCount": "{count, plural, one {# factura vencida o por vencer} other {# facturas vencidas o por vencer}}",
+      "requests": "Solicitudes"
     }
   },
   "topbar": {
@@ -2839,7 +2840,8 @@
         "removeOf": "Quitar {title}",
         "confirmRemove": "¿Quitar «{title}» con todas sus versiones?",
         "hint": "Cada documento guarda sus versiones; las facturas y sus justificantes están en cada factura."
-      }
+      },
+      "fromRequest": "desde <link>{number}</link>"
     },
     "history": {
       "title": "Historial",
@@ -2862,7 +2864,8 @@
         "issuedOn": "Fecha",
         "dueOn": "Vencimiento",
         "baseCents": "Base",
-        "irpfBp": "IRPF"
+        "irpfBp": "IRPF",
+        "neededBy": "Para el"
       },
       "changed": {
         "subcontractorId": "Proveedor cambiado",
@@ -2885,7 +2888,14 @@
       "milestones": "{count, plural, =0 {Hitos de pago quitados} one {Hitos de pago: # hito} other {Hitos de pago: # hitos}}",
       "documentAdded": "Documento añadido: {title}",
       "documentVersionAdded": "Nueva versión de {title} (v{version})",
-      "documentRemoved": "Documento quitado: {title}"
+      "documentRemoved": "Documento quitado: {title}",
+      "request": {
+        "approved": "Aprobada",
+        "rejected": "Rechazada",
+        "cancelled": "Cancelada",
+        "ordered": "Pedido {number} creado",
+        "reopened": "{number} cancelado: aprobada de nuevo, se puede volver a pedir"
+      }
     },
     "form": {
       "numbered": "{ref} · se numerará {number}",
@@ -2969,7 +2979,11 @@
       "retentionHint": "Se descuenta de cada pago hasta el fin de la garantía",
       "vatKind": "IVA de sus facturas",
       "vatDefault": "Según el tipo ({vat})",
-      "firstDocument": "Pedido o contrato"
+      "firstDocument": "Pedido o contrato",
+      "supplierOptionalHint": "Opcional: el proveedor que propone la obra. Vuelve a pulsarlo para dejarlo a la oficina.",
+      "estimateHint": "Marca las partidas que hacen falta y cuánto calculas de cada una. Importes sin IVA.",
+      "estimate": "Estimado",
+      "fromRequest": "Desde la solicitud <b>{number}</b> de {by}: revisa el proveedor, los importes y las fechas antes de guardar. El pedido quedará enlazado a ella."
     },
     "chapter": {
       "title": "Pedidos",
@@ -3051,12 +3065,14 @@
       "has_payments": "La factura ya tiene pagos: no se pueden cambiar sus importes ni eliminarla.",
       "duplicate_number": "Ese proveedor ya tiene una factura con ese número.",
       "milestones_mismatch": "Los hitos deben sumar el importe del pedido.",
-      "exceeds_amount": "El importe supera lo que queda por pagar o por abonar."
+      "exceeds_amount": "El importe supera lo que queda por pagar o por abonar.",
+      "request_not_approved": "La solicitud ya no está aprobada (se ha pedido o cancelado mientras tanto). Vuelve a ella para ver qué ha pasado."
     },
     "views": {
       "label": "Vista",
       "lines": "Partidas",
-      "orders": "Pedidos"
+      "orders": "Pedidos",
+      "requests": "Solicitudes"
     },
     "progress": {
       "to_contract": "Pendiente de contratar",
@@ -3414,6 +3430,134 @@
       "cancel": "Cancelar",
       "saving": "Guardando…",
       "paidLocked": "Ya tiene pagos: solo se pueden cambiar el número, las fechas y las notas."
+    },
+    "requests": {
+      "status": {
+        "pending": "Por aprobar",
+        "approved": "Aprobada",
+        "ordered": "Pedida",
+        "rejected": "Rechazada",
+        "cancelled": "Cancelada"
+      },
+      "groups": {
+        "label": "Estado",
+        "all": "Todas",
+        "pending": "Por aprobar",
+        "approved": "Por pedir",
+        "closed": "Cerradas"
+      },
+      "kpis": {
+        "label": "Resumen",
+        "pending": "Por aprobar",
+        "approved": "Aprobadas sin pedir",
+        "amount": "{amount} estimados"
+      },
+      "list": {
+        "title": "Solicitudes",
+        "project": "Obra",
+        "all": "Todas",
+        "noMatch": "Ninguna solicitud con estos filtros.",
+        "cards": "Solicitudes",
+        "table": "Solicitudes de compra",
+        "projectNumber": "Obra · Nº",
+        "number": "Nº",
+        "concept": "Concepto",
+        "supplier": "Proveedor propuesto",
+        "estimate": "Estimado",
+        "neededBy": "Para el",
+        "requestedBy": "Solicitada por",
+        "status": "Estado",
+        "noSupplier": "Sin proveedor propuesto",
+        "chapterShort": "cap. {codes}"
+      },
+      "project": {
+        "title": "Solicitudes de compra",
+        "description": "Lo que la obra necesita comprar o subcontratar, antes de pedirlo. Un administrador la aprueba o la rechaza; aprobada, se convierte en pedido.",
+        "new": "Nueva solicitud",
+        "none": "Todavía no hay solicitudes en esta obra.",
+        "footnote": "Una solicitud no contrata nada: Obra y Compras solo cuentan los pedidos. También se pueden crear pedidos sin solicitud."
+      },
+      "company": {
+        "eyebrow": "Compras · todas las obras",
+        "title": "Solicitudes",
+        "description": "Lo que piden las obras, primero lo que espera aprobación. Cada solicitud se decide y se pide desde su obra.",
+        "none": "Todavía no hay solicitudes."
+      },
+      "form": {
+        "newLabel": "Nueva solicitud de compra",
+        "editLabel": "Editar solicitud de compra",
+        "newTitle": "Nueva solicitud",
+        "editTitle": "Editar solicitud",
+        "intro": "Qué hace falta, para cuándo y cuánto calculas. Un administrador la revisa antes de hacer el pedido.",
+        "noBudget": "Todavía no hay un presupuesto aceptado: las solicitudes se hacen sobre sus partidas.",
+        "conceptTitle": "2 · Qué hace falta",
+        "description": "Concepto",
+        "descriptionPlaceholder": "Ej.: piedra para la fachada norte",
+        "neededBy": "Para el",
+        "neededByHint": "El día que la obra lo necesita (opcional).",
+        "notes": "Notas",
+        "notesPlaceholder": "Calidades, cantidades, ofertas recibidas…",
+        "totalLabel": "Importe estimado",
+        "total": "Estimado (sin IVA)",
+        "cancel": "Cancelar",
+        "saving": "Guardando…",
+        "saveChanges": "Guardar cambios",
+        "send": "Enviar para aprobar"
+      },
+      "detail": {
+        "askedBy": "Solicitada por {name} el {date}",
+        "late": "{days, plural, one {# día} other {# días}} tarde",
+        "lateHint": "Hacía falta para el {date} y todavía no hay pedido.",
+        "lines": "Partidas",
+        "line": "Partida",
+        "cost": "Coste",
+        "contracted": "Ya contratado",
+        "estimate": "Estimado",
+        "total": "Total estimado",
+        "notInBudget": "Ya no está en el presupuesto aceptado",
+        "data": "Datos",
+        "neededBy": "Para el",
+        "supplier": "Proveedor propuesto",
+        "noSupplier": "Lo elige la oficina",
+        "chapters": "Capítulos",
+        "notes": "Notas",
+        "createOrder": "Crear pedido",
+        "edit": "Editar",
+        "cancel": "Cancelar solicitud",
+        "confirmCancel": "¿Cancelar la solicitud {number}? No se podrá pedir."
+      },
+      "decision": {
+        "title": "Aprobación",
+        "waiting": "Espera la aprobación de un administrador.",
+        "hint": "Revisa las partidas y el estimado. Aprobada, cualquiera de la obra puede convertirla en pedido.",
+        "approve": "Aprobar",
+        "reject": "Rechazar",
+        "reason": "Motivo del rechazo",
+        "reasonPlaceholder": "Ej.: hay material en otra obra",
+        "back": "Volver",
+        "saving": "Guardando…",
+        "confirmReject": "Rechazar solicitud",
+        "approvedBy": "Aprobada por {name} el {date}.",
+        "rejectedBy": "Rechazada por {name} el {date}.",
+        "toOrder": "Lista para pedir.",
+        "ordered": "Pedida en",
+        "cancelled": "Cancelada: no se pedirá."
+      }
+    },
+    "requestErrors": {
+      "generic": "No se ha podido guardar. Inténtalo de nuevo.",
+      "missing_fields": "Escribe el concepto y marca al menos una partida con su importe. Para rechazar, escribe el motivo.",
+      "invalid_input": "Revisa los importes y los valores introducidos.",
+      "invalid_date": "Revisa la fecha.",
+      "unknown_line": "Una de las partidas ya no está en el presupuesto aceptado. Recarga la página.",
+      "unknown_supplier": "Ese proveedor ya no está en Subcontratas.",
+      "supplies_only": "Un proveedor de material solo recibe pedidos de material, no subcontratos.",
+      "invalid_state": "La solicitud ya no está en ese estado. Recarga la página.",
+      "not_found": "No se ha encontrado la solicitud.",
+      "forbidden": "No tienes permiso: solo un administrador aprueba o rechaza, y administradores y gestores solicitan.",
+      "project_not_found": "Proyecto no encontrado.",
+      "no_budget": "Todavía no hay un presupuesto aceptado.",
+      "request_not_approved": "La solicitud ya no está aprobada (se ha pedido o cancelado mientras tanto). Vuelve a ella para ver qué ha pasado."
     }
   }
 }

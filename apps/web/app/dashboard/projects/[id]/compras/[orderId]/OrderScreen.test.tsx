@@ -263,3 +263,10 @@ describe("OrderScreen", () => {
     });
   });
 });
+
+describe("OrderScreen from a purchase request", () => {
+  it("links back to the request it was made from", () => {
+    renderScreen({ order: { ...orderDetail, request: { id: "req-1", number: 1 } } });
+    expect(screen.getByRole("link", { name: "SOL-001" })).toHaveAttribute("href", "/dashboard/projects/p-1/compras/solicitudes/req-1");
+  });
+});

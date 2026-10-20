@@ -1,7 +1,11 @@
 "use client";
 
 import type { PurchaseOrderListItem } from "@repo/core/contract";
+import { todayInSpain } from "@repo/core/obra-calc";
 import { useControlFormat } from "../construction/format";
+
+/** A timestamp's day in Spain. */
+export const day = (iso: string) => todayInSpain(new Date(iso));
 
 /** The Obra tab's figures, plus an order's delivery or works period ("14 oct", "20 oct – 7 nov"). */
 export function usePurchaseFormat() {

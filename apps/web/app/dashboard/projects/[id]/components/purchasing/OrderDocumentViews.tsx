@@ -4,7 +4,6 @@ import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { FileText } from "lucide-react";
 import type { PurchaseOrderDocument } from "@repo/core/contract";
-import { todayInSpain } from "@repo/core/obra-calc";
 import { Button } from "@/components/ui/button";
 import { cardVariants } from "@/components/ui/card";
 import { Field, FormActions } from "@/components/ui/field";
@@ -12,14 +11,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import FormError from "../../../../components/FormError";
 import FileSlot from "../../../../subcontratas/empresas/nueva/steps/FileSlot";
-import { usePurchaseFormat } from "./format";
+import { day, usePurchaseFormat } from "./format";
 
 // Presentational: an order's documents (the order, the signed contract, its
 // annexes, the offer…), each in versions. The container (OrderScreen) runs
 // the actions.
 
-/** A timestamp's day in Spain. */
-const day = (iso: string) => todayInSpain(new Date(iso));
 
 /** Which form is open: a new document, or a new version of one. */
 type Open = { kind: "document" } | { kind: "version"; documentId: string } | null;

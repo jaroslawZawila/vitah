@@ -8,11 +8,11 @@ import {
   PURCHASE_FLOWS,
   isCompletedOrder,
   orderLabel,
+  requestLabel,
   type PurchaseOrderDetail,
   type PurchaseOrderEvent,
   type PurchaseStatus,
 } from "@repo/core/contract";
-import { todayInSpain } from "@repo/core/obra-calc";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cardVariants } from "@/components/ui/card";
@@ -26,14 +26,13 @@ import { companyHref } from "../../../../subcontratas/components/display";
 import { ChapterStatePill } from "../construction/pills";
 import { StageEyebrow } from "../construction/ObraFrame";
 import { deviationTone } from "../construction/format";
-import { usePurchaseFormat } from "./format";
+import { day, usePurchaseFormat } from "./format";
+import { requestHref } from "./links";
 import { PurchaseKindPill, PurchaseStatusPill, SupplierCaePill } from "./pills";
 
 // Presentational: an order's page (heading, late warning, status steps,
 // lines, data and history). The container (OrderScreen) runs the actions.
 
-/** A timestamp's day in Spain. */
-const day = (iso: string) => todayInSpain(new Date(iso));
 
 /** "VTH-26-001 · PED-049", status and kind; the concept; the supplier. */
 export function OrderHeading({ order, actions }: { order: PurchaseOrderDetail; actions?: React.ReactNode }) {
@@ -55,6 +54,19 @@ export function OrderHeading({ order, actions }: { order: PurchaseOrderDetail; a
           <span>· {order.suppliesOnly ? ty("supplier.label") : t("subcontractor")}</span>
           {!order.suppliesOnly && order.caeStatus && order.caeStatus !== "apta" && (
             <SupplierCaePill suppliesOnly={false} status={order.caeStatus} />
+          )}
+          {order.request && (
+            <span>
+              ·{" "}
+              {t.rich("fromRequest", {
+                number: requestLabel(order.request.number),
+                link: (chunks) => (
+                  <Link href={requestHref(order.projectId, order.request!.id)} className="num font-semibold text-brand-ink hover:text-primary">
+                    {chunks}
+                  </Link>
+                ),
+              })}
+            </span>
           )}
         </p>
       </div>
@@ -331,10 +343,10 @@ export function OrderData({
   );
 }
 
-const FIELD_DATES = new Set(["orderedOn", "expectedOn", "workStart", "workEnd", "issuedOn", "dueOn"]);
+const FIELD_DATES = new Set(["orderedOn", "expectedOn", "workStart", "workEnd", "issuedOn", "dueOn", "neededBy"]);
 
-/** One history entry, in words. */
-function EventText({ event }: { event: PurchaseOrderEvent }) {
+/** One history entry (an order's, or the parts a purchase request shares with it), in words. */
+export function EventText({ event }: { event: PurchaseOrderEvent }) {
   const t = useTranslations("purchasing.history");
   const ts = useTranslations("purchasing.status");
   const tk = useTranslations("purchasing.kind");
@@ -453,8 +465,14 @@ function EventText({ event }: { event: PurchaseOrderEvent }) {
   }
 }
 
-/** Every change to the order, newest first. */
-export function OrderHistory({ events }: { events: PurchaseOrderEvent[] }) {
+/** Every change to the order (or to a request, with its own `Text`), newest first. */
+export function OrderHistory({
+  events,
+  Text = EventText,
+}: {
+  events: PurchaseOrderEvent[];
+  Text?: (props: { event: PurchaseOrderEvent }) => React.ReactNode;
+}) {
   const t = useTranslations("purchasing.history");
   const f = usePurchaseFormat();
   return (
@@ -470,7 +488,7 @@ export function OrderHistory({ events }: { events: PurchaseOrderEvent[] }) {
             <li key={event.id} className="grid gap-x-4 gap-y-0.5 border-b py-2.5 text-[13.5px] last:border-b-0 sm:grid-cols-[110px_minmax(0,1fr)]">
               <span className="num text-[12.5px] text-muted-foreground">{f.date(day(event.at))}</span>
               <div className="min-w-0 [overflow-wrap:anywhere]">
-                <EventText event={event} />
+                <Text event={event} />
                 {event.note && <span className="text-muted-foreground"> “{event.note}”</span>}
                 {event.by && <span className="text-muted-foreground"> · {event.by}</span>}
               </div>

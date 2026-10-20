@@ -9,6 +9,7 @@ import { and, budgetRevisions, db, eq, obraChapterProgress, projects, seedConfig
 import { seedControl, seedObra } from "./seed-obra";
 import { seedPlanning } from "./planning";
 import { seedPurchaseInvoices } from "./purchase-invoices";
+import { seedPurchaseRequests } from "./purchase-requests";
 import { seedPurchasing } from "./purchasing";
 import { seedSubcontractors } from "./subcontractors";
 
@@ -68,6 +69,9 @@ async function run() {
 
   const invoices = await seedPurchaseInvoices(ctx, project.id);
   console.log(invoices ? `Seeded ${invoices} supplier invoices on ${projectRef}` : `${projectRef} already has invoices, skipping them`);
+
+  const asked = await seedPurchaseRequests(ctx, project.id);
+  console.log(asked ? `Seeded ${asked} purchase requests on ${projectRef}` : `${projectRef} already has purchase requests, skipping them`);
 }
 
 run()

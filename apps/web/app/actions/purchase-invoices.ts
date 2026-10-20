@@ -4,10 +4,9 @@
 // (packages/core/src/purchase-invoices.ts): Compras › Facturas and Pagos, an
 // invoice's page and form, and an order's payment schedule.
 
-import { purchaseInvoicesService as svc, type ObraError } from "@repo/core";
-import { revalidatePath } from "next/cache";
+import { purchaseInvoicesService as svc } from "@repo/core";
 import { fieldsWithFile } from "../../lib/api";
-import { mutate, read, type ObraState } from "./run";
+import { mutateDashboard, read, type ObraState } from "./run";
 
 // ─── Reads ───────────────────────────────────────────────────────────────────
 
@@ -39,15 +38,7 @@ export async function getPurchasingCounts() {
 
 // ─── Writes ──────────────────────────────────────────────────────────────────
 
-/**
- * Runs the write, then refreshes every page under the dashboard: the obra's
- * Compras, Compras' lists and the rail's counts all read the same invoices.
- */
-async function write(fn: Parameters<typeof mutate>[1]): Promise<ObraState> {
-  const state = await mutate<ObraError>(null, fn);
-  if (state?.success) revalidatePath("/dashboard", "layout");
-  return state;
-}
+const write = (fn: Parameters<typeof mutateDashboard>[1]) => mutateDashboard(null, fn);
 
 /** Form data: `data` (the invoice as JSON) and `file` (PDF, optional). → the new invoice's id too. */
 export async function createInvoiceAction(

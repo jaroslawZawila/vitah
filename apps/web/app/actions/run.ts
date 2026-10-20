@@ -45,3 +45,13 @@ export async function mutate<E extends string>(
   if (projectId) revalidatePath(`/dashboard/projects/${projectId}`, "layout");
   return { success: true };
 }
+
+/**
+ * `mutate`, then refreshes every page under the dashboard: Compras' lists,
+ * the obra's Compras and the rail's counts all read the same purchasing data.
+ */
+export async function mutateDashboard(projectId: string | null, fn: (ctx: Ctx) => Promise<unknown>): Promise<ObraState> {
+  const state = await mutate<ObraError>(projectId, fn);
+  if (state?.success) revalidatePath("/dashboard", "layout");
+  return state;
+}

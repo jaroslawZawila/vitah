@@ -117,7 +117,7 @@ describe("invoice actions", () => {
 
     expect((await getInvoices())!.invoices.summary).toMatchObject({ overdueInvoices: 1 });
     expect((await getPayments())!.payments.forecast[0]!.invoices).toHaveLength(1);
-    expect(await getPurchasingCounts()).toEqual({ orders: 1, invoices: 1, payments: 0, dueAttention: 1 });
+    expect(await getPurchasingCounts()).toEqual({ requests: 0, orders: 1, invoices: 1, payments: 0, dueAttention: 1 });
     expect((await getProjectPurchaseLines(project.id))!.lines.counts.invoiced).toBe(1);
   });
 

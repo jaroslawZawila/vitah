@@ -225,6 +225,7 @@ export const orderDetail: PurchaseOrderDetail = {
   createdBy: "Laura Pérez",
   reached: { pending: "2026-10-02", ordered: "2026-10-03", in_transit: "2026-10-13" },
   budgetNumber: 1,
+  request: null,
   terms: { paymentDays: 30, retentionBp: 0, vatKind: "vat21" },
   milestones: [],
   invoices: [],
