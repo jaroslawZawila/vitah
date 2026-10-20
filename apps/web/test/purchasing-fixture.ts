@@ -32,6 +32,7 @@ export function orderItem(overrides: Partial<PurchaseOrderListItem> = {}): Purch
     amountCents: 312_000,
     chapterCodes: ["06"],
     lateDays: 3,
+    invoicedCents: 0,
     hasFile: true,
     createdAt: "2026-10-02T09:00:00.000Z",
     ...overrides,
@@ -213,6 +214,10 @@ export const orderDetail: PurchaseOrderDetail = {
   createdBy: "Laura Pérez",
   reached: { pending: "2026-10-02", ordered: "2026-10-03", in_transit: "2026-10-13" },
   budgetNumber: 1,
+  terms: { paymentDays: 30, retentionBp: 0, vatKind: "vat21" },
+  milestones: [],
+  invoices: [],
+  invoicing: { invoicedCents: 0, paidCents: 0, outstandingCents: 0, retainedCents: 0, toInvoiceCents: 312_000 },
   events: [
     {
       id: "ev-4",
@@ -331,6 +336,9 @@ export const editForm: PurchaseForm = {
     workStart: orderDetail.workStart,
     workEnd: orderDetail.workEnd,
     notes: orderDetail.notes,
+    paymentDays: null,
+    retentionBp: 0,
+    vatKind: null,
     lines: orderDetail.lines.map(({ lineageId, amountCents, closesLine }) => ({ lineageId, amountCents, closesLine })),
   },
 };

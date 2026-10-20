@@ -4,7 +4,8 @@ import { readJson, withContext } from "../../../../../lib/api";
 // ─── /api/v1/purchases/:orderId ───────────────────────────────────────────────
 // GET → PurchaseOrderDetail
 // PATCH any of { description, subcontractorId, orderedOn, expectedOn,
-//   workStart, workEnd, notes, kind (while pending), lines } → { orderId }
+//   workStart, workEnd, notes, paymentDays, retentionBp, vatKind, kind (while
+//   pending), lines } → { orderId }
 // ─────────────────────────────────────────────────────────────────────────────
 
 type Params = { params: Promise<{ orderId: string }> };

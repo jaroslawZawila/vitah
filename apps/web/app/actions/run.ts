@@ -23,9 +23,13 @@ export async function read<T>(fn: (ctx: Ctx) => Promise<T>) {
   }
 }
 
-/** Runs a core mutation; returns `{ error: code }` for expected failures. */
+/**
+ * Runs a core mutation; returns `{ error: code }` for expected failures. With
+ * a `projectId`, every tab of that project is refreshed; without, the caller
+ * revalidates what it touched.
+ */
 export async function mutate<E extends string>(
-  projectId: string,
+  projectId: string | null,
   fn: (ctx: Ctx) => Promise<unknown>,
 ): Promise<ActionState<E>> {
   const ctx = await getSessionContext();
@@ -38,6 +42,6 @@ export async function mutate<E extends string>(
   }
   // Every tab of the project: counts, lists, the obra, budget and payments
   // all read from the same data.
-  revalidatePath(`/dashboard/projects/${projectId}`, "layout");
+  if (projectId) revalidatePath(`/dashboard/projects/${projectId}`, "layout");
   return { success: true };
 }

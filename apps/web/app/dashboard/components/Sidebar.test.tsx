@@ -3,7 +3,7 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import { NextIntlClientProvider } from "next-intl";
 import { describe, expect, it, vi } from "vitest";
 import messages from "../../../messages/es.json";
-import type { SubcontractorCounts } from "@repo/core/contract";
+import type { PurchasingCounts, SubcontractorCounts } from "@repo/core/contract";
 import Sidebar from "./Sidebar";
 
 const navigation = { pathname: "/dashboard/projects", params: {} as { id?: string } };
@@ -14,7 +14,12 @@ vi.mock("next/navigation", () => ({
 const onLanguageChange = vi.fn(async () => ({}));
 
 /** Next only sets `id` on `projects/[id]` routes. */
-function renderAt(pathname: string, isAdmin = true, subcontractors: SubcontractorCounts | null = null) {
+function renderAt(
+  pathname: string,
+  isAdmin = true,
+  subcontractors: SubcontractorCounts | null = null,
+  purchases: PurchasingCounts | null = null,
+) {
   navigation.pathname = pathname;
   navigation.params = /^\/dashboard\/projects\/(?!new$)[^/]+/.test(pathname)
     ? { id: pathname.split("/")[3] }
@@ -26,6 +31,7 @@ function renderAt(pathname: string, isAdmin = true, subcontractors: Subcontracto
         email="laura@vitah.es"
         isAdmin={isAdmin}
         subcontractors={subcontractors}
+        purchases={purchases}
         language="es"
         onLanguageChange={onLanguageChange}
       />
@@ -89,9 +95,24 @@ describe("Sidebar", () => {
     expect(link).not.toHaveAttribute("aria-current");
   });
 
-  it("marks Compras current on its page", () => {
-    renderAt("/dashboard/compras");
-    expect(screen.getByRole("link", { name: "Compras" })).toHaveAttribute("aria-current", "page");
+  it("opens Compras on Pedidos, with Facturas and Pagos and their counts", () => {
+    renderAt("/dashboard/compras", true, null, { orders: 58, invoices: 9, payments: 4, dueAttention: 3 });
+    const sections = within(screen.getByRole("list", { name: "Secciones de compras" }));
+    expect(sections.getAllByRole("link").map((link) => [link.textContent, link.getAttribute("href")])).toEqual([
+      ["Pedidos58", "/dashboard/compras"],
+      ["Facturas9", "/dashboard/compras/facturas"],
+      ["Pagos4", "/dashboard/compras/pagos"],
+    ]);
+    expect(sections.getByRole("link", { name: /Pedidos/ })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("link", { name: /^Compras/ })).toHaveTextContent("3 · 3 facturas vencidas o por vencer");
+  });
+
+  it("marks the Compras section open, on an invoice too", () => {
+    renderAt("/dashboard/compras/facturas/inv-1", true, null, { orders: 1, invoices: 1, payments: 0, dueAttention: 0 });
+    const sections = within(screen.getByRole("list", { name: "Secciones de compras" }));
+    expect(sections.getByRole("link", { name: /Facturas/ })).toHaveAttribute("aria-current", "page");
+    expect(sections.getByRole("link", { name: /Pedidos/ })).not.toHaveAttribute("aria-current");
+    expect(screen.getByRole("link", { name: "Compras" })).toBeInTheDocument();
   });
 
   describe("Subcontratas", () => {

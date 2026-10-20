@@ -287,6 +287,7 @@ export function OrderData({
   onRemoveFile: () => void;
 }) {
   const t = useTranslations("purchasing.order.data");
+  const tv = useTranslations("purchasing.vat");
   const f = usePurchaseFormat();
   // Over 4 MB is refused here, before anything is sent.
   const [tooLarge, setTooLarge] = useState(false);
@@ -366,6 +367,9 @@ export function OrderData({
         <FormError namespace="purchasing.errors" error={tooLarge ? "file_too_large" : undefined} />
       </div>,
     ],
+    [t("paymentTerms"), t("paymentDays", { days: order.terms.paymentDays })],
+    [t("retention"), order.terms.retentionBp > 0 ? t("retentionValue", { pct: f.share(order.terms.retentionBp) }) : t("noRetention")],
+    [t("vat"), tv(order.terms.vatKind)],
     ...(order.notes ? ([[t("notes"), <span key="notes" className="whitespace-pre-line">{order.notes}</span>]] as [string, React.ReactNode][]) : []),
     [t("createdBy"), `${order.createdBy ?? "—"} · ${f.shortDay(day(order.createdAt))}`],
   ];
@@ -387,13 +391,14 @@ export function OrderData({
   );
 }
 
-const FIELD_DATES = new Set(["orderedOn", "expectedOn", "workStart", "workEnd"]);
+const FIELD_DATES = new Set(["orderedOn", "expectedOn", "workStart", "workEnd", "issuedOn", "dueOn"]);
 
 /** One history entry, in words. */
 function EventText({ event }: { event: PurchaseOrderEvent }) {
   const t = useTranslations("purchasing.history");
   const ts = useTranslations("purchasing.status");
   const tk = useTranslations("purchasing.kind");
+  const tv = useTranslations("purchasing.vat");
   const f = usePurchaseFormat();
   const d = event.detail;
   const num = (value: unknown) => (typeof value === "number" ? value : 0);
@@ -402,6 +407,9 @@ function EventText({ event }: { event: PurchaseOrderEvent }) {
     if (value === null || value === undefined || value === "") return "—";
     if (FIELD_DATES.has(key)) return f.shortDay(String(value));
     if (key === "kind") return tk(String(value) as "material");
+    if (key === "vatKind") return tv(String(value) as "vat21");
+    if (key === "retentionBp" || key === "irpfBp") return f.share(Number(value));
+    if (key === "baseCents") return f.amount(Number(value));
     return String(value);
   };
 
@@ -462,6 +470,34 @@ function EventText({ event }: { event: PurchaseOrderEvent }) {
         </>
       );
     }
+    case "invoice_created":
+      return <>{t(d.kind === "credit_note" ? "creditCreated" : "invoiceCreated", { number: text(d.number), amount: f.amount(num(d.baseCents)) })}</>;
+    case "invoice_updated": {
+      const fields = (d.fields ?? {}) as Record<string, { from: unknown; to: unknown }>;
+      return (
+        <>
+          {t("invoiceUpdated", { number: text(d.number) })}
+          {Object.entries(fields)
+            .filter(([key]) => key !== "notes" && key !== "milestoneId")
+            .map(([key, change]) => (
+              <span key={key}>
+                {" · "}
+                {t("field", { field: t.has(`fields.${key}`) ? t(`fields.${key}`) : key, from: shown(key, change.from), to: shown(key, change.to) })}
+              </span>
+            ))}
+        </>
+      );
+    }
+    case "invoice_deleted":
+      return <>{t("invoiceDeleted", { number: text(d.number) })}</>;
+    case "invoice_file_added":
+      return <>{t("invoiceFileAdded", { number: text(d.number), version: num(d.version) })}</>;
+    case "payment_added":
+      return <>{t("paymentAdded", { number: text(d.number), amount: f.amount(num(d.amountCents)) })}</>;
+    case "payment_deleted":
+      return <>{t("paymentDeleted", { number: text(d.number), amount: f.amount(num(d.amountCents)) })}</>;
+    case "milestones":
+      return <>{t("milestones", { count: Array.isArray(d.to) ? d.to.length : 0 })}</>;
     case "file_added":
       return <>{t("fileAdded", { name: text(d.name) })}</>;
     case "file_removed":

@@ -83,7 +83,7 @@ export const contractedCents = (orders: PurchaseOrderListItem[]) =>
   orders.filter((o) => countsAsContracted(o.status)).reduce((sum, o) => sum + o.amountCents, 0);
 
 /** The suppliers that appear in `orders`, by name. */
-export function suppliersOf(orders: PurchaseOrderListItem[]) {
+export function suppliersOf(orders: { subcontractorId: string; supplierName: string }[]) {
   const names = new Map(orders.map((o) => [o.subcontractorId, o.supplierName]));
   return [...names].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
 }

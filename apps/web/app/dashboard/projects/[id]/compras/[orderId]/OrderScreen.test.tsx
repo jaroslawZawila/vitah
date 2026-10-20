@@ -5,6 +5,7 @@ import { NextIntlClientProvider } from "next-intl";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import messages from "../../../../../../messages/es.json";
 import { orderDetail } from "../../../../../../test/purchasing-fixture";
+import { invoiceItem, milestones } from "../../../../../../test/invoice-fixture";
 import OrderScreen from "./OrderScreen";
 
 vi.mock("../../../../../actions/purchasing", () => ({
@@ -12,7 +13,9 @@ vi.mock("../../../../../actions/purchasing", () => ({
   uploadPurchaseFileAction: vi.fn(),
   deletePurchaseFileAction: vi.fn(),
 }));
+vi.mock("../../../../../actions/purchase-invoices", () => ({ setOrderMilestonesAction: vi.fn() }));
 const actions = await import("../../../../../actions/purchasing");
+const invoiceActions = await import("../../../../../actions/purchase-invoices");
 
 function renderScreen(props: Partial<Parameters<typeof OrderScreen>[0]> = {}) {
   return render(
@@ -26,6 +29,7 @@ beforeEach(() => {
   vi.mocked(actions.setPurchaseStatusAction).mockReset().mockResolvedValue({ success: true });
   vi.mocked(actions.uploadPurchaseFileAction).mockReset().mockResolvedValue({ success: true });
   vi.mocked(actions.deletePurchaseFileAction).mockReset().mockResolvedValue({ success: true });
+  vi.mocked(invoiceActions.setOrderMilestonesAction).mockReset().mockResolvedValue({ success: true });
   vi.spyOn(window, "confirm").mockReturnValue(true);
 });
 
@@ -146,5 +150,79 @@ describe("OrderScreen", () => {
     expect(screen.queryByRole("link", { name: "Editar" })).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Sustituir PDF")).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Pedido_PED-049.pdf" })).toBeInTheDocument();
+  });
+
+  describe("invoices", () => {
+    /** PED-004: the structure, contracted, with its three milestones and invoices. */
+    const structure = {
+      ...orderDetail,
+      id: "order-4",
+      number: 4,
+      kind: "subcontract" as const,
+      status: "contracted" as const,
+      lateDays: null,
+      amountCents: 8_700_000,
+      description: "Estructura Steel Frame",
+      terms: { paymentDays: 30, retentionBp: 500, vatKind: "reverse_charge" as const },
+      milestones,
+      invoices: [invoiceItem()],
+      invoicing: { invoicedCents: 5_880_000, paidCents: 4_236_000, outstandingCents: 1_350_000, retainedCents: 294_000, toInvoiceCents: 2_820_000 },
+    };
+
+    it("shows the schedule, its invoices, the order's invoicing and its terms; registers an invoice", () => {
+      renderScreen({ order: structure });
+
+      expect(screen.getByRole("link", { name: "Registrar factura" })).toHaveAttribute("href", "/dashboard/compras/facturas/nueva?pedido=order-4");
+      const schedule = within(screen.getByRole("region", { name: "Hitos de pago del contrato" }));
+      const second = schedule.getByText("Entrega en obra").closest("tr")!;
+      expect(within(second).getByText("34,48")).toBeInTheDocument();
+      expect(within(second).getByText("Factura")).toBeInTheDocument();
+      expect(within(second).getByRole("link", { name: "MSN-2026/148" })).toHaveAttribute("href", "/dashboard/compras/facturas/inv-148");
+      expect(schedule.getByText("✓ Cuadra con el pedido")).toBeInTheDocument();
+      expect(schedule.getByText("28.200,00")).toBeInTheDocument();
+
+      const invoices = within(screen.getByRole("region", { name: /Facturas del pedido/ }));
+      const row = invoices.getByRole("link", { name: "MSN-2026/148" }).closest("tr")!;
+      expect(within(row).getByText("Pago parcial")).toBeInTheDocument();
+      expect(within(row).getByText("28.500,00")).toBeInTheDocument();
+
+      const data = within(screen.getByRole("region", { name: "Datos" }));
+      expect(data.getByText("30 días desde la factura")).toBeInTheDocument();
+      expect(data.getByText("5 % de garantía")).toBeInTheDocument();
+      expect(data.getByText("Inversión del sujeto pasivo")).toBeInTheDocument();
+    });
+
+    it("edits the schedule: an invoiced milestone stays, the others add up to the order", async () => {
+      renderScreen({ order: structure });
+      const schedule = within(screen.getByRole("region", { name: "Hitos de pago del contrato" }));
+      await userEvent.click(schedule.getByRole("button", { name: "Editar hitos" }));
+
+      expect(schedule.getByRole("textbox", { name: "Importe del hito 1" })).toBeDisabled();
+      expect(schedule.queryByRole("button", { name: "Quitar el hito 1" })).not.toBeInTheDocument();
+      const third = schedule.getByRole("textbox", { name: "Importe del hito 3" });
+      await userEvent.clear(third);
+      await userEvent.type(third, "18000");
+      expect(schedule.getByRole("button", { name: "Guardar hitos" })).toBeDisabled();
+
+      await userEvent.click(schedule.getByRole("button", { name: "+ Añadir hito" }));
+      await userEvent.type(schedule.getByRole("textbox", { name: "Concepto del hito 4" }), "Recepción");
+      expect(schedule.getByRole("textbox", { name: "Importe del hito 4" })).toHaveValue("9000,00");
+      await userEvent.click(schedule.getByRole("button", { name: "Guardar hitos" }));
+
+      expect(invoiceActions.setOrderMilestonesAction).toHaveBeenCalledWith("order-4", [
+        { id: "m-1", concept: "Inicio de fabricación", amountCents: 3_000_000 },
+        { id: "m-2", concept: "Entrega en obra", amountCents: 3_000_000 },
+        { id: "m-3", concept: "Fin de montaje", amountCents: 1_800_000 },
+        { concept: "Recepción", amountCents: 900_000 },
+      ]);
+      expect(await schedule.findByRole("button", { name: "Editar hitos" })).toBeInTheDocument();
+    });
+
+    it("shows a pending order's invoices without a way to register one, and viewers no editing", () => {
+      renderScreen({ order: { ...orderDetail, status: "pending", lateDays: null } });
+      expect(screen.queryByRole("link", { name: "Registrar factura" })).not.toBeInTheDocument();
+      expect(screen.getByText("Sin hitos: las facturas se registran libremente contra el pedido.")).toBeInTheDocument();
+      expect(screen.getByText("Todavía no hay facturas de este pedido.")).toBeInTheDocument();
+    });
   });
 });

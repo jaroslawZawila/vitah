@@ -25,7 +25,7 @@ describe("ComprasScreen", () => {
   it("shows every order of every obra, with the company's totals", () => {
     renderScreen();
 
-    expect(screen.getByRole("heading", { level: 1, name: "Compras" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "Pedidos" })).toBeInTheDocument();
     const kpis = within(screen.getByRole("region", { name: "Resumen" }));
     expect(kpis.getByText("Contratado en 2026")).toBeInTheDocument();
     expect(kpis.getByText("486.910 €")).toBeInTheDocument();

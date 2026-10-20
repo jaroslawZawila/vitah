@@ -100,6 +100,35 @@ export async function readForm(request: Request): Promise<Record<string, unknown
 }
 
 /**
+ * A form that carries a file: its fields as JSON in a `data` part (numbers
+ * and lists keep their types) and the file, if any, in `file`. The server
+ * actions and the multipart API bodies share it.
+ */
+export function fieldsWithFile(form: FormData): Record<string, unknown> {
+  const data = form.get("data");
+  let parsed: unknown = {};
+  try {
+    parsed = typeof data === "string" ? JSON.parse(data) : {};
+  } catch {
+    throw new CoreError("invalid_body", 400);
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new CoreError("invalid_body", 400);
+  const file = form.get("file");
+  return { ...parsed, ...(file instanceof Blob ? { file } : {}) };
+}
+
+/** A body that may carry a file: JSON, or multipart as `fieldsWithFile` reads it. */
+export async function readWithFile(request: Request): Promise<Record<string, unknown>> {
+  if (!request.headers.get("content-type")?.startsWith("multipart/form-data")) return readJson(request);
+  try {
+    return fieldsWithFile(await request.formData());
+  } catch (error) {
+    if (error instanceof CoreError) throw error;
+    throw new CoreError("invalid_body", 400);
+  }
+}
+
+/**
  * Streams a stored file to the caller. Never cached by shared caches;
  * `immutable` files (photos: new id per upload) may stay in the caller's own,
  * for a day only (the device may be shared). A file built on the fly (no

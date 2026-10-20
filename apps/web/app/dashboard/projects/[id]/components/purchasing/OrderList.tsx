@@ -123,7 +123,7 @@ export default function OrderList({
 
       {/* From 768px: the table. */}
       <div className="hidden md:block">
-        <Table className={cn("text-[13px]", inProject ? "min-w-[860px]" : "min-w-[980px]")} aria-label={t("table")}>
+        <Table className={cn("text-[13px]", inProject ? "min-w-[940px]" : "min-w-[1060px]")} aria-label={t("table")}>
           <TableHeader>
             <TableRow>
               <TableHead className="pl-[18px]">{inProject ? t("number") : t("projectNumber")}</TableHead>
@@ -131,6 +131,7 @@ export default function OrderList({
               <TableHead>{t("concept")}</TableHead>
               {inProject && <TableHead>{t("chapter")}</TableHead>}
               <TableHead className="text-right">{t("amount")}</TableHead>
+              <TableHead className="text-right">{t("invoiced")}</TableHead>
               {isCompany && <TableHead>{t("orderedOn")}</TableHead>}
               <TableHead>{inProject ? t("expected") : t("when")}</TableHead>
               <TableHead className="pr-[18px]">{t("status")}</TableHead>
@@ -164,6 +165,9 @@ export default function OrderList({
                 </TableCell>
                 {inProject && <TableCell className="num">{chapters(order) || <Dash />}</TableCell>}
                 <TableCell className="num text-right">{f.amount(order.amountCents)}</TableCell>
+                <TableCell className="num text-right text-muted-foreground">
+                  {order.invoicedCents ? f.ratio(order.invoicedCents, order.amountCents) : <Dash />}
+                </TableCell>
                 {isCompany && (
                   <TableCell className="num whitespace-nowrap">{order.orderedOn ? f.shortDay(order.orderedOn) : <Dash />}</TableCell>
                 )}
@@ -183,7 +187,7 @@ export default function OrderList({
                   {footer}
                 </TableCell>
                 <TableCell className="num text-right">{f.amount(contractedCents(orders))}</TableCell>
-                <TableCell colSpan={isCompany ? 3 : 2} className="pr-[18px] text-[12px] font-normal text-muted-foreground">
+                <TableCell colSpan={isCompany ? 4 : 3} className="pr-[18px] text-[12px] font-normal text-muted-foreground">
                   {tp("notCounted")}
                 </TableCell>
               </TableRow>

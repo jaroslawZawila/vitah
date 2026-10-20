@@ -57,14 +57,14 @@ beforeEach(async () => {
 afterEach(() => vi.useRealTimers());
 
 describe("purchasing actions", () => {
-  it("create, move, edit and attach to an order, refreshing the project and the Compras list", async () => {
+  it("create, move, edit and attach to an order, refreshing the project, the Compras lists and the rail", async () => {
     const { project, order } = await setup();
 
     const created = await createPurchaseAction(project.id, order);
     expect(created).toEqual({ success: true, orderId: expect.any(String), number: 1 });
     const orderId = created!.orderId!;
     expect(revalidatePath).toHaveBeenCalledWith(`/dashboard/projects/${project.id}`, "layout");
-    expect(revalidatePath).toHaveBeenCalledWith("/dashboard/compras", "layout");
+    expect(revalidatePath).toHaveBeenCalledWith("/dashboard", "layout");
 
     expect(await setPurchaseStatusAction(project.id, orderId, { status: "ordered", date: "2026-10-10" })).toEqual({ success: true });
     expect(await updatePurchaseAction(project.id, orderId, { notes: "Portes incluidos" })).toEqual({ success: true });

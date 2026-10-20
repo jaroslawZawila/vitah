@@ -6,6 +6,8 @@ import {
   eq,
   inArray,
   projects,
+  purchaseInvoiceLines,
+  purchaseInvoices,
   purchaseOrderEvents,
   purchaseOrderLines,
   purchaseOrders,
@@ -19,7 +21,11 @@ import { requireEditor, type Ctx } from "./context";
 import {
   CONTINGENCY_CHAPTER,
   MAX_ORDER_LINES,
+  MAX_PAYMENT_DAYS,
+  MAX_RETENTION_BP,
   PURCHASE_KINDS,
+  PURCHASE_PROGRESS,
+  PURCHASE_VAT_KINDS,
   UPCOMING_DAYS,
   canCancel,
   canTakeOrder,
@@ -30,12 +36,15 @@ import {
   placedStatus,
   statusesOf,
   type LineContracting,
+  type ProjectPurchaseLines,
   type ProjectPurchases,
   type PurchaseForm,
   type PurchaseKind,
+  type PurchaseLineItem,
   type PurchaseOrderDetail,
   type PurchaseOrderLine,
   type PurchaseOrderListItem,
+  type PurchaseProgress,
   type PurchaseStatus,
   type PurchaseUpcoming,
   type TenantPurchases,
@@ -43,6 +52,18 @@ import {
 import { contractSchedule, contractTotals, daysPast, deviation, lateDays, type LineContract } from "./control-calc";
 import { orderByDate, templateLeadDays } from "./planning-calc";
 import { requirePdf } from "./documents";
+import { addInvoicing, isDueSoon, purchaseProgress, termsOf } from "./purchase-calc";
+import {
+  buildInvoices,
+  groupsOfOrder,
+  invoicedByOrder,
+  invoicingByLine,
+  itemsOfOrder,
+  loadInvoices,
+  loadMilestones,
+  orderInvoicing,
+  orderMilestones,
+} from "./purchase-invoice-data";
 import { addDays, todayInSpain } from "./obra-calc";
 import {
   calendarDate,
@@ -62,7 +83,7 @@ import {
   workDate,
 } from "./obra-data";
 import { projectInTenant, type Tx } from "./project-client";
-import { openStoredFile, projectFolder, removeFiles, storeFiles, type StoredFile } from "./project-files";
+import { openStoredFile, projectFolder, removeFiles, storeFiles, uploadedName, type StoredFile } from "./project-files";
 import { deleteFile } from "./storage";
 import { loadNetwork, requireCompany, type Network } from "./subcontractor-network";
 
@@ -75,7 +96,10 @@ import { loadNetwork, requireCompany, type Network } from "./subcontractor-netwo
 // so a half-contracted line never shows as a saving. The Obra tab reads it
 // (`loadProjectOrders`). Suppliers are the Subcontratas companies, material
 // suppliers included. Every change is logged. Staff only: admins and
-// managers write, viewers read; the client's app never sees it.
+// managers write, viewers read; the client's app never sees it. Suppliers'
+// invoices and payments are ./purchase-invoices; once an order has invoices
+// it keeps its supplier, its invoiced lines and its place (never back to
+// pending, never cancelled).
 // ─────────────────────────────────────────────────────────────────────────────
 
 const MAX_DESCRIPTION = 500;
@@ -93,7 +117,7 @@ type NewLine = Pick<LineRow, "lineageId" | "chapterCode" | "amountCents" | "clos
 const inTenant = (ctx: Ctx) => eq(purchaseOrders.tenantId, ctx.tenantId);
 
 /** Orders with their supplier, project and lines, newest first. */
-async function loadOrders(tenantId: string, where?: SQL) {
+export async function loadOrders(tenantId: string, where?: SQL) {
   const rows = await db
     .select({
       order: purchaseOrders,
@@ -106,23 +130,22 @@ async function loadOrders(tenantId: string, where?: SQL) {
     .innerJoin(projects, eq(projects.id, purchaseOrders.projectId))
     .where(and(eq(purchaseOrders.tenantId, tenantId), where))
     .orderBy(desc(purchaseOrders.createdAt), desc(purchaseOrders.number));
-  const lineRows =
-    rows.length === 0
+  const ids = rows.map((r) => r.order.id);
+  const [lineRows, invoiced] = await Promise.all([
+    ids.length === 0
       ? []
-      : await db
+      : db
           .select()
           .from(purchaseOrderLines)
-          .where(
-            and(
-              eq(purchaseOrderLines.tenantId, tenantId),
-              inArray(
-                purchaseOrderLines.orderId,
-                rows.map((r) => r.order.id),
-              ),
-            ),
-          );
+          .where(and(eq(purchaseOrderLines.tenantId, tenantId), inArray(purchaseOrderLines.orderId, ids))),
+    invoicedByOrder(tenantId, ids),
+  ]);
   const lines = groupBy(lineRows, (l) => l.orderId);
-  return rows.map((row) => ({ ...row, lines: lines.get(row.order.id) ?? [] }));
+  return rows.map((row) => ({
+    ...row,
+    lines: lines.get(row.order.id) ?? [],
+    invoicedCents: invoiced.get(row.order.id) ?? 0,
+  }));
 }
 
 type LoadedOrder = Awaited<ReturnType<typeof loadOrders>>[number];
@@ -150,6 +173,7 @@ function toListItem(loaded: LoadedOrder, net: Network | null, today: string): Pu
     amountCents: lines.reduce((sum, l) => sum + l.amountCents, 0),
     chapterCodes: [...new Set(lines.map((l) => l.chapterCode))].sort(),
     lateDays: lateDays(order, today),
+    invoicedCents: loaded.invoicedCents,
     hasFile: order.filePathname !== null,
     createdAt: order.createdAt.toISOString(),
   };
@@ -233,7 +257,7 @@ async function contractPlan(tenantId: string, projectId: string) {
 }
 
 /** The contract's budget lines by lineage, for checking an order's lines. */
-async function contractLines(tenantId: string, projectId: string) {
+export async function contractLines(tenantId: string, projectId: string) {
   const { costChapters } = await loadBudget(tenantId, projectId);
   return new Map(
     costChapters
@@ -246,16 +270,17 @@ async function contractLines(tenantId: string, projectId: string) {
 
 const sumOf = (list: PurchaseOrderListItem[]) => list.reduce((total, o) => total + o.amountCents, 0);
 
+/** The tenant's projects, for the lists' filter. */
+export const projectList = (tenantId: string) =>
+  db
+    .select({ id: projects.id, ref: projects.ref, address: projects.address })
+    .from(projects)
+    .where(eq(projects.tenantId, tenantId))
+    .orderBy(asc(projects.ref));
+
 /** Every order of the tenant, with the totals Administration watches. */
 export async function listPurchases(ctx: Ctx): Promise<TenantPurchases> {
-  const [loaded, projectRows] = await Promise.all([
-    loadOrders(ctx.tenantId),
-    db
-      .select({ id: projects.id, ref: projects.ref, address: projects.address })
-      .from(projects)
-      .where(eq(projects.tenantId, ctx.tenantId))
-      .orderBy(asc(projects.ref)),
-  ]);
+  const [loaded, projectRows] = await Promise.all([loadOrders(ctx.tenantId), projectList(ctx.tenantId)]);
   // Only the suppliers with orders: not the tenant's whole network.
   const net = await networkOf(ctx.tenantId, loaded);
   const today = todayInSpain();
@@ -330,23 +355,149 @@ export async function getProjectPurchases(ctx: Ctx, projectId: string): Promise<
   // What must go out first, first.
   upcoming.sort((a, b) => (a.orderBy ?? "").localeCompare(b.orderBy ?? "") || a.code.localeCompare(b.code));
 
-  const lines = plan.chapters.flatMap((c) => c.lines);
-  const totals = contractTotals(lines, contracts);
   return {
     ref: plan.ref,
     orders,
-    summary: {
-      costCents: lines.reduce((sum, l) => sum + l.amountCents, 0),
-      contractedCents: totals.contractedCents,
-      closedLines: totals.closedLines,
-      deviationCents: totals.deviationCents,
-      deviationBp: totals.deviationBp,
-      toContractCents: totals.uncontractedCostCents,
-      uncontractedLines: totals.uncontractedLines,
-      pendingOrders: pendingOrders.length,
-      lateDeliveries: orders.filter((o) => o.lateDays !== null).length,
-    },
+    summary: contractSummary(plan, orders, contracts),
     upcoming,
+    today,
+    sources: { planning: plan.planSource },
+  };
+}
+
+/** The obra's contract at cost against what its orders contract. */
+function contractSummary(
+  plan: Awaited<ReturnType<typeof contractPlan>>,
+  orders: PurchaseOrderListItem[],
+  contracts: Map<string, LineContract>,
+): ProjectPurchases["summary"] {
+  const lines = plan.chapters.flatMap((c) => c.lines);
+  const totals = contractTotals(lines, contracts);
+  return {
+    costCents: lines.reduce((sum, l) => sum + l.amountCents, 0),
+    contractedCents: totals.contractedCents,
+    closedLines: totals.closedLines,
+    deviationCents: totals.deviationCents,
+    deviationBp: totals.deviationBp,
+    toContractCents: totals.uncontractedCostCents,
+    uncontractedLines: totals.uncontractedLines,
+    pendingOrders: orders.filter((o) => o.status === "pending").length,
+    lateDeliveries: orders.filter((o) => o.lateDays !== null).length,
+  };
+}
+
+/**
+ * The obra's Compras by budget line: each line's cost, what is contracted,
+ * invoiced and paid of it and where that leaves it (the four states), with
+ * the orders behind it, their milestones and invoices; the obra's totals
+ * (without VAT) and its invoices past due or due soon.
+ */
+export async function getProjectPurchaseLines(ctx: Ctx, projectId: string): Promise<ProjectPurchaseLines> {
+  const [plan, loaded, invoices, milestones] = await Promise.all([
+    contractPlan(ctx.tenantId, projectId),
+    loadOrders(ctx.tenantId, ofProject(projectId)),
+    loadInvoices(ctx.tenantId, ofProject(projectId)),
+    loadMilestones(ctx.tenantId, ofProject(projectId)),
+  ]);
+  const today = todayInSpain();
+  const contracts = contractsOf(loaded, today);
+  const built = buildInvoices(invoices, today);
+  const byLine = invoicingByLine(built);
+  const items = loaded.map((o) => toListItem(o, null, today));
+  // Each order once: a line shows the whole order's schedule and invoices.
+  const orderViews = new Map(
+    loaded.map((o, i) => {
+      const item = items[i]!;
+      const view = {
+        id: item.id,
+        number: item.number,
+        kind: item.kind,
+        status: item.status,
+        supplierName: item.supplierName,
+        description: item.description,
+        amountCents: item.amountCents,
+        expectedOn: item.expectedOn,
+        completedOn: item.completedOn,
+        lateDays: item.lateDays,
+        retentionBp: o.order.retentionBp,
+        milestones: orderMilestones(milestones.get(item.id) ?? [], built),
+        invoices: itemsOfOrder(built, item.id),
+        invoicing: orderInvoicing(item.amountCents, groupsOfOrder(built, item.id)),
+      };
+      return [item.id, { view, lineAmounts: new Map(o.lines.map((l) => [l.lineageId, l.amountCents])) }];
+    }),
+  );
+  const lineOrder = (orderId: string, lineageId: string) => {
+    const { view, lineAmounts } = orderViews.get(orderId)!;
+    return { ...view, lineAmountCents: lineAmounts.get(lineageId) ?? 0 };
+  };
+
+  const counts = Object.fromEntries(PURCHASE_PROGRESS.map((p) => [p, 0])) as Record<PurchaseProgress, number>;
+  const chapters = plan.chapters.map((chapter) => {
+    const lines = chapter.lines
+      // A line that costs nothing and nobody ordered has nothing to buy.
+      .filter((line) => line.amountCents > 0 || contracts.has(line.lineageId))
+      .map((line): PurchaseLineItem => {
+        const contract = contracts.get(line.lineageId);
+        const invoicing = byLine.get(line.lineageId);
+        const contractedCents = contract?.contractedCents ?? 0;
+        const progress = purchaseProgress({
+          contracted: contract !== undefined,
+          closed: contract?.closed ?? false,
+          contractedCents,
+          invoicedCents: invoicing?.invoicedCents ?? 0,
+          hasInvoices: invoicing !== undefined,
+          settled: invoicing?.settled ?? true,
+        });
+        counts[progress]++;
+        return {
+          lineageId: line.lineageId,
+          code: line.code,
+          description: line.description,
+          costCents: line.amountCents,
+          contractedCents,
+          contracting: contractingOf(contract),
+          ...deviation(line.amountCents, contract?.closed ? contractedCents : null),
+          uncontractedCents: contract?.closed ? 0 : Math.max(0, line.amountCents - contractedCents),
+          progress,
+          overdue: invoicing?.overdue ?? false,
+          invoicedCents: invoicing?.invoicedCents ?? 0,
+          paidCents: invoicing?.paidCents ?? 0,
+          outstandingCents: invoicing?.outstandingCents ?? 0,
+          retainedCents: invoicing?.retainedCents ?? 0,
+          orders: (contract?.orders ?? []).map((o) => lineOrder(o.id, line.lineageId)),
+        };
+      });
+    return {
+      code: chapter.code,
+      name: chapter.name,
+      orderBy: chapter.orderBy,
+      costCents: lines.reduce((sum, l) => sum + l.costCents, 0),
+      contractedCents: lines.reduce((sum, l) => sum + l.contractedCents, 0),
+      deviationCents: contractTotals(chapter.lines, contracts).deviationCents,
+      lines,
+    };
+  });
+
+  const groups = [...built.groups.values()];
+  const listed = [...built.items.values()];
+  const dueAlerts = listed
+    .filter((i) => i.state === "overdue" || isDueSoon(i, today))
+    .sort((a, b) => (a.dueOn ?? "").localeCompare(b.dueOn ?? ""));
+  return {
+    ref: plan.ref,
+    summary: {
+      ...contractSummary(plan, items, contracts),
+      ...addInvoicing(groups.map((g) => g.settlement.base)),
+      overdueCents: groups
+        .filter((g) => built.items.get(g.invoice.invoice.id)?.state === "overdue")
+        .reduce((sum, g) => sum + g.settlement.base.outstandingCents, 0),
+      invoices: listed.filter((i) => i.kind === "invoice").length,
+      creditNotes: listed.filter((i) => i.kind === "credit_note").length,
+    },
+    counts,
+    dueAlerts,
+    chapters,
     today,
     sources: { planning: plan.planSource },
   };
@@ -382,6 +533,9 @@ export async function getPurchaseForm(ctx: Ctx, projectId: string, orderId?: str
           workStart: edited.order.workStart,
           workEnd: edited.order.workEnd,
           notes: edited.order.notes,
+          paymentDays: edited.order.paymentDays,
+          retentionBp: edited.order.retentionBp,
+          vatKind: edited.order.vatKind,
           lines: edited.lines.map(({ lineageId, amountCents, closesLine }) => ({ lineageId, amountCents, closesLine })),
         }
       : null,
@@ -425,7 +579,7 @@ export async function getPurchaseForm(ctx: Ctx, projectId: string, orderId?: str
 }
 
 /** The tenant's order; `not_found` otherwise. */
-async function requireOrder(ctx: Ctx, orderId: string) {
+export async function requireOrder(ctx: Ctx, orderId: string) {
   const order = await db.query.purchaseOrders.findFirst({ where: and(eq(purchaseOrders.id, orderId), inTenant(ctx)) });
   if (!order) fail("not_found");
   return order;
@@ -448,7 +602,7 @@ function reachedOn(events: { action: string; detail: Record<string, unknown>; cr
 /** One order: its lines against the budget, its chapters on the obra, and its history. */
 export async function getPurchase(ctx: Ctx, orderId: string): Promise<PurchaseOrderDetail> {
   const order = await requireOrder(ctx, orderId);
-  const [plan, projectOrders, events, [creator], net] = await Promise.all([
+  const [plan, projectOrders, events, [creator], net, invoices, milestones] = await Promise.all([
     contractPlan(ctx.tenantId, order.projectId),
     loadOrders(ctx.tenantId, ofProject(order.projectId)),
     db
@@ -462,9 +616,13 @@ export async function getPurchase(ctx: Ctx, orderId: string): Promise<PurchaseOr
       ? db.select({ by: userName }).from(users).where(eq(users.id, order.createdById))
       : Promise.resolve([]),
     loadNetwork(ctx.tenantId, order.subcontractorId),
+    loadInvoices(ctx.tenantId, eq(purchaseInvoices.orderId, orderId)),
+    loadMilestones(ctx.tenantId, eq(purchaseOrders.id, orderId)),
   ]);
   const today = todayInSpain();
   const loaded = projectOrders.find((o) => o.order.id === orderId)!;
+  const built = buildInvoices(invoices, today);
+  const schedule = orderMilestones(milestones.get(orderId) ?? [], built);
   const others = contractsOf(projectOrders, today, orderId);
   // A pending or cancelled order contracts nothing: its lines show what the others contracted.
   const counts = countsAsContracted(order.status);
@@ -493,8 +651,9 @@ export async function getPurchase(ctx: Ctx, orderId: string): Promise<PurchaseOr
       };
     });
   const codes = new Set(lines.map((l) => l.chapterCode));
+  const item = toListItem(loaded, net, today);
   return {
-    ...toListItem(loaded, net, today),
+    ...item,
     notes: order.notes,
     lines,
     file: order.filePathname ? { name: order.fileName ?? "pedido.pdf", sizeBytes: order.fileSizeBytes ?? 0 } : null,
@@ -510,6 +669,10 @@ export async function getPurchase(ctx: Ctx, orderId: string): Promise<PurchaseOr
     })),
     reached: reachedOn(events.map((e) => e.event).reverse()),
     budgetNumber: plan.budgetNumber,
+    terms: termsOf(order),
+    milestones: schedule,
+    invoices: [...built.items.values()],
+    invoicing: orderInvoicing(item.amountCents, [...built.groups.values()]),
     today,
   };
 }
@@ -563,7 +726,17 @@ function parseLines(value: unknown, contract: Awaited<ReturnType<typeof contract
 
 type OrderFields = Pick<
   OrderRow,
-  "kind" | "subcontractorId" | "description" | "orderedOn" | "expectedOn" | "workStart" | "workEnd" | "notes"
+  | "kind"
+  | "subcontractorId"
+  | "description"
+  | "orderedOn"
+  | "expectedOn"
+  | "workStart"
+  | "workEnd"
+  | "notes"
+  | "paymentDays"
+  | "retentionBp"
+  | "vatKind"
 >;
 
 const FIELD_PARSERS = {
@@ -573,7 +746,31 @@ const FIELD_PARSERS = {
   workStart: orNull(calendarDate),
   workEnd: orNull(calendarDate),
   notes: (value: unknown) => optionalText(value, MAX_NOTES),
+  // Its invoices' terms: null = the defaults.
+  paymentDays: orNull((value) => integer(value, 0, MAX_PAYMENT_DAYS)),
+  retentionBp: (value: unknown) => integer(value ?? 0, 0, MAX_RETENTION_BP),
+  vatKind: orNull(pick(PURCHASE_VAT_KINDS)),
 };
+
+/** Whether the order has invoices (credit notes too); in `run`, after locking the order. */
+async function hasInvoices(run: Tx | typeof db, tenantId: string, orderId: string) {
+  const [row] = await run
+    .select({ id: purchaseInvoices.id })
+    .from(purchaseInvoices)
+    .where(and(eq(purchaseInvoices.tenantId, tenantId), eq(purchaseInvoices.orderId, orderId)))
+    .limit(1);
+  return row !== undefined;
+}
+
+/** The budget lines (lineages) the order's invoices are split across. */
+async function invoicedLineages(run: Tx, tenantId: string, orderId: string) {
+  const rows = await run
+    .selectDistinct({ lineageId: purchaseInvoiceLines.lineageId })
+    .from(purchaseInvoiceLines)
+    .innerJoin(purchaseInvoices, eq(purchaseInvoices.id, purchaseInvoiceLines.invoiceId))
+    .where(and(eq(purchaseInvoiceLines.tenantId, tenantId), eq(purchaseInvoices.orderId, orderId)));
+  return new Set(rows.map((r) => r.lineageId));
+}
 
 /** A kind's own dates only: a delivery for material, a works period for a subcontract. */
 function checkDates(fields: OrderFields): OrderFields {
@@ -583,7 +780,7 @@ function checkDates(fields: OrderFields): OrderFields {
   return own;
 }
 
-async function logEvent(
+export async function logEvent(
   tx: Tx,
   ctx: Ctx,
   orderId: string,
@@ -597,8 +794,8 @@ async function logEvent(
 /**
  * Body: { kind, subcontractorId, description, lines: [{ lineageId,
  * amountCents, closesLine? }], status? (pending, or ordered / contracted to
- * place it now), orderedOn?, expectedOn?, workStart?, workEnd?, notes? }.
- * → { orderId, number }
+ * place it now), orderedOn?, expectedOn?, workStart?, workEnd?, notes?,
+ * paymentDays?, retentionBp?, vatKind? }. → { orderId, number }
  */
 export async function createPurchase(ctx: Ctx, projectId: string, input: Record<string, unknown>) {
   requireEditor(ctx);
@@ -621,6 +818,9 @@ export async function createPurchase(ctx: Ctx, projectId: string, input: Record<
     workStart: parsed.workStart ?? null,
     workEnd: parsed.workEnd ?? null,
     notes: parsed.notes ?? null,
+    paymentDays: parsed.paymentDays ?? null,
+    retentionBp: parsed.retentionBp ?? 0,
+    vatKind: parsed.vatKind ?? null,
   });
   const sameProject = and(ofProject(projectId), inTenant(ctx));
   const amountCents = lines.reduce((sum, l) => sum + l.amountCents, 0);
@@ -651,8 +851,10 @@ export async function createPurchase(ctx: Ctx, projectId: string, input: Record<
 
 /**
  * Body: any of { description, subcontractorId, orderedOn, expectedOn,
- * workStart, workEnd, notes, kind (only while pending), lines }. Each change
- * is logged with its previous value. → { orderId }
+ * workStart, workEnd, notes, paymentDays, retentionBp, vatKind, kind (only
+ * while pending), lines }. An invoiced order keeps its supplier and the lines
+ * its invoices are split across. Each change is logged with its previous
+ * value. → { orderId }
  */
 export async function updatePurchase(ctx: Ctx, orderId: string, input: Record<string, unknown>) {
   requireEditor(ctx);
@@ -676,6 +878,9 @@ export async function updatePurchase(ctx: Ctx, orderId: string, input: Record<st
     workStart: order.workStart,
     workEnd: order.workEnd,
     notes: order.notes,
+    paymentDays: order.paymentDays,
+    retentionBp: order.retentionBp,
+    vatKind: order.vatKind,
     ...pickChanges(input, FIELD_PARSERS),
   });
   const changed = Object.fromEntries(
@@ -693,6 +898,15 @@ export async function updatePurchase(ctx: Ctx, orderId: string, input: Record<st
       .where(eq(purchaseOrders.id, orderId))
       .for("update");
     if (locked?.status !== order.status) fail("invalid_state");
+    // Its invoices were the supplier's, split across its lines.
+    if (fields.subcontractorId !== order.subcontractorId && (await hasInvoices(tx, ctx.tenantId, orderId))) {
+      fail("has_invoices");
+    }
+    if (lines) {
+      const kept = new Set(lines.map((l) => l.lineageId));
+      const invoiced = await invoicedLineages(tx, ctx.tenantId, orderId);
+      if ([...invoiced].some((id) => !kept.has(id))) fail("has_invoices");
+    }
     if (Object.keys(changed).length > 0) {
       await tx.update(purchaseOrders).set(fields).where(eq(purchaseOrders.id, orderId));
       await logEvent(tx, ctx, orderId, "updated", { fields: changed });
@@ -756,6 +970,8 @@ export async function setPurchaseStatus(ctx: Ctx, orderId: string, input: Record
       .where(eq(purchaseOrders.id, orderId))
       .for("update");
     if (locked?.status !== order.status) fail("invalid_state");
+    // An invoiced order stays placed: its invoices were against what it contracted.
+    if (!countsAsContracted(status) && (await hasInvoices(tx, ctx.tenantId, orderId))) fail("has_invoices");
     await tx.update(purchaseOrders).set({ status, orderedOn, completedOn }).where(eq(purchaseOrders.id, orderId));
     // The date it records: the day it was placed or completed (none for the steps between).
     const day = completedOn ?? (status === placedStatus(order.kind) ? orderedOn : null);
@@ -769,7 +985,7 @@ export async function uploadPurchaseFile(ctx: Ctx, orderId: string, input: Recor
   requireEditor(ctx);
   const order = await requireOrder(ctx, orderId);
   const file = await requirePdf(input.file);
-  const name = (file instanceof File && file.name ? file.name : "pedido.pdf").slice(0, 200);
+  const name = uploadedName(file, "pedido.pdf");
   const pathname = `${projectFolder(ctx.tenantId, order.projectId)}purchases/${orderId}/${crypto.randomUUID()}.pdf`;
   await storeFiles([{ pathname, body: file, contentType: "application/pdf" }], () =>
     db.transaction(async (tx) => {

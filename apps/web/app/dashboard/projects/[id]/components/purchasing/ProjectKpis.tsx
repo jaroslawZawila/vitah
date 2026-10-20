@@ -8,6 +8,28 @@ import Kpi from "../obra/Kpi";
 import { deviationTone } from "../construction/format";
 import { usePurchaseFormat } from "./format";
 
+/** The deviation over the closed lines (cost − contracted: a saving is positive), or why there is none yet. */
+export function DeviationKpi({ summary }: { summary: Pick<ProjectPurchases["summary"], "deviationCents" | "deviationBp" | "closedLines"> }) {
+  const t = useTranslations("purchasing.kpis");
+  const f = usePurchaseFormat();
+  const { deviationCents, deviationBp, closedLines } = summary;
+  return (
+    <Kpi
+        label={t("deviation")}
+        value={
+          <span className={deviationTone(deviationCents)}>
+            {deviationCents === null ? "—" : `${f.signedEuros(deviationCents)} €`}
+          </span>
+        }
+        hints={[
+          deviationCents === null || deviationBp === null
+            ? t("noneClosed")
+            : t(deviationCents < 0 ? "overrunHint" : "savingHint", { pct: f.share(Math.abs(deviationBp)), count: closedLines }),
+        ]}
+      />
+  );
+}
+
 /**
  * Presentational: the project's Compras at a glance: contracted against the
  * cost, the deviation over closed lines, what is left to contract and the
@@ -25,7 +47,7 @@ export default function ProjectKpis({
 }) {
   const t = useTranslations("purchasing.kpis");
   const f = usePurchaseFormat();
-  const { costCents, contractedCents, deviationCents, deviationBp, closedLines } = summary;
+  const { costCents, contractedCents } = summary;
   const pct = costCents ? (contractedCents * 100) / costCents : 0;
   const first = late[0];
 
@@ -38,19 +60,7 @@ export default function ProjectKpis({
         barTone="brand"
         hints={[t("contractedHint", { pct: f.ratio(contractedCents, costCents), cost: f.moneyRound(costCents) })]}
       />
-      <Kpi
-        label={t("deviation")}
-        value={
-          <span className={deviationTone(deviationCents)}>
-            {deviationCents === null ? "—" : `${f.signedEuros(deviationCents)} €`}
-          </span>
-        }
-        hints={[
-          deviationCents === null || deviationBp === null
-            ? t("noneClosed")
-            : t(deviationCents < 0 ? "overrunHint" : "savingHint", { pct: f.share(Math.abs(deviationBp)), count: closedLines }),
-        ]}
-      />
+      <DeviationKpi summary={summary} />
       <Kpi
         label={t("toContract")}
         value={f.moneyRound(summary.toContractCents)}

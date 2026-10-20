@@ -7,6 +7,8 @@ import { AlertTriangle } from "lucide-react";
 import {
   PURCHASE_FLOWS,
   PURCHASE_KINDS,
+  PURCHASE_VAT_KINDS,
+  defaultVatKind,
   canTakeOrder,
   companyType,
   placedStatus,
@@ -385,7 +387,65 @@ function Lines({
   );
 }
 
-/** Step 4 (new orders): the order or signed contract as a PDF, uploaded once the order exists. */
+/** Step 4: what its invoices will start from (each invoice may say otherwise). */
+function Terms({ draft, onChange }: { draft: OrderDraft; onChange: (patch: Partial<OrderDraft>) => void }) {
+  const t = useTranslations("purchasing.form");
+  const tv = useTranslations("purchasing.vat");
+  return (
+    <section className={section} aria-labelledby="form-terms">
+      <div>
+        <h2 id="form-terms" className="text-[22px]">
+          {t("termsTitle")}
+        </h2>
+        <p className="mt-1 text-[12.5px] text-muted-foreground">{t("termsHint")}</p>
+      </div>
+      <div className="grid gap-3.5 sm:grid-cols-3">
+        <Field>
+          <Label htmlFor="form-payment-days">{t("paymentDays")}</Label>
+          <Input
+            id="form-payment-days"
+            inputMode="numeric"
+            className="num"
+            placeholder="30"
+            value={draft.paymentDays}
+            onChange={(e) => onChange({ paymentDays: e.target.value })}
+          />
+          <FieldDescription>{t("paymentDaysHint")}</FieldDescription>
+        </Field>
+        <Field>
+          <Label htmlFor="form-retention">{t("retention")}</Label>
+          <Input
+            id="form-retention"
+            inputMode="decimal"
+            className="num"
+            placeholder="0"
+            value={draft.retention}
+            onChange={(e) => onChange({ retention: e.target.value })}
+          />
+          <FieldDescription>{t("retentionHint")}</FieldDescription>
+        </Field>
+        <Field>
+          <Label htmlFor="form-vat">{t("vatKind")}</Label>
+          <NativeSelect
+            id="form-vat"
+            className="w-full"
+            value={draft.vatKind}
+            onChange={(e) => onChange({ vatKind: e.target.value as OrderDraft["vatKind"] })}
+          >
+            <NativeSelectOption value="">{t("vatDefault", { vat: tv(defaultVatKind(draft.kind)) })}</NativeSelectOption>
+            {PURCHASE_VAT_KINDS.map((kind) => (
+              <NativeSelectOption key={kind} value={kind}>
+                {tv(kind)}
+              </NativeSelectOption>
+            ))}
+          </NativeSelect>
+        </Field>
+      </div>
+    </section>
+  );
+}
+
+/** Step 5 (new orders): the order or signed contract as a PDF, uploaded once the order exists. */
 function DocumentPicker({ file, onChange }: { file: File | null; onChange: (file: File | null) => void }) {
   const t = useTranslations("purchasing.form");
   return (
@@ -449,6 +509,7 @@ export default function OrderForm({
       <KindAndSupplier form={form} draft={draft} onChange={onChange} kindLocked={!!editing && !editing.pending} />
       <ConceptAndDates form={form} draft={draft} onChange={onChange} showOrderedOn={!editing || !editing.pending} />
       <Lines form={form} draft={draft} parse={parse} onChange={onChange} />
+      <Terms draft={draft} onChange={onChange} />
       {!editing && <DocumentPicker file={draft.file} onChange={(file) => onChange({ file })} />}
 
       <div

@@ -1,5 +1,6 @@
 import { and, eq, ne, relations, sql } from "drizzle-orm";
 import {
+  type AnyPgColumn,
   bigint,
   boolean,
   date,
@@ -1123,6 +1124,11 @@ export type PurchaseOrderStatus =
   | "contracted"
   | "finished"
   | "cancelled";
+// The VAT a supplier's invoice carries: 21 %, 10 %, reverse charge (a
+// subcontract between contractors, art. 84 LIVA) or exempt.
+export type PurchaseVatKind = "vat21" | "vat10" | "reverse_charge" | "exempt";
+export type PurchaseInvoiceKind = "invoice" | "credit_note";
+export type PurchasePaymentMethod = "transfer" | "confirming" | "promissory_note" | "direct_debit";
 
 export const purchaseOrders = pgTable(
   "purchase_orders",
@@ -1153,6 +1159,11 @@ export const purchaseOrders = pgTable(
     // Delivered (material) or finished (subcontract).
     completedOn: date("completed_on", { mode: "string" }),
     notes: text("notes"),
+    // What its invoices start from: days to pay them (null: the default 30),
+    // the guarantee retention, and their VAT (null: by kind).
+    paymentDays: integer("payment_days"),
+    retentionBp: integer("retention_bp").default(0).notNull(),
+    vatKind: text("vat_kind").$type<PurchaseVatKind>(),
     // The order or signed contract (PDF, private Blob store).
     fileName: text("file_name"),
     filePathname: text("file_pathname"),
@@ -1218,6 +1229,168 @@ export const purchaseOrderEvents = pgTable(
   },
   (table) => ({
     orderCreatedIdx: index("purchase_order_events_order_created_idx").on(table.orderId, table.createdAt),
+  }),
+);
+
+// A contract's payment schedule: how its amount is invoiced, in turn. They
+// split what the order contracts, never add to it.
+export const purchaseOrderMilestones = pgTable(
+  "purchase_order_milestones",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    orderId: text("order_id")
+      .notNull()
+      .references(() => purchaseOrders.id, { onDelete: "cascade" }),
+    position: integer("position").notNull(),
+    concept: text("concept").notNull(),
+    amountCents: integer("amount_cents").notNull(),
+  },
+  (table) => ({
+    orderIdx: index("purchase_order_milestones_order_idx").on(table.orderId),
+  }),
+);
+
+// A supplier's invoice (or credit note) for an order, registered once by
+// Administration. Its amounts are as invoiced: the base (without VAT) is what
+// is compared with the budget's cost; what is paid is the total less the
+// guarantee retention. A credit note rectifies one invoice and has a negative base.
+export const purchaseInvoices = pgTable(
+  "purchase_invoices",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    orderId: text("order_id")
+      .notNull()
+      .references(() => purchaseOrders.id, { onDelete: "cascade" }),
+    // The order's supplier, kept here so each supplier's numbers stay unique.
+    subcontractorId: text("subcontractor_id")
+      .notNull()
+      .references(() => subcontractors.id),
+    kind: text("kind").$type<PurchaseInvoiceKind>().default("invoice").notNull(),
+    // The supplier's own number.
+    number: text("number").notNull(),
+    // An invoiced milestone is never removed: not cascaded.
+    milestoneId: text("milestone_id").references(() => purchaseOrderMilestones.id),
+    rectifiesId: text("rectifies_id").references((): AnyPgColumn => purchaseInvoices.id),
+    issuedOn: date("issued_on", { mode: "string" }).notNull(),
+    // None for a credit note: it settles against the invoice it rectifies.
+    dueOn: date("due_on", { mode: "string" }),
+    baseCents: integer("base_cents").notNull(),
+    vatKind: text("vat_kind").$type<PurchaseVatKind>().notNull(),
+    vatCents: integer("vat_cents").notNull(),
+    // Income tax withheld from a self-employed supplier.
+    irpfBp: integer("irpf_bp").default(0).notNull(),
+    irpfCents: integer("irpf_cents").default(0).notNull(),
+    // The guarantee held back until the works' guarantee ends.
+    retentionBp: integer("retention_bp").default(0).notNull(),
+    retentionCents: integer("retention_cents").default(0).notNull(),
+    notes: text("notes"),
+    createdById: text("created_by_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date" })
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => ({
+    supplierNumberUnique: unique("purchase_invoices_supplier_number_unique").on(
+      table.tenantId,
+      table.subcontractorId,
+      table.number,
+    ),
+    orderIdx: index("purchase_invoices_order_idx").on(table.orderId),
+    tenantDueIdx: index("purchase_invoices_tenant_due_idx").on(table.tenantId, table.dueOn),
+    // A credit note's invoice: settling an invoice reads its credit notes.
+    rectifiesIdx: index("purchase_invoices_rectifies_idx").on(table.rectifiesId),
+  }),
+);
+
+// How an invoice's base splits across its order's budget lines (by lineage).
+export const purchaseInvoiceLines = pgTable(
+  "purchase_invoice_lines",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    invoiceId: text("invoice_id")
+      .notNull()
+      .references(() => purchaseInvoices.id, { onDelete: "cascade" }),
+    lineageId: text("lineage_id").notNull(),
+    chapterCode: text("chapter_code").notNull(),
+    amountCents: integer("amount_cents").notNull(),
+  },
+  (table) => ({
+    invoiceLineageUnique: unique("purchase_invoice_lines_invoice_lineage_unique").on(table.invoiceId, table.lineageId),
+  }),
+);
+
+// An invoice's PDF, versioned: a new upload adds a version, none is deleted.
+export const purchaseInvoiceFiles = pgTable(
+  "purchase_invoice_files",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    invoiceId: text("invoice_id")
+      .notNull()
+      .references(() => purchaseInvoices.id, { onDelete: "cascade" }),
+    version: integer("version").notNull(),
+    pathname: text("pathname").unique().notNull(),
+    filename: text("filename").notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    // Why it replaced the previous version.
+    note: text("note"),
+    uploadedById: text("uploaded_by_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => ({
+    invoiceVersionUnique: unique("purchase_invoice_files_invoice_version_unique").on(table.invoiceId, table.version),
+  }),
+);
+
+// A payment of an invoice: partial ones add up; past the amount due, the
+// retention is being released.
+export const purchasePayments = pgTable(
+  "purchase_payments",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    invoiceId: text("invoice_id")
+      .notNull()
+      .references(() => purchaseInvoices.id, { onDelete: "cascade" }),
+    paidOn: date("paid_on", { mode: "string" }).notNull(),
+    amountCents: integer("amount_cents").notNull(),
+    method: text("method").$type<PurchasePaymentMethod>().notNull(),
+    reference: text("reference"),
+    // The proof of payment (PDF, private Blob store).
+    fileName: text("file_name"),
+    filePathname: text("file_pathname"),
+    fileSizeBytes: integer("file_size_bytes"),
+    createdById: text("created_by_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => ({
+    invoiceIdx: index("purchase_payments_invoice_idx").on(table.invoiceId),
+    tenantPaidIdx: index("purchase_payments_tenant_paid_idx").on(table.tenantId, table.paidOn),
   }),
 );
 

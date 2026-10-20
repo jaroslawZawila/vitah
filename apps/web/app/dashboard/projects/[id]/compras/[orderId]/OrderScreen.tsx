@@ -8,6 +8,7 @@ import { useState } from "react";
 import { useTranslations } from "next-intl";
 import {
   canCancel,
+  countsAsContracted,
   isCompletedOrder,
   nextStatus,
   orderLabel,
@@ -16,10 +17,12 @@ import {
 } from "@repo/core/contract";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { deletePurchaseFileAction, setPurchaseStatusAction, uploadPurchaseFileAction } from "../../../../../actions/purchasing";
+import { setOrderMilestonesAction } from "../../../../../actions/purchase-invoices";
 import FormError from "../../../../components/FormError";
 import { obraHref } from "../../components/construction/ObraFrame";
 import { useObraAction } from "../../components/obra/useObraAction";
-import { editOrderHref, orderFileUrl, purchasesHref } from "../../components/purchasing/links";
+import { editOrderHref, newInvoiceHref, orderFileUrl, purchasesHref } from "../../components/purchasing/links";
+import { MilestonesCard, OrderInvoices } from "../../components/purchasing/OrderInvoiceViews";
 import { LateBanner, OrderData, OrderHeading, OrderHistory, OrderLines, StatusForm, StatusSteps } from "../../components/purchasing/OrderViews";
 import BackLink from "../../../../components/BackLink";
 
@@ -36,6 +39,9 @@ export default function OrderScreen({
   const t = useTranslations("purchasing.order");
   const status = useObraAction();
   const file = useObraAction();
+  const schedule = useObraAction();
+  // Invoices go only to a placed order; the form lives in Compras › Facturas.
+  const registerHref = canManage && countsAsContracted(order.status) ? newInvoiceHref({ orderId: order.id }) : undefined;
   const [dated, setDated] = useState<PurchaseStatus | null>(null);
   const next = nextStatus(order.kind, order.status);
 
@@ -48,6 +54,11 @@ export default function OrderScreen({
 
   const actions = canManage && order.status !== "cancelled" && (
     <>
+      {registerHref && (
+        <Link href={registerHref} className={buttonVariants({ variant: next ? "outline" : "default" })}>
+          {t("registerInvoice")}
+        </Link>
+      )}
       {next && (
         <Button type="button" onClick={() => advance(next)} disabled={status.pending}>
           {t(`advance.${next}`)}
@@ -102,6 +113,15 @@ export default function OrderScreen({
       )}
 
       <StatusSteps order={order} />
+
+      <MilestonesCard
+        order={order}
+        canEdit={canManage && order.status !== "cancelled"}
+        pending={schedule.pending}
+        error={schedule.state?.error}
+        onSave={(milestones, onSaved) => schedule.run(() => setOrderMilestonesAction(order.id, milestones), onSaved)}
+      />
+      <OrderInvoices order={order} registerHref={registerHref} />
 
       {/* Full width: the lines table needs ~760px, more than a two-thirds column has on a laptop. */}
       <OrderLines order={order} />

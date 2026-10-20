@@ -181,7 +181,8 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
   `obra_invoice_requests`, `obra_issues`, `obra_issue_files`, and the obra's `budget_revisions`, `budget_chapters`, `budget_lines`, `obra_hitos`, `obra_hito_chapters`, `obra_hito_checks`, `obra_hito_photos`, plus `budget_generations` (AI runs) and `ai_usage` (one row per Claude call, with its cost), and the
   Subcontratas tables `subcontractors`, `subcontractor_workers`, `subcontractor_documents`, `subcontractor_document_versions`,
   `subcontractor_assignments`, `subcontractor_audit`, Compras' `purchase_orders`, `purchase_order_lines`,
-  `purchase_order_events`, and Planning's `planning_versions`, `planning_items`. A project is deliberately minimal — exactly what the mobile app shows: `ref`, `address`, `start_date`, `completion_date`, plus `client_user_id` linking it to its mobile app client
+  `purchase_order_events`, `purchase_order_milestones`, `purchase_invoices`, `purchase_invoice_lines`, `purchase_invoice_files`,
+  `purchase_payments`, and Planning's `planning_versions`, `planning_items`. A project is deliberately minimal — exactly what the mobile app shows: `ref`, `address`, `start_date`, `completion_date`, plus `client_user_id` linking it to its mobile app client
 - Prod migrations are additive SQL files in `packages/db/sql/`, applied by hand (no plain `db:push` on prod)
 
 ### Obra (construction process)
@@ -240,11 +241,34 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
   Costes/Resumen read it; a material order past its expected date and not delivered is a late delivery (warning only)
 - Suppliers are the Subcontratas companies; a material supplier is `subcontractors.supplies_only` (no CAE documents,
   workers or obras: always apta; it can't take a subcontract)
+- Supplier invoices and payments (`packages/core/src/purchase-invoices.ts`, `purchaseInvoicesService`; arithmetic pure in
+  `purchase-calc.ts`, loading shared in `purchase-invoice-data.ts`): Administration registers each invoice once against a
+  placed order (`purchase_invoices`, number unique per supplier): its base without VAT split across the order's lines
+  (`purchase_invoice_lines`, in proportion unless given), VAT (`vat21`/`vat10`/`reverse_charge`/`exempt`), IRPF and the
+  guarantee retention, and its PDF in versions (`purchase_invoice_files`, none deleted). The order holds the defaults
+  (`payment_days` 30, `retention_bp`, `vat_kind`: a subcontract is reverse-charged) and an optional payment schedule
+  (`purchase_order_milestones`, adding up to its amount; an invoice then goes to one milestone, an invoiced one is locked).
+  A credit note rectifies one invoice of its order (negative base) and settles against it. Payments (`purchase_payments`,
+  partial, with an optional proof) go up to what is due, then release the retention. Invoice states pending → partial →
+  overdue → paid (`credit` for a credit note). An invoiced order keeps its supplier, its invoiced lines and its place
+  (`has_invoices`). Every change goes to `purchase_order_events` (`detail.invoiceId`)
+- The obra's Compras by budget line (`getProjectPurchaseLines`) gives each line one of four states
+  (`PURCHASE_PROGRESS`): to_contract → contracted → invoiced → paid (closed, all invoiced, nothing owed; retention
+  aside), with its orders, their milestones and invoices; money there is without VAT (`settle`'s `base`)
+- Portal: the project tab opens by budget line (`compras`, `PurchaseLinesScreen`; `?vista=pedidos` is the orders list);
+  an order's page shows its milestones (editable) and invoices. The rail's Compras has Pedidos · Facturas · Pagos
+  (`dashboard/compras/`, `facturas/` list, `facturas/nueva` form with `?pedido=` and `?abono=` for a credit note,
+  `facturas/[invoiceId]` + `editar`, `pagos/` forecast and payments) with a badge for invoices due within a week.
+  Actions `app/actions/purchase-invoices.ts`; API `/api/v1/purchases/invoices` (GET), `/api/v1/purchases/:orderId/invoices`
+  (POST JSON, or multipart with the fields as JSON in `data` and the PDF in `file`), `…/invoices/form`, `…/invoices/:invoiceId` (GET, PATCH, DELETE), `…/file` (GET `?fileId`, POST a version),
+  `…/payments` (POST), `/api/v1/purchases/payments` (GET), `…/payments/:paymentId` (DELETE) and `…/file`,
+  `/api/v1/purchases/:orderId/milestones` (PUT), `/api/v1/purchases/counts`, `/api/v1/projects/:id/purchases/lines`
 - Portal: project tab Compras (`dashboard/projects/[id]/compras/`: list, `nuevo`, `[orderId]`, `[orderId]/editar`) and the
   rail's company-wide Compras (`dashboard/compras/`, every order of the tenant for Administration). API: `/api/v1/purchases`
   (`?projectId`, `?subcontractorId`), `/api/v1/purchases/:orderId` (GET, PATCH), `…/status` (POST), `…/file`;
   `/api/v1/projects/:id/purchases` (GET, POST) and `…/purchases/form`. `pnpm db:seed` gives VTH-26-001 its orders
-  (`seed/purchasing.ts`). Prod SQL: `packages/db/sql/2026-10-purchasing.sql`
+  (`seed/purchasing.ts`) and their invoices and payments (`seed/purchase-invoices.ts`). Prod SQL:
+  `packages/db/sql/2026-10-purchasing.sql`, `packages/db/sql/2026-10-purchase-invoices.sql`
 
 ### Planning (Planificación)
 

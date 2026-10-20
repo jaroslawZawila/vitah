@@ -117,9 +117,24 @@ describe("OrderFormScreen", () => {
         { lineageId: "lin-0701", amountCents: 725_000, closesLine: true },
         { lineageId: "lin-0704", amountCents: 166_000, closesLine: false },
       ],
+      paymentDays: null,
+      retentionBp: 0,
+      vatKind: null,
       status: "contracted",
     });
     expect(router.push).toHaveBeenCalledWith("/dashboard/projects/p-1/compras/order-57");
+  });
+
+  it("sends the terms its invoices start from: days to pay, retention and VAT", async () => {
+    renderScreen();
+    await fillSubcontract();
+    expect(screen.getByRole("combobox", { name: "IVA de sus facturas" })).toHaveDisplayValue("Según el tipo (Inversión del sujeto pasivo)");
+    await userEvent.type(screen.getByRole("textbox", { name: "Días de pago" }), "60");
+    await userEvent.type(screen.getByRole("textbox", { name: "Retención de garantía (%)" }), "5");
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "IVA de sus facturas" }), "vat21");
+    await userEvent.click(screen.getByRole("button", { name: "Guardar y marcar contratado" }));
+
+    expect(actions.createPurchaseAction).toHaveBeenCalledWith("p-1", expect.objectContaining({ paymentDays: 60, retentionBp: 500, vatKind: "vat21" }));
   });
 
   it("saves as pending without an order date, and uploads the PDF once the order exists", async () => {

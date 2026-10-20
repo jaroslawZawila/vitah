@@ -646,6 +646,11 @@ export type ObraError =
   | "unknown_line"
   | "unknown_supplier"
   | "supplies_only"
+  | "has_invoices"
+  | "has_payments"
+  | "duplicate_number"
+  | "milestones_mismatch"
+  | "exceeds_amount"
   | "budget_exists"
   | "draft_exists"
   | "no_budget"
@@ -991,6 +996,8 @@ export type PurchaseOrderListItem = {
   chapterCodes: string[];
   /** A material order past its expected delivery and not delivered: days late today. */
   lateDays: number | null;
+  /** Its suppliers' invoices' base, credit notes taken off (without VAT). */
+  invoicedCents: number;
   hasFile: boolean;
   createdAt: string;
 };
@@ -1037,6 +1044,13 @@ export type PurchaseOrderDetail = PurchaseOrderListItem & {
   reached: Partial<Record<PurchaseStatus, string>>;
   /** The accepted budget revision its lines' costs come from. */
   budgetNumber: number | null;
+  /** What its invoices start from: as set on the order, else the defaults. */
+  terms: PurchaseTerms;
+  /** Its payment schedule; empty when invoiced freely. */
+  milestones: OrderMilestone[];
+  /** Its invoices and credit notes, newest first. */
+  invoices: PurchaseInvoiceListItem[];
+  invoicing: OrderInvoicing;
   today: string;
 };
 
@@ -1134,6 +1148,9 @@ export type PurchaseForm = {
     workStart: string | null;
     workEnd: string | null;
     notes: string | null;
+    paymentDays: number | null;
+    retentionBp: number;
+    vatKind: PurchaseVatKind | null;
     lines: { lineageId: string; amountCents: number; closesLine: boolean }[];
   } | null;
   suppliers: {
@@ -1159,6 +1176,307 @@ export type PurchaseForm = {
   }[];
   today: string;
   sources: { planning: PlanningSource };
+};
+
+// ─── Supplier invoices and payments (Compras) ────────────────────────────────
+// Administration registers each supplier's invoice once, against its order
+// (and the order's payment milestone, when it has a schedule), then the
+// payments. The obra reads them by budget line: what is invoiced, paid, owed
+// and held back, without VAT. Staff only, portal only.
+
+export const PURCHASE_VAT_KINDS = ["vat21", "vat10", "reverse_charge", "exempt"] as const;
+export type PurchaseVatKind = (typeof PURCHASE_VAT_KINDS)[number];
+/** Each VAT kind's rate, in basis points. */
+export const VAT_RATE_BP: Record<PurchaseVatKind, number> = { vat21: 2100, vat10: 1000, reverse_charge: 0, exempt: 0 };
+/** An order's invoices' VAT unless it says otherwise: a subcontract between contractors is reverse-charged (art. 84 LIVA). */
+export const defaultVatKind = (kind: PurchaseKind): PurchaseVatKind => (kind === "subcontract" ? "reverse_charge" : "vat21");
+/** Days to pay an invoice when its order doesn't say (Ley 3/2004's default). */
+export const DEFAULT_PAYMENT_DAYS = 30;
+export const MAX_PAYMENT_DAYS = 365;
+/** An invoice due within this many days is due soon. */
+export const DUE_SOON_DAYS = 7;
+/** How far ahead the payments forecast looks. */
+export const PAYMENT_FORECAST_DAYS = 30;
+export const MAX_RETENTION_BP = 2000;
+export const MAX_IRPF_BP = 2500;
+export const MAX_MILESTONES = 20;
+
+export const PURCHASE_INVOICE_KINDS = ["invoice", "credit_note"] as const;
+export type PurchaseInvoiceKind = (typeof PURCHASE_INVOICE_KINDS)[number];
+export const PURCHASE_PAYMENT_METHODS = ["transfer", "confirming", "promissory_note", "direct_debit"] as const;
+export type PurchasePaymentMethod = (typeof PURCHASE_PAYMENT_METHODS)[number];
+
+/**
+ * An invoice's state, by what is owed on it: nothing yet paid, part paid,
+ * past its due date with something owed, or paid (its retention may still be
+ * held). A credit note settles against the invoice it rectifies.
+ */
+export const PURCHASE_INVOICE_STATES = ["pending", "partial", "overdue", "paid", "credit"] as const;
+export type PurchaseInvoiceState = (typeof PURCHASE_INVOICE_STATES)[number];
+
+/**
+ * Where a budget line (or an order's milestone) stands in purchasing:
+ * nothing contracted yet; contracted, no invoice; invoiced, with something
+ * still to invoice or pay; or all of it invoiced and paid (retention aside).
+ */
+export const PURCHASE_PROGRESS = ["to_contract", "contracted", "invoiced", "paid"] as const;
+export type PurchaseProgress = (typeof PURCHASE_PROGRESS)[number];
+
+/** What an order's invoices start from. */
+export type PurchaseTerms = { paymentDays: number; retentionBp: number; vatKind: PurchaseVatKind };
+
+/** An invoice's amounts, as invoiced; credit notes are negative. */
+export type PurchaseInvoiceAmounts = {
+  /** Without VAT: what is compared with the budget's cost. */
+  baseCents: number;
+  vatKind: PurchaseVatKind;
+  vatCents: number;
+  /** Income tax withheld from a self-employed supplier. */
+  irpfBp: number;
+  irpfCents: number;
+  /** The guarantee held back. */
+  retentionBp: number;
+  retentionCents: number;
+  /** Base + VAT − IRPF. */
+  totalCents: number;
+  /** Total − retention: what is due by the due date. */
+  payableCents: number;
+};
+
+/** A supplier's invoice or credit note, in a list. */
+export type PurchaseInvoiceListItem = PurchaseInvoiceAmounts & {
+  id: string;
+  kind: PurchaseInvoiceKind;
+  /** The supplier's own number. */
+  number: string;
+  orderId: string;
+  orderNumber: number;
+  orderDescription: string;
+  projectId: string;
+  projectRef: string;
+  subcontractorId: string;
+  supplierName: string;
+  milestoneId: string | null;
+  milestoneConcept: string | null;
+  /** A credit note's invoice. */
+  rectifiesId: string | null;
+  rectifiesNumber: string | null;
+  issuedOn: string;
+  /** None for a credit note. */
+  dueOn: string | null;
+  /** Paid against it so far (a credit note: 0). */
+  paidCents: number;
+  /** Still owed by its due date, net of its credit notes; negative: in our favour. A credit note: 0. */
+  outstandingCents: number;
+  /** Retention still held back. */
+  retainedCents: number;
+  state: PurchaseInvoiceState;
+  /** Days past its due date while something is owed. */
+  overdueDays: number | null;
+  hasFile: boolean;
+  createdAt: string;
+};
+
+export type PurchasePayment = {
+  id: string;
+  invoiceId: string;
+  invoiceNumber: string;
+  orderId: string;
+  projectId: string;
+  projectRef: string;
+  supplierName: string;
+  paidOn: string;
+  amountCents: number;
+  method: PurchasePaymentMethod;
+  reference: string | null;
+  file: { name: string; sizeBytes: number } | null;
+  by: string | null;
+  createdAt: string;
+};
+
+/** GET /api/v1/purchases/invoices/:invoiceId */
+export type PurchaseInvoiceDetail = PurchaseInvoiceListItem & {
+  notes: string | null;
+  projectAddress: string;
+  orderKind: PurchaseKind;
+  supplierKind: SubcontractorKind;
+  /** How its base splits across the budget's lines. */
+  lines: { lineageId: string; chapterCode: string; code: string | null; description: string | null; amountCents: number }[];
+  /** The credit notes rectifying it. */
+  creditNotes: PurchaseInvoiceListItem[];
+  /** Newest first. */
+  payments: PurchasePayment[];
+  /** Its PDF's versions, newest (current) first. */
+  files: { id: string; version: number; filename: string; sizeBytes: number; note: string | null; by: string | null; at: string }[];
+  /** What may still be paid: the amount due, then the retention once released. */
+  payableLeftCents: number;
+  createdBy: string | null;
+  /** Its history (in its order's log). */
+  events: PurchaseOrderEvent[];
+  today: string;
+};
+
+/** Money of an order or a line, without VAT: invoiced (credit notes off), then how that stands. */
+export type PurchaseInvoicing = {
+  invoicedCents: number;
+  paidCents: number;
+  /** Still owed, due or not. */
+  outstandingCents: number;
+  /** Held back until the guarantee ends. */
+  retainedCents: number;
+};
+
+export type OrderInvoicing = PurchaseInvoicing & {
+  /** The order's amount not invoiced yet. */
+  toInvoiceCents: number;
+};
+
+/** A step of an order's payment schedule. */
+export type OrderMilestone = PurchaseInvoicing & {
+  id: string;
+  position: number;
+  concept: string;
+  amountCents: number;
+  progress: Exclude<PurchaseProgress, "to_contract">;
+  /** Its invoices (credit notes go with theirs). */
+  invoices: { id: string; number: string; state: PurchaseInvoiceState; issuedOn: string; dueOn: string | null }[];
+};
+
+/** An order seen from one of its budget lines, on the obra's Compras by line. */
+export type PurchaseLineOrder = {
+  id: string;
+  number: number;
+  kind: PurchaseKind;
+  status: PurchaseStatus;
+  supplierName: string;
+  description: string;
+  /** What it contracts of this line. */
+  lineAmountCents: number;
+  amountCents: number;
+  expectedOn: string | null;
+  completedOn: string | null;
+  lateDays: number | null;
+  retentionBp: number;
+  /** The whole order's schedule and invoices: a milestone is the contract's, not the line's. */
+  milestones: OrderMilestone[];
+  invoices: PurchaseInvoiceListItem[];
+  invoicing: OrderInvoicing;
+};
+
+export type PurchaseLineItem = PurchaseInvoicing & {
+  lineageId: string;
+  code: string;
+  description: string;
+  costCents: number;
+  contractedCents: number;
+  contracting: LineContracting;
+  /** Only once closed: cost − contracted. */
+  deviationCents: number | null;
+  deviationBp: number | null;
+  /** Its cost not contracted yet while it is open or not ordered. */
+  uncontractedCents: number;
+  progress: PurchaseProgress;
+  /** One of its invoices is past due with something owed. */
+  overdue: boolean;
+  orders: PurchaseLineOrder[];
+};
+
+/** GET /api/v1/projects/:id/purchases/lines: the obra's Compras by budget line. */
+export type ProjectPurchaseLines = {
+  ref: string;
+  summary: ProjectPurchases["summary"] &
+    PurchaseInvoicing & {
+      /** Owed on invoices past due. */
+      overdueCents: number;
+      invoices: number;
+      creditNotes: number;
+    };
+  /** Lines by progress, for the filter. */
+  counts: Record<PurchaseProgress, number>;
+  /** The obra's invoices overdue or due within `DUE_SOON_DAYS`, soonest first. */
+  dueAlerts: PurchaseInvoiceListItem[];
+  chapters: {
+    code: string;
+    name: string;
+    /** The day its orders must be placed by (planned start − lead time). */
+    orderBy: string | null;
+    costCents: number;
+    contractedCents: number;
+    deviationCents: number | null;
+    lines: PurchaseLineItem[];
+  }[];
+  today: string;
+  sources: { planning: PlanningSource };
+};
+
+/** GET /api/v1/purchases/invoices: the tenant's invoices (`?projectId`, `?subcontractorId`). */
+export type TenantInvoices = {
+  invoices: PurchaseInvoiceListItem[];
+  projects: { id: string; ref: string; address: string }[];
+  summary: {
+    outstandingCents: number;
+    outstandingInvoices: number;
+    outstandingSuppliers: number;
+    overdueCents: number;
+    overdueInvoices: number;
+    /** Due within `DUE_SOON_DAYS` days, not past due. */
+    dueSoonCents: number;
+    dueSoonInvoices: number;
+    paidThisMonthCents: number;
+    paymentsThisMonth: number;
+  };
+  today: string;
+};
+
+/** GET /api/v1/purchases/payments: what is owed by due week, and the payments made. */
+export type TenantPayments = {
+  /** What is owed: past due first (`from` null), then 7-day weeks from today over `PAYMENT_FORECAST_DAYS`. */
+  forecast: { from: string | null; to: string; totalCents: number; invoices: PurchaseInvoiceListItem[] }[];
+  /** Newest first. */
+  payments: PurchasePayment[];
+  summary: { monthCents: number; monthPayments: number };
+  today: string;
+};
+
+/** GET /api/v1/purchases/counts: Compras' sections in the rail. */
+export type PurchasingCounts = {
+  orders: number;
+  invoices: number;
+  payments: number;
+  /** Invoices overdue or due within `DUE_SOON_DAYS`: the rail's badge. */
+  dueAttention: number;
+};
+
+/** GET /api/v1/purchases/invoices/form: what a new (or edited) invoice picks from. */
+export type PurchaseInvoiceForm = {
+  /** Orders that can be invoiced: placed, not cancelled. */
+  orders: {
+    id: string;
+    number: number;
+    projectId: string;
+    projectRef: string;
+    description: string;
+    subcontractorId: string;
+    supplierName: string;
+    amountCents: number;
+    invoicedCents: number;
+  }[];
+  /** With `?orderId=` (or editing): that order's details. */
+  order: {
+    id: string;
+    kind: PurchaseKind;
+    supplierKind: SubcontractorKind;
+    amountCents: number;
+    terms: PurchaseTerms;
+    milestones: OrderMilestone[];
+    lines: { lineageId: string; chapterCode: string; code: string | null; description: string | null; amountCents: number; invoicedCents: number }[];
+    /** Its invoices a credit note may rectify. */
+    invoices: PurchaseInvoiceListItem[];
+    invoicing: OrderInvoicing;
+  } | null;
+  /** With `?invoiceId=`: that invoice as it stands, to edit. */
+  editing: PurchaseInvoiceDetail | null;
+  today: string;
 };
 
 // ─── Planning (the works schedule) ───────────────────────────────────────────

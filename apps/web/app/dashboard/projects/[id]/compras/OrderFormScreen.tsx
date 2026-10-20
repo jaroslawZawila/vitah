@@ -36,7 +36,7 @@ export default function OrderFormScreen({
   const router = useRouter();
   const order = form.editing;
   const [draft, setDraft] = useState<OrderDraft>(() =>
-    order ? orderDraftFrom(order, form, f.decimal) : newOrderDraft(form, chapter),
+    order ? orderDraftFrom(order, form, f) : newOrderDraft(form, chapter),
   );
   const [error, setError] = useState<string | null>(null);
   // Set once a new order exists; `error` when its PDF didn't go up (saving again only retries the upload).

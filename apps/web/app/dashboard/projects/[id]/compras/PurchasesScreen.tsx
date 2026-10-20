@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 import { FilterSelect } from "../components/construction/Filters";
 import { StageEyebrow, type ObraHeader } from "../components/construction/ObraFrame";
 import { CheckFilter, GroupFilter } from "../components/purchasing/Filters";
+import { ViewSwitch } from "../components/purchasing/LineViews";
 import { newOrderHref, orderHref } from "../components/purchasing/links";
 import OrderList from "../components/purchasing/OrderList";
 import { NO_ORDER_FILTER, filterOrders, groupCounts, suppliersOf, type OrderFilter } from "../components/purchasing/orders";
@@ -59,12 +60,15 @@ export default function PurchasesScreen({
           <h1 className="mt-1.5">{t("title")}</h1>
           <p className="mt-1 max-w-[640px] text-[14px] text-muted-foreground">{t("description")}</p>
         </div>
-        {canManage && (
-          <Link href={newOrderHref(projectId)} className={cn(buttonVariants(), "w-full sm:w-auto")}>
-            <Plus aria-hidden />
-            {t("new")}
-          </Link>
-        )}
+        <div className="flex w-full flex-wrap items-center gap-2.5 sm:w-auto">
+          <ViewSwitch projectId={projectId} view="orders" />
+          {canManage && (
+            <Link href={newOrderHref(projectId)} className={cn(buttonVariants(), "w-full sm:w-auto")}>
+              <Plus aria-hidden />
+              {t("new")}
+            </Link>
+          )}
+        </div>
       </header>
 
       <ProjectKpis summary={purchases.summary} late={late} orderHref={href} />

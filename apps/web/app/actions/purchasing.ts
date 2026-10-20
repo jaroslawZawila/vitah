@@ -25,6 +25,12 @@ export async function getProjectPurchases(projectId: string) {
   return result && { purchases: result.data, canManage: result.canManage };
 }
 
+/** The project's Compras by budget line: each line's state, its orders, milestones and invoices. */
+export async function getProjectPurchaseLines(projectId: string) {
+  const result = await read((ctx) => svc.getProjectPurchaseLines(ctx, projectId));
+  return result && { lines: result.data, canManage: result.canManage };
+}
+
 /** What a new order (or `orderId`, edited) picks from. */
 export async function getPurchaseForm(projectId: string, orderId?: string) {
   const result = await read((ctx) => svc.getPurchaseForm(ctx, projectId, orderId));
@@ -38,10 +44,10 @@ export async function getPurchase(orderId: string) {
 
 // ─── Writes ──────────────────────────────────────────────────────────────────
 
-/** Runs the write, then refreshes the project's tabs and the company-wide list. */
+/** Runs the write, then refreshes the project's tabs, the company-wide lists and the rail's counts. */
 async function write(projectId: string, fn: Parameters<typeof mutate>[1]): Promise<ObraState> {
   const state = await mutate<ObraError>(projectId, fn);
-  if (state?.success) revalidatePath("/dashboard/compras", "layout");
+  if (state?.success) revalidatePath("/dashboard", "layout");
   return state;
 }
 

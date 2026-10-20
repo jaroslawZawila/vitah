@@ -5,7 +5,7 @@ import { useTransition } from "react";
 import { useParams, usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Contact, FolderKanban, HardHat, Settings, ShoppingCart, UserCog } from "lucide-react";
-import { APP_LANGUAGES, type AppLanguage, type SubcontractorCounts } from "@repo/core/contract";
+import { APP_LANGUAGES, type AppLanguage, type PurchasingCounts, type SubcontractorCounts } from "@repo/core/contract";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,7 +16,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-import { COMPANY_PURCHASES_HREF } from "../projects/[id]/components/purchasing/links";
+import { COMPANY_PURCHASES_HREF, INVOICES_HREF, PAYMENTS_HREF } from "../projects/[id]/components/purchasing/links";
 
 const NAV_ITEMS = [
   { key: "projects", href: "/dashboard/projects", icon: FolderKanban, adminOnly: false },
@@ -43,6 +43,13 @@ const SUBCONTRACTOR_TABS = [
   { key: "expiries", href: `${SUBCONTRACTORS_HREF}/empresas#caducidades` },
 ] as const;
 
+/** Compras' pages, nested under it in the rail's "Red" group. */
+const PURCHASE_TABS = [
+  { key: "orders", href: COMPANY_PURCHASES_HREF },
+  { key: "invoices", href: INVOICES_HREF },
+  { key: "payments", href: PAYMENTS_HREF },
+] as const;
+
 const navLinkClass = (active: boolean) =>
   cn(
     "relative flex min-h-11 items-center gap-2 rounded-[9px] px-2.5 text-[13.5px] font-medium text-rail-foreground transition-colors hover:bg-white/6 lg:min-h-10 lg:gap-[11px] lg:px-3 lg:text-[14.5px]",
@@ -59,6 +66,7 @@ export default function Sidebar({
   email,
   isAdmin,
   subcontractors = null,
+  purchases = null,
   language,
   onLanguageChange,
 }: {
@@ -67,6 +75,8 @@ export default function Sidebar({
   isAdmin: boolean;
   /** The Subcontratas badges; null hides them. */
   subcontractors?: SubcontractorCounts | null;
+  /** Compras' counts and its badge (invoices due); null hides them. */
+  purchases?: PurchasingCounts | null;
   /** The portal's language, the user's setting. */
   language: AppLanguage;
   onLanguageChange: (language: AppLanguage) => Promise<{ error?: string }>;
@@ -120,7 +130,7 @@ export default function Sidebar({
           );
         })}
         <SubcontractorsNav pathname={pathname} counts={subcontractors} />
-        <PurchasesNav pathname={pathname} />
+        <PurchasesNav pathname={pathname} counts={purchases} />
       </nav>
 
       <div className="mt-auto hidden border-t border-white/8 pt-3 lg:block">
@@ -267,18 +277,61 @@ function SubcontractorsNav({ pathname, counts }: { pathname: string; counts: Sub
   );
 }
 
-function PurchasesNav({ pathname }: { pathname: string }) {
+function PurchasesNav({ pathname, counts }: { pathname: string; counts: PurchasingCounts | null }) {
   const t = useTranslations("sidebar");
   const active = pathname.startsWith(COMPANY_PURCHASES_HREF);
+  const due = counts?.dueAttention ?? 0;
+  // Pedidos is Compras' own page: current there and on its order pages, not under its siblings.
+  const current = (href: string) =>
+    href === COMPANY_PURCHASES_HREF
+      ? pathname === href || (active && !PURCHASE_TABS.some((tab) => tab.href !== href && pathname.startsWith(tab.href)))
+      : pathname.startsWith(href);
+
   return (
-    <Link href={COMPANY_PURCHASES_HREF} className={navLinkClass(active)} aria-current={active ? "page" : undefined}>
-      <ShoppingCart
-        aria-hidden
-        className={cn("size-[19px] flex-none opacity-85", active && "text-rail-accent opacity-100")}
-        strokeWidth={1.8}
-      />
-      {t("purchases")}
-    </Link>
+    <div className="max-lg:contents">
+      <Link href={COMPANY_PURCHASES_HREF} className={navLinkClass(active)} aria-expanded={active}>
+        <ShoppingCart
+          aria-hidden
+          className={cn("size-[19px] flex-none opacity-85", active && "text-rail-accent opacity-100")}
+          strokeWidth={1.8}
+        />
+        {t("purchases")}
+        {due > 0 && (
+          <span className="ml-auto rounded-full bg-bad px-1.5 font-mono text-[11px] text-white">
+            {due}
+            <span className="sr-only"> · {t("purchaseTabs.dueCount", { count: due })}</span>
+          </span>
+        )}
+      </Link>
+      {active && (
+        <ul
+          className="order-last -mx-3 flex basis-full gap-1 overflow-x-auto px-3 lg:mx-0 lg:mt-0.5 lg:mb-1.5 lg:ml-[21px] lg:flex-col lg:gap-0 lg:overflow-visible lg:border-l lg:border-white/10 lg:px-0"
+          aria-label={t("purchaseTabs.label")}
+        >
+          {PURCHASE_TABS.map((tab) => {
+            const here = current(tab.href);
+            const count = counts?.[tab.key];
+            return (
+              <li key={tab.key} className="flex-none">
+                <Link
+                  href={tab.href}
+                  className={cn(
+                    "flex min-h-11 items-center gap-2 rounded-full px-3 text-[13px] whitespace-nowrap text-rail-muted transition-colors hover:text-rail-foreground lg:-ml-px lg:min-h-9 lg:rounded-none lg:border-l-2 lg:border-transparent lg:px-3.5 lg:text-[13.5px]",
+                    here && "bg-white/10 font-semibold text-white lg:border-rail-accent lg:bg-transparent",
+                  )}
+                  aria-current={here ? "page" : undefined}
+                >
+                  {t(`purchaseTabs.${tab.key}`)}
+                  {count !== undefined && (
+                    <span className="ml-auto rounded-full bg-white/9 px-1.5 font-mono text-[11px] text-rail-foreground">{count}</span>
+                  )}
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
   );
 }
 

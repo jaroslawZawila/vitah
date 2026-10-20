@@ -49,6 +49,10 @@ export async function requireProject(tenantId: string, projectId: string) {
   return project;
 }
 
+/** An uploaded file's own name (≤ 200 characters), else `fallback`. */
+export const uploadedName = (file: Blob, fallback: string) =>
+  (file instanceof File && file.name ? file.name : fallback).slice(0, 200);
+
 type NewFile = { pathname: string; body: Blob; contentType: string };
 
 /** Stores a row's files, then records it; the files are removed again if anything fails. */

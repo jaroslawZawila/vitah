@@ -2,7 +2,13 @@
 
 import { useTranslations } from "next-intl";
 import type { VariantProps } from "class-variance-authority";
-import type { CompanyStatus, PurchaseKind, PurchaseStatus } from "@repo/core/contract";
+import type {
+  CompanyStatus,
+  PurchaseInvoiceState,
+  PurchaseKind,
+  PurchaseProgress,
+  PurchaseStatus,
+} from "@repo/core/contract";
 import { Badge, type badgeVariants } from "@/components/ui/badge";
 import { COMPANY_STATUS_VARIANT } from "../../../../subcontratas/components/display";
 import { Dot } from "../construction/pills";
@@ -56,6 +62,43 @@ export function SupplierCaePill({ suppliesOnly, status }: { suppliesOnly: boolea
     <Badge variant={COMPANY_STATUS_VARIANT[status]}>
       <Dot />
       {t(status)}
+    </Badge>
+  );
+}
+
+const INVOICE_STATE_TONE: Record<PurchaseInvoiceState, Variant> = {
+  pending: "info",
+  partial: "yel",
+  overdue: "destructive",
+  paid: "good",
+  credit: "outline",
+};
+
+/** A supplier invoice's state: por pagar, pago parcial, vencida, pagada, or abono. */
+export function InvoiceStatePill({ state, className }: { state: PurchaseInvoiceState; className?: string }) {
+  const t = useTranslations("purchasing.invoiceState");
+  return (
+    <Badge variant={INVOICE_STATE_TONE[state]} className={className}>
+      <Dot />
+      {t(state)}
+    </Badge>
+  );
+}
+
+const PROGRESS_TONE: Record<PurchaseProgress, Variant> = {
+  to_contract: "outline",
+  contracted: "info",
+  invoiced: "yel",
+  paid: "good",
+};
+
+/** Where a budget line (or a milestone) stands: the four states. */
+export function ProgressPill({ progress, className }: { progress: PurchaseProgress; className?: string }) {
+  const t = useTranslations("purchasing.progress");
+  return (
+    <Badge variant={PROGRESS_TONE[progress]} className={className}>
+      <Dot />
+      {t(progress)}
     </Badge>
   );
 }

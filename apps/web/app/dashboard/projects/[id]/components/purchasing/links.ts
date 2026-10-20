@@ -2,6 +2,9 @@
 
 export const purchasesHref = (projectId: string) => `/dashboard/projects/${projectId}/compras`;
 
+/** The project's Compras as a list of orders (the tab opens on its budget lines). */
+export const ordersViewHref = (projectId: string) => `${purchasesHref(projectId)}?vista=pedidos`;
+
 export const orderHref = (projectId: string, orderId: string) => `${purchasesHref(projectId)}/${orderId}`;
 
 /** The new-order form, optionally on one chapter's lines. */
@@ -15,3 +18,29 @@ export const orderFileUrl = (orderId: string) => `/api/v1/purchases/${orderId}/f
 
 /** The company-wide list (rail › Red › Compras), for Administration. */
 export const COMPANY_PURCHASES_HREF = "/dashboard/compras";
+
+/** Compras › Facturas: the suppliers' invoices of every obra. */
+export const INVOICES_HREF = `${COMPANY_PURCHASES_HREF}/facturas`;
+
+/** Compras › Pagos: what falls due, and the payments made. */
+export const PAYMENTS_HREF = `${COMPANY_PURCHASES_HREF}/pagos`;
+
+export const invoiceHref = (invoiceId: string) => `${INVOICES_HREF}/${invoiceId}`;
+
+export const editInvoiceHref = (invoiceId: string) => `${invoiceHref(invoiceId)}/editar`;
+
+/** The invoice form: on `orderId`, and as a credit note on `rectifiesId`. */
+export function newInvoiceHref({ orderId, rectifiesId }: { orderId?: string; rectifiesId?: string } = {}) {
+  const query = new URLSearchParams();
+  if (orderId) query.set("pedido", orderId);
+  if (rectifiesId) query.set("abono", rectifiesId);
+  const text = query.toString();
+  return `${INVOICES_HREF}/nueva${text ? `?${text}` : ""}`;
+}
+
+/** An invoice's PDF (its current version, or `fileId`), served by /api/v1 with the session. */
+export const invoiceFileUrl = (invoiceId: string, fileId?: string) =>
+  `/api/v1/purchases/invoices/${invoiceId}/file${fileId ? `?fileId=${encodeURIComponent(fileId)}` : ""}`;
+
+/** A payment's proof. */
+export const paymentFileUrl = (paymentId: string) => `/api/v1/purchases/payments/${paymentId}/file`;

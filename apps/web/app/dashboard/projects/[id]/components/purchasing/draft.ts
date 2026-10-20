@@ -1,4 +1,4 @@
-import type { PurchaseForm, PurchaseFormLine, PurchaseKind } from "@repo/core/contract";
+import type { PurchaseForm, PurchaseFormLine, PurchaseKind, PurchaseVatKind } from "@repo/core/contract";
 
 // What the order form holds (amounts as typed, dates as "" when empty), and
 // how it turns into the body of createPurchaseAction / updatePurchaseAction.
@@ -23,6 +23,10 @@ export type OrderDraft = {
   lines: Record<string, LineDraft>;
   /** A PDF to upload once the order exists (new orders only). */
   file: File | null;
+  /** Its invoices' terms: days to pay ("" = the default), retention % as typed, VAT ("" = by kind). */
+  paymentDays: string;
+  retention: string;
+  vatKind: PurchaseVatKind | "";
 };
 
 /** Reads typed euros into cents; NaN when it isn't an amount. */
@@ -51,6 +55,9 @@ export function newOrderDraft(form: PurchaseForm, chapter?: string): OrderDraft 
     chapter: startChapter(form, chapter),
     lines: {},
     file: null,
+    paymentDays: "",
+    retention: "",
+    vatKind: "",
   };
 }
 
@@ -58,7 +65,7 @@ export function newOrderDraft(form: PurchaseForm, chapter?: string): OrderDraft 
 export function orderDraftFrom(
   order: NonNullable<PurchaseForm["editing"]>,
   form: PurchaseForm,
-  decimal: (euros: number) => string,
+  { decimal, pctInput }: { decimal: (euros: number) => string; pctInput: (bp: number) => string },
 ): OrderDraft {
   const chapterOf = new Map(form.chapters.flatMap((c) => c.lines.map((l) => [l.lineageId, c.code] as const)));
   return {
@@ -74,6 +81,9 @@ export function orderDraftFrom(
       order.lines.map((line) => [line.lineageId, { amount: decimal(line.amountCents / 100), closes: line.closesLine }]),
     ),
     file: null,
+    paymentDays: order.paymentDays === null ? "" : String(order.paymentDays),
+    retention: order.retentionBp ? pctInput(order.retentionBp) : "",
+    vatKind: order.vatKind ?? "",
   };
 }
 
@@ -141,5 +151,10 @@ export function orderInput(draft: OrderDraft, parse: ParseAmount, placed: boolea
       amountCents: parse(line.amount),
       closesLine: line.closes,
     })),
+    // A whole number of days; anything else is refused by core.
+    paymentDays: draft.paymentDays.trim() === "" ? null : /^\d+$/.test(draft.paymentDays.trim()) ? Number(draft.paymentDays.trim()) : NaN,
+    // A % in hundredths is basis points.
+    retentionBp: draft.retention.trim() === "" ? 0 : parse(draft.retention),
+    vatKind: draft.vatKind || null,
   };
 }

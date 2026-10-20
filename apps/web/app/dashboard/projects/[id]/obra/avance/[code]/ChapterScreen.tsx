@@ -22,7 +22,7 @@ import { obraHref, StageEyebrow } from "../../../components/construction/ObraFra
 import LateDeliveriesBanner from "../../../components/construction/LateDeliveriesBanner";
 import { ChapterStatePill } from "../../../components/construction/pills";
 import ChapterOrders from "../../../components/purchasing/ChapterOrders";
-import { newOrderHref, orderHref, purchasesHref } from "../../../components/purchasing/links";
+import { newOrderHref, orderHref, ordersViewHref } from "../../../components/purchasing/links";
 import { completesMilestone } from "../../../components/construction/schedule";
 import { SchedulePill } from "../../../components/construction/SummaryTable";
 import ChapterProgress, { type ProgressRequest } from "../../ChapterProgress";
@@ -154,7 +154,7 @@ export default function ChapterScreen({
       <ChapterOrders
         orders={detail.orders}
         orderHref={(order) => orderHref(projectId, order.id)}
-        purchasesHref={purchasesHref(projectId)}
+        purchasesHref={ordersViewHref(projectId)}
         newOrderHref={canManage ? newOrderHref(projectId, chapter.code) : undefined}
       />
 

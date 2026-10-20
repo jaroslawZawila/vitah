@@ -6,6 +6,7 @@ import { DEFAULT_LOCALE } from "../../i18n/locale";
 import { NavigationTracker } from "./components/BackLink";
 import Sidebar from "./components/Sidebar";
 import Topbar from "./components/Topbar";
+import { getPurchasingCounts } from "../actions/purchase-invoices";
 import { getSubcontractorCounts } from "../actions/subcontractors";
 import { setLanguageAction } from "../actions/users";
 
@@ -18,10 +19,12 @@ export default async function DashboardLayout({
   if (!session?.user) redirect("/");
   const locale = await getLocale();
   // Only badges: a failure here (e.g. its tables not yet migrated) must not take the portal down.
-  const subcontractors = await getSubcontractorCounts().catch((error: unknown) => {
-    console.error(error);
-    return null;
-  });
+  const badges = <T,>(load: Promise<T>) =>
+    load.catch((error: unknown) => {
+      console.error(error);
+      return null;
+    });
+  const [subcontractors, purchases] = await Promise.all([badges(getSubcontractorCounts()), badges(getPurchasingCounts())]);
 
   return (
     <div className="min-h-svh lg:grid lg:grid-cols-[236px_minmax(0,1fr)]">
@@ -31,6 +34,7 @@ export default async function DashboardLayout({
         email={session.user.email ?? null}
         isAdmin={session.user.role === "admin"}
         subcontractors={subcontractors}
+        purchases={purchases}
         language={isAppLanguage(locale) ? locale : DEFAULT_LOCALE}
         onLanguageChange={setLanguageAction}
       />

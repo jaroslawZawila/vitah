@@ -9,6 +9,7 @@
     "./obra-calc": "./src/obra-calc.ts",
     "./control-calc": "./src/control-calc.ts",
     "./planning-calc": "./src/planning-calc.ts",
+    "./purchase-calc": "./src/purchase-calc.ts",
     "./projects": "./src/projects.ts",
     "./users": "./src/users.ts",
     "./storage": "./src/storage.ts",

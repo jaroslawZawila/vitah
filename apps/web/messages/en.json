@@ -44,6 +44,13 @@
       "label": "Language",
       "es": "Spanish",
       "en": "English"
+    },
+    "purchaseTabs": {
+      "label": "Purchasing sections",
+      "orders": "Orders",
+      "invoices": "Invoices",
+      "payments": "Payments",
+      "dueCount": "{count, plural, one {# invoice overdue or due soon} other {# invoices overdue or due soon}}"
     }
   },
   "topbar": {
@@ -1494,7 +1501,7 @@
       "coverHint": "The table on the first page of the PDF",
       "coverFields": {
         "promoter": "Developer",
-        "site": "Site",
+        "site": "Project",
         "cadastral": "Cadastral reference and plot",
         "surfaces": "Floor areas",
         "program": "Programme",
@@ -1759,7 +1766,7 @@
       "factsPending": "It will appear once it has finished reading the project.",
       "factLabels": {
         "promoter": "Developer",
-        "site": "Site",
+        "site": "Project",
         "architect": "Architect",
         "typology": "Typology",
         "surfaces": "Floor areas",
@@ -2029,7 +2036,7 @@
     "accessRules": {
       "company": {
         "title": "Company cleared",
-        "detail": "All its mandatory documents validated and in date; on the site, its H&S Plan adherence and subcontracting book entry."
+        "detail": "All its mandatory documents validated and in date; on the project, its H&S Plan adherence and subcontracting book entry."
       },
       "social_security": {
         "title": "Social Security registration",
@@ -2234,7 +2241,7 @@
         "search": "Search company or CIF",
         "trade": "Trade",
         "allTrades": "All trades",
-        "project": "Site",
+        "project": "Project",
         "allProjects": "All sites"
       },
       "table": {
@@ -2336,10 +2343,10 @@
       },
       "obras": {
         "title": "Sites",
-        "empty": "Not assigned to any site.",
+        "empty": "Not assigned to any project.",
         "assignTitle": "Assign to a site",
         "editTitle": "Edit the assignment to {ref}",
-        "project": "Site",
+        "project": "Project",
         "chooseProject": "Choose a site",
         "chapters": "Chapters it will carry out",
         "noChapters": "No chapters",
@@ -2372,7 +2379,7 @@
       },
       "orders": {
         "title": "Orders",
-        "empty": "It has no orders on any site yet."
+        "empty": "It has no orders on any project yet."
       }
     },
     "fields": {
@@ -2488,7 +2495,7 @@
       },
       "obra": {
         "intro": "Optional: it can be assigned later from its record.",
-        "project": "Site",
+        "project": "Project",
         "noProject": "Not assigned yet",
         "chapters": "Chapters it will carry out",
         "dates": "Planned dates",
@@ -2549,7 +2556,7 @@
       "check": {
         "title": "Check access",
         "query": "DNI, NIE or TPC number",
-        "project": "Site",
+        "project": "Project",
         "anyProject": "Any site",
         "submit": "Check",
         "checking": "Checking…",
@@ -2569,7 +2576,7 @@
       "search": "Search name or company",
       "company": "Company",
       "allCompanies": "All companies",
-      "project": "Site",
+      "project": "Project",
       "allProjects": "All sites",
       "empty": "No workers match these filters.",
       "noTpc": "No TPC",
@@ -2693,7 +2700,8 @@
       "all": "All",
       "chapterFilter": "Chapter",
       "lateOnly": "Late only",
-      "noMatch": "No orders match these filters."
+      "noMatch": "No orders match these filters.",
+      "invoiced": "Invoiced"
     },
     "kpis": {
       "label": "Purchasing summary",
@@ -2806,8 +2814,15 @@
         "remove": "Remove",
         "notes": "Notes",
         "createdBy": "Created by",
-        "change": "Change"
-      }
+        "change": "Change",
+        "paymentTerms": "Payment terms",
+        "paymentDays": "{days, plural, one {# day} other {# days}} from the invoice",
+        "retention": "Retention",
+        "retentionValue": "{pct} guarantee",
+        "noRetention": "No retention",
+        "vat": "VAT"
+      },
+      "registerInvoice": "Record invoice"
     },
     "history": {
       "title": "History",
@@ -2822,7 +2837,15 @@
         "expectedOn": "Expected delivery",
         "workStart": "Works from",
         "workEnd": "Works until",
-        "kind": "Type"
+        "kind": "Type",
+        "paymentDays": "Days to pay",
+        "retentionBp": "Retention",
+        "vatKind": "VAT",
+        "number": "Number",
+        "issuedOn": "Date",
+        "dueOn": "Due date",
+        "baseCents": "Base",
+        "irpfBp": "IRPF"
       },
       "changed": {
         "subcontractorId": "Supplier changed",
@@ -2834,7 +2857,15 @@
       "lineCloses": "{code} now closes the line",
       "lineReopens": "{code} no longer closes the line",
       "fileAdded": "Document added: {name}",
-      "fileRemoved": "Document removed: {name}"
+      "fileRemoved": "Document removed: {name}",
+      "invoiceCreated": "Invoice {number} recorded, {amount} €",
+      "creditCreated": "Credit note {number} recorded, {amount} €",
+      "invoiceUpdated": "{number} changed",
+      "invoiceDeleted": "{number} deleted",
+      "invoiceFileAdded": "New PDF version of {number} (v{version})",
+      "paymentAdded": "Payment of {amount} € on {number}",
+      "paymentDeleted": "Payment of {amount} € on {number} removed",
+      "milestones": "{count, plural, =0 {Payment milestones removed} one {Payment milestones: # milestone} other {Payment milestones: # milestones}}"
     },
     "form": {
       "numbered": "{ref} · will be numbered {number}",
@@ -2891,7 +2922,7 @@
       "closesNo": "No, another part is missing",
       "open": "open",
       "closesNote": "Untick “Closes the line” if another part is still to contract (e.g. the material or the fitting). While it stays open, the line shows what is contracted so far but no deviation.",
-      "documentTitle": "4 · Document",
+      "documentTitle": "5 · Document",
       "optional": "(optional)",
       "documentHint": "The order or the signed contract (PDF, up to 4 MB)",
       "chooseFile": "Choose file",
@@ -2909,7 +2940,15 @@
       "saving": "Saving…",
       "uploadFailed": "{number} was saved, but its document wasn't uploaded:",
       "goToOrder": "Go to the order",
-      "noBudget": "This project has no accepted budget yet: there are no lines to order."
+      "noBudget": "This project has no accepted budget yet: there are no lines to order.",
+      "termsTitle": "4 · Payment terms",
+      "termsHint": "What its invoices will suggest; each invoice can change it.",
+      "paymentDays": "Days to pay",
+      "paymentDaysHint": "From the invoice date; empty = 30",
+      "retention": "Guarantee retention (%)",
+      "retentionHint": "Taken off each payment until the guarantee ends",
+      "vatKind": "Its invoices' VAT",
+      "vatDefault": "By type ({vat})"
     },
     "chapter": {
       "title": "Orders",
@@ -2918,8 +2957,8 @@
       "empty": "No order has lines in this chapter."
     },
     "company": {
-      "eyebrow": "All projects",
-      "title": "Purchasing",
+      "eyebrow": "Purchasing · all projects",
+      "title": "Orders",
       "description": "Every order and subcontract of the company, across all projects. Orders are created from the project.",
       "export": "Export CSV",
       "ordersLabel": "Orders",
@@ -2986,7 +3025,374 @@
       "no_budget": "There is no accepted budget yet.",
       "missing_file": "Choose a PDF file.",
       "invalid_file_type": "The file isn't a valid PDF.",
-      "file_too_large": "The file is over the 4 MB limit."
+      "file_too_large": "The file is over the 4 MB limit.",
+      "has_invoices": "There are invoices: the order keeps its supplier, its invoiced line items and its status, and an invoiced milestone its amount.",
+      "has_payments": "The invoice has payments: its amounts can't change and it can't be deleted.",
+      "duplicate_number": "That supplier already has an invoice with that number.",
+      "milestones_mismatch": "The milestones must add up to the order's amount.",
+      "exceeds_amount": "The amount is more than what is left to pay or to credit."
+    },
+    "views": {
+      "label": "View",
+      "lines": "Line items",
+      "orders": "Orders"
+    },
+    "progress": {
+      "to_contract": "To contract",
+      "contracted": "Contracted",
+      "invoiced": "Invoiced",
+      "paid": "Paid"
+    },
+    "invoiceState": {
+      "pending": "To pay",
+      "partial": "Part paid",
+      "overdue": "Overdue",
+      "paid": "Paid",
+      "credit": "Credit note"
+    },
+    "vat": {
+      "vat21": "21 %",
+      "vat10": "10 %",
+      "reverse_charge": "Reverse charge",
+      "exempt": "Exempt"
+    },
+    "vatHint": {
+      "vat21": "Standard VAT: added to the base and paid to the supplier.",
+      "vat10": "Reduced rate (e.g. refurbishing a home).",
+      "reverse_charge": "The supplier invoices without VAT and we declare it (art. 84 LIVA): usual for a building subcontract.",
+      "exempt": "No VAT: exempt."
+    },
+    "method": {
+      "transfer": "Bank transfer",
+      "confirming": "Confirming",
+      "promissory_note": "Promissory note",
+      "direct_debit": "Direct debit"
+    },
+    "dueIn": "{days, plural, =0 {today} one {in # day} other {in # days}}",
+    "overdueFor": "{days, plural, one {# day ago} other {# days ago}}",
+    "lines": {
+      "description": "What is contracted, invoiced and paid of each line item, against the accepted budget's cost. Amounts without VAT.",
+      "tableTitle": "Budget line items",
+      "tableHint": "Open a line item to see its orders, milestones, invoices and payments",
+      "filter": "Status",
+      "all": "All",
+      "chapter": "Chapter",
+      "allChapters": "All",
+      "line": "Line item",
+      "cost": "Budgeted cost",
+      "contracted": "Contracted",
+      "deviation": "Deviation",
+      "state": "Status",
+      "toContract": "To contract {amount}",
+      "chapterSummary": "{contracted} of {total} contracted",
+      "noOrders": "No orders.",
+      "orderBy": "By the plan, it must be ordered before {date}.",
+      "createOrder": "Create order",
+      "noInvoices": "No invoices yet",
+      "toInvoice": "To invoice",
+      "payPaid": "Paid",
+      "payPartial": "{paid} paid · {left} left, due {date}",
+      "payPending": "Due on {date}",
+      "payOverdue": "Overdue since {date}",
+      "milestonePaid": "Paid",
+      "foot": {
+        "invoiced": "Invoiced",
+        "paid": "Paid",
+        "outstanding": "To pay",
+        "retained": "Retained",
+        "toInvoice": "To invoice"
+      },
+      "total": "Total · {count, plural, one {# line item} other {# line items}}",
+      "closedNote": "{count, plural, =0 {no line item closed} one {on # closed line item} other {on # closed line items}}",
+      "none": "This project has no accepted budget yet: there are no line items.",
+      "noMatch": "No line item matches these filters.",
+      "footnote": "Each line item's status: <b>To contract</b> (no firm order) · <b>Contracted</b> (an order or contract, no invoice) · <b>Invoiced</b> (there are invoices and something is left to pay or to invoice) · <b>Paid</b> (everything contracted is invoiced and paid; the guarantee retention doesn't count until it is due). Invoices and payments are recorded once, in Purchasing › Invoices; here they are only shown.",
+      "kpis": {
+        "label": "Purchasing summary",
+        "contracted": "Contracted",
+        "contractedHint": "{pct} of the {cost} cost · {left} left to contract",
+        "invoiced": "Invoiced",
+        "invoicedHint": "{pct} of what is contracted · {count, plural, one {# invoice} other {# invoices}}",
+        "creditNotes": "{count, plural, one {# credit note} other {# credit notes}}",
+        "paid": "Paid",
+        "paidHint": "To pay {outstanding} · retained {retained}",
+        "overdueHint": "Overdue {amount}"
+      },
+      "due": {
+        "title": "{count, plural, one {# invoice overdue or due in the next 7 days.} other {# invoices overdue or due in the next 7 days.}}",
+        "item": "{number} from {supplier} ({amount})",
+        "overdue": "was due on {date}",
+        "dueOn": "due on {date}",
+        "byAdmin": "Administration pays them.",
+        "link": "See due dates"
+      },
+      "payLeft": "{paid} paid · {left} left"
+    },
+    "milestones": {
+      "title": "Contract payment milestones",
+      "hint": "The invoicing schedule agreed with the supplier. It splits the order's amount; it adds nothing to the budget. Each invoice goes to one milestone.",
+      "none": "No milestones: invoices are recorded freely against the order.",
+      "define": "Set milestones",
+      "edit": "Edit milestones",
+      "save": "Save milestones",
+      "cancel": "Cancel",
+      "saving": "Saving…",
+      "concept": "Milestone",
+      "pct": "%",
+      "amount": "Amount",
+      "state": "Status",
+      "invoice": "Invoice",
+      "payment": "Payment",
+      "total": "Total",
+      "matches": "✓ Matches the order",
+      "gap": "The milestones add up to {sum} and the order is {total}: make them match the order.",
+      "conceptOf": "Milestone {n} name",
+      "amountOf": "Milestone {n} amount",
+      "removeOf": "Remove milestone {n}",
+      "remove": "Remove",
+      "add": "+ Add milestone",
+      "locked": "Invoiced",
+      "editHint": "Invoiced milestones can't change. They must add up to the order's amount ({total}). Without milestones, invoices are recorded freely.",
+      "noInvoice": "No invoice"
+    },
+    "orderInvoices": {
+      "title": "The order's invoices",
+      "register": "+ Record invoice",
+      "none": "No invoices for this order yet.",
+      "number": "Invoice",
+      "milestone": "Milestone",
+      "issuedOn": "Date",
+      "dueOn": "Due",
+      "base": "Base",
+      "payable": "To pay",
+      "paid": "Paid",
+      "state": "Status",
+      "note": "Each invoice's amounts; \"To pay\" takes off the guarantee retention. The summary is without VAT."
+    },
+    "invoices": {
+      "eyebrow": "Purchasing · all projects",
+      "title": "Invoices",
+      "description": "Suppliers' invoices from every project. What is recorded here shows on the project and its line item.",
+      "new": "Record invoice",
+      "kpis": {
+        "label": "Invoices summary",
+        "outstanding": "To pay",
+        "outstandingHint": "{count, plural, one {# invoice} other {# invoices}} from {suppliers, plural, one {# supplier} other {# suppliers}}",
+        "overdue": "Overdue",
+        "dueSoon": "Due in 7 days",
+        "countHint": "{count, plural, =0 {No invoices} one {# invoice} other {# invoices}}",
+        "paidMonth": "Paid this month",
+        "paidMonthHint": "{count, plural, =0 {No payments} one {# payment} other {# payments}}"
+      },
+      "tableTitle": "Invoices received",
+      "groups": {
+        "label": "Status",
+        "all": "All",
+        "open": "To pay",
+        "overdue": "Overdue",
+        "paid": "Paid",
+        "credit": "Credit notes"
+      },
+      "project": "Project",
+      "allProjects": "All",
+      "supplier": "Supplier",
+      "allSuppliers": "All",
+      "search": "No., supplier or description",
+      "cols": {
+        "dueOn": "Due",
+        "number": "Invoice",
+        "supplier": "Supplier",
+        "order": "Project · order",
+        "base": "Base",
+        "payable": "To pay",
+        "outstanding": "Outstanding",
+        "state": "Status"
+      },
+      "rectifies": "corrects {number}",
+      "paidOn": "paid",
+      "none": "No invoices recorded yet.",
+      "noMatch": "No invoice matches these filters."
+    },
+    "payments": {
+      "eyebrow": "Purchasing · all projects",
+      "title": "Payments",
+      "description": "What falls due each week, and the company's recorded payments.",
+      "forecastTitle": "Payment forecast · next 30 days",
+      "forecastHint": "What is still owed on each invoice, by week of its due date",
+      "overdue": "Overdue",
+      "nothing": "Nothing",
+      "listTitle": "Recorded payments",
+      "cols": {
+        "paidOn": "Date",
+        "supplier": "Supplier",
+        "invoice": "Invoice",
+        "amount": "Amount",
+        "method": "Method",
+        "reference": "Reference",
+        "proof": "Proof",
+        "by": "Recorded by"
+      },
+      "month": "This month: {amount} in {count, plural, one {# payment} other {# payments}}",
+      "none": "No payments recorded yet."
+    },
+    "invoice": {
+      "eyebrow": "Invoice received · {ref}",
+      "creditEyebrow": "Credit note · {ref}",
+      "pay": "Record payment",
+      "credit": "Record credit note",
+      "edit": "Edit",
+      "delete": "Delete",
+      "confirmDelete": "Delete {number}? Its PDFs go too.",
+      "banner": {
+        "dueIn": "Due on {date}, {in}.",
+        "overdue": "Was due on {date}, {ago}.",
+        "owed": "{left} left to pay of {payable}.",
+        "paid": "Invoice paid.",
+        "inFavour": "Balance in our favour: {amount}.",
+        "retained": "{amount} still retained until the guarantee ends.",
+        "credit": "Credit note on {number}: takes {amount} off what is owed."
+      },
+      "amounts": {
+        "title": "Amounts",
+        "base": "Taxable base",
+        "vat": "VAT ({kind})",
+        "irpf": "IRPF withheld {pct}",
+        "total": "Invoice total",
+        "retention": "Guarantee retention {pct}",
+        "payable": "To pay",
+        "credits": "Credit notes",
+        "paid": "Paid",
+        "outstanding": "Outstanding",
+        "inFavour": "In our favour"
+      },
+      "data": {
+        "title": "Details",
+        "issuedOn": "Date",
+        "dueOn": "Due",
+        "project": "Project",
+        "order": "Order",
+        "milestone": "Milestone",
+        "rectifies": "Corrects",
+        "lines": "Line items",
+        "notes": "Notes",
+        "createdBy": "Recorded"
+      },
+      "credits": {
+        "title": "Credit notes"
+      },
+      "payments": {
+        "title": "Payments",
+        "none": "No payments yet.",
+        "remove": "Remove",
+        "removeOf": "Remove the payment of {date}",
+        "confirmRemove": "Remove the payment of {amount}?"
+      },
+      "payForm": {
+        "title": "Record payment",
+        "hint": "The day the money went out: it can be before today, never after. Part payments are fine.",
+        "paidOn": "Date",
+        "amount": "Amount (€)",
+        "amountHint": "What is outstanding; change it for a part payment",
+        "retentionHint": "What is left is the retention: pay it once released",
+        "method": "Payment method",
+        "reference": "Reference (optional)",
+        "referencePlaceholder": "Transaction no.",
+        "proof": "Proof of payment (PDF, optional)",
+        "chooseFile": "Choose file",
+        "removeFile": "Remove {name}",
+        "cancel": "Cancel",
+        "confirm": "Record payment of {amount}",
+        "saving": "Saving…"
+      },
+      "files": {
+        "title": "Documents",
+        "none": "No PDF yet.",
+        "newVersion": "+ New version",
+        "upload": "+ Upload PDF",
+        "current": "v{version} · current",
+        "version": "v{version}",
+        "replaced": "replaced",
+        "note": "Reason (optional)",
+        "notePlaceholder": "The order number was missing…",
+        "file": "PDF",
+        "chooseFile": "Choose file",
+        "removeFile": "Remove {name}",
+        "save": "Upload version",
+        "cancel": "Cancel",
+        "keepAll": "No version is ever deleted; proofs of payment are on each payment."
+      }
+    },
+    "invoiceForm": {
+      "newTitle": "Record invoice",
+      "newCreditTitle": "Record credit note",
+      "editTitle": "Edit invoice",
+      "editCreditTitle": "Edit credit note",
+      "intro": "Recorded once, here. The project, the order and the line item see it at once, without uploading it again.",
+      "label": "Invoice details",
+      "kind": "Document type",
+      "kinds": {
+        "invoice": "Invoice",
+        "credit_note": "Credit note"
+      },
+      "orderTitle": "1 · Supplier and order",
+      "supplier": "Supplier",
+      "chooseSupplier": "Choose a supplier",
+      "order": "Project and order",
+      "chooseOrder": "Choose an order",
+      "orderHint": "Only this supplier's firm orders, from any project",
+      "noOrders": "There are no firm orders to invoice.",
+      "number": "Supplier's invoice no.",
+      "creditNumber": "Supplier's credit note no.",
+      "issuedOn": "Date",
+      "dueOn": "Due",
+      "dueOnHint": "{days, plural, one {# day} other {# days}}, as the order says",
+      "rectifies": "Corrects",
+      "chooseInvoice": "Choose an invoice",
+      "rectifiesHint": "The credit note takes off that invoice and its milestone; if it was already paid, the balance is in our favour",
+      "noInvoices": "This order has no invoices to credit yet.",
+      "milestoneTitle": "{n} · Contract milestone",
+      "milestoneHint": "The order has {count, plural, one {# payment milestone} other {# payment milestones}}. The invoice goes to one; its amount suggests the base.",
+      "milestones": "Milestone",
+      "milestoneInvoiced": "invoiced in {numbers}",
+      "milestoneLeft": "to invoice",
+      "amountsTitle": "{n} · Amounts",
+      "base": "Taxable base (€)",
+      "baseCredit": "Amount credited, without VAT (€)",
+      "baseHint": "Without VAT: this is what is compared with the cost",
+      "retention": "Guarantee retention (%)",
+      "retentionHint": "From the order; paid when the guarantee ends",
+      "irpf": "IRPF withheld (%)",
+      "irpfHint": "Self-employed only",
+      "vat": "VAT",
+      "splitTitle": "{n} · Split by line item",
+      "splitHint": "Suggested in proportion to what the order contracts of each line item. Only change it if the invoice says otherwise.",
+      "line": "Line item",
+      "contracted": "Contracted",
+      "invoiced": "Already invoiced",
+      "thisInvoice": "This invoice",
+      "amountOf": "{code} amount on this invoice",
+      "resplit": "Split in proportion",
+      "splitMismatch": "The split adds up to {sum} and the base is {base}.",
+      "documentTitle": "{n} · Document",
+      "optional": "(optional)",
+      "documentHint": "The invoice as a PDF, up to 4 MB",
+      "chooseFile": "Choose file",
+      "removeFile": "Remove {name}",
+      "notes": "Notes (optional)",
+      "summary": "Summary",
+      "progress": "Invoiced after this one",
+      "progressOf": "{amount} of {total}",
+      "complete": "✓ Nothing left to invoice on the order.",
+      "over": "Goes {amount} over what is contracted: it will show as a deviation once the line item is closed.",
+      "left": "{amount} will be left to invoice.",
+      "dueNote": "Due on {date}.",
+      "creditNote": "Takes off what is owed on {number}.",
+      "save": "Record invoice",
+      "saveCredit": "Record credit note",
+      "saveChanges": "Save changes",
+      "cancel": "Cancel",
+      "saving": "Saving…",
+      "paidLocked": "It has payments: only its number, dates and notes can change."
     }
   }
 }
