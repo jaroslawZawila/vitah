@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import { describe, expect, it, vi } from "vitest";
 import messages from "../../../messages/es.json";
@@ -21,7 +21,7 @@ function renderAt(
   purchases: PurchasingCounts | null = null,
 ) {
   navigation.pathname = pathname;
-  navigation.params = /^\/dashboard\/projects\/(?!new$)[^/]+/.test(pathname)
+  navigation.params = /^\/dashboard\/projects\/(?!new$|compras$)[^/]+/.test(pathname)
     ? { id: pathname.split("/")[3] }
     : {};
   return render(
@@ -86,6 +86,16 @@ describe("Sidebar", () => {
       ["Documentos", "/dashboard/projects/p-1/documents"],
     ]);
     expect(tabs.getByRole("link", { current: "page" })).toHaveTextContent(current);
+  });
+
+  it("offers Proyectos › Compras before an obra is chosen, and the obra's own tabs once it is", () => {
+    renderAt("/dashboard/projects/compras");
+    const sections = within(screen.getByRole("list", { name: "Secciones de proyectos" }));
+    expect(sections.getByRole("link", { name: "Compras de obra" })).toHaveAttribute("href", "/dashboard/projects/compras");
+    expect(sections.getByRole("link", { name: "Compras de obra" })).toHaveAttribute("aria-current", "page");
+    cleanup();
+    renderAt("/dashboard/projects/p-1/compras");
+    expect(screen.queryByRole("list", { name: "Secciones de proyectos" })).not.toBeInTheDocument();
   });
 
   it("has the company-wide Compras in the Red group for every staff member", () => {

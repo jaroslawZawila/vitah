@@ -53,6 +53,10 @@
       "dueCount": "{count, plural, one {# invoice overdue or due soon} other {# invoices overdue or due soon}}",
       "requests": "Requests",
       "suppliers": "Suppliers"
+    },
+    "projectSections": {
+      "label": "Project sections",
+      "purchases": "Site purchasing"
     }
   },
   "topbar": {
@@ -3658,5 +3662,23 @@
         "linesTitle": "2 · The order’s lines"
       }
     }
+  },
+  "obraPicker": {
+    "label": "Site",
+    "search": "Find a site by code, client or address",
+    "placeholder": "Change site: code, client or address",
+    "results": "Sites",
+    "noMatch": "No site matches.",
+    "current": "current site",
+    "count": "{count, plural, =0 {No site} one {# site} other {# sites}}"
+  },
+  "obraPurchases": {
+    "eyebrow": "Projects",
+    "title": "Purchasing",
+    "description": "Pick the site by its code, the client’s name or the address to see its purchasing: lines, requests and orders.",
+    "search": "Code, client or address",
+    "list": "Sites",
+    "none": "No sites yet.",
+    "noMatch": "No site matches."
   }
 }

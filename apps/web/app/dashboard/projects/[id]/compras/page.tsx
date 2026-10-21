@@ -1,7 +1,10 @@
 import { redirect } from "next/navigation";
+import { getProjects } from "../../../../actions/projects";
 import { getRequests } from "../../../../actions/purchase-requests";
 import { getProjectPurchaseLines, getProjectPurchases } from "../../../../actions/purchasing";
+import { toObraOptions } from "../../components/obra-options";
 import { loadHeader } from "../obra/load";
+import ComprasObraBar from "./ComprasObraBar";
 import PurchaseLinesScreen from "./PurchaseLinesScreen";
 import PurchasesScreen from "./PurchasesScreen";
 import RequestsScreen from "./RequestsScreen";
@@ -19,6 +22,18 @@ export default async function ProjectPurchasesPage({
   searchParams: Promise<{ vista?: string }>;
 }) {
   const [{ id }, { vista }] = await Promise.all([params, searchParams]);
+  // The obra picker on top (Proyectos › Compras): another obra opens on the same view.
+  const [options, view] = await Promise.all([getProjects().then(toObraOptions), purchasesView(id, vista)]);
+  return (
+    <>
+      <ComprasObraBar projectId={id} options={options} vista={vista} />
+      {view}
+    </>
+  );
+}
+
+/** The view asked for: by line (default), the requests or the orders. */
+async function purchasesView(id: string, vista: string | undefined) {
   const header = loadHeader(id);
   if (vista === "solicitudes") {
     const [{ ref, stage, openIssues }, result] = await Promise.all([header, getRequests(id)]);

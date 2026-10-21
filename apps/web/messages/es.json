@@ -53,6 +53,10 @@
       "dueCount": "{count, plural, one {# factura vencida o por vencer} other {# facturas vencidas o por vencer}}",
       "requests": "Solicitudes",
       "suppliers": "Proveedores"
+    },
+    "projectSections": {
+      "label": "Secciones de proyectos",
+      "purchases": "Compras de obra"
     }
   },
   "topbar": {
@@ -3658,5 +3662,23 @@
         "linesTitle": "2 · Partidas del pedido"
       }
     }
+  },
+  "obraPicker": {
+    "label": "Obra",
+    "search": "Buscar obra por código, cliente o dirección",
+    "placeholder": "Cambiar de obra: código, cliente o dirección",
+    "results": "Obras",
+    "noMatch": "Ninguna obra coincide.",
+    "current": "obra actual",
+    "count": "{count, plural, =0 {Ninguna obra} one {# obra} other {# obras}}"
+  },
+  "obraPurchases": {
+    "eyebrow": "Proyectos",
+    "title": "Compras",
+    "description": "Elige la obra por su código, el nombre del cliente o la dirección para ver sus compras: partidas, solicitudes y pedidos.",
+    "search": "Código, cliente o dirección",
+    "list": "Obras",
+    "none": "Todavía no hay obras.",
+    "noMatch": "Ninguna obra coincide."
   }
 }

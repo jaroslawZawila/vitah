@@ -280,6 +280,10 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
 - The obra's Compras by budget line (`getProjectPurchaseLines`) gives each line one of four states
   (`PURCHASE_PROGRESS`): to_contract → contracted → invoiced → paid (closed, all invoiced, nothing owed; retention
   aside), with its orders, their milestones and invoices; money there is without VAT (`settle`'s `base`)
+- Proyectos › Compras as the doc has it: the rail's Proyectos offers "Compras de obra" (`dashboard/projects/compras`,
+  every obra filtered by code, client or address); the project's Compras list views open with the same picker at the
+  top (`compras/page.tsx` › `ComprasObraBar`, `projects/components/ObraPicker` + `obra-options.ts`), and choosing
+  another obra keeps the view (`?vista=`). Its data is the project list (`GET /api/v1/projects`)
 - Portal: the project tab opens by budget line (`compras`, `PurchaseLinesScreen`; `?vista=solicitudes` the requests,
   `?vista=pedidos` the orders list); a request's page `compras/solicitudes/[requestId]` (+ `editar`, `solicitudes/nueva`)
   decides it and opens the order form on it (`nuevo?solicitud=`); an order's page shows its milestones (editable) and
