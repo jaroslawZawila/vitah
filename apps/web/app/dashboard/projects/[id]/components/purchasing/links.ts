@@ -42,6 +42,11 @@ export const INVOICES_HREF = `${COMPANY_PURCHASES_HREF}/facturas`;
 /** Compras › Pagos: what falls due, and the payments made. */
 export const PAYMENTS_HREF = `${COMPANY_PURCHASES_HREF}/pagos`;
 
+/** Compras › Proveedores: every company as a supplier, and one's purchasing. */
+export const SUPPLIERS_HREF = `${COMPANY_PURCHASES_HREF}/proveedores`;
+
+export const supplierHref = (subcontractorId: string) => `${SUPPLIERS_HREF}/${subcontractorId}`;
+
 export const invoiceHref = (invoiceId: string) => `${INVOICES_HREF}/${invoiceId}`;
 
 export const editInvoiceHref = (invoiceId: string) => `${invoiceHref(invoiceId)}/editar`;

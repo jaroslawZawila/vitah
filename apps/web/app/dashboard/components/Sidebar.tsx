@@ -16,7 +16,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-import { COMPANY_PURCHASES_HREF, INVOICES_HREF, PAYMENTS_HREF, REQUESTS_HREF } from "../projects/[id]/components/purchasing/links";
+import {
+  COMPANY_PURCHASES_HREF,
+  INVOICES_HREF,
+  PAYMENTS_HREF,
+  REQUESTS_HREF,
+  SUPPLIERS_HREF,
+} from "../projects/[id]/components/purchasing/links";
 
 const NAV_ITEMS = [
   { key: "projects", href: "/dashboard/projects", icon: FolderKanban, adminOnly: false },
@@ -49,6 +55,7 @@ const PURCHASE_TABS = [
   { key: "orders", href: COMPANY_PURCHASES_HREF },
   { key: "invoices", href: INVOICES_HREF },
   { key: "payments", href: PAYMENTS_HREF },
+  { key: "suppliers", href: SUPPLIERS_HREF },
 ] as const;
 
 const navLinkClass = (active: boolean) =>

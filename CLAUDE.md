@@ -263,13 +263,18 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
   only while pending. `createPurchase({ requestId })` makes the order from an approved one in the same transaction and
   links them (`purchase_requests.order_id`, once only; cancelling that order approves the request again, unlinked); orders can still be made without one. A request contracts
   nothing. Every change goes to `purchase_request_events`
+- Suppliers (Compras › Proveedores, `packages/core/src/purchase-suppliers.ts`, `purchaseSuppliersService`): every
+  Subcontratas company as a supplier, read-only: its orders across the obras, contracted, invoiced and paid (without VAT,
+  as compared with the cost), owed and past due (with VAT: what Administration pays), retention held, those owed first. Data and CAE stay on its Subcontratas ficha.
+  Portal `dashboard/compras/proveedores/` (+ `[id]`: its orders, invoices and payments); API `/api/v1/purchases/suppliers`
+  (GET) and `…/suppliers/:subcontractorId` (GET)
 - The obra's Compras by budget line (`getProjectPurchaseLines`) gives each line one of four states
   (`PURCHASE_PROGRESS`): to_contract → contracted → invoiced → paid (closed, all invoiced, nothing owed; retention
   aside), with its orders, their milestones and invoices; money there is without VAT (`settle`'s `base`)
 - Portal: the project tab opens by budget line (`compras`, `PurchaseLinesScreen`; `?vista=solicitudes` the requests,
   `?vista=pedidos` the orders list); a request's page `compras/solicitudes/[requestId]` (+ `editar`, `solicitudes/nueva`)
   decides it and opens the order form on it (`nuevo?solicitud=`); an order's page shows its milestones (editable) and
-  invoices. The rail's Compras has Solicitudes (with those to approve) · Pedidos · Facturas · Pagos
+  invoices. The rail's Compras has Solicitudes (with those to approve) · Pedidos · Facturas · Pagos · Proveedores
   (`dashboard/compras/`, `solicitudes/`, `facturas/` list, `facturas/nueva` form with `?pedido=` and `?abono=` for a credit note,
   `facturas/[invoiceId]` + `editar`, `pagos/` forecast and payments) with a badge for invoices due within a week.
   Actions `app/actions/purchase-invoices.ts`; API `/api/v1/purchases/invoices` (GET), `/api/v1/purchases/:orderId/invoices`

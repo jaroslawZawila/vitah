@@ -51,7 +51,8 @@
       "invoices": "Facturas",
       "payments": "Pagos",
       "dueCount": "{count, plural, one {# factura vencida o por vencer} other {# facturas vencidas o por vencer}}",
-      "requests": "Solicitudes"
+      "requests": "Solicitudes",
+      "suppliers": "Proveedores"
     }
   },
   "topbar": {
@@ -3558,6 +3559,64 @@
       "project_not_found": "Proyecto no encontrado.",
       "no_budget": "Todavía no hay un presupuesto aceptado.",
       "request_not_approved": "La solicitud ya no está aprobada (se ha pedido o cancelado mientras tanto). Vuelve a ella para ver qué ha pasado."
+    },
+    "suppliers": {
+      "eyebrow": "Compras · todas las obras",
+      "title": "Proveedores",
+      "description": "Cada empresa de Subcontratas como proveedor: lo contratado en todas las obras, lo facturado, lo pagado y lo que se le debe. Sus datos y su CAE están en su ficha.",
+      "search": "Nombre del proveedor",
+      "none": "Todavía no hay empresas en Subcontratas.",
+      "noMatch": "Ningún proveedor con estos filtros.",
+      "footnote": "Contratado, facturado y pagado sin IVA (lo que se compara con el coste); pendiente, vencido y retenido con IVA, como en Facturas y Pagos. Un pedido pendiente o cancelado no suma.",
+      "groups": {
+        "label": "Mostrar",
+        "withOrders": "Con pedidos",
+        "owed": "Con deuda",
+        "overdue": "Con vencidas",
+        "all": "Todos"
+      },
+      "kpis": {
+        "label": "Resumen",
+        "contracted": "Contratado",
+        "active": "{count, plural, one {# proveedor con pedidos} other {# proveedores con pedidos}}",
+        "outstanding": "Pendiente de pago",
+        "outstandingHint": "Facturado y aún no pagado, con IVA",
+        "overdue": "Vencido",
+        "overdueSuppliers": "{count, plural, one {# proveedor con facturas vencidas} other {# proveedores con facturas vencidas}}",
+        "noneOverdue": "Ninguna factura vencida",
+        "retained": "Retenciones",
+        "retainedHint": "Garantías retenidas hasta su fin",
+        "invoiced": "Facturado (sin IVA)",
+        "paid": "Pagado {amount} sin IVA",
+        "orders": "{count, plural, one {# pedido} other {# pedidos}} en {projects, plural, one {# obra} other {# obras}}",
+        "overdueOf": "{amount} vencido"
+      },
+      "list": {
+        "title": "Proveedores",
+        "cards": "Proveedores",
+        "table": "Proveedores y sus compras",
+        "supplier": "Proveedor",
+        "orders": "Pedidos",
+        "contracted": "Contratado",
+        "invoiced": "Facturado",
+        "paid": "Pagado",
+        "outstanding": "Pendiente",
+        "lastOrder": "Último pedido",
+        "overdue": "{amount} vencido",
+        "ordersCount": "{count, plural, =0 {sin pedidos} one {# pedido} other {# pedidos}}",
+        "contractedShort": "Contratado {amount}",
+        "projects": "{count, plural, one {# obra} other {# obras}}"
+      },
+      "detail": {
+        "eyebrow": "Compras · proveedor",
+        "ficha": "Ficha en Subcontratas",
+        "orders": "Pedidos",
+        "noOrders": "Todavía no tiene pedidos.",
+        "invoices": "Facturas",
+        "noInvoices": "Todavía no hay facturas suyas.",
+        "payments": "Pagos",
+        "noPayments": "Todavía no se le ha pagado nada."
+      }
     }
   }
 }

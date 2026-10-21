@@ -51,7 +51,8 @@
       "invoices": "Invoices",
       "payments": "Payments",
       "dueCount": "{count, plural, one {# invoice overdue or due soon} other {# invoices overdue or due soon}}",
-      "requests": "Requests"
+      "requests": "Requests",
+      "suppliers": "Suppliers"
     }
   },
   "topbar": {
@@ -3558,6 +3559,64 @@
       "project_not_found": "Project not found.",
       "no_budget": "There is no accepted budget yet.",
       "request_not_approved": "The request is no longer approved (it was ordered or cancelled meanwhile). Go back to it to see what happened."
+    },
+    "suppliers": {
+      "eyebrow": "Purchasing · all sites",
+      "title": "Suppliers",
+      "description": "Every Subcontractors company as a supplier: what was contracted across the sites, invoiced, paid and is owed. Its details and CAE are on its profile.",
+      "search": "Supplier name",
+      "none": "There are no companies in Subcontractors yet.",
+      "noMatch": "No supplier matches these filters.",
+      "footnote": "Contracted, invoiced and paid exclude VAT (what is compared with the cost); owed, past due and retained include VAT, as in Invoices and Payments. Pending or cancelled orders don’t count.",
+      "groups": {
+        "label": "Show",
+        "withOrders": "With orders",
+        "owed": "Owed",
+        "overdue": "Past due",
+        "all": "All"
+      },
+      "kpis": {
+        "label": "Summary",
+        "contracted": "Contracted",
+        "active": "{count, plural, one {# supplier with orders} other {# suppliers with orders}}",
+        "outstanding": "Owed",
+        "outstandingHint": "Invoiced and not paid yet, VAT included",
+        "overdue": "Past due",
+        "overdueSuppliers": "{count, plural, one {# supplier with invoices past due} other {# suppliers with invoices past due}}",
+        "noneOverdue": "No invoice past due",
+        "retained": "Retentions",
+        "retainedHint": "Guarantees held back until they end",
+        "invoiced": "Invoiced (excl. VAT)",
+        "paid": "Paid {amount} excl. VAT",
+        "orders": "{count, plural, one {# order} other {# orders}} on {projects, plural, one {# site} other {# sites}}",
+        "overdueOf": "{amount} past due"
+      },
+      "list": {
+        "title": "Suppliers",
+        "cards": "Suppliers",
+        "table": "Suppliers and their purchases",
+        "supplier": "Supplier",
+        "orders": "Orders",
+        "contracted": "Contracted",
+        "invoiced": "Invoiced",
+        "paid": "Paid",
+        "outstanding": "Owed",
+        "lastOrder": "Last order",
+        "overdue": "{amount} past due",
+        "ordersCount": "{count, plural, =0 {no orders} one {# order} other {# orders}}",
+        "contractedShort": "Contracted {amount}",
+        "projects": "{count, plural, one {# site} other {# sites}}"
+      },
+      "detail": {
+        "eyebrow": "Purchasing · supplier",
+        "ficha": "Profile in Subcontractors",
+        "orders": "Orders",
+        "noOrders": "No orders yet.",
+        "invoices": "Invoices",
+        "noInvoices": "No invoices from it yet.",
+        "payments": "Payments",
+        "noPayments": "Nothing paid to it yet."
+      }
     }
   }
 }

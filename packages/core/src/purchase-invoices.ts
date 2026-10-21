@@ -118,13 +118,13 @@ async function requireInvoice(ctx: Ctx, invoiceId: string) {
 }
 
 const owed = (i: PurchaseInvoiceListItem) => isOwed(i.state);
-const sumOwed = (list: PurchaseInvoiceListItem[]) => list.reduce((sum, i) => sum + Math.max(0, i.outstandingCents), 0);
+export const sumOwed = (list: PurchaseInvoiceListItem[]) => list.reduce((sum, i) => sum + Math.max(0, i.outstandingCents), 0);
 
 /** The invoice whose payments settle `invoice`: its own, or a credit note's invoice. */
 const payerOf = (invoice: InvoiceRow) => (invoice.kind === "invoice" ? invoice.id : invoice.rectifiesId!);
 
 /** Owed first, soonest due first; then the settled ones, newest first. */
-function byUrgency(a: PurchaseInvoiceListItem, b: PurchaseInvoiceListItem) {
+export function byUrgency(a: PurchaseInvoiceListItem, b: PurchaseInvoiceListItem) {
   if (owed(a) !== owed(b)) return owed(a) ? -1 : 1;
   if (owed(a)) return (a.dueOn ?? "").localeCompare(b.dueOn ?? "");
   return b.issuedOn.localeCompare(a.issuedOn) || b.createdAt.localeCompare(a.createdAt);
@@ -208,8 +208,9 @@ export async function getPurchasingCounts(ctx: Ctx): Promise<PurchasingCounts> {
   const horizon = addDays(todayInSpain(), DUE_SOON_DAYS);
   const tenant = ctx.tenantId;
   // One round trip: the rail asks on every page.
-  const [row] = await db.execute<{ requests: number; orders: number; invoices: number; payments: number; due: number }>(sql`
+  const [row] = await db.execute<{ requests: number; orders: number; invoices: number; payments: number; suppliers: number; due: number }>(sql`
     select
+      (select count(*) from ${subcontractors} where tenant_id = ${tenant})::int as suppliers,
       (select count(*) from ${purchaseRequests} where tenant_id = ${tenant} and status = 'pending')::int as requests,
       (select count(*) from ${purchaseOrders} where tenant_id = ${tenant})::int as orders,
       (select count(*) from ${purchaseInvoices} where tenant_id = ${tenant})::int as invoices,
@@ -222,6 +223,7 @@ export async function getPurchasingCounts(ctx: Ctx): Promise<PurchasingCounts> {
     orders: row?.orders ?? 0,
     invoices: row?.invoices ?? 0,
     payments: row?.payments ?? 0,
+    suppliers: row?.suppliers ?? 0,
     dueAttention: row?.due ?? 0,
   };
 }

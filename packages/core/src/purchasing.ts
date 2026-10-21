@@ -154,7 +154,7 @@ export async function loadOrders(tenantId: string, where?: SQL, { documents = fa
 type LoadedOrder = Awaited<ReturnType<typeof loadOrders>>[number];
 
 /** `net` gives the supplier's CAE status; without it, null. */
-function toListItem(loaded: LoadedOrder, net: Network | null, today: string): PurchaseOrderListItem {
+export function toListItem(loaded: LoadedOrder, net: Network | null, today: string): PurchaseOrderListItem {
   const { order, lines } = loaded;
   return {
     id: order.id,

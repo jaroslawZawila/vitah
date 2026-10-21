@@ -539,7 +539,7 @@ describe("Administration's lists", () => {
     expect(payments.payments).toMatchObject([{ invoiceNumber: "SOC-2", amountCents: 1_210 }]);
     expect(payments.summary).toEqual({ monthCents: 1_210, monthPayments: 1 });
 
-    expect(await svc.getPurchasingCounts(s.ctx)).toEqual({ requests: 0, orders: 2, invoices: 3, payments: 1, dueAttention: 2 });
+    expect(await svc.getPurchasingCounts(s.ctx)).toEqual({ requests: 0, orders: 2, invoices: 3, payments: 1, suppliers: 2, dueAttention: 2 });
   });
 
   it("gives the invoice form the orders to invoice and the chosen one's schedule, lines and invoices", async () => {
@@ -587,7 +587,7 @@ describe("access", () => {
 
     expect((await svc.listInvoices(stranger)).invoices).toEqual([]);
     expect((await svc.listPayments(stranger)).payments).toEqual([]);
-    expect(await svc.getPurchasingCounts(stranger)).toEqual({ requests: 0, orders: 0, invoices: 0, payments: 0, dueAttention: 0 });
+    expect(await svc.getPurchasingCounts(stranger)).toEqual({ requests: 0, orders: 0, invoices: 0, payments: 0, suppliers: 0, dueAttention: 0 });
     for (const attempt of [
       () => svc.getInvoice(stranger, invoiceId),
       () => svc.openInvoiceFile(stranger, invoiceId),

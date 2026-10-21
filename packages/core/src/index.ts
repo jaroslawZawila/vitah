@@ -25,6 +25,7 @@ export * as purchasingService from "./purchasing";
 export * as purchaseInvoicesService from "./purchase-invoices";
 export * as purchaseDocumentsService from "./purchase-documents";
 export * as purchaseRequestsService from "./purchase-requests";
+export * as purchaseSuppliersService from "./purchase-suppliers";
 export * as planningService from "./planning";
 export * as changesService from "./changes";
 export * as subcontractorsService from "./subcontractors";

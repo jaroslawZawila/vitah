@@ -103,7 +103,7 @@ describe("/api/v1 supplier invoices", () => {
     expect(all.invoices.map((i: { id: string }) => i.id)).toEqual([invoiceId]);
     const payments = await (await listPayments(apiRequest(token))).json();
     expect(payments.payments).toHaveLength(2);
-    expect(await (await counts(apiRequest(token))).json()).toEqual({ requests: 0, orders: 1, invoices: 1, payments: 2, dueAttention: 0 });
+    expect(await (await counts(apiRequest(token))).json()).toEqual({ requests: 0, orders: 1, invoices: 1, payments: 2, suppliers: 1, dueAttention: 0 });
     const byLine = await (await lines(apiRequest(token), routeParams({ id: project.id }))).json();
     expect(byLine.summary).toMatchObject({ invoicedCents: 300_000, invoices: 1 });
 

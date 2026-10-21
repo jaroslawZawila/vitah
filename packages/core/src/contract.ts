@@ -1454,6 +1454,61 @@ export type TenantPayments = {
   today: string;
 };
 
+// ─── Suppliers (Compras › Proveedores) ───────────────────────────────────────
+// Each Subcontratas company (material suppliers too) as Compras sees it:
+// what it was ordered, invoiced and paid across the obras, and what is owed.
+// The company's data and CAE stay on its Subcontratas ficha.
+
+export type PurchaseSupplierItem = {
+  id: string;
+  legalName: string;
+  kind: SubcontractorKind;
+  suppliesOnly: boolean;
+  /** CAE standing (a material supplier is always apta). */
+  caeStatus: CompanyStatus;
+  /** Orders, cancelled ones aside, and the obras they are for. */
+  orders: number;
+  projects: number;
+  /** Placed orders (ordered / contracted on), without VAT. */
+  contractedCents: number;
+  /** Invoiced and paid without VAT, net of credit notes: compared with what is contracted. */
+  invoicedCents: number;
+  paidCents: number;
+  /** Still owed on its invoices, VAT in, retention apart: what Administration pays. */
+  outstandingCents: number;
+  /** Of what is owed, past due. */
+  overdueCents: number;
+  /** Retention held back until its guarantees end. */
+  retainedCents: number;
+  /** Its last order's day (placed, else created; in Spain). */
+  lastOrderOn: string | null;
+};
+
+/** GET /api/v1/purchases/suppliers: every supplier, those owed first. */
+export type TenantSuppliers = {
+  suppliers: PurchaseSupplierItem[];
+  summary: {
+    /** Suppliers with orders. */
+    active: number;
+    contractedCents: number;
+    outstandingCents: number;
+    overdueCents: number;
+    overdueSuppliers: number;
+    retainedCents: number;
+  };
+};
+
+/** GET /api/v1/purchases/suppliers/:subcontractorId: one supplier's orders, invoices and payments. */
+export type SupplierPurchasing = {
+  supplier: PurchaseSupplierItem;
+  orders: PurchaseOrderListItem[];
+  /** Owed first, as Compras › Facturas. */
+  invoices: PurchaseInvoiceListItem[];
+  /** Newest first. */
+  payments: PurchasePayment[];
+  today: string;
+};
+
 /** GET /api/v1/purchases/counts: Compras' sections in the rail. */
 export type PurchasingCounts = {
   /** Requests waiting for approval. */
@@ -1461,6 +1516,8 @@ export type PurchasingCounts = {
   orders: number;
   invoices: number;
   payments: number;
+  /** Companies in Subcontratas: every one can be a supplier. */
+  suppliers: number;
   /** Invoices overdue or due within `DUE_SOON_DAYS`: the rail's badge. */
   dueAttention: number;
 };
