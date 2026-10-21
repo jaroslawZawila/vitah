@@ -6,7 +6,9 @@ import {
   eq,
   gte,
   inArray,
+  or,
   projects,
+  purchaseDocumentChecks,
   purchaseInvoiceFiles,
   purchaseInvoiceLines,
   purchaseInvoices,
@@ -14,12 +16,12 @@ import {
   purchaseOrderLines,
   purchaseOrderMilestones,
   purchaseOrders,
-  purchaseRequests,
   purchasePayments,
+  purchaseRequests,
   sql,
+  type SQL,
   subcontractors,
   users,
-  type SQL,
 } from "@repo/db";
 import { isUniqueViolation } from "./accounts";
 import { requireEditor, type Ctx } from "./context";
@@ -69,6 +71,7 @@ import {
   termsOf,
   withTotals,
 } from "./purchase-calc";
+import { loadChecks } from "./purchase-check-data";
 import {
   buildInvoices,
   groupsOfOrder,
@@ -246,7 +249,7 @@ export async function getInvoice(ctx: Ctx, invoiceId: string): Promise<PurchaseI
   if (!order) fail("not_found");
   // A credit note's payments are its invoice's.
   const payer = payerOf(invoice);
-  const [loaded, payments, fileRows, events, budget, [creator]] = await Promise.all([
+  const [loaded, payments, fileRows, events, budget, [creator], checks] = await Promise.all([
     loadInvoices(ctx.tenantId, eq(purchaseInvoices.orderId, invoice.orderId)),
     loadPayments(ctx.tenantId, eq(purchasePayments.invoiceId, payer)),
     db
@@ -270,6 +273,14 @@ export async function getInvoice(ctx: Ctx, invoiceId: string): Promise<PurchaseI
       .limit(MAX_EVENTS),
     loadBudget(ctx.tenantId, order.projectId),
     invoice.createdById ? db.select({ by: userName }).from(users).where(eq(users.id, invoice.createdById)) : Promise.resolve([]),
+    // Its PDFs' reviews, and its payments' proofs'.
+    loadChecks(
+      ctx.tenantId,
+      or(
+        inArray(purchaseDocumentChecks.invoiceFileId, db.select({ id: purchaseInvoiceFiles.id }).from(purchaseInvoiceFiles).where(eq(purchaseInvoiceFiles.invoiceId, invoiceId))),
+        inArray(purchaseDocumentChecks.paymentId, db.select({ id: purchasePayments.id }).from(purchasePayments).where(eq(purchasePayments.invoiceId, payer))),
+      )!,
+    ),
   ]);
   const today = todayInSpain();
   const built = buildInvoices(loaded, today);
@@ -293,6 +304,7 @@ export async function getInvoice(ctx: Ctx, invoiceId: string): Promise<PurchaseI
       .sort((a, b) => (a.code ?? a.chapterCode).localeCompare(b.code ?? b.chapterCode)),
     creditNotes: [...built.items.values()].filter((i) => i.rectifiesId === invoiceId),
     payments,
+    checks,
     files: fileRows.map(({ file, by }) => ({
       id: file.id,
       version: file.version,

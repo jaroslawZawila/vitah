@@ -1,5 +1,6 @@
 import { purchaseInvoicesService } from "@repo/core";
 import { readWithFile, withContext } from "../../../../../../lib/api";
+import { reviewed } from "../../../../../../lib/review-documents";
 
 // POST /api/v1/purchases/:orderId/invoices { kind?, number, issuedOn, dueOn?,
 // milestoneId?, rectifiesId?, baseCents, vatKind?, irpfBp?, retentionBp?,
@@ -10,5 +11,5 @@ type Params = { params: Promise<{ orderId: string }> };
 
 export async function POST(request: Request, { params }: Params) {
   const { orderId } = await params;
-  return withContext(request, async (ctx) => purchaseInvoicesService.createInvoice(ctx, orderId, await readWithFile(request)), 201);
+  return withContext(request, async (ctx) => reviewed(ctx, await purchaseInvoicesService.createInvoice(ctx, orderId, await readWithFile(request))), 201);
 }

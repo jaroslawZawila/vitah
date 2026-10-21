@@ -161,6 +161,7 @@ export const invoiceDetail: PurchaseInvoiceDetail = {
   lines: [{ lineageId: "lin-0301", chapterCode: "03", code: "03.01", description: "Estructura LSF de perfiles galvanizados", amountCents: 3_000_000 }],
   creditNotes: [],
   payments: [payment],
+  checks: [],
   files: [
     { id: "f-2", version: 2, filename: "MSN-2026-148.pdf", sizeBytes: 191 * 1024, note: "Faltaba el nº de pedido", by: "Laura Pérez", at: "2026-09-26T09:00:00.000Z" },
     { id: "f-1", version: 1, filename: "MSN-2026-148.pdf", sizeBytes: 180 * 1024, note: null, by: "Laura Pérez", at: "2026-09-24T09:00:00.000Z" },

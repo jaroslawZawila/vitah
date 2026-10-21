@@ -1066,6 +1066,8 @@ export type PurchaseOrderDetail = PurchaseOrderListItem & {
   amendments: PurchaseOrderAmendment[];
   /** What it was placed for, before any modification. */
   originalAmountCents: number;
+  /** The AI's review of its documents' versions, newest first. */
+  checks: PurchaseDocumentCheck[];
   /** What its invoices start from: as set on the order, else the defaults. */
   terms: PurchaseTerms;
   /** Its payment schedule; empty when invoiced freely. */
@@ -1330,6 +1332,8 @@ export type PurchaseInvoiceDetail = PurchaseInvoiceListItem & {
   payments: PurchasePayment[];
   /** Its PDF's versions, newest (current) first. */
   files: { id: string; version: number; filename: string; sizeBytes: number; note: string | null; by: string | null; at: string }[];
+  /** The AI's review of its PDFs and of its payments' proofs, newest first. */
+  checks: PurchaseDocumentCheck[];
   /** What may still be paid: the amount due, then the retention once released. */
   payableLeftCents: number;
   createdBy: string | null;
@@ -1374,6 +1378,46 @@ export type PurchaseOrderAmendment = {
 
 /** Whether an order may be modified: placed, not cancelled (a pending one is just edited). */
 export const canAmend = (status: PurchaseStatus) => countsAsContracted(status);
+
+// ─── The AI's review of purchase documents ───────────────────────────────────
+// Each PDF of Compras (an order document's version, an invoice's PDF, a
+// payment's proof) is read against what its record says. Warnings only: it
+// never blocks, moves, deletes or changes a file or a record.
+
+export const DOCUMENT_FINDINGS = [
+  "wrong_document",
+  "other_project",
+  "supplier_mismatch",
+  "amount_mismatch",
+  "date_mismatch",
+  "number_mismatch",
+  "duplicate",
+  "unreadable",
+  "inconsistency",
+] as const;
+export type DocumentFindingKind = (typeof DOCUMENT_FINDINGS)[number];
+
+export type DocumentFinding = {
+  kind: DocumentFindingKind;
+  /** What the AI saw, in both languages; none for a duplicate (`duplicate` says of what). */
+  detail: { es: string; en: string } | null;
+  /** The same file, already uploaded. */
+  duplicate?: { label: string; orderId: string; projectId: string; invoiceId: string | null };
+};
+
+export type PurchaseDocumentCheck = {
+  id: string;
+  subject: "order_document" | "invoice_file" | "payment_proof";
+  /** The file reviewed, as its record names it. */
+  label: string;
+  status: "pending" | "running" | "done" | "failed" | "skipped";
+  findings: DocumentFinding[];
+  /** Why it wasn't reviewed: the tenant's monthly AI limit. */
+  reason: "ai_limit" | null;
+  checkedAt: string | null;
+  dismissedAt: string | null;
+  dismissedBy: string | null;
+};
 
 /** A step of an order's payment schedule. */
 export type OrderMilestone = PurchaseInvoicing & {

@@ -7,8 +7,9 @@ import messages from "../../../../../messages/es.json";
 import { invoiceDetail, invoiceItem } from "../../../../../test/invoice-fixture";
 import InvoiceScreen from "./InvoiceScreen";
 
-const router = { push: vi.fn() };
+const router = { push: vi.fn(), refresh: vi.fn() };
 vi.mock("next/navigation", () => ({ useRouter: () => router, usePathname: () => "/dashboard/compras/facturas/inv-148" }));
+vi.mock("../../../../actions/purchase-checks", () => ({ recheckDocumentAction: vi.fn(), dismissCheckAction: vi.fn() }));
 vi.mock("../../../../actions/purchase-invoices", () => ({
   addInvoiceFileAction: vi.fn(),
   createPaymentAction: vi.fn(),
@@ -121,5 +122,39 @@ describe("InvoiceScreen", () => {
     expect(screen.getByRole("status")).toHaveTextContent(/Factura pagada\. .*Siguen retenidos 1500,00\s€ hasta el fin de la garantía\./);
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Editar" })).not.toBeInTheDocument();
+  });
+});
+
+describe("InvoiceScreen with the AI's review of its PDF and proofs", () => {
+  it("shows each review, a duplicate linking to the other invoice", () => {
+    render(
+      <NextIntlClientProvider locale="es" messages={messages} timeZone="Europe/Madrid">
+        <InvoiceScreen
+          invoice={{
+            ...invoiceDetail,
+            checks: [
+              {
+                id: "chk-9",
+                subject: "invoice_file",
+                label: "MSN-2026/148 · v1",
+                status: "done",
+                findings: [{ kind: "duplicate", detail: null, duplicate: { label: "MSN-2026/112 · v1", orderId: "order-4", projectId: "p-1", invoiceId: "inv-112" } }],
+                reason: null,
+                checkedAt: "2026-09-24T10:00:00.000Z",
+                dismissedAt: null,
+                dismissedBy: null,
+              },
+              { id: "chk-10", subject: "payment_proof", label: "Justificante.pdf", status: "done", findings: [], reason: null, checkedAt: "2026-10-15T10:00:00.000Z", dismissedAt: null, dismissedBy: null },
+            ],
+          }}
+          canManage
+        />
+      </NextIntlClientProvider>,
+    );
+    const card = within(screen.getByRole("region", { name: "Revisión de documentos con IA" }));
+    expect(card.getByText("PDF de la factura")).toBeInTheDocument();
+    expect(card.getByRole("link", { name: "MSN-2026/112 · v1" })).toHaveAttribute("href", "/dashboard/compras/facturas/inv-112");
+    expect(card.getByText("Justificante de pago")).toBeInTheDocument();
+    expect(card.getByText("Sin avisos")).toBeInTheDocument();
   });
 });

@@ -44,6 +44,8 @@ export {
   purchaseOrderEvents,
   purchaseOrderMilestones,
   purchaseOrderAmendments,
+  purchaseDocumentChecks,
+  type PurchaseCheckStatus,
   purchaseRequests,
   purchaseRequestLines,
   purchaseRequestEvents,

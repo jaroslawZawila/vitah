@@ -12,6 +12,8 @@ import {
   purchaseOrderLines,
   purchaseOrders,
   purchaseRequests,
+  purchaseDocumentChecks,
+  isNotNull,
   sql,
   subcontractors,
   users,
@@ -54,6 +56,7 @@ import { contractSchedule, contractTotals, daysPast, deviation, lateDays, type L
 import { orderByDate, templateLeadDays } from "./planning-calc";
 import { loadDocuments, ordersWithDocuments } from "./purchase-document-data";
 import { loadAmendments } from "./purchase-amendment-data";
+import { loadChecks } from "./purchase-check-data";
 import { orderRequest, reopenRequestOf } from "./purchase-request-data";
 import { addInvoicing, isDueSoon, purchaseProgress, termsOf } from "./purchase-calc";
 import {
@@ -615,7 +618,7 @@ function reachedOn(events: { action: string; detail: Record<string, unknown>; cr
 /** One order: its lines against the budget, its chapters on the obra, and its history. */
 export async function getPurchase(ctx: Ctx, orderId: string): Promise<PurchaseOrderDetail> {
   const order = await requireOrder(ctx, orderId);
-  const [plan, projectOrders, events, [creator], net, invoices, milestones, documents, [request], amendments] = await Promise.all([
+  const [plan, projectOrders, events, [creator], net, invoices, milestones, documents, [request], amendments, checks] = await Promise.all([
     contractPlan(ctx.tenantId, order.projectId),
     loadOrders(ctx.tenantId, ofProject(order.projectId)),
     db
@@ -637,6 +640,7 @@ export async function getPurchase(ctx: Ctx, orderId: string): Promise<PurchaseOr
       .from(purchaseRequests)
       .where(and(eq(purchaseRequests.tenantId, ctx.tenantId), eq(purchaseRequests.orderId, orderId))),
     loadAmendments(ctx.tenantId, orderId),
+    loadChecks(ctx.tenantId, and(eq(purchaseDocumentChecks.orderId, orderId), isNotNull(purchaseDocumentChecks.documentVersionId))!),
   ]);
   const today = todayInSpain();
   const loaded = projectOrders.find((o) => o.order.id === orderId)!;
@@ -692,6 +696,7 @@ export async function getPurchase(ctx: Ctx, orderId: string): Promise<PurchaseOr
     budgetNumber: plan.budgetNumber,
     request: request ?? null,
     amendments,
+    checks,
     // Before its modificados: what they changed taken back off (edits since are corrections of it).
     originalAmountCents: item.amountCents - amendments.reduce((sum, a) => sum + a.amountAfterCents - a.amountBeforeCents, 0),
     terms: termsOf(order),

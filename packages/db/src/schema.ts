@@ -1285,6 +1285,7 @@ export const purchaseOrderDocumentVersions = pgTable(
       table.documentId,
       table.version,
     ),
+    tenantCreatedIdx: index("purchase_order_document_versions_tenant_created_idx").on(table.tenantId, table.createdAt),
   }),
 );
 
@@ -1539,6 +1540,7 @@ export const purchaseInvoiceFiles = pgTable(
   },
   (table) => ({
     invoiceVersionUnique: unique("purchase_invoice_files_invoice_version_unique").on(table.invoiceId, table.version),
+    tenantCreatedIdx: index("purchase_invoice_files_tenant_created_idx").on(table.tenantId, table.createdAt),
   }),
 );
 
@@ -1570,6 +1572,54 @@ export const purchasePayments = pgTable(
   (table) => ({
     invoiceIdx: index("purchase_payments_invoice_idx").on(table.invoiceId),
     tenantPaidIdx: index("purchase_payments_tenant_paid_idx").on(table.tenantId, table.paidOn),
+    tenantCreatedIdx: index("purchase_payments_tenant_created_idx").on(table.tenantId, table.createdAt),
+  }),
+);
+
+export type PurchaseCheckStatus = "pending" | "running" | "done" | "failed" | "skipped";
+
+// The AI's review of one purchase PDF (an order document's version, an
+// invoice's PDF or a payment's proof): warnings only, it never changes a
+// record or a file. Exactly one subject is set; a check goes with its
+// subject. `sha256` finds the same file uploaded twice.
+export const purchaseDocumentChecks = pgTable(
+  "purchase_document_checks",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    orderId: text("order_id")
+      .notNull()
+      .references(() => purchaseOrders.id, { onDelete: "cascade" }),
+    documentVersionId: text("document_version_id").references(() => purchaseOrderDocumentVersions.id, { onDelete: "cascade" }),
+    invoiceFileId: text("invoice_file_id").references(() => purchaseInvoiceFiles.id, { onDelete: "cascade" }),
+    paymentId: text("payment_id").references(() => purchasePayments.id, { onDelete: "cascade" }),
+    // The file reviewed (a payment's proof may be replaced: a new one is reviewed again).
+    pathname: text("pathname").notNull(),
+    label: text("label").notNull(),
+    sha256: text("sha256"),
+    status: text("status").$type<PurchaseCheckStatus>().default("pending").notNull(),
+    // [{ kind, detail: { es, en } | null, duplicate?: { label, orderId, invoiceId } }]
+    findings: jsonb("findings").$type<Record<string, unknown>[]>().default([]).notNull(),
+    // Why it wasn't reviewed (`ai_limit`) or what failed.
+    reason: text("reason"),
+    // When a run took it (one left running past 15 minutes is taken again), and when it ended.
+    startedAt: timestamp("started_at"),
+    checkedAt: timestamp("checked_at"),
+    dismissedAt: timestamp("dismissed_at"),
+    dismissedById: text("dismissed_by_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    versionUnique: unique("purchase_document_checks_version_unique").on(table.documentVersionId),
+    invoiceFileUnique: unique("purchase_document_checks_invoice_file_unique").on(table.invoiceFileId),
+    paymentUnique: unique("purchase_document_checks_payment_unique").on(table.paymentId),
+    tenantStatusIdx: index("purchase_document_checks_tenant_status_idx").on(table.tenantId, table.status),
+    tenantShaIdx: index("purchase_document_checks_tenant_sha_idx").on(table.tenantId, table.sha256),
+    orderIdx: index("purchase_document_checks_order_idx").on(table.orderId),
   }),
 );
 

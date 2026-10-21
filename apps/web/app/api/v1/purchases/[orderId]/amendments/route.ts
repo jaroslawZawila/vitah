@@ -1,5 +1,6 @@
 import { purchaseAmendmentsService } from "@repo/core";
 import { readWithFile, withContext } from "../../../../../../lib/api";
+import { reviewed } from "../../../../../../lib/review-documents";
 
 // POST /api/v1/purchases/:orderId/amendments { concept, lines: [{ lineageId,
 // amountCents, closesLine? }] (all the order's lines as they will be),
@@ -11,5 +12,5 @@ type Params = { params: Promise<{ orderId: string }> };
 
 export async function POST(request: Request, { params }: Params) {
   const { orderId } = await params;
-  return withContext(request, async (ctx) => purchaseAmendmentsService.amendPurchase(ctx, orderId, await readWithFile(request)), 201);
+  return withContext(request, async (ctx) => reviewed(ctx, await purchaseAmendmentsService.amendPurchase(ctx, orderId, await readWithFile(request))), 201);
 }

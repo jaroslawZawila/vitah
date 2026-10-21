@@ -182,7 +182,7 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
   Subcontratas tables `subcontractors`, `subcontractor_workers`, `subcontractor_documents`, `subcontractor_document_versions`,
   `subcontractor_assignments`, `subcontractor_audit`, Compras' `purchase_orders`, `purchase_order_lines`,
   `purchase_order_events`, `purchase_order_documents`, `purchase_order_document_versions`, `purchase_order_milestones`, `purchase_invoices`, `purchase_invoice_lines`, `purchase_invoice_files`,
-  `purchase_payments`, `purchase_requests`, `purchase_request_lines`, `purchase_request_events`, `purchase_order_amendments`, and Planning's `planning_versions`, `planning_items`. A project is deliberately minimal — exactly what the mobile app shows: `ref`, `address`, `start_date`, `completion_date`, plus `client_user_id` linking it to its mobile app client
+  `purchase_payments`, `purchase_requests`, `purchase_request_lines`, `purchase_request_events`, `purchase_order_amendments`, `purchase_document_checks`, and Planning's `planning_versions`, `planning_items`. A project is deliberately minimal — exactly what the mobile app shows: `ref`, `address`, `start_date`, `completion_date`, plus `client_user_id` linking it to its mobile app client
 - Prod migrations are additive SQL files in `packages/db/sql/`, applied by hand (no plain `db:push` on prod)
 
 ### Obra (construction process)
@@ -272,6 +272,17 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
   `originalAmountCents` (its amount less what they changed; edits are corrections). Signed between the order's date and today. A pending order is just edited. Portal: the order page's
   Modificados card and `compras/[orderId]/modificado`; API `POST /api/v1/purchases/:orderId/amendments` (JSON or
   multipart with `data` + `file`)
+- AI review of purchase documents (`packages/core/src/purchase-document-checks.ts`, `purchaseChecksService`; loader
+  `purchase-check-data.ts`): every PDF of Compras (an order document's version, an invoice's PDF, a payment's proof) gets a
+  `purchase_document_checks` row: the same file uploaded before (SHA-256) and Claude (`MODELS.checker`, Haiku 4.5, the PDF
+  + its record's facts, the modificados included) warning of a wrong document, another obra, another supplier, amounts, dates or numbers that don't
+  match, unreadable or inconsistent. Warnings only: it never blocks, moves, deletes or changes anything. An upload queues
+  it (`queueNewChecks`, files of the last day) and `runPendingChecks` reviews it after the response (`lib/review-documents.ts`
+  › `after()`; `mutateDashboard(…, { review: true })` in actions, `reviewed(ctx, …)` in the upload routes); a run drains the
+  queue for a few minutes and takes again checks cut off. Within `tenants.ai_monthly_limit_cents` (`ai-limit.ts`, checked
+  before each call; past it only duplicates, `skipped`, retried once there is room), each call in `ai_usage` (`purchase.check`). Order and
+  invoice pages show `checks` (re-read while one runs); staff mark one as seen or ask again
+  (`POST /api/v1/purchases/checks/:checkId/{dismiss,recheck}`). Tests mock `budget-ai/claude`
 - Suppliers (Compras › Proveedores, `packages/core/src/purchase-suppliers.ts`, `purchaseSuppliersService`): every
   Subcontratas company as a supplier, read-only: its orders across the obras, contracted, invoiced and paid (without VAT,
   as compared with the cost), owed and past due (with VAT: what Administration pays), retention held, those owed first. Data and CAE stay on its Subcontratas ficha.
@@ -306,7 +317,8 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
   (`seed/purchase-requests.ts`). Prod SQL:
   `packages/db/sql/2026-10-purchasing.sql`, `packages/db/sql/2026-10-purchase-invoices.sql`,
   `packages/db/sql/2026-10-purchase-documents.sql`, `packages/db/sql/2026-10-purchase-requests.sql`,
-  `packages/db/sql/2026-10-purchase-amendments.sql`
+  `packages/db/sql/2026-10-purchase-amendments.sql`,
+  `packages/db/sql/2026-10-purchase-document-checks.sql`
 
 ### Planning (Planificación)
 

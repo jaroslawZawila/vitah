@@ -20,7 +20,10 @@ import BackLink from "../../../components/BackLink";
 import FormError from "../../../components/FormError";
 import { useObraAction } from "../../../projects/[id]/components/obra/useObraAction";
 import { usePurchaseFormat } from "../../../projects/[id]/components/purchasing/format";
-import { INVOICES_HREF, editInvoiceHref, newInvoiceHref } from "../../../projects/[id]/components/purchasing/links";
+import { INVOICES_HREF, editInvoiceHref, invoiceHref, newInvoiceHref, orderHref } from "../../../projects/[id]/components/purchasing/links";
+import { DocumentChecks, reviewing } from "../../../projects/[id]/components/purchasing/DocumentCheckViews";
+import { useRefreshWhile } from "../../../projects/[id]/components/purchasing/useRefreshWhile";
+import { dismissCheckAction, recheckDocumentAction } from "../../../../actions/purchase-checks";
 import { OrderHistory } from "../../../projects/[id]/components/purchasing/OrderViews";
 import {
   AmountsCard,
@@ -42,6 +45,9 @@ export default function InvoiceScreen({ invoice, canManage }: { invoice: Purchas
   const action = useObraAction();
   const payment = useObraAction();
   const file = useObraAction();
+  const review = useObraAction();
+  // The AI reviews a new PDF or proof after its upload: the page re-reads until it is done.
+  useRefreshWhile(reviewing(invoice.checks));
   const [paying, setPaying] = useState(false);
   const isInvoice = invoice.kind === "invoice";
   const canPay = canManage && isInvoice && invoice.payableLeftCents > 0;
@@ -148,7 +154,22 @@ export default function InvoiceScreen({ invoice, canManage }: { invoice: Purchas
           />
           <CreditNotes invoice={invoice} />
         </div>
-        <OrderHistory events={invoice.events} />
+        <div className="flex min-w-0 flex-col gap-[18px]">
+          {invoice.checks.length > 0 && (
+            <DocumentChecks
+              checks={invoice.checks}
+              canManage={canManage}
+              pending={review.pending}
+              error={review.state?.error}
+              duplicateHref={({ duplicate }) =>
+                duplicate!.invoiceId ? invoiceHref(duplicate!.invoiceId) : orderHref(duplicate!.projectId, duplicate!.orderId)
+              }
+              onRecheck={(check) => review.run(() => recheckDocumentAction(check.id))}
+              onDismiss={(check) => review.run(() => dismissCheckAction(check.id))}
+            />
+          )}
+          <OrderHistory events={invoice.events} />
+        </div>
       </div>
     </div>
   );

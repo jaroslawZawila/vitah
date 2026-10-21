@@ -44,8 +44,8 @@ export async function getPurchase(orderId: string) {
 
 // ─── Writes ──────────────────────────────────────────────────────────────────
 
-/** Refreshes the project's tabs too. */
-const write = (projectId: string, fn: Parameters<typeof mutateDashboard>[1]) => mutateDashboard(projectId, fn);
+/** Refreshes the project's tabs too; `review` when it uploads a PDF (the AI's review follows). */
+const write = (projectId: string, fn: Parameters<typeof mutateDashboard>[1], review = false) => mutateDashboard(projectId, fn, { review });
 
 /** → the new order's id and number too. */
 export async function createPurchaseAction(
@@ -74,7 +74,7 @@ export async function setPurchaseStatusAction(
 
 /** Form data: `title`, `file` (PDF) and `note`: a new document of the order. */
 export async function addOrderDocumentAction(projectId: string, orderId: string, formData: FormData): Promise<ObraState> {
-  return write(projectId, (ctx) => documents.addOrderDocument(ctx, orderId, Object.fromEntries(formData)));
+  return write(projectId, (ctx) => documents.addOrderDocument(ctx, orderId, Object.fromEntries(formData)), true);
 }
 
 /** Form data: `file` (PDF) and `note` (why it replaces the last): the document's next version. */
@@ -84,7 +84,7 @@ export async function addOrderDocumentVersionAction(
   documentId: string,
   formData: FormData,
 ): Promise<ObraState> {
-  return write(projectId, (ctx) => documents.addOrderDocumentVersion(ctx, orderId, documentId, Object.fromEntries(formData)));
+  return write(projectId, (ctx) => documents.addOrderDocumentVersion(ctx, orderId, documentId, Object.fromEntries(formData)), true);
 }
 
 /**
@@ -97,9 +97,13 @@ export async function amendPurchaseAction(
   formData: FormData,
 ): Promise<(NonNullable<ObraState> & { number?: number; documentFailed?: boolean }) | null> {
   let made: { number: number; documentFailed?: boolean } | undefined;
-  const state = await write(projectId, async (ctx) => {
-    made = await amendments.amendPurchase(ctx, orderId, fieldsWithFile(formData));
-  });
+  const state = await write(
+    projectId,
+    async (ctx) => {
+      made = await amendments.amendPurchase(ctx, orderId, fieldsWithFile(formData));
+    },
+    formData.has("file"),
+  );
   return state?.success ? { ...state, number: made?.number, ...(made?.documentFailed ? { documentFailed: true } : {}) } : state;
 }
 

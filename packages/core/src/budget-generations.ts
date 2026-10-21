@@ -1,3 +1,4 @@
+import { aiLimitReached } from "./ai-limit";
 import {
   aiUsage,
   and,
@@ -110,15 +111,6 @@ export async function getGeneration(ctx: Ctx, projectId: string, generationId: s
   return toGeneration(await generationInProject(ctx, projectId, generationId));
 }
 
-/** This month's AI spend of the tenant, in US cents. */
-async function monthSpendCents(tenantId: string) {
-  const [row] = await db
-    .select({ micro: sql<string>`coalesce(sum(${aiUsage.costMicroUsd}), 0)` })
-    .from(aiUsage)
-    .where(and(eq(aiUsage.tenantId, tenantId), gt(aiUsage.createdAt, sql`date_trunc('month', now())`)));
-  return Number(row?.micro ?? 0) / 10_000;
-}
-
 /**
  * Queues a run over the project's budget documents (the ones uploaded on the
  * Budget tab, `budget_input` set). Only before the project has a budget, one
@@ -141,13 +133,7 @@ export async function startGeneration(ctx: Ctx, projectId: string, input: Record
   const docs = await budgetInputs(ctx.tenantId, projectId, documentIds);
   if (docs.length !== documentIds.length) fail("not_found");
 
-  const tenant = await db.query.tenants.findFirst({
-    where: eq(tenants.id, ctx.tenantId),
-    columns: { aiMonthlyLimitCents: true },
-  });
-  if (tenant?.aiMonthlyLimitCents != null && (await monthSpendCents(ctx.tenantId)) >= tenant.aiMonthlyLimitCents) {
-    fail("ai_limit_reached");
-  }
+  if (await aiLimitReached(ctx.tenantId)) fail("ai_limit_reached");
 
   return db.transaction(async (tx) => {
     // Serialises starts within the project, like revision creation.

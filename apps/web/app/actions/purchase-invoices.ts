@@ -38,7 +38,8 @@ export async function getPurchasingCounts() {
 
 // ─── Writes ──────────────────────────────────────────────────────────────────
 
-const write = (fn: Parameters<typeof mutateDashboard>[1]) => mutateDashboard(null, fn);
+/** `review` when it uploads a PDF: the AI's review follows. */
+const write = (fn: Parameters<typeof mutateDashboard>[1], review = false) => mutateDashboard(null, fn, { review });
 
 /** Form data: `data` (the invoice as JSON) and `file` (PDF, optional). → the new invoice's id too. */
 export async function createInvoiceAction(
@@ -48,7 +49,7 @@ export async function createInvoiceAction(
   let made: { invoiceId: string } | undefined;
   const state = await write(async (ctx) => {
     made = await svc.createInvoice(ctx, orderId, fieldsWithFile(formData));
-  });
+  }, formData.has("file"));
   return state?.success ? { ...state, ...made } : state;
 }
 
@@ -62,12 +63,12 @@ export async function deleteInvoiceAction(invoiceId: string): Promise<ObraState>
 
 /** Form data: `file` (PDF) and `note` (why it replaces the last version). */
 export async function addInvoiceFileAction(invoiceId: string, formData: FormData): Promise<ObraState> {
-  return write((ctx) => svc.addInvoiceFile(ctx, invoiceId, Object.fromEntries(formData)));
+  return write((ctx) => svc.addInvoiceFile(ctx, invoiceId, Object.fromEntries(formData)), true);
 }
 
 /** Form data: `data` ({ amountCents, paidOn, method, reference }) and `file` (the proof, optional). */
 export async function createPaymentAction(invoiceId: string, formData: FormData): Promise<ObraState> {
-  return write((ctx) => svc.createPayment(ctx, invoiceId, fieldsWithFile(formData)));
+  return write((ctx) => svc.createPayment(ctx, invoiceId, fieldsWithFile(formData)), formData.has("file"));
 }
 
 export async function deletePaymentAction(paymentId: string): Promise<ObraState> {

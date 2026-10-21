@@ -14,7 +14,7 @@ import { markChanged } from "../changes";
 import { CoreError } from "../errors";
 import { ACTIVE_GENERATION_STATUSES, lineAmountCents, type BudgetGenerationLogEntry, type BudgetInput } from "../contract";
 import { budgetInputs, setClaudeFileId } from "../documents";
-import { readFile } from "../storage";
+import { readStoredBytes } from "../project-files";
 import { ClaudeError, MODELS, structuredCall, uploadFile, type CallContext, type ContentBlock } from "./claude";
 import { measurementText, parseBc3, parseXlsx } from "./measurements";
 import { chapterNotes, toDraftLines, toTexts } from "./postprocess";
@@ -89,9 +89,9 @@ const callContext = (row: GenerationRow, purpose: string): CallContext => ({
 });
 
 async function readBytes(pathname: string): Promise<Uint8Array> {
-  const stream = await readFile(pathname);
-  if (!stream) throw new GenerationFailed("missing_file", `Missing file ${pathname}`);
-  return new Uint8Array(await new Response(stream).arrayBuffer());
+  const bytes = await readStoredBytes(pathname);
+  if (!bytes) throw new GenerationFailed("missing_file", `Missing file ${pathname}`);
+  return bytes;
 }
 
 /** A photo of a plan, at most 2000 px on its longest side, as JPEG. */

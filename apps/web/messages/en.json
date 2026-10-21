@@ -3661,6 +3661,40 @@
         "goToOrder": "Go to the order",
         "linesTitle": "2 · The order’s lines"
       }
+    },
+    "checks": {
+      "title": "AI document review",
+      "intro": "The AI reads each PDF and compares it with what its record says. It only warns: it never blocks, moves, deletes or changes anything.",
+      "status": {
+        "reviewing": "Reviewing…",
+        "skipped": "Not reviewed",
+        "failed": "Couldn’t be reviewed",
+        "clear": "No warnings",
+        "warnings": "{count, plural, one {# warning} other {# warnings}}"
+      },
+      "kinds": {
+        "wrong_document": "Wrong document",
+        "other_project": "Another site",
+        "supplier_mismatch": "Another supplier",
+        "amount_mismatch": "Amounts don’t match",
+        "date_mismatch": "Dates don’t match",
+        "number_mismatch": "Number doesn’t match",
+        "duplicate": "Duplicate file",
+        "unreadable": "Can’t be read",
+        "inconsistency": "Inconsistency",
+        "duplicateOf": "It is the same file as"
+      },
+      "subject": {
+        "order_document": "Order document",
+        "invoice_file": "Invoice PDF",
+        "payment_proof": "Proof of payment"
+      },
+      "dismiss": "Seen",
+      "recheck": "Review again",
+      "recheckOf": "Review {label} again",
+      "seen": "Seen by {by} on {date}",
+      "checked": "Reviewed on {date}",
+      "skippedHint": "The company has reached its monthly AI limit. Ask again once there is room."
     }
   },
   "obraPicker": {

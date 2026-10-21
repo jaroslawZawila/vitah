@@ -228,6 +228,7 @@ export const orderDetail: PurchaseOrderDetail = {
   request: null,
   amendments: [],
   originalAmountCents: 312_000,
+  checks: [],
   terms: { paymentDays: 30, retentionBp: 0, vatKind: "vat21" },
   milestones: [],
   invoices: [],

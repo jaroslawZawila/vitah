@@ -95,3 +95,9 @@ export async function openStoredFile(
   const { pathname: _, ...meta } = file;
   return { ...meta, body };
 }
+
+/** A stored file's bytes, or null if it isn't there (the budget's AI and the purchase documents' review read whole files). */
+export async function readStoredBytes(pathname: string): Promise<Uint8Array<ArrayBuffer> | null> {
+  const stream = await readFile(pathname);
+  return stream ? new Uint8Array(await new Response(stream).arrayBuffer()) : null;
+}

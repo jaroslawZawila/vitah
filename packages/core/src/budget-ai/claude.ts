@@ -9,13 +9,19 @@ import { aiUsage, db } from "@repo/db";
 // `ai_usage`. Tests replace this module with a fake.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const MODELS = { reader: "claude-opus-5-5", writer: "claude-sonnet-5-5" } as const;
+export const MODELS = {
+  reader: "claude-opus-5-5",
+  writer: "claude-sonnet-5-5",
+  /** Quick, cheap checks: the purchase documents' review. */
+  checker: "claude-haiku-4-5-20251001",
+} as const;
 export type Model = (typeof MODELS)[keyof typeof MODELS];
 
 /** US dollars per million tokens (platform.claude.com pricing, 2026-09). */
 const PRICES: Record<Model, { input: number; output: number; cacheRead: number; cacheWrite: number }> = {
   "claude-opus-5-5": { input: 4, output: 20, cacheRead: 0.2, cacheWrite: 5 },
   "claude-sonnet-5-5": { input: 2, output: 10, cacheRead: 0.2, cacheWrite: 2.5 },
+  "claude-haiku-4-5-20251001": { input: 1, output: 5, cacheRead: 0.1, cacheWrite: 1.25 },
 };
 
 export type Usage = {
@@ -41,7 +47,8 @@ export type CallContext = {
   tenantId: string;
   userId: string | null;
   projectId: string;
-  generationId: string;
+  /** The budget run it is part of; none for a purchase document's review. */
+  generationId: string | null;
   purpose: string;
 };
 
@@ -78,8 +85,11 @@ export async function structuredCall<T>(
     system: string;
     content: ContentBlock[];
     schema: z.ZodType<T>;
-    effort: "low" | "medium" | "high";
+    /** How hard it thinks; omitted for a model without effort control (Haiku). */
+    effort?: "low" | "medium" | "high";
     maxTokens?: number;
+    /** Another model on a policy refusal (default); off for a quick check. */
+    fallback?: boolean;
   },
   context: CallContext,
 ): Promise<T> {
@@ -91,9 +101,8 @@ export async function structuredCall<T>(
         max_tokens: options.maxTokens ?? 64_000,
         system: options.system,
         messages: [{ role: "user", content: options.content }],
-        output_config: { effort: options.effort, format: zodOutputFormat(options.schema) },
-        betas: ["server-side-fallback-2026-07-01"],
-        fallbacks: "default",
+        output_config: { ...(options.effort ? { effort: options.effort } : {}), format: zodOutputFormat(options.schema) },
+        ...(options.fallback === false ? {} : { betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" as const }),
       })
       .finalMessage();
   } catch (error) {

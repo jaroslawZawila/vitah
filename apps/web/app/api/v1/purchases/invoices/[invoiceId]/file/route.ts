@@ -1,5 +1,6 @@
 import { purchaseInvoicesService } from "@repo/core";
 import { fileResponse, readForm, withContext } from "../../../../../../../lib/api";
+import { reviewed } from "../../../../../../../lib/review-documents";
 
 // ─── /api/v1/purchases/invoices/:invoiceId/file ───────────────────────────────
 // GET (?fileId: an older version) → the invoice's PDF
@@ -17,5 +18,5 @@ export async function GET(request: Request, { params }: Params) {
 
 export async function POST(request: Request, { params }: Params) {
   const { invoiceId } = await params;
-  return withContext(request, async (ctx) => purchaseInvoicesService.addInvoiceFile(ctx, invoiceId, await readForm(request)), 201);
+  return withContext(request, async (ctx) => reviewed(ctx, await purchaseInvoicesService.addInvoiceFile(ctx, invoiceId, await readForm(request))), 201);
 }

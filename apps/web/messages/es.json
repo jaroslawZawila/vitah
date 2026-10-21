@@ -3661,6 +3661,40 @@
         "goToOrder": "Ir al pedido",
         "linesTitle": "2 · Partidas del pedido"
       }
+    },
+    "checks": {
+      "title": "Revisión de documentos con IA",
+      "intro": "La IA lee cada PDF y lo compara con lo que dice su registro. Solo avisa: nunca bloquea, mueve, borra ni cambia nada.",
+      "status": {
+        "reviewing": "Revisando…",
+        "skipped": "Sin revisar",
+        "failed": "No se ha podido revisar",
+        "clear": "Sin avisos",
+        "warnings": "{count, plural, one {# aviso} other {# avisos}}"
+      },
+      "kinds": {
+        "wrong_document": "Documento equivocado",
+        "other_project": "Otra obra",
+        "supplier_mismatch": "Otro proveedor",
+        "amount_mismatch": "Importes que no coinciden",
+        "date_mismatch": "Fechas que no coinciden",
+        "number_mismatch": "Número que no coincide",
+        "duplicate": "Archivo duplicado",
+        "unreadable": "No se puede leer",
+        "inconsistency": "Incoherencia",
+        "duplicateOf": "Es el mismo archivo que"
+      },
+      "subject": {
+        "order_document": "Documento del pedido",
+        "invoice_file": "PDF de la factura",
+        "payment_proof": "Justificante de pago"
+      },
+      "dismiss": "Visto",
+      "recheck": "Revisar de nuevo",
+      "recheckOf": "Revisar de nuevo {label}",
+      "seen": "Visto por {by} el {date}",
+      "checked": "Revisado el {date}",
+      "skippedHint": "La empresa ha llegado a su límite mensual de IA. Pide revisarlo cuando haya margen."
     }
   },
   "obraPicker": {

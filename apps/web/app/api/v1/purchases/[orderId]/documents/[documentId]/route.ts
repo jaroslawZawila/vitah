@@ -1,5 +1,6 @@
 import { purchaseDocumentsService } from "@repo/core";
 import { fileResponse, readForm, withContext } from "../../../../../../../lib/api";
+import { reviewed } from "../../../../../../../lib/review-documents";
 
 // ─── /api/v1/purchases/:orderId/documents/:documentId ─────────────────────────
 // GET (?versionId: an older one) → the document's PDF, its current version
@@ -21,7 +22,7 @@ export async function POST(request: Request, { params }: Params) {
   const { orderId, documentId } = await params;
   return withContext(
     request,
-    async (ctx) => purchaseDocumentsService.addOrderDocumentVersion(ctx, orderId, documentId, await readForm(request)),
+    async (ctx) => reviewed(ctx, await purchaseDocumentsService.addOrderDocumentVersion(ctx, orderId, documentId, await readForm(request))),
     201,
   );
 }

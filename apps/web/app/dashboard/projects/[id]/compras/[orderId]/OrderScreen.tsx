@@ -27,8 +27,19 @@ import { setOrderMilestonesAction } from "../../../../../actions/purchase-invoic
 import FormError from "../../../../components/FormError";
 import { obraHref } from "../../components/construction/ObraFrame";
 import { useObraAction } from "../../components/obra/useObraAction";
-import { amendOrderHref, editOrderHref, newInvoiceHref, orderDocumentUrl, purchasesHref } from "../../components/purchasing/links";
+import {
+  amendOrderHref,
+  editOrderHref,
+  invoiceHref,
+  newInvoiceHref,
+  orderDocumentUrl,
+  orderHref,
+  purchasesHref,
+} from "../../components/purchasing/links";
 import { OrderAmendments } from "../../components/purchasing/OrderAmendmentViews";
+import { DocumentChecks, reviewing } from "../../components/purchasing/DocumentCheckViews";
+import { useRefreshWhile } from "../../components/purchasing/useRefreshWhile";
+import { dismissCheckAction, recheckDocumentAction } from "../../../../../actions/purchase-checks";
 import { OrderDocuments } from "../../components/purchasing/OrderDocumentViews";
 import { MilestonesCard, OrderInvoices } from "../../components/purchasing/OrderInvoiceViews";
 import { LateBanner, OrderData, OrderHeading, OrderHistory, OrderLines, StatusForm, StatusSteps } from "../../components/purchasing/OrderViews";
@@ -48,6 +59,9 @@ export default function OrderScreen({
   const status = useObraAction();
   const file = useObraAction();
   const schedule = useObraAction();
+  const review = useObraAction();
+  // The AI reviews a new PDF after its upload: the page re-reads until it is done.
+  useRefreshWhile(reviewing(order.checks));
   // Invoices go only to a placed order; the form lives in Compras › Facturas.
   const registerHref = canManage && countsAsContracted(order.status) ? newInvoiceHref({ orderId: order.id }) : undefined;
   const [dated, setDated] = useState<PurchaseStatus | null>(null);
@@ -173,7 +187,20 @@ export default function OrderScreen({
             }
           />
         </div>
-        <div className="min-w-0 lg:col-span-2">
+        <div className="flex min-w-0 flex-col gap-[18px] lg:col-span-2">
+          {order.checks.length > 0 && (
+            <DocumentChecks
+              checks={order.checks}
+              canManage={canManage}
+              pending={review.pending}
+              error={review.state?.error}
+              duplicateHref={({ duplicate }) =>
+                duplicate!.invoiceId ? invoiceHref(duplicate!.invoiceId) : orderHref(duplicate!.projectId, duplicate!.orderId)
+              }
+              onRecheck={(check) => review.run(() => recheckDocumentAction(check.id))}
+              onDismiss={(check) => review.run(() => dismissCheckAction(check.id))}
+            />
+          )}
           <OrderHistory events={order.events} />
         </div>
       </div>

@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import messages from "../../../../../../messages/es.json";
+import type { PurchaseDocumentCheck } from "@repo/core/contract";
 import { orderDetail } from "../../../../../../test/purchasing-fixture";
 import { invoiceItem, milestones } from "../../../../../../test/invoice-fixture";
 import OrderScreen from "./OrderScreen";
@@ -15,6 +16,10 @@ vi.mock("../../../../../actions/purchasing", () => ({
   deleteOrderDocumentAction: vi.fn(),
 }));
 vi.mock("../../../../../actions/purchase-invoices", () => ({ setOrderMilestonesAction: vi.fn() }));
+vi.mock("../../../../../actions/purchase-checks", () => ({ recheckDocumentAction: vi.fn(), dismissCheckAction: vi.fn() }));
+const router = { refresh: vi.fn(), push: vi.fn() };
+vi.mock("next/navigation", () => ({ useRouter: () => router }));
+const checkActions = await import("../../../../../actions/purchase-checks");
 const actions = await import("../../../../../actions/purchasing");
 const invoiceActions = await import("../../../../../actions/purchase-invoices");
 
@@ -315,5 +320,67 @@ describe("OrderScreen with modificados", () => {
     expect(screen.queryByRole("link", { name: "Registrar modificado" })).not.toBeInTheDocument();
     renderScreen({ order: { ...orderDetail, status: "pending" } });
     expect(screen.queryByRole("link", { name: "Registrar modificado" })).not.toBeInTheDocument();
+  });
+});
+
+describe("OrderScreen with the AI's review of its documents", () => {
+  const check = (overrides: Partial<PurchaseDocumentCheck> = {}): PurchaseDocumentCheck => ({
+    id: "chk-1",
+    subject: "order_document",
+    label: "Pedido PED-049 · v2",
+    status: "done",
+    findings: [
+      { kind: "amount_mismatch", detail: { es: "El PDF dice 3.300 €; el pedido, 3.120 €.", en: "The PDF says €3,300; the order, €3,120." } },
+      { kind: "duplicate", detail: null, duplicate: { label: "Pedido PED-049 · v1", orderId: "order-49", projectId: "p-1", invoiceId: null } },
+    ],
+    reason: null,
+    checkedAt: "2026-10-06T10:00:00.000Z",
+    dismissedAt: null,
+    dismissedBy: null,
+    ...overrides,
+  });
+
+  beforeEach(() => {
+    vi.mocked(checkActions.recheckDocumentAction).mockReset().mockResolvedValue({ success: true });
+    vi.mocked(checkActions.dismissCheckAction).mockReset().mockResolvedValue({ success: true });
+    router.refresh.mockReset();
+  });
+
+  it("shows what the AI warns of, and lets staff mark it as seen or ask again", async () => {
+    renderScreen({ order: { ...orderDetail, checks: [check()] } });
+    const card = within(screen.getByRole("region", { name: "Revisión de documentos con IA" }));
+    expect(card.getByText("2 avisos")).toBeInTheDocument();
+    expect(card.getByText("Importes que no coinciden")).toBeInTheDocument();
+    expect(card.getByText("El PDF dice 3.300 €; el pedido, 3.120 €.")).toBeInTheDocument();
+    expect(card.getByRole("link", { name: "Pedido PED-049 · v1" })).toHaveAttribute("href", "/dashboard/projects/p-1/compras/order-49");
+    await userEvent.click(card.getByRole("button", { name: "Visto" }));
+    expect(checkActions.dismissCheckAction).toHaveBeenCalledWith("chk-1");
+    await userEvent.click(card.getByRole("button", { name: "Revisar de nuevo Pedido PED-049 · v2" }));
+    expect(checkActions.recheckDocumentAction).toHaveBeenCalledWith("chk-1");
+  });
+
+  it("re-reads the page while a review is under way, and offers viewers nothing to do", () => {
+    vi.useFakeTimers();
+    renderScreen({ order: { ...orderDetail, checks: [check({ status: "running", findings: [], checkedAt: null })] }, canManage: false });
+    expect(screen.getByText("Revisando…")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Visto" })).not.toBeInTheDocument();
+    vi.advanceTimersByTime(5_000);
+    expect(router.refresh).toHaveBeenCalledTimes(1);
+    vi.useRealTimers();
+  });
+
+  it("says when the monthly AI limit left it unreviewed, and once it is seen", () => {
+    renderScreen({
+      order: {
+        ...orderDetail,
+        checks: [
+          check({ id: "chk-2", status: "skipped", reason: "ai_limit", findings: [], checkedAt: null }),
+          check({ dismissedAt: "2026-10-07T10:00:00.000Z", dismissedBy: "Laura Pérez" }),
+        ],
+      },
+    });
+    expect(screen.getByText("Sin revisar")).toBeInTheDocument();
+    expect(screen.getByText(/límite mensual de IA/)).toBeInTheDocument();
+    expect(screen.getByText("Visto por Laura Pérez el 7 oct")).toBeInTheDocument();
   });
 });
