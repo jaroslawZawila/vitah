@@ -466,7 +466,7 @@ describe("getProjectPurchaseLines", () => {
       progress: "paid",
       costCents: 100_000,
       contractedCents: 95_000,
-      deviationCents: 5_000,
+      deviationCents: -5_000,
       invoicedCents: 95_000,
       paidCents: 95_000,
       outstandingCents: 0,

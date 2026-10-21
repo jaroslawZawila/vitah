@@ -241,7 +241,7 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
   in `purchase-documents.ts` (`purchaseDocumentsService`). `purchase_orders.file_*` is the legacy single PDF, copied
   into a first document by the prod SQL; `/api/v1/purchases/:orderId/file` still serves the first document
 - A line's contracted amount = its orders from ordered/contracted on (pending and cancelled don't count); its
-  deviation (cost − contracted) counts only once it is closed, so an open line never shows as a saving. The Obra tab's
+  deviation (contracted − cost: positive is an overrun, negative a saving) counts only once it is closed, so an open line never shows as a saving. The Obra tab's
   Costes/Resumen read it; a material order past its expected date and not delivered is a late delivery (warning only)
 - Suppliers are the Subcontratas companies; a material supplier is `subcontractors.supplies_only` (no CAE documents,
   workers or obras: always apta; it can't take a subcontract)

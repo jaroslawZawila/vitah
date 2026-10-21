@@ -669,7 +669,7 @@
         "deviation": "Desviación",
         "contractedLines": "{contracted} de {total} partidas cerradas",
         "total": "Total · {count, plural, one {# capítulo} other {# capítulos}} a coste",
-        "footnote": "Importes en euros, a coste. Imprevistos (cap. 20, {contingency} €) quedan como reserva. Desviación = coste presupuestado − contratado, solo sobre partidas cerradas: positivo es ahorro, negativo sobrecoste."
+        "footnote": "Importes en euros, a coste. Imprevistos (cap. 20, {contingency} €) quedan como reserva. Desviación = contratado − coste presupuestado, solo sobre partidas cerradas: positivo es sobrecoste, negativo ahorro."
       },
       "milestones": {
         "title": "Hitos de pago",
@@ -902,7 +902,7 @@
       "contracted": "Contratado",
       "deviation": "Desviación",
       "notContracted": "Sin contratar",
-      "footnote": "Lo contratado es la suma de los pedidos de la partida desde Pedido o Contratado; los pendientes y cancelados no suman. Desviación = coste presupuestado − contratado, solo en partidas cerradas: positivo es ahorro, negativo sobrecoste. Una partida abierta (falta contratar otra parte) muestra lo contratado hasta ahora, pero su desviación se deja vacía: nunca cuenta como ahorro. Una sin contratar solo muestra su coste, nunca un cero.",
+      "footnote": "Lo contratado es la suma de los pedidos de la partida desde Pedido o Contratado; los pendientes y cancelados no suman. Desviación = contratado − coste presupuestado, solo en partidas cerradas: positivo es sobrecoste, negativo ahorro. Una partida abierta (falta contratar otra parte) muestra lo contratado hasta ahora, pero su desviación se deja vacía: nunca cuenta como ahorro. Una sin contratar solo muestra su coste, nunca un cero.",
       "orders": "Pedidos",
       "late": "retraso",
       "openLine": "Abierta",
@@ -2795,7 +2795,7 @@
         "open": "abierta",
         "gone": "Ya no está en el presupuesto aceptado",
         "total": "Total del pedido (sin IVA)",
-        "closedNote": "Una partida cerrada (por este pedido o por otro) cuenta su desviación: coste − todo lo contratado para ella. Las abiertas no cuentan hasta cerrarse.",
+        "closedNote": "Una partida cerrada (por este pedido o por otro) cuenta su desviación: todo lo contratado para ella − su coste. Las abiertas no cuentan hasta cerrarse.",
         "openNote": "Ninguna partida de este pedido está cerrada: lo contratado suma, pero su desviación no cuenta hasta cerrarlas."
       },
       "data": {

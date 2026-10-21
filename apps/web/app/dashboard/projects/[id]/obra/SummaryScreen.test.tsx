@@ -65,14 +65,14 @@ describe("SummaryScreen", () => {
     const row = within(table).getByRole("link", { name: "Envolvente térmica Thermochip" }).closest("tr")!;
     expect(row.querySelector("a")).toHaveAttribute("href", "/dashboard/projects/p-1/obra/avance/06");
     expect(within(row).getByText("Fin superado +8 d")).toBeInTheDocument();
-    expect(within(row).getByText("+440 · +1,4 %")).toBeInTheDocument();
+    expect(within(row).getByText("−440 · −1,4 %")).toBeInTheDocument();
     // Not contracted: a dash, never zero.
     const pending = within(table).getByRole("link", { name: "Electricidad e iluminación" }).closest("tr")!;
     expect(within(pending).getByText("empieza en 2 d")).toBeInTheDocument();
     expect(within(pending).getAllByText("—").length).toBeGreaterThanOrEqual(2);
     // An overrun is negative.
     const roof = within(table).getByRole("link", { name: "Cubierta inclinada" }).closest("tr")!;
-    expect(within(roof).getByText("−2544 · −4,6 %")).toBeInTheDocument();
+    expect(within(roof).getByText("+2544 · +4,6 %")).toBeInTheDocument();
   });
 
   it("filters the chapters by chapter, state and period", async () => {

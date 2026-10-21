@@ -125,14 +125,14 @@ export function linesFromRequest(request: PurchaseRequestDetail, form: PurchaseF
 /** What a line still has to contract (never below zero): the amount a newly ticked line starts with. */
 export const remainingCents = (line: PurchaseFormLine) => Math.max(0, line.costCents - line.contractedCents);
 
-/** A ticked line's amount and, when it closes the line, cost − everything contracted (saving > 0). */
+/** A ticked line's amount and, when it closes the line, everything contracted − cost (overrun > 0). */
 export function lineFigures(line: PurchaseFormLine, draft: LineDraft | undefined, parse: ParseAmount) {
   if (!draft) return { amountCents: null, deviationCents: null };
   const amountCents = parse(draft.amount);
   const valid = Number.isFinite(amountCents);
   return {
     amountCents: valid ? amountCents : null,
-    deviationCents: draft.closes && valid ? line.costCents - line.contractedCents - amountCents : null,
+    deviationCents: draft.closes && valid ? line.contractedCents + amountCents - line.costCents : null,
   };
 }
 

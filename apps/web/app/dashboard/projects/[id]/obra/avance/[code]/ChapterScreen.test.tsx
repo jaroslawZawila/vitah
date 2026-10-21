@@ -58,7 +58,7 @@ describe("ChapterScreen", () => {
     expect(hito.getByRole("link", { name: "Ver en Pagos →" })).toHaveAttribute("href", "/dashboard/projects/p-1/payments/hito-h4");
 
     const cost = within(screen.getByRole("region", { name: "Coste" }));
-    expect(cost.getByText("+440,00 € · +1,4 %")).toBeInTheDocument();
+    expect(cost.getByText("−440,00 € · −1,4 %")).toBeInTheDocument();
     expect(cost.getByText("· 6 de 9 cerradas · 1 abierta")).toBeInTheDocument();
     expect(cost.queryByText("Simulado")).not.toBeInTheDocument();
 

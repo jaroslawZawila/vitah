@@ -39,10 +39,10 @@ describe("CostsScreen", () => {
     expect(lines()).toEqual(["06.01", "06.02", "06.05", "06.06", "06.09"]);
 
     const saving = row("Panel Thermochip de fachada");
-    expect(within(saving).getByText("+450,00")).toHaveClass("text-good");
-    expect(within(saving).getByText("+3,6 %")).toBeInTheDocument();
+    expect(within(saving).getByText("−450,00")).toHaveClass("text-good");
+    expect(within(saving).getByText("−3,6 %")).toBeInTheDocument();
     expect(within(saving).getByRole("link", { name: "PED-041" })).toHaveAttribute("href", "/dashboard/projects/p-1/compras/order-41");
-    expect(within(row("Lámina transpirable Tyvek")).getByText("−70,72")).toHaveClass("text-bad");
+    expect(within(row("Lámina transpirable Tyvek")).getByText("+70,72")).toHaveClass("text-bad");
 
     // Two orders, the late one flagged.
     const stone = row("Aplacado de piedra natural");

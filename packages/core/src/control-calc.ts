@@ -220,9 +220,9 @@ export function contractTotals(
   };
 }
 
-/** Cost − contracted (a saving is positive), and as bp of the cost; nulls when not contracted. */
+/** Contracted − cost (an overrun is positive, a saving negative), and as bp of the cost; nulls when not contracted. */
 export function deviation(costCents: number, contracted: number | null) {
   if (contracted === null) return { deviationCents: null, deviationBp: null };
-  const deviationCents = costCents - contracted;
+  const deviationCents = contracted - costCents;
   return { deviationCents, deviationBp: costCents ? Math.round((deviationCents * 10_000) / costCents) : 0 };
 }

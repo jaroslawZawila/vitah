@@ -15,7 +15,7 @@ const sign = (value: number) => (value > 0 ? "+" : value < 0 ? "−" : "");
 
 /**
  * Figures as the Obra tab shows them: dates as dd/mm, whole euros in tables,
- * signed deviations (positive = saving) and signed day counts.
+ * signed deviations (positive = overrun) and signed day counts.
  */
 export function useControlFormat() {
   const format = useFormatter();
@@ -76,4 +76,4 @@ export type ControlFormat = ReturnType<typeof useControlFormat>;
 
 /** The text colour of a deviation: a saving is good, an overrun bad. */
 export const deviationTone = (cents: number | null) =>
-  cents === null || cents === 0 ? "" : cents > 0 ? "text-good" : "text-bad";
+  cents === null || cents === 0 ? "" : cents > 0 ? "text-bad" : "text-good";

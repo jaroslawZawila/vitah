@@ -8,7 +8,7 @@ import Kpi from "../obra/Kpi";
 import { deviationTone } from "../construction/format";
 import { usePurchaseFormat } from "./format";
 
-/** The deviation over the closed lines (cost − contracted: a saving is positive), or why there is none yet. */
+/** The deviation over the closed lines (contracted − cost: an overrun is positive), or why there is none yet. */
 export function DeviationKpi({ summary }: { summary: Pick<ProjectPurchases["summary"], "deviationCents" | "deviationBp" | "closedLines"> }) {
   const t = useTranslations("purchasing.kpis");
   const f = usePurchaseFormat();
@@ -24,7 +24,7 @@ export function DeviationKpi({ summary }: { summary: Pick<ProjectPurchases["summ
         hints={[
           deviationCents === null || deviationBp === null
             ? t("noneClosed")
-            : t(deviationCents < 0 ? "overrunHint" : "savingHint", { pct: f.share(Math.abs(deviationBp)), count: closedLines }),
+            : t(deviationCents > 0 ? "overrunHint" : "savingHint", { pct: f.share(Math.abs(deviationBp)), count: closedLines }),
         ]}
       />
   );

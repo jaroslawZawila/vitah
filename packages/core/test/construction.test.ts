@@ -369,12 +369,12 @@ describe("getCosts", () => {
 
     const { chapters, sources } = await svc.getCosts(ctx, project.id);
     expect(sources.purchasing).toBe("live");
-    expect(chapters[0]!.lines[0]).toMatchObject({ contractedCents: 104_000, contracting: "closed", deviationCents: -4_000, deviationBp: -400 });
+    expect(chapters[0]!.lines[0]).toMatchObject({ contractedCents: 104_000, contracting: "closed", deviationCents: 4_000, deviationBp: 400 });
     expect(chapters[1]!.lines[0]).toMatchObject({ costCents: 100_000, contractedCents: null, contracting: "none", deviationCents: null, deviationBp: null });
 
     // The summary's deviation is over the contracted lines only.
     const { cost } = await svc.getControl(ctx, project.id);
-    expect(cost).toMatchObject({ contractedCents: 104_000, contractedCostCents: 100_000, deviationCents: -4_000, deviationBp: -400 });
+    expect(cost).toMatchObject({ contractedCents: 104_000, contractedCostCents: 100_000, deviationCents: 4_000, deviationBp: 400 });
   });
 });
 

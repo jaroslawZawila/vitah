@@ -723,7 +723,7 @@ export type ControlChapter = {
   contractedCents: number | null;
   /** The budgeted cost of the closed lines: what the deviation is measured on. */
   contractedCostCents: number;
-  /** Cost − contracted over the closed lines (saving > 0), and as bp of their cost; null when none are closed. */
+  /** Contracted − cost over the closed lines (overrun > 0, saving < 0), and as bp of their cost; null when none are closed. */
   deviationCents: number | null;
   deviationBp: number | null;
   openIssues: number;

@@ -24,7 +24,7 @@ const MATCHES: Record<Contracting, (line: CostLine) => boolean> = {
   closed: (line) => line.contracting === "closed",
   open: (line) => line.contracting === "open",
   uncontracted: (line) => line.contracting === "none",
-  overrun: (line) => (line.deviationCents ?? 0) < 0,
+  overrun: (line) => (line.deviationCents ?? 0) > 0,
 };
 
 /** What each budget line was expected to cost against what was contracted. */

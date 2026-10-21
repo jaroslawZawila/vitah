@@ -38,7 +38,7 @@ describe("PurchasesScreen", () => {
     const kpis = within(screen.getByRole("region", { name: "Resumen de compras" }));
     expect(kpis.getByText("214.270 €")).toBeInTheDocument();
     expect(kpis.getByText(/de 312.840 € a coste/)).toBeInTheDocument();
-    expect(kpis.getByText("+3412 €")).toHaveClass("text-good");
+    expect(kpis.getByText("−3412 €")).toHaveClass("text-good");
     expect(kpis.getByText(/Ahorro del 1,9 % sobre 58 partidas cerradas/)).toBeInTheDocument();
     expect(kpis.getByText("98.170 €")).toBeInTheDocument();
     expect(kpis.getByText("44 partidas sin pedido · 1 pedido pendiente de enviar")).toBeInTheDocument();

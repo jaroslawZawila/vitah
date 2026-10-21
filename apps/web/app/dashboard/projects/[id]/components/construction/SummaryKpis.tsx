@@ -78,7 +78,7 @@ export default function SummaryKpis({ control }: { control: ConstructionControl 
         </div>
         <p className="mt-0.5 text-[12px] leading-snug text-muted-foreground">
           {cost.contractedCostCents
-            ? t(cost.deviationCents < 0 ? "overrunNote" : "savingNote", { amount: f.moneyRound(cost.contractedCostCents) })
+            ? t(cost.deviationCents > 0 ? "overrunNote" : "savingNote", { amount: f.moneyRound(cost.contractedCostCents) })
             : t("nothingContracted")}
         </p>
         <SourceLabel>

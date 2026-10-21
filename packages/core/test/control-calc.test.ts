@@ -104,9 +104,9 @@ describe("plannedDates", () => {
 });
 
 describe("deviation", () => {
-  it("is cost minus contracted: a saving is positive", () => {
-    expect(deviation(1_260_000, 1_215_000)).toEqual({ deviationCents: 45_000, deviationBp: 357 });
-    expect(deviation(116_928, 124_000)).toEqual({ deviationCents: -7_072, deviationBp: -605 });
+  it("is contracted minus cost: an overrun is positive, a saving negative", () => {
+    expect(deviation(1_260_000, 1_215_000)).toEqual({ deviationCents: -45_000, deviationBp: -357 });
+    expect(deviation(116_928, 124_000)).toEqual({ deviationCents: 7_072, deviationBp: 605 });
     expect(deviation(1000, null)).toEqual({ deviationCents: null, deviationBp: null });
   });
 });

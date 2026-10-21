@@ -93,11 +93,11 @@ describe("OrderFormScreen", () => {
     expect(screen.getByRole("textbox", { name: "Importe de 07.04" })).toHaveValue("1660,00");
     expect(within(open).getByText("abierta")).toBeInTheDocument();
     const closed = screen.getByRole("textbox", { name: "Importe de 07.01" }).closest("tr")!;
-    expect(within(closed).getByText("+190,00")).toHaveClass("text-good");
+    expect(within(closed).getByText("−190,00")).toHaveClass("text-good");
 
     expect(total().getByText("8910,00 €")).toBeInTheDocument();
     expect(total().getByText("Desviación en 1 partida cerrada")).toBeInTheDocument();
-    expect(total().getByText("+190,00 €")).toBeInTheDocument();
+    expect(total().getByText("−190,00 €")).toBeInTheDocument();
   });
 
   it("saves as contracted with its lines, then opens the order", async () => {

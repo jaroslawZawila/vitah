@@ -388,7 +388,7 @@ export async function getControl(ctx: Ctx, projectId: string): Promise<Construct
   const sum = (values: number[]) => values.reduce((total, v) => total + v, 0);
   const contractedCents = sum(chapters.map((c) => c.contractedCents ?? 0));
   const contractedCostCents = sum(chapters.map((c) => c.contractedCostCents));
-  const total = deviation(contractedCostCents, contractedCostCents - sum(chapters.map((c) => c.deviationCents ?? 0)));
+  const total = deviation(contractedCostCents, contractedCostCents + sum(chapters.map((c) => c.deviationCents ?? 0)));
   const { contractCents } = control;
   const invoicedCents = sum(milestones.map((m) => m.invoicedCents));
   const collectedCents = sum(milestones.map((m) => m.collectedCents));

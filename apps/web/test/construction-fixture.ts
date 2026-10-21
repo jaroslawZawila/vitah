@@ -35,7 +35,7 @@ export function controlChapter(overrides: Partial<ControlChapter> = {}): Control
     openLines: 0,
     contractedCents: 3_040_000,
     contractedCostCents: 3_084_000,
-    deviationCents: 44_000,
+    deviationCents: -44_000,
     openIssues: 1,
     added: false,
     ...overrides,
@@ -63,7 +63,7 @@ export const chapters: ControlChapter[] = [
     contractedLines: 10,
     contractedCents: 2_710_000,
     contractedCostCents: 2_791_100,
-    deviationCents: 81_100,
+    deviationCents: -81_100,
     openIssues: 0,
   }),
   controlChapter({
@@ -124,7 +124,7 @@ export const chapters: ControlChapter[] = [
     contractedLines: 9,
     contractedCents: 5_790_000,
     contractedCostCents: 5_535_600,
-    deviationCents: -254_400,
+    deviationCents: 254_400,
     openIssues: 0,
   }),
   controlChapter({
@@ -145,7 +145,7 @@ export const chapters: ControlChapter[] = [
     contractedLines: 16,
     contractedCents: 8_940_000,
     contractedCostCents: 9_061_000,
-    deviationCents: 121_000,
+    deviationCents: -121_000,
     openIssues: 0,
   }),
 ];
@@ -298,8 +298,8 @@ export const control: ConstructionControl = {
     budgetedCents: 25_532_600,
     contractedCents: 20_480_000,
     contractedCostCents: 20_471_700,
-    deviationCents: -8_300,
-    deviationBp: -4,
+    deviationCents: 8_300,
+    deviationBp: 4,
     contingencyCents: 2_475_900,
   },
   sales: {
@@ -419,9 +419,9 @@ export const costs: ConstructionCosts = {
       name: "Envolvente térmica Thermochip",
       state: "in_progress",
       lines: [
-        { id: "l-1", code: "06.01", description: "Panel Thermochip de fachada", unit: "m²", quantity: 201.6, costCents: 1_260_000, contractedCents: 1_215_000, contracting: "closed", orders: [{ id: "order-41", number: 41, supplierName: "Montajes Steel Norte", lateDays: null }], deviationCents: 45_000, deviationBp: 357 },
-        { id: "l-2", code: "06.02", description: "Lámina transpirable Tyvek", unit: "m²", quantity: 201.6, costCents: 116_928, contractedCents: 124_000, contracting: "closed", orders: [{ id: "order-41", number: 41, supplierName: "Montajes Steel Norte", lateDays: null }], deviationCents: -7_072, deviationBp: -605 },
-        { id: "l-5", code: "06.05", description: "Aplacado de piedra natural", unit: "m²", quantity: 24, costCents: 332_400, contractedCents: 352_000, contracting: "closed", orders: [{ id: "order-49", number: 49, supplierName: "Piedra de Liébana", lateDays: 3 }, { id: "order-47", number: 47, supplierName: "Revocos Cantábrico", lateDays: null }], deviationCents: -19_600, deviationBp: -590 },
+        { id: "l-1", code: "06.01", description: "Panel Thermochip de fachada", unit: "m²", quantity: 201.6, costCents: 1_260_000, contractedCents: 1_215_000, contracting: "closed", orders: [{ id: "order-41", number: 41, supplierName: "Montajes Steel Norte", lateDays: null }], deviationCents: -45_000, deviationBp: -357 },
+        { id: "l-2", code: "06.02", description: "Lámina transpirable Tyvek", unit: "m²", quantity: 201.6, costCents: 116_928, contractedCents: 124_000, contracting: "closed", orders: [{ id: "order-41", number: 41, supplierName: "Montajes Steel Norte", lateDays: null }], deviationCents: 7_072, deviationBp: 605 },
+        { id: "l-5", code: "06.05", description: "Aplacado de piedra natural", unit: "m²", quantity: 24, costCents: 332_400, contractedCents: 352_000, contracting: "closed", orders: [{ id: "order-49", number: 49, supplierName: "Piedra de Liébana", lateDays: 3 }, { id: "order-47", number: 47, supplierName: "Revocos Cantábrico", lateDays: null }], deviationCents: 19_600, deviationBp: 590 },
         { id: "l-3", code: "06.06", description: "Perfilería de arranque y goterones", unit: "ml", quantity: 180, costCents: 171_000, contractedCents: null, contracting: "none", orders: [], deviationCents: null, deviationBp: null },
         { id: "l-9", code: "06.09", description: "Estanqueidad al aire de la envolvente", unit: "ud", quantity: 1, costCents: 145_000, contractedCents: 90_000, contracting: "open", orders: [{ id: "order-41", number: 41, supplierName: "Montajes Steel Norte", lateDays: null }], deviationCents: null, deviationBp: null },
       ],
@@ -431,7 +431,7 @@ export const costs: ConstructionCosts = {
       name: "Cubierta inclinada",
       state: "finished",
       lines: [
-        { id: "l-4", code: "05.01", description: "Teja cerámica mixta", unit: "m²", quantity: 180, costCents: 2_000_000, contractedCents: 2_100_000, contracting: "closed", orders: [{ id: "order-40", number: 40, supplierName: "Cubiertas Besaya", lateDays: null }], deviationCents: -100_000, deviationBp: -500 },
+        { id: "l-4", code: "05.01", description: "Teja cerámica mixta", unit: "m²", quantity: 180, costCents: 2_000_000, contractedCents: 2_100_000, contracting: "closed", orders: [{ id: "order-40", number: 40, supplierName: "Cubiertas Besaya", lateDays: null }], deviationCents: 100_000, deviationBp: 500 },
       ],
     },
   ],

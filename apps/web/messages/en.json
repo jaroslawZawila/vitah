@@ -669,7 +669,7 @@
         "deviation": "Deviation",
         "contractedLines": "{contracted} of {total} lines closed",
         "total": "Total · {count, plural, one {# chapter} other {# chapters}} at cost",
-        "footnote": "Amounts in euros, at cost. Contingencies (ch. 20, {contingency} €) are kept as a reserve. Deviation = budgeted cost − contracted, only on closed lines: positive is a saving, negative an overrun."
+        "footnote": "Amounts in euros, at cost. Contingencies (ch. 20, {contingency} €) are kept as a reserve. Deviation = contracted − budgeted cost, only on closed lines: positive is an overrun, negative a saving."
       },
       "milestones": {
         "title": "Payment milestones",
@@ -902,7 +902,7 @@
       "contracted": "Contracted",
       "deviation": "Deviation",
       "notContracted": "Not contracted",
-      "footnote": "Contracted is the sum of the line's orders from Ordered or Contracted on; pending and cancelled ones don't count. Deviation = budgeted cost − contracted, only on closed lines: positive is a saving, negative an overrun. An open line (another part still to contract) shows what is contracted so far but no deviation: it never counts as a saving. A line not contracted only shows its cost, never a zero.",
+      "footnote": "Contracted is the sum of the line's orders from Ordered or Contracted on; pending and cancelled ones don't count. Deviation = contracted − budgeted cost, only on closed lines: positive is an overrun, negative a saving. An open line (another part still to contract) shows what is contracted so far but no deviation: it never counts as a saving. A line not contracted only shows its cost, never a zero.",
       "orders": "Orders",
       "late": "late",
       "openLine": "Open",
@@ -2795,7 +2795,7 @@
         "open": "open",
         "gone": "No longer in the accepted budget",
         "total": "Order total (excl. VAT)",
-        "closedNote": "A closed line (by this order or another) counts its deviation: cost − everything contracted for it. Open lines don't count until they are closed.",
+        "closedNote": "A closed line (by this order or another) counts its deviation: everything contracted for it − its cost. Open lines don't count until they are closed.",
         "openNote": "None of this order's lines is closed: what is contracted adds up, but their deviation doesn't count until they are closed."
       },
       "data": {

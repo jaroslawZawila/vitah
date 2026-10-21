@@ -16,7 +16,7 @@ export function useObraFormat() {
     /** Euro cents → "12.500,00 €". */
     money,
     /** "+2.570,00 €" / "−1.200,00 €". */
-    signedMoney: (cents: number) => `${cents > 0 ? "+" : ""}${money(cents)}`,
+    signedMoney: (cents: number) => `${cents > 0 ? "+" : cents < 0 ? "−" : ""}${money(Math.abs(cents))}`,
     /** Basis points → "19,26 %". */
     share,
     /** `part` of `whole` → "24 %". */

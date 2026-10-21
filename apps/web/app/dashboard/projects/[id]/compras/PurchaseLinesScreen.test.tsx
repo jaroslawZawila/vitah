@@ -39,7 +39,7 @@ describe("PurchaseLinesScreen", () => {
     expect(within(due).getByRole("link", { name: "Ver vencimientos" })).toHaveAttribute("href", "/dashboard/compras/facturas");
 
     expect(within(row("03.01")).getByText("Factura")).toBeInTheDocument();
-    expect(within(row("03.01")).getByText("−7000,00")).toHaveClass("text-bad");
+    expect(within(row("03.01")).getByText("+7000,00")).toHaveClass("text-bad");
     expect(within(row("02.02")).getByText("Vencida")).toBeInTheDocument();
     expect(within(row("10.01")).getByText("Por contratar 10.900,00")).toBeInTheDocument();
     expect(within(row("10.01")).getByText("Pendiente de contratar")).toBeInTheDocument();

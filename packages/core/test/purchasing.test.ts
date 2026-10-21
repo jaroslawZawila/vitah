@@ -138,7 +138,7 @@ describe("createPurchase", () => {
 describe("what is contracted", () => {
   it("counts placed orders by line, and a line's deviation only once it is closed", async () => {
     const s = await setup();
-    // 01: closed for 950 € (a saving of 50 €); 02: 400 € so far, more to order.
+    // 01: closed for 950 € (a saving of 50 €: −50); 02: 400 € so far, more to order.
     await svc.createPurchase(s.ctx, s.project.id, material(s, { status: "ordered" }));
     const open = await svc.createPurchase(s.ctx, s.project.id, {
       kind: "subcontract",
@@ -152,8 +152,8 @@ describe("what is contracted", () => {
     expect(summary).toMatchObject({
       contractedCents: 135_000,
       closedLines: 1,
-      deviationCents: 5_000,
-      deviationBp: 500,
+      deviationCents: -5_000,
+      deviationBp: -500,
       toContractCents: 100_000,
       uncontractedLines: 1,
     });
@@ -163,7 +163,7 @@ describe("what is contracted", () => {
     expect(chapters[0]!.lines[0]).toMatchObject({
       contractedCents: 95_000,
       contracting: "closed",
-      deviationCents: 5_000,
+      deviationCents: -5_000,
       orders: [{ number: 1, supplierName: "Piedra de Liébana S.L.", lateDays: null }],
     });
     expect(chapters[1]!.lines[0]).toMatchObject({ contractedCents: 40_000, contracting: "open", deviationCents: null });
@@ -171,11 +171,11 @@ describe("what is contracted", () => {
 
     const control = await constructionService.getControl(s.ctx, s.project.id);
     expect(control.chapters.map((c) => [c.code, c.contractedLines, c.openLines, c.contractedCents, c.deviationCents])).toEqual([
-      ["01", 1, 0, 95_000, 5_000],
+      ["01", 1, 0, 95_000, -5_000],
       ["02", 0, 1, 40_000, null],
       ["03", 0, 0, null, null],
     ]);
-    expect(control.cost).toMatchObject({ contractedCents: 135_000, contractedCostCents: 100_000, deviationCents: 5_000, deviationBp: 500 });
+    expect(control.cost).toMatchObject({ contractedCents: 135_000, contractedCostCents: 100_000, deviationCents: -5_000, deviationBp: -500 });
 
     // Closing 02 with the rest: its deviation is over both orders.
     await svc.createPurchase(s.ctx, s.project.id, material(s, {
@@ -183,11 +183,11 @@ describe("what is contracted", () => {
       lines: [{ lineageId: s.lineage("02"), amountCents: 65_000 }],
     }));
     const detail = await svc.getPurchase(s.ctx, open.orderId);
-    expect(detail.lines[0]).toMatchObject({ code: "02.01", costCents: 100_000, amountCents: 40_000, otherCents: 65_000, deviationCents: -5_000 });
+    expect(detail.lines[0]).toMatchObject({ code: "02.01", costCents: 100_000, amountCents: 40_000, otherCents: 65_000, deviationCents: 5_000 });
     expect((await constructionService.getCosts(s.ctx, s.project.id)).chapters[1]!.lines[0]).toMatchObject({
       contracting: "closed",
       contractedCents: 105_000,
-      deviationBp: -500,
+      deviationBp: 500,
     });
   });
 
@@ -490,7 +490,7 @@ describe("code review fixes", () => {
   it("shows no contracted amount or deviation on a cancelled order's page", async () => {
     const s = await setup();
     const { orderId } = await svc.createPurchase(s.ctx, s.project.id, material(s, { status: "ordered" }));
-    expect((await svc.getPurchase(s.ctx, orderId)).lines[0]).toMatchObject({ deviationCents: 5_000 });
+    expect((await svc.getPurchase(s.ctx, orderId)).lines[0]).toMatchObject({ deviationCents: -5_000 });
     await svc.setPurchaseStatus(s.ctx, orderId, { status: "cancelled" });
     expect((await svc.getPurchase(s.ctx, orderId)).lines[0]).toMatchObject({ otherCents: 0, deviationCents: null });
     // And it's history: reopen it to change it.

@@ -63,7 +63,7 @@ describe("OrderScreen", () => {
     expect(within(row).getByText("3324,00")).toBeInTheDocument();
     expect(within(row).getByText("400,00")).toBeInTheDocument();
     expect(within(row).getByText("Sí")).toBeInTheDocument();
-    expect(within(row).getByText(/−196,00/)).toHaveClass("text-bad");
+    expect(within(row).getByText(/\+196,00/)).toHaveClass("text-bad");
 
     const data = within(screen.getByRole("region", { name: "Datos" }));
     expect(data.getByText("3 oct 2026")).toBeInTheDocument();
