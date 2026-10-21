@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import {
+  canAmend,
   canCancel,
   countsAsContracted,
   isCompletedOrder,
@@ -26,7 +27,8 @@ import { setOrderMilestonesAction } from "../../../../../actions/purchase-invoic
 import FormError from "../../../../components/FormError";
 import { obraHref } from "../../components/construction/ObraFrame";
 import { useObraAction } from "../../components/obra/useObraAction";
-import { editOrderHref, newInvoiceHref, orderDocumentUrl, purchasesHref } from "../../components/purchasing/links";
+import { amendOrderHref, editOrderHref, newInvoiceHref, orderDocumentUrl, purchasesHref } from "../../components/purchasing/links";
+import { OrderAmendments } from "../../components/purchasing/OrderAmendmentViews";
 import { OrderDocuments } from "../../components/purchasing/OrderDocumentViews";
 import { MilestonesCard, OrderInvoices } from "../../components/purchasing/OrderInvoiceViews";
 import { LateBanner, OrderData, OrderHeading, OrderHistory, OrderLines, StatusForm, StatusSteps } from "../../components/purchasing/OrderViews";
@@ -131,6 +133,13 @@ export default function OrderScreen({
 
       {/* Full width: the lines table needs ~760px, more than a two-thirds column has on a laptop. */}
       <OrderLines order={order} />
+      {(canAmend(order.status) || order.amendments.length > 0) && (
+        <OrderAmendments
+          order={order}
+          amendHref={canManage && canAmend(order.status) ? amendOrderHref(projectId, order.id) : undefined}
+          documentUrl={(documentId) => orderDocumentUrl(order.id, documentId)}
+        />
+      )}
 
       <div className="grid items-start gap-[18px] lg:grid-cols-3">
         <div className="flex min-w-0 flex-col gap-[18px]">

@@ -3,7 +3,8 @@
 // Thin portal adapters over @repo/core's purchasing (packages/core/src/purchasing.ts):
 // the project's Compras tab, the company-wide Compras list and an order's page.
 
-import { purchaseDocumentsService as documents, purchasingService as svc } from "@repo/core";
+import { purchaseAmendmentsService as amendments, purchaseDocumentsService as documents, purchasingService as svc } from "@repo/core";
+import { fieldsWithFile } from "../../lib/api";
 import { mutateDashboard, read, type ObraState } from "./run";
 
 // ─── Reads ───────────────────────────────────────────────────────────────────
@@ -84,6 +85,22 @@ export async function addOrderDocumentVersionAction(
   formData: FormData,
 ): Promise<ObraState> {
   return write(projectId, (ctx) => documents.addOrderDocumentVersion(ctx, orderId, documentId, Object.fromEntries(formData)));
+}
+
+/**
+ * Form data: `data` (the modificado as JSON) and `file` (its signed PDF,
+ * optional). → its number too, and `documentFailed` when the PDF didn't go up.
+ */
+export async function amendPurchaseAction(
+  projectId: string,
+  orderId: string,
+  formData: FormData,
+): Promise<(NonNullable<ObraState> & { number?: number; documentFailed?: boolean }) | null> {
+  let made: { number: number; documentFailed?: boolean } | undefined;
+  const state = await write(projectId, async (ctx) => {
+    made = await amendments.amendPurchase(ctx, orderId, fieldsWithFile(formData));
+  });
+  return state?.success ? { ...state, number: made?.number, ...(made?.documentFailed ? { documentFailed: true } : {}) } : state;
 }
 
 /** The document with all its versions. */

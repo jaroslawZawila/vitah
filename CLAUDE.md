@@ -182,7 +182,7 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
   Subcontratas tables `subcontractors`, `subcontractor_workers`, `subcontractor_documents`, `subcontractor_document_versions`,
   `subcontractor_assignments`, `subcontractor_audit`, Compras' `purchase_orders`, `purchase_order_lines`,
   `purchase_order_events`, `purchase_order_documents`, `purchase_order_document_versions`, `purchase_order_milestones`, `purchase_invoices`, `purchase_invoice_lines`, `purchase_invoice_files`,
-  `purchase_payments`, `purchase_requests`, `purchase_request_lines`, `purchase_request_events`, and Planning's `planning_versions`, `planning_items`. A project is deliberately minimal — exactly what the mobile app shows: `ref`, `address`, `start_date`, `completion_date`, plus `client_user_id` linking it to its mobile app client
+  `purchase_payments`, `purchase_requests`, `purchase_request_lines`, `purchase_request_events`, `purchase_order_amendments`, and Planning's `planning_versions`, `planning_items`. A project is deliberately minimal — exactly what the mobile app shows: `ref`, `address`, `start_date`, `completion_date`, plus `client_user_id` linking it to its mobile app client
 - Prod migrations are additive SQL files in `packages/db/sql/`, applied by hand (no plain `db:push` on prod)
 
 ### Obra (construction process)
@@ -263,6 +263,15 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
   only while pending. `createPurchase({ requestId })` makes the order from an approved one in the same transaction and
   links them (`purchase_requests.order_id`, once only; cancelling that order approves the request again, unlinked); orders can still be made without one. A request contracts
   nothing. Every change goes to `purchase_request_events`
+- Modificados (`packages/core/src/purchase-amendments.ts`, `purchaseAmendmentsService`; loader in
+  `purchase-amendment-data.ts`): a placed order changes formally by a numbered modificado (`purchase_order_amendments`:
+  reason, signed day ≤ today, amounts before and after, the line changes, optionally its signed PDF as one of the
+  order's documents). It rewrites the order's lines like an edit (`replaceOrderLines`: invoiced lines stay, never below what
+  they invoiced, `below_invoiced`; `no_changes` if nothing moves) and keeps a payment schedule adding up (a rise is a
+  milestone of its own, a cut comes off the last ones not invoiced). The order keeps its `amendments` and
+  `originalAmountCents` (its amount less what they changed; edits are corrections). Signed between the order's date and today. A pending order is just edited. Portal: the order page's
+  Modificados card and `compras/[orderId]/modificado`; API `POST /api/v1/purchases/:orderId/amendments` (JSON or
+  multipart with `data` + `file`)
 - Suppliers (Compras › Proveedores, `packages/core/src/purchase-suppliers.ts`, `purchaseSuppliersService`): every
   Subcontratas company as a supplier, read-only: its orders across the obras, contracted, invoiced and paid (without VAT,
   as compared with the cost), owed and past due (with VAT: what Administration pays), retention held, those owed first. Data and CAE stay on its Subcontratas ficha.
@@ -292,7 +301,8 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
   (`seed/purchasing.ts`), their invoices and payments (`seed/purchase-invoices.ts`) and three requests
   (`seed/purchase-requests.ts`). Prod SQL:
   `packages/db/sql/2026-10-purchasing.sql`, `packages/db/sql/2026-10-purchase-invoices.sql`,
-  `packages/db/sql/2026-10-purchase-documents.sql`, `packages/db/sql/2026-10-purchase-requests.sql`
+  `packages/db/sql/2026-10-purchase-documents.sql`, `packages/db/sql/2026-10-purchase-requests.sql`,
+  `packages/db/sql/2026-10-purchase-amendments.sql`
 
 ### Planning (Planificación)
 

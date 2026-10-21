@@ -2896,7 +2896,8 @@
         "cancelled": "Cancelada",
         "ordered": "Pedido {number} creado",
         "reopened": "{number} cancelado: aprobada de nuevo, se puede volver a pedir"
-      }
+      },
+      "amended": "Modificado nº {number}: {amount} €"
     },
     "form": {
       "numbered": "{ref} · se numerará {number}",
@@ -3067,7 +3068,10 @@
       "duplicate_number": "Ese proveedor ya tiene una factura con ese número.",
       "milestones_mismatch": "Los hitos deben sumar el importe del pedido.",
       "exceeds_amount": "El importe supera lo que queda por pagar o por abonar.",
-      "request_not_approved": "La solicitud ya no está aprobada (se ha pedido o cancelado mientras tanto). Vuelve a ella para ver qué ha pasado."
+      "request_not_approved": "La solicitud ya no está aprobada (se ha pedido o cancelado mientras tanto). Vuelve a ella para ver qué ha pasado.",
+      "no_changes": "El modificado no cambia ninguna partida: cambia un importe, añade o quita una partida, o cambia si la cierra.",
+      "amendment_incomplete": "Escribe el motivo y deja al menos una partida con su importe.",
+      "below_invoiced": "Una partida no puede quedar por debajo de lo que ya se ha facturado en ella."
     },
     "views": {
       "label": "Vista",
@@ -3616,6 +3620,42 @@
         "noInvoices": "Todavía no hay facturas suyas.",
         "payments": "Pagos",
         "noPayments": "Todavía no se le ha pagado nada."
+      }
+    },
+    "amendments": {
+      "title": "Modificados",
+      "add": "Registrar modificado",
+      "none": "Sin modificados: el importe es el contratado.",
+      "original": "Importe original",
+      "current": "actual",
+      "list": "Modificados del pedido",
+      "number": "Modificado nº {number}",
+      "recorded": "Registrado por {by} el {date}",
+      "form": {
+        "title": "Modificado nº {number}",
+        "label": "Modificado nº {number}",
+        "intro": "Un cambio formal del contrato ya firmado: por qué y cuándo, y cómo quedan sus partidas (otro importe, partidas nuevas o quitadas). El original y cada modificado quedan en el pedido.",
+        "whyTitle": "1 · Motivo y fecha",
+        "concept": "Motivo",
+        "conceptPlaceholder": "Ej.: refuerzo de forjado por cambio de uso",
+        "signedOn": "Firmado el",
+        "signedOnHint": "No puede ser posterior a hoy.",
+        "documentTitle": "3 · Documento firmado",
+        "optional": "(opcional)",
+        "documentHint": "El PDF firmado se guarda entre los documentos del pedido como «Modificado nº {number}».",
+        "chooseFile": "Elegir PDF",
+        "removeFile": "Quitar {name}",
+        "totalLabel": "Importe del pedido",
+        "before": "Antes",
+        "after": "Después",
+        "delta": "Diferencia",
+        "cancel": "Cancelar",
+        "saving": "Guardando…",
+        "save": "Registrar modificado nº {number}",
+        "documentName": "Modificado nº {number}",
+        "documentFailed": "El modificado nº {number} está registrado, pero su PDF no se ha podido subir. Súbelo desde los documentos del pedido.",
+        "goToOrder": "Ir al pedido",
+        "linesTitle": "2 · Partidas del pedido"
       }
     }
   }

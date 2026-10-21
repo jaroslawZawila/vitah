@@ -166,6 +166,10 @@ export const orderComplete = (draft: OrderDraft, parse: ParseAmount) =>
 
 const orNull = (value: string) => (value === "" ? null : value);
 
+/** The ticked lines as core takes them: amount in cents and whether each closes its budget line. */
+export const linesInput = (draft: Pick<OrderDraft, "lines">, parse: ParseAmount) =>
+  Object.entries(draft.lines).map(([lineageId, line]) => ({ lineageId, amountCents: parse(line.amount), closesLine: line.closes }));
+
 /**
  * The body for createPurchaseAction / updatePurchaseAction. The order date is
  * sent once the order is placed (`placed`); a pending one gets it when marked.
@@ -180,11 +184,7 @@ export function orderInput(draft: OrderDraft, parse: ParseAmount, placed: boolea
     expectedOn: material ? orNull(draft.expectedOn) : null,
     workStart: material ? null : orNull(draft.workStart),
     workEnd: material ? null : orNull(draft.workEnd),
-    lines: Object.entries(draft.lines).map(([lineageId, line]) => ({
-      lineageId,
-      amountCents: parse(line.amount),
-      closesLine: line.closes,
-    })),
+    lines: linesInput(draft, parse),
     // A whole number of days; anything else is refused by core.
     paymentDays: draft.paymentDays.trim() === "" ? null : /^\d+$/.test(draft.paymentDays.trim()) ? Number(draft.paymentDays.trim()) : NaN,
     // A % in hundredths is basis points.

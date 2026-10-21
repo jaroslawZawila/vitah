@@ -43,6 +43,7 @@ export {
   purchaseOrderLines,
   purchaseOrderEvents,
   purchaseOrderMilestones,
+  purchaseOrderAmendments,
   purchaseRequests,
   purchaseRequestLines,
   purchaseRequestEvents,

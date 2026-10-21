@@ -7,6 +7,7 @@ import { signInAs } from "../../test/session";
 import {
   addOrderDocumentAction,
   addOrderDocumentVersionAction,
+  amendPurchaseAction,
   createPurchaseAction,
   deleteOrderDocumentAction,
   getProjectPurchases,
@@ -88,6 +89,18 @@ describe("purchasing actions", () => {
     });
     expect(await deleteOrderDocumentAction(project.id, orderId, documentId)).toEqual({ success: true });
     expect(await deleteOrderDocumentAction(project.id, orderId, documentId)).toEqual({ error: "not_found" });
+  });
+
+  it("record a modificado on a placed order, refreshing the dashboard", async () => {
+    const { project, order } = await setup();
+    const created = await createPurchaseAction(project.id, { ...order, status: "ordered" });
+    vi.mocked(revalidatePath).mockClear();
+    const form = new FormData();
+    form.set("data", JSON.stringify({ concept: "Más metros", lines: [{ ...order.lines[0]!, amountCents: 320_000 }] }));
+    expect(await amendPurchaseAction(project.id, created!.orderId!, form)).toEqual({ success: true, number: 1 });
+    expect(revalidatePath).toHaveBeenCalledWith("/dashboard", "layout");
+    expect((await getPurchase(created!.orderId!))!.order).toMatchObject({ amountCents: 320_000, originalAmountCents: 300_000 });
+    expect(await amendPurchaseAction(project.id, created!.orderId!, form)).toEqual({ error: "no_changes" });
   });
 
   it("read the project's, the tenant's and the form, with whether the caller may edit", async () => {

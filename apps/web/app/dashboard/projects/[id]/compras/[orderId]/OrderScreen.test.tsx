@@ -270,3 +270,50 @@ describe("OrderScreen from a purchase request", () => {
     expect(screen.getByRole("link", { name: "SOL-001" })).toHaveAttribute("href", "/dashboard/projects/p-1/compras/solicitudes/req-1");
   });
 });
+
+describe("OrderScreen with modificados", () => {
+  it("shows the original amount, each modificado with its lines and PDF, and how to record another", () => {
+    renderScreen({
+      order: {
+        ...orderDetail,
+        originalAmountCents: 300_000,
+        amendments: [
+          {
+            id: "am-1",
+            number: 1,
+            concept: "Portes incluidos según confirmación",
+            signedOn: "2026-10-06",
+            amountBeforeCents: 300_000,
+            amountAfterCents: 312_000,
+            changes: [{ code: "06.05", lineageId: "lin-0605", from: { amountCents: 300_000, closesLine: true }, to: { amountCents: 312_000, closesLine: true } }],
+            document: { id: "doc-1", title: "Modificado nº 1" },
+            by: "Laura Pérez",
+            at: "2026-10-06T10:00:00.000Z",
+          },
+        ],
+      },
+    });
+    const card = within(screen.getByRole("region", { name: /Modificados/ }));
+    expect(card.getByText("3000,00 €")).toBeInTheDocument();
+    expect(card.getByText("(+120,00 €)")).toHaveClass("text-bad");
+    const item = within(card.getByRole("listitem"));
+    expect(item.getByText("Modificado nº 1", { selector: "b" })).toBeInTheDocument();
+    expect(item.getByText("Importe de 06.05: 3000,00 → 3120,00")).toBeInTheDocument();
+    expect(item.getByRole("link", { name: "Modificado nº 1" })).toHaveAttribute("href", "/api/v1/purchases/order-49/documents/doc-1");
+    expect(card.getByRole("link", { name: "Registrar modificado" })).toHaveAttribute("href", "/dashboard/projects/p-1/compras/order-49/modificado");
+    renderScreen({
+      order: {
+        ...orderDetail,
+        events: [{ id: "ev-9", action: "amended", detail: { number: 1, concept: "Portes", deltaCents: 12_000 }, note: null, by: "Laura Pérez", at: "2026-10-06T10:00:00.000Z" }],
+      },
+    });
+    expect(screen.getAllByText(/Modificado nº 1: \+120,00 €/).length).toBeGreaterThan(0);
+  });
+
+  it("offers no modificado to viewers or on a pending order", () => {
+    renderScreen({ canManage: false });
+    expect(screen.queryByRole("link", { name: "Registrar modificado" })).not.toBeInTheDocument();
+    renderScreen({ order: { ...orderDetail, status: "pending" } });
+    expect(screen.queryByRole("link", { name: "Registrar modificado" })).not.toBeInTheDocument();
+  });
+});

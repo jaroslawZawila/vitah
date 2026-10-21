@@ -53,6 +53,7 @@ import {
 import { contractSchedule, contractTotals, daysPast, deviation, lateDays, type LineContract } from "./control-calc";
 import { orderByDate, templateLeadDays } from "./planning-calc";
 import { loadDocuments, ordersWithDocuments } from "./purchase-document-data";
+import { loadAmendments } from "./purchase-amendment-data";
 import { orderRequest, reopenRequestOf } from "./purchase-request-data";
 import { addInvoicing, isDueSoon, purchaseProgress, termsOf } from "./purchase-calc";
 import {
@@ -614,7 +615,7 @@ function reachedOn(events: { action: string; detail: Record<string, unknown>; cr
 /** One order: its lines against the budget, its chapters on the obra, and its history. */
 export async function getPurchase(ctx: Ctx, orderId: string): Promise<PurchaseOrderDetail> {
   const order = await requireOrder(ctx, orderId);
-  const [plan, projectOrders, events, [creator], net, invoices, milestones, documents, [request]] = await Promise.all([
+  const [plan, projectOrders, events, [creator], net, invoices, milestones, documents, [request], amendments] = await Promise.all([
     contractPlan(ctx.tenantId, order.projectId),
     loadOrders(ctx.tenantId, ofProject(order.projectId)),
     db
@@ -635,6 +636,7 @@ export async function getPurchase(ctx: Ctx, orderId: string): Promise<PurchaseOr
       .select({ id: purchaseRequests.id, number: purchaseRequests.number })
       .from(purchaseRequests)
       .where(and(eq(purchaseRequests.tenantId, ctx.tenantId), eq(purchaseRequests.orderId, orderId))),
+    loadAmendments(ctx.tenantId, orderId),
   ]);
   const today = todayInSpain();
   const loaded = projectOrders.find((o) => o.order.id === orderId)!;
@@ -689,6 +691,9 @@ export async function getPurchase(ctx: Ctx, orderId: string): Promise<PurchaseOr
     reached: reachedOn(events.map((e) => e.event).reverse()),
     budgetNumber: plan.budgetNumber,
     request: request ?? null,
+    amendments,
+    // Before its modificados: what they changed taken back off (edits since are corrections of it).
+    originalAmountCents: item.amountCents - amendments.reduce((sum, a) => sum + a.amountAfterCents - a.amountBeforeCents, 0),
     terms: termsOf(order),
     milestones: schedule,
     invoices: [...built.items.values()],
@@ -770,14 +775,44 @@ async function hasInvoices(run: Tx | typeof db, tenantId: string, orderId: strin
   return row !== undefined;
 }
 
-/** The budget lines (lineages) the order's invoices are split across. */
-async function invoicedLineages(run: Tx, tenantId: string, orderId: string) {
+/** What the order's invoices (credit notes net) put on each budget line, by lineage. */
+async function invoicedByLineage(run: Tx, tenantId: string, orderId: string) {
   const rows = await run
-    .selectDistinct({ lineageId: purchaseInvoiceLines.lineageId })
+    .select({ lineageId: purchaseInvoiceLines.lineageId, cents: sql<number>`sum(${purchaseInvoiceLines.amountCents})::int` })
     .from(purchaseInvoiceLines)
     .innerJoin(purchaseInvoices, eq(purchaseInvoices.id, purchaseInvoiceLines.invoiceId))
-    .where(and(eq(purchaseInvoiceLines.tenantId, tenantId), eq(purchaseInvoices.orderId, orderId)));
-  return new Set(rows.map((r) => r.lineageId));
+    .where(and(eq(purchaseInvoiceLines.tenantId, tenantId), eq(purchaseInvoices.orderId, orderId)))
+    .groupBy(purchaseInvoiceLines.lineageId);
+  return new Map(rows.map((r) => [r.lineageId, r.cents]));
+}
+
+/**
+ * In `tx`, with the order locked: its lines become `lines` (an edit or a
+ * modificado). The lines its invoices are split across stay (`has_invoices`),
+ * never below what they invoiced (`below_invoiced`). → the lines before and
+ * what changed (nothing written when nothing did).
+ */
+export async function replaceOrderLines(
+  tx: Tx,
+  ctx: Ctx,
+  orderId: string,
+  lines: NewLine[],
+  contract: Awaited<ReturnType<typeof contractLines>>,
+) {
+  const invoiced = await invoicedByLineage(tx, ctx.tenantId, orderId);
+  const next = new Map(lines.map((l) => [l.lineageId, l]));
+  for (const [lineageId, cents] of invoiced) {
+    const line = next.get(lineageId);
+    if (!line) fail("has_invoices");
+    if (line.amountCents < cents) fail("below_invoiced");
+  }
+  const before = await tx.select().from(purchaseOrderLines).where(eq(purchaseOrderLines.orderId, orderId)).for("update");
+  const changes = diffLines(before, lines, contract);
+  if (changes.length > 0) {
+    await tx.delete(purchaseOrderLines).where(eq(purchaseOrderLines.orderId, orderId));
+    await tx.insert(purchaseOrderLines).values(lines.map((l) => ({ ...l, tenantId: ctx.tenantId, orderId })));
+  }
+  return { before, changes };
 }
 
 /** A kind's own dates only: a delivery for material, a works period for a subcontract. */
@@ -915,22 +950,13 @@ export async function updatePurchase(ctx: Ctx, orderId: string, input: Record<st
     if (fields.subcontractorId !== order.subcontractorId && (await hasInvoices(tx, ctx.tenantId, orderId))) {
       fail("has_invoices");
     }
-    if (lines) {
-      const kept = new Set(lines.map((l) => l.lineageId));
-      const invoiced = await invoicedLineages(tx, ctx.tenantId, orderId);
-      if ([...invoiced].some((id) => !kept.has(id))) fail("has_invoices");
-    }
     if (Object.keys(changed).length > 0) {
       await tx.update(purchaseOrders).set(fields).where(eq(purchaseOrders.id, orderId));
       await logEvent(tx, ctx, orderId, "updated", { fields: changed });
     }
     if (lines && contract) {
-      const before = await tx.select().from(purchaseOrderLines).where(eq(purchaseOrderLines.orderId, orderId)).for("update");
-      const lineChanges = diffLines(before, lines, contract);
-      if (lineChanges.length === 0) return;
-      await tx.delete(purchaseOrderLines).where(eq(purchaseOrderLines.orderId, orderId));
-      await tx.insert(purchaseOrderLines).values(lines.map((l) => ({ ...l, tenantId: ctx.tenantId, orderId })));
-      await logEvent(tx, ctx, orderId, "lines", { changes: lineChanges });
+      const { changes } = await replaceOrderLines(tx, ctx, orderId, lines, contract);
+      if (changes.length > 0) await logEvent(tx, ctx, orderId, "lines", { changes });
     }
   });
   return { orderId };

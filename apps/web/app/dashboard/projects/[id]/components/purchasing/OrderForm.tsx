@@ -323,12 +323,15 @@ export function Lines({
   parse,
   onChange,
   estimate = false,
+  title,
 }: {
   form: PurchaseForm;
   draft: LinesDraft;
   parse: ParseAmount;
   onChange: (patch: Partial<LinesDraft>) => void;
   estimate?: boolean;
+  /** Its heading, when the form numbers its steps otherwise. */
+  title?: string;
 }) {
   const t = useTranslations("purchasing.form");
   const f = usePurchaseFormat();
@@ -354,7 +357,7 @@ export function Lines({
       <div className="flex flex-wrap items-end justify-between gap-2.5">
         <div>
           <h2 id="form-lines" className="text-[22px]">
-            {t("linesTitle")}
+            {title ?? t("linesTitle")}
           </h2>
           <p className="mt-1 text-[12.5px] text-muted-foreground">{estimate ? t("estimateHint") : t("linesHint")}</p>
         </div>

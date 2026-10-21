@@ -2896,7 +2896,8 @@
         "cancelled": "Cancelled",
         "ordered": "Order {number} created",
         "reopened": "{number} cancelled: approved again, it can be ordered again"
-      }
+      },
+      "amended": "Change order {number}: {amount} €"
     },
     "form": {
       "numbered": "{ref} · will be numbered {number}",
@@ -3067,7 +3068,10 @@
       "duplicate_number": "That supplier already has an invoice with that number.",
       "milestones_mismatch": "The milestones must add up to the order's amount.",
       "exceeds_amount": "The amount is more than what is left to pay or to credit.",
-      "request_not_approved": "The request is no longer approved (it was ordered or cancelled meanwhile). Go back to it to see what happened."
+      "request_not_approved": "The request is no longer approved (it was ordered or cancelled meanwhile). Go back to it to see what happened.",
+      "no_changes": "The change order changes no line: change an amount, add or remove a line, or whether it closes it.",
+      "amendment_incomplete": "Write the reason and keep at least one line with its amount.",
+      "below_invoiced": "A line can’t go below what has already been invoiced on it."
     },
     "views": {
       "label": "View",
@@ -3616,6 +3620,42 @@
         "noInvoices": "No invoices from it yet.",
         "payments": "Payments",
         "noPayments": "Nothing paid to it yet."
+      }
+    },
+    "amendments": {
+      "title": "Change orders",
+      "add": "Record a change order",
+      "none": "No change orders: the amount is the one contracted.",
+      "original": "Original amount",
+      "current": "now",
+      "list": "The order’s change orders",
+      "number": "Change order {number}",
+      "recorded": "Recorded by {by} on {date}",
+      "form": {
+        "title": "Change order {number}",
+        "label": "Change order {number}",
+        "intro": "A formal change to the signed contract: why and when, and how its lines end up (another amount, lines added or removed). The original and every change order stay on the order.",
+        "whyTitle": "1 · Reason and date",
+        "concept": "Reason",
+        "conceptPlaceholder": "E.g. slab reinforcement for a change of use",
+        "signedOn": "Signed on",
+        "signedOnHint": "It can’t be after today.",
+        "documentTitle": "3 · Signed document",
+        "optional": "(optional)",
+        "documentHint": "The signed PDF is kept among the order’s documents as “Change order {number}”.",
+        "chooseFile": "Choose PDF",
+        "removeFile": "Remove {name}",
+        "totalLabel": "Order amount",
+        "before": "Before",
+        "after": "After",
+        "delta": "Difference",
+        "cancel": "Cancel",
+        "saving": "Saving…",
+        "save": "Record change order {number}",
+        "documentName": "Change order {number}",
+        "documentFailed": "Change order {number} is recorded, but its PDF couldn’t be uploaded. Upload it from the order’s documents.",
+        "goToOrder": "Go to the order",
+        "linesTitle": "2 · The order’s lines"
       }
     }
   }

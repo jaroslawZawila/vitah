@@ -652,6 +652,8 @@ export type ObraError =
   | "milestones_mismatch"
   | "exceeds_amount"
   | "request_not_approved"
+  | "no_changes"
+  | "below_invoiced"
   | "budget_exists"
   | "draft_exists"
   | "no_budget"
@@ -1060,6 +1062,10 @@ export type PurchaseOrderDetail = PurchaseOrderListItem & {
   budgetNumber: number | null;
   /** The purchase request it was made from. */
   request: { id: string; number: number } | null;
+  /** Its formal modifications, newest first; its amount is already the last one's. */
+  amendments: PurchaseOrderAmendment[];
+  /** What it was placed for, before any modification. */
+  originalAmountCents: number;
   /** What its invoices start from: as set on the order, else the defaults. */
   terms: PurchaseTerms;
   /** Its payment schedule; empty when invoiced freely. */
@@ -1346,6 +1352,28 @@ export type OrderInvoicing = PurchaseInvoicing & {
   /** The order's amount not invoiced yet. */
   toInvoiceCents: number;
 };
+
+/** A shape of an order line, before or after a change. */
+export type PurchaseLineShape = { amountCents: number; closesLine: boolean };
+
+/** An order's modification (modificado nº N): its lines' changes, signed on a day for a reason. */
+export type PurchaseOrderAmendment = {
+  id: string;
+  number: number;
+  concept: string;
+  signedOn: string;
+  amountBeforeCents: number;
+  amountAfterCents: number;
+  /** Added (from null), removed (to null) or changed lines; `code` as in the budget then. */
+  changes: { code: string | null; lineageId: string; from: PurchaseLineShape | null; to: PurchaseLineShape | null }[];
+  /** Its signed PDF: one of the order's documents. */
+  document: { id: string; title: string } | null;
+  by: string | null;
+  at: string;
+};
+
+/** Whether an order may be modified: placed, not cancelled (a pending one is just edited). */
+export const canAmend = (status: PurchaseStatus) => countsAsContracted(status);
 
 /** A step of an order's payment schedule. */
 export type OrderMilestone = PurchaseInvoicing & {

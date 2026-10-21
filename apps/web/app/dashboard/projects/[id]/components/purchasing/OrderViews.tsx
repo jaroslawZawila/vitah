@@ -422,6 +422,13 @@ export function EventText({ event }: { event: PurchaseOrderEvent }) {
         </>
       );
     }
+    case "amended":
+      return (
+        <>
+          {t("amended", { number: num(d.number), amount: f.signedDecimal(num(d.deltaCents)) })}
+          {typeof d.concept === "string" && <span className="text-muted-foreground"> “{d.concept}”</span>}
+        </>
+      );
     case "invoice_created":
       return <>{t(d.kind === "credit_note" ? "creditCreated" : "invoiceCreated", { number: text(d.number), amount: f.amount(num(d.baseCents)) })}</>;
     case "invoice_updated": {

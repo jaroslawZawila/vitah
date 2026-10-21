@@ -1402,6 +1402,38 @@ export const purchaseOrderMilestones = pgTable(
   }),
 );
 
+// A placed order's formal modification (modificado nº 1, 2…): what changed in
+// its lines, signed on a day for a reason, maybe with its signed PDF (one of
+// the order's documents). The order's lines are the current ones; each
+// amendment keeps the amounts before and after and the lines it changed.
+export const purchaseOrderAmendments = pgTable(
+  "purchase_order_amendments",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    orderId: text("order_id")
+      .notNull()
+      .references(() => purchaseOrders.id, { onDelete: "cascade" }),
+    number: integer("number").notNull(),
+    concept: text("concept").notNull(),
+    signedOn: date("signed_on", { mode: "string" }).notNull(),
+    amountBeforeCents: integer("amount_before_cents").notNull(),
+    amountAfterCents: integer("amount_after_cents").notNull(),
+    // [{ code, lineageId, from: { amountCents, closesLine } | null, to: … | null }]
+    changes: jsonb("changes").$type<Record<string, unknown>[]>().default([]).notNull(),
+    documentId: text("document_id").references(() => purchaseOrderDocuments.id, { onDelete: "set null" }),
+    createdById: text("created_by_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    orderNumberUnique: unique("purchase_order_amendments_order_number_unique").on(table.orderId, table.number),
+  }),
+);
+
 // A supplier's invoice (or credit note) for an order, registered once by
 // Administration. Its amounts are as invoiced: the base (without VAT) is what
 // is compared with the budget's cost; what is paid is the total less the

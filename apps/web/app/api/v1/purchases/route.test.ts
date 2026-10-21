@@ -6,6 +6,7 @@ import { apiRequest, routeParams, seededObraProject, staffToken } from "../../..
 import { GET as listAll } from "./route";
 import { GET as getOne, PATCH as update } from "./[orderId]/route";
 import { POST as setStatus } from "./[orderId]/status/route";
+import { POST as amend } from "./[orderId]/amendments/route";
 import { DELETE as deleteFile, GET as getFile, POST as uploadFile } from "./[orderId]/file/route";
 import { POST as addDocument } from "./[orderId]/documents/route";
 import { DELETE as removeDocument, GET as getDocument, POST as addVersion } from "./[orderId]/documents/[documentId]/route";
@@ -129,6 +130,34 @@ describe("/api/v1 purchases", () => {
 
     expect(await (await removeDocument(apiRequest(token, { method: "DELETE" }), routeParams({ orderId, documentId }))).json()).toEqual({ documentId });
     expect((await getDocument(apiRequest(token), routeParams({ orderId, documentId }))).status).toBe(404);
+  });
+
+  it("records a placed order's modificado, as JSON or with its signed PDF", async () => {
+    const { tenant, project, supplierId, lineageId } = await setup();
+    const { token } = await staffToken(tenant.id);
+    const created = await create(
+      apiRequest(token, json({ kind: "material", subcontractorId: supplierId, description: "Piedra", status: "ordered", lines: [{ lineageId, amountCents: 300_000 }] })),
+      routeParams({ id: project.id }),
+    );
+    const { orderId } = await created.json();
+
+    const first = await amend(apiRequest(token, json({ concept: "Más metros", lines: [{ lineageId, amountCents: 330_000 }] })), routeParams({ orderId }));
+    expect(first.status).toBe(201);
+    expect(await first.json()).toEqual({ amendmentId: expect.any(String), number: 1, deltaCents: 30_000 });
+    const form = new FormData();
+    form.set("data", JSON.stringify({ concept: "Portes", lines: [{ lineageId, amountCents: 340_000 }], documentTitle: "Modificado nº 2" }));
+    form.set("file", new File(["%PDF-1.7 mod"], "mod.pdf", { type: "application/pdf" }));
+    expect(await (await amend(apiRequest(token, { method: "POST", body: form }), routeParams({ orderId }))).json()).toMatchObject({ number: 2 });
+    const same = await amend(apiRequest(token, json({ concept: "Nada", lines: [{ lineageId, amountCents: 340_000 }] })), routeParams({ orderId }));
+    expect(same.status).toBe(400);
+    expect(await same.json()).toEqual({ error: "no_changes" });
+
+    const order = await (await getOne(apiRequest(token), routeParams({ orderId }))).json();
+    expect(order).toMatchObject({ amountCents: 340_000, originalAmountCents: 300_000 });
+    expect(order.amendments.map((a: { number: number; document: { title: string } | null }) => [a.number, a.document?.title ?? null])).toEqual([
+      [2, "Modificado nº 2"],
+      [1, null],
+    ]);
   });
 
   it("needs a token, lets viewers only read, and keeps tenants apart", async () => {

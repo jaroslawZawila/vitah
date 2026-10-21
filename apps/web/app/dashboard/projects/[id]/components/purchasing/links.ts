@@ -26,6 +26,9 @@ export const newOrderHref = (projectId: string, chapterCode?: string) =>
 
 export const editOrderHref = (projectId: string, orderId: string) => `${orderHref(projectId, orderId)}/editar`;
 
+/** The form that records a placed order's modificado. */
+export const amendOrderHref = (projectId: string, orderId: string) => `${orderHref(projectId, orderId)}/modificado`;
+
 /** One of the order's documents (its current version, or `versionId`), served by /api/v1 with the session. */
 export const orderDocumentUrl = (orderId: string, documentId: string, versionId?: string) =>
   `/api/v1/purchases/${orderId}/documents/${documentId}${versionId ? `?versionId=${encodeURIComponent(versionId)}` : ""}`;

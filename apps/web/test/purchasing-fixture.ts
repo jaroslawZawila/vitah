@@ -226,6 +226,8 @@ export const orderDetail: PurchaseOrderDetail = {
   reached: { pending: "2026-10-02", ordered: "2026-10-03", in_transit: "2026-10-13" },
   budgetNumber: 1,
   request: null,
+  amendments: [],
+  originalAmountCents: 312_000,
   terms: { paymentDays: 30, retentionBp: 0, vatKind: "vat21" },
   milestones: [],
   invoices: [],
