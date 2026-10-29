@@ -79,8 +79,8 @@ describe("Sidebar", () => {
     const tabs = within(projectTabs()!);
     expect(tabs.getAllByRole("link").map((link) => [link.textContent, link.getAttribute("href")])).toEqual([
       ["General", "/dashboard/projects/p-1"],
-      ["Obra", "/dashboard/projects/p-1/obra"],
       ["Presupuesto", "/dashboard/projects/p-1/budget"],
+      ["Obra", "/dashboard/projects/p-1/obra"],
       ["Compras", "/dashboard/projects/p-1/compras"],
       ["Pagos", "/dashboard/projects/p-1/payments"],
       ["Documentos", "/dashboard/projects/p-1/documents"],

@@ -33,8 +33,8 @@ const NAV_ITEMS = [
 /** Routes under `dashboard/projects/[id]/`, shown nested under "Projects". */
 const PROJECT_TABS = [
   { key: "general", path: "" },
-  { key: "obra", path: "/obra" },
   { key: "budget", path: "/budget" },
+  { key: "obra", path: "/obra" },
   { key: "purchases", path: "/compras" },
   { key: "payments", path: "/payments" },
   { key: "documents", path: "/documents" },

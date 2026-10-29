@@ -41,7 +41,8 @@ const company = {
 function upload(requirementId: string, extra: Record<string, string> = {}) {
   const data = new FormData();
   data.set("requirementId", requirementId);
-  data.set("issuedAt", "2026-10-01");
+  // Issued two days ago, so a monthly document is never near its expiry whatever day the tests run.
+  data.set("issuedAt", new Date(Date.now() - 2 * 86_400_000).toISOString().slice(0, 10));
   for (const [key, value] of Object.entries(extra)) data.set(key, value);
   data.set("file", new File(["%PDF-1.7 doc"], "doc.pdf", { type: "application/pdf" }));
   return data;

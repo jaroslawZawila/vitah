@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -355,7 +355,10 @@ describe("OrderScreen with the AI's review of its documents", () => {
     expect(card.getByRole("link", { name: "Pedido PED-049 · v1" })).toHaveAttribute("href", "/dashboard/projects/p-1/compras/order-49");
     await userEvent.click(card.getByRole("button", { name: "Visto" }));
     expect(checkActions.dismissCheckAction).toHaveBeenCalledWith("chk-1");
-    await userEvent.click(card.getByRole("button", { name: "Revisar de nuevo Pedido PED-049 · v2" }));
+    // The buttons stay disabled until the dismissal settles.
+    const recheck = card.getByRole("button", { name: "Revisar de nuevo Pedido PED-049 · v2" });
+    await waitFor(() => expect(recheck).toBeEnabled());
+    await userEvent.click(recheck);
     expect(checkActions.recheckDocumentAction).toHaveBeenCalledWith("chk-1");
   });
 
