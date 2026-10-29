@@ -7,8 +7,14 @@
 import { useState, useTransition } from "react";
 import { useTranslations } from "next-intl";
 import type { PhotoError, ProjectPhoto } from "@repo/core/contract";
-import { addProjectPhotoAction, deleteProjectPhotoAction } from "../../../../../actions/photos";
+import {
+  addProjectPhotoAction,
+  deleteProjectPhotoAction,
+  setPhotoVisibilityAction,
+  type PhotosState,
+} from "../../../../../actions/photos";
 import EmptyState from "../../components/EmptyState";
+import { useObraAction } from "../../components/obra/useObraAction";
 import { SleepingCamera } from "../../components/illustrations";
 import { projectPhotoUrl } from "../../components/photoUrl";
 import { usePhotoName } from "../../components/usePhotoName";
@@ -99,18 +105,9 @@ export default function PhotosScreen({
 }) {
   const t = useTranslations("construction.photos");
   const [grouping, setGrouping] = useState<PhotoGrouping>("date");
-  const [deleteError, setDeleteError] = useState<PhotoError | undefined>();
-  const [deleting, startDelete] = useTransition();
+  const { state, pending, run, confirmThen } = useObraAction<PhotosState>();
   const groups = usePhotoGroups(photos, grouping, chapters, today);
   const photoName = usePhotoName();
-
-  function remove(photo: ProjectPhoto) {
-    if (!confirm(t("confirmDelete"))) return;
-    startDelete(async () => {
-      const state = await deleteProjectPhotoAction(projectId, photo.id);
-      setDeleteError(state?.success ? undefined : state?.error);
-    });
-  }
 
   return (
     <ObraFrame
@@ -139,14 +136,19 @@ export default function PhotosScreen({
                   { key: "chapter", label: t("byChapter") },
                 ]}
               />
-              <FormError namespace="construction.photos.errors" error={deleteError} />
+              <FormError namespace="construction.photos.errors" error={state?.error} />
               <PhotoGroups
                 groups={groups}
                 grouping={grouping}
                 fileUrl={(photo, size) => projectPhotoUrl(projectId, photo.id, size)}
                 photoName={photoName}
-                onDelete={canManage ? remove : undefined}
-                deleting={deleting}
+                onToggleVisibility={
+                  canManage
+                    ? (photo, visibleToClient) => run(() => setPhotoVisibilityAction(projectId, photo.id, visibleToClient))
+                    : undefined
+                }
+                onDelete={canManage ? (photo) => confirmThen(t("confirmDelete"), () => deleteProjectPhotoAction(projectId, photo.id)) : undefined}
+                busy={pending}
               />
             </>
           )}

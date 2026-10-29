@@ -300,6 +300,9 @@ export const projectDocuments = pgTable(
       onDelete: "set null",
     }),
     budgetPdf: text("budget_pdf").$type<"general" | "detailed">(),
+    // When the client was first pushed about it: once only, however often it
+    // is hidden and shown again. Null while it was never visible.
+    clientNotifiedAt: timestamp("client_notified_at", { mode: "date" }),
     // The file's id in Claude's Files API, reused across generations.
     claudeFileId: text("claude_file_id"),
     uploadedById: text("uploaded_by_id").references(() => users.id, {
@@ -315,8 +318,9 @@ export const projectDocuments = pgTable(
 
 // --- Project photos ---
 
-// A site photo shared with the project's client (JPEG, PNG or WebP). Stored
-// like documents: private Blob store, only served through our API.
+// A site photo shared with the project's client (JPEG, PNG or WebP) unless
+// staff hide it. Stored like documents: private Blob store, only served
+// through our API.
 export const projectPhotos = pgTable(
   "project_photos",
   {
@@ -341,6 +345,10 @@ export const projectPhotos = pgTable(
     // Size of the small copy for grids, stored next to the photo as
     // "<id>.thumb.webp". Null for photos uploaded before thumbnails existed.
     thumbSizeBytes: integer("thumb_size_bytes"),
+    // Whether the project's client sees it in the app; staff may hide one.
+    visibleToClient: boolean("visible_to_client").default(true).notNull(),
+    // As on documents: when the client was first pushed about it.
+    clientNotifiedAt: timestamp("client_notified_at", { mode: "date" }),
     uploadedById: text("uploaded_by_id").references(() => users.id, {
       onDelete: "set null",
     }),

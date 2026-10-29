@@ -270,6 +270,7 @@ export function photo(overrides: Partial<ProjectPhoto> = {}): ProjectPhoto {
     uploadedBy: "Rubén García",
     chapterCode: "06",
     takenOn: "2026-10-17",
+    visibleToClient: true,
     ...overrides,
   };
 }

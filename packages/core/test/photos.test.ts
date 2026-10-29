@@ -238,6 +238,7 @@ describe("listPhotos", () => {
         uploadedBy: "Admin",
         chapterCode: null,
         takenOn: "2026-02-01",
+        visibleToClient: true,
       },
       {
         id: older.id,
@@ -247,6 +248,7 @@ describe("listPhotos", () => {
         uploadedBy: null,
         chapterCode: null,
         takenOn: "2026-01-01",
+        visibleToClient: true,
       },
     ]);
   });
@@ -364,6 +366,36 @@ describe("openPhoto", () => {
     await expect(svc.openPhoto(ctx, project.id, photo.id)).rejects.toMatchObject({
       code: "not_found",
     });
+  });
+});
+
+describe("setPhotoVisibility", () => {
+  it("hides a photo from the client's app and shows it again; staff still see it", async () => {
+    const { tenant, client, project, ctx } = await setup();
+    const { photoId } = await upload(ctx, project.id, { chapterCode: "05" });
+
+    await svc.setPhotoVisibility(ctx, project.id, photoId, { visibleToClient: false });
+    expect(await svc.listClientPhotos(tenant.id, client.id)).toEqual([]);
+    await expect(svc.openClientPhoto(tenant.id, client.id, photoId)).rejects.toMatchObject({ code: "not_found" });
+    expect((await svc.photosByChapter(tenant.id, project.id)).size).toBe(0);
+    expect((await svc.listPhotos(ctx, project.id))[0]).toMatchObject({ id: photoId, visibleToClient: false });
+    expect((await svc.openPhoto(ctx, project.id, photoId)).contentType).toBe("image/jpeg");
+
+    await svc.setPhotoVisibility(ctx, project.id, photoId, { visibleToClient: true });
+    expect((await svc.listClientPhotos(tenant.id, client.id)).map((p) => p.id)).toEqual([photoId]);
+    expect([...(await svc.photosByChapter(tenant.id, project.id)).keys()]).toEqual(["05"]);
+  });
+
+  it("is for editors of the photo's own tenant", async () => {
+    const { tenant, project, ctx } = await setup();
+    const photo = await createTestPhoto(tenant.id, project.id);
+    const other = await setup();
+
+    await expect(svc.setPhotoVisibility({ ...ctx, role: "manager" }, project.id, photo.id, { visibleToClient: false })).resolves.toEqual({ photoId: photo.id });
+    await expect(svc.setPhotoVisibility({ ...ctx, role: "viewer" }, project.id, photo.id, { visibleToClient: false })).rejects.toMatchObject({ code: "forbidden" });
+    await expect(svc.setPhotoVisibility(other.ctx, project.id, photo.id, { visibleToClient: false })).rejects.toMatchObject({ code: "project_not_found" });
+    await expect(svc.setPhotoVisibility(other.ctx, other.project.id, photo.id, { visibleToClient: false })).rejects.toMatchObject({ code: "not_found" });
+    await expect(svc.setPhotoVisibility(ctx, project.id, photo.id, { visibleToClient: "yes" })).rejects.toMatchObject({ code: "missing_fields" });
   });
 });
 

@@ -8,7 +8,7 @@ import {
 } from "@repo/db/testing";
 import { files, testImage } from "@repo/core/testing";
 import { signInAs } from "../../test/session";
-import { addProjectPhotoAction, deleteProjectPhotoAction, getProjectPhotos } from "./photos";
+import { addProjectPhotoAction, deleteProjectPhotoAction, getProjectPhotos, setPhotoVisibilityAction } from "./photos";
 
 // The service itself is covered in packages/core; these tests cover the
 // adapter: session → core → `{ error }` / revalidation.
@@ -83,6 +83,7 @@ describe("photo actions", () => {
       error: "forbidden",
     });
     expect(await deleteProjectPhotoAction(project.id, photo.id)).toEqual({ error: "forbidden" });
+    expect(await setPhotoVisibilityAction(project.id, photo.id, false)).toEqual({ error: "forbidden" });
     expect(await getProjectPhotos(project.id)).toEqual({
       photos: [expect.objectContaining({ id: photo.id })],
       canManage: false,
@@ -95,6 +96,26 @@ describe("photo actions", () => {
 
     expect(await deleteProjectPhotoAction(project.id, photo.id)).toEqual({ success: true });
     expect((await getProjectPhotos(project.id)).photos).toEqual([]);
+  });
+
+  it("hides a photo from the client's app and shows it again", async () => {
+    const { tenant, project } = await setup();
+    const photo = await createTestPhoto(tenant.id, project.id);
+
+    expect(await setPhotoVisibilityAction(project.id, photo.id, false)).toEqual({ success: true });
+    expect(revalidatePath).toHaveBeenCalledWith(`/dashboard/projects/${project.id}`, "layout");
+    expect((await getProjectPhotos(project.id)).photos).toEqual([expect.objectContaining({ visibleToClient: false })]);
+
+    expect(await setPhotoVisibilityAction(project.id, photo.id, true)).toEqual({ success: true });
+    expect((await getProjectPhotos(project.id)).photos).toEqual([expect.objectContaining({ visibleToClient: true })]);
+  });
+
+  it("does not change another tenant's photo", async () => {
+    const { tenant, project } = await setup();
+    const photo = await createTestPhoto(tenant.id, project.id);
+
+    await setup();
+    expect(await setPhotoVisibilityAction(project.id, photo.id, false)).toEqual({ error: "project_not_found" });
   });
 
   it("lists nothing for another tenant's project or when signed out", async () => {

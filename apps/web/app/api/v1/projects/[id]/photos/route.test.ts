@@ -9,7 +9,7 @@ import { createMobileToken } from "@repo/auth/mobile";
 import { MAX_PHOTO_BYTES } from "@repo/core/contract";
 import { files, testImage } from "@repo/core/testing";
 import { GET as list, POST } from "./route";
-import { DELETE, GET as download } from "./[photoId]/route";
+import { DELETE, GET as download, PATCH } from "./[photoId]/route";
 
 // Bearer requests never read the NextAuth session, and next-auth itself
 // can't load outside Next.js.
@@ -85,6 +85,27 @@ describe("/api/v1/projects/:id/photos", () => {
     const deleted = await DELETE(request(token, { method: "DELETE" }), params(project.id, photoId));
     expect(deleted.status).toBe(204);
     expect(files.size).toBe(0);
+  });
+
+  it("hides a photo from the client's app and shows it again", async () => {
+    const tenant = await createTestTenant();
+    const project = await createTestProject(tenant.id);
+    const token = await staffToken(tenant.id);
+    const { photoId } = await (await upload(project.id, token, png)).json();
+    const patch = (body: unknown, as = token) =>
+      PATCH(request(as, { method: "PATCH", body: JSON.stringify(body) }), params(project.id, photoId));
+
+    const hidden = await patch({ visibleToClient: false });
+    expect(hidden.status).toBe(200);
+    expect(await hidden.json()).toEqual({ photoId });
+    expect(await (await list(request(token), projectParams(project.id))).json()).toEqual([
+      expect.objectContaining({ id: photoId, visibleToClient: false }),
+    ]);
+
+    expect((await patch({ visibleToClient: true })).status).toBe(200);
+    expect(await (await patch({})).json()).toEqual({ error: "missing_fields" });
+    expect((await patch({ visibleToClient: false }, await staffToken(tenant.id, "viewer"))).status).toBe(403);
+    expect((await patch({ visibleToClient: false }, await staffToken((await createTestTenant()).id))).status).toBe(404);
   });
 
   it("returns core errors as JSON", async () => {

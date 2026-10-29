@@ -138,6 +138,14 @@ const cases: Case[] = [
     },
   ],
   [
+    "setPhotoVisibility",
+    ["photos"],
+    async ({ ctx, project, tenant }) => {
+      const photo = await createTestPhoto(tenant.id, project.id);
+      return () => photosService.setPhotoVisibility(ctx, project.id, photo.id, { visibleToClient: false });
+    },
+  ],
+  [
     "addDocument",
     ["documents"],
     async ({ ctx, project }) =>

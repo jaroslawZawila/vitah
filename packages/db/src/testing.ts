@@ -124,6 +124,8 @@ export async function createTestDocument(
       category: "contract",
       pathname: `tenants/${tenantId}/projects/${projectId}/${unique()}.pdf`,
       sizeBytes: 1024,
+      // A visible one was pushed to the client, as in production.
+      clientNotifiedAt: overrides.visibleToClient === false ? null : new Date(),
       ...overrides,
     })
     .returning();
@@ -144,6 +146,7 @@ export async function createTestPhoto(
       pathname: `tenants/${tenantId}/projects/${projectId}/photos/${unique()}.jpg`,
       contentType: "image/jpeg",
       sizeBytes: 2048,
+      clientNotifiedAt: overrides.visibleToClient === false ? null : new Date(),
       ...overrides,
     })
     .returning();

@@ -1013,7 +1013,7 @@
     },
     "photos": {
       "title": "Fotos de obra",
-      "description": "Cada foto lleva su fecha y, si quieres, una descripción y el capítulo que muestra. El cliente las ve en la app.",
+      "description": "Cada foto lleva su fecha y, si quieres, una descripción y el capítulo que muestra. El cliente las ve en la app, salvo las que ocultes.",
       "listLabel": "Fotos",
       "groupBy": "Agrupar",
       "byDate": "Por fecha",
@@ -1024,6 +1024,9 @@
       "open": "Abrir foto a tamaño completo",
       "download": "Descargar {name}",
       "delete": "Eliminar {name}",
+      "visible": "En la app",
+      "hidden": "Solo equipo",
+      "visibleLabel": "Visible en la app del cliente: {name}",
       "confirmDelete": "¿Eliminar esta foto? El cliente dejará de verla en la app.",
       "emptyTitle": "Todavía no hay fotos",
       "emptyText": "La cámara se ha echado la siesta. Sube la primera foto de la obra y el cliente la verá en la app.",
@@ -1050,7 +1053,8 @@
         "file_too_large": "Una imagen supera el máximo de 4 MB.",
         "project_not_found": "Proyecto no encontrado.",
         "not_found": "Foto no encontrada.",
-        "forbidden": "Solo administradores y gestores pueden gestionar fotos."
+        "forbidden": "Solo administradores y gestores pueden gestionar fotos.",
+        "missing_fields": "Indica si la foto se ve en la app."
       }
     },
     "lateDeliveries": {

@@ -169,11 +169,14 @@ export type ProjectPhoto = MobilePhoto & {
   chapterCode: string | null;
   /** The day it was taken, YYYY-MM-DD: as staff set it, else its upload day. */
   takenOn: string;
+  /** Whether the project's client sees it in the app. */
+  visibleToClient: boolean;
 };
 
 /** Error codes of the photos service (`{ error: code }` in the API). */
 export type PhotoError =
   | "missing_file"
+  | "missing_fields"
   | "invalid_date"
   | "invalid_file_type"
   | "file_too_large"

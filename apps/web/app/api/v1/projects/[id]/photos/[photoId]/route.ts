@@ -1,9 +1,10 @@
 import { parsePhotoSize, photosService } from "@repo/core";
-import { fileResponse, withContext } from "../../../../../../../lib/api";
+import { fileResponse, readJson, withContext } from "../../../../../../../lib/api";
 
 // ─── /api/v1/projects/:id/photos/:photoId ─────────────────────────────────────
 // GET    → the image itself (image/jpeg, image/png or image/webp);
 //          ?size=thumb → a WebP of at most 800 px, for grids
+// PATCH  { visibleToClient } → whether the client sees it in the app
 // DELETE → 204
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -16,6 +17,13 @@ export async function GET(request: Request, { params }: Params) {
     fileResponse(await photosService.openPhoto(ctx, id, photoId, size), {
       immutable: true,
     }),
+  );
+}
+
+export async function PATCH(request: Request, { params }: Params) {
+  const { id, photoId } = await params;
+  return withContext(request, async (ctx) =>
+    photosService.setPhotoVisibility(ctx, id, photoId, await readJson(request)),
   );
 }
 

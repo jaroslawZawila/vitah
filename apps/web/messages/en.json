@@ -1013,7 +1013,7 @@
     },
     "photos": {
       "title": "Site photos",
-      "description": "Each photo has its date and, if you like, a description and the chapter it shows. The client sees them in the app.",
+      "description": "Each photo has its date and, if you like, a description and the chapter it shows. The client sees them in the app, except those you hide.",
       "listLabel": "Photos",
       "groupBy": "Group",
       "byDate": "By date",
@@ -1024,6 +1024,9 @@
       "open": "Open the full-size photo",
       "download": "Download {name}",
       "delete": "Delete {name}",
+      "visible": "In the app",
+      "hidden": "Staff only",
+      "visibleLabel": "Visible in the client's app: {name}",
       "confirmDelete": "Delete this photo? The client will no longer see it in the app.",
       "emptyTitle": "No photos yet",
       "emptyText": "The camera is taking a nap. Upload the first site photo and the client will see it in the app.",
@@ -1050,7 +1053,8 @@
         "file_too_large": "An image is over the 4 MB limit.",
         "project_not_found": "Project not found.",
         "not_found": "Photo not found.",
-        "forbidden": "Only admins and managers can manage photos."
+        "forbidden": "Only admins and managers can manage photos.",
+        "missing_fields": "Say whether the photo shows in the app."
       }
     },
     "lateDeliveries": {

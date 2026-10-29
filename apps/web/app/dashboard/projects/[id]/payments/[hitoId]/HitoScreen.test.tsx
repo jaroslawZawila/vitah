@@ -21,8 +21,8 @@ vi.mock("../../../../../actions/obra", () => ({
 const actions = await import("../../../../../actions/obra");
 
 const photos = [
-  { id: "ph-1", caption: "Estructura", sizeBytes: 1, uploadedAt: "2026-09-20T10:00:00Z", uploadedBy: "Laura", chapterCode: null, takenOn: "2026-09-20" },
-  { id: "ph-2", caption: "Cubierta", sizeBytes: 1, uploadedAt: "2026-09-21T10:00:00Z", uploadedBy: "Laura", chapterCode: null, takenOn: "2026-09-21" },
+  { id: "ph-1", caption: "Estructura", sizeBytes: 1, uploadedAt: "2026-09-20T10:00:00Z", uploadedBy: "Laura", chapterCode: null, takenOn: "2026-09-20", visibleToClient: true },
+  { id: "ph-2", caption: "Cubierta", sizeBytes: 1, uploadedAt: "2026-09-21T10:00:00Z", uploadedBy: "Laura", chapterCode: null, takenOn: "2026-09-21", visibleToClient: true },
 ];
 const h3 = hitos.find((h) => h.code === "H3")!;
 

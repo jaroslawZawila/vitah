@@ -1,4 +1,4 @@
-import { db } from "@repo/db";
+import { and, db, eq, isNull, projectDocuments, projectPhotos, type SQL } from "@repo/db";
 import type { Ctx } from "./context";
 import type { DocumentError, PhotoError } from "./contract";
 import { CoreError } from "./errors";
@@ -27,6 +27,20 @@ const STATUS: Record<DocumentError | PhotoError, number> = {
 
 export function fail(code: DocumentError | PhotoError): never {
   throw new CoreError(code, STATUS[code]);
+}
+
+/**
+ * Marks the visible document or photo `where` picks as notified, so its client
+ * is pushed about it once only, however often it is hidden and shown again.
+ * True for the one caller that should push.
+ */
+export async function claimFirstShown(table: typeof projectDocuments | typeof projectPhotos, where: SQL | undefined) {
+  const claimed = await db
+    .update(table)
+    .set({ clientNotifiedAt: new Date() })
+    .where(and(where, eq(table.visibleToClient, true), isNull(table.clientNotifiedAt)))
+    .returning({ id: table.id });
+  return claimed.length > 0;
 }
 
 /** Whether the file really is a PDF: the browser-supplied type can't be trusted. */

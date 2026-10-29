@@ -16,6 +16,7 @@ import { workDate } from "./obra-data";
 import { notifyProjectClient } from "./notifications";
 import type { PhotosByChapter } from "./obra-calc";
 import {
+  claimFirstShown,
   fail,
   openStoredFile,
   projectFolder,
@@ -26,7 +27,8 @@ import {
 
 // ─── Project photos ───────────────────────────────────────────────────────────
 // Site photos staff share with a project's client (see ./project-files for who
-// may do what). The client sees their own project's photos in the mobile app.
+// may do what). The client sees their own project's photos in the mobile app,
+// except those staff hide, as with documents.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const EXTENSIONS: Record<PhotoType, string> = {
@@ -40,7 +42,7 @@ const THUMBNAIL = { px: 800, contentType: "image/webp", extension: "webp" } as c
 
 const MAX_PIXELS = 50_000_000;
 
-/** After a photo push, more photos of the project within this time send none. */
+/** After a photo push, more photos of the project shown within this time send none. */
 const PHOTO_PUSH_QUIET_MS = 10 * 60 * 1000;
 
 /** A photo's thumbnail sits next to it: "<id>.jpg" → "<id>.thumb.webp". */
@@ -142,21 +144,57 @@ export async function addPhoto(ctx: Ctx, projectId: string, input: Record<string
         sizeBytes: file.size,
         thumbSizeBytes: thumbnail.size,
         uploadedById: ctx.userId,
+        // Visible from the start: the push below tells the client.
+        clientNotifiedAt: new Date(),
       }),
   );
   await markChanged(ctx.tenantId, projectId, ["photos"]);
-  // One push per visit, not per photo: the first photo of a batch tells them.
+  await pushPhoto(ctx, projectId, id);
+
+  return { photoId: id };
+}
+
+/**
+ * Pushes a photo the client has just been told of: once per visit, not per
+ * photo (the first of a batch tells them).
+ */
+async function pushPhoto(ctx: Ctx, projectId: string, photoId: string) {
   const recent = await db.query.projectPhotos.findFirst({
     where: and(
       eq(projectPhotos.projectId, projectId),
-      ne(projectPhotos.id, id),
-      gt(projectPhotos.createdAt, new Date(Date.now() - PHOTO_PUSH_QUIET_MS)),
+      ne(projectPhotos.id, photoId),
+      gt(projectPhotos.clientNotifiedAt, new Date(Date.now() - PHOTO_PUSH_QUIET_MS)),
     ),
     columns: { id: true },
   });
   if (!recent) await notifyProjectClient(ctx.tenantId, projectId, { kind: "photo" });
+}
 
-  return { photoId: id };
+/**
+ * Shows a photo to the project's client, or hides it. The client is pushed the
+ * first time it is shown, never again. Body: { visibleToClient }
+ */
+export async function setPhotoVisibility(
+  ctx: Ctx,
+  projectId: string,
+  photoId: string,
+  input: Record<string, unknown>,
+) {
+  requireEditor(ctx);
+  if (typeof input.visibleToClient !== "boolean") fail("missing_fields");
+  await requireProject(ctx.tenantId, projectId);
+  const where = photoInProject(ctx, projectId, photoId);
+  const [photo] = await db
+    .update(projectPhotos)
+    .set({ visibleToClient: input.visibleToClient, updatedAt: new Date() })
+    .where(where)
+    .returning({ id: projectPhotos.id });
+  if (!photo) fail("not_found");
+  await markChanged(ctx.tenantId, projectId, ["photos"]);
+  if (input.visibleToClient && (await claimFirstShown(projectPhotos, where))) {
+    await pushPhoto(ctx, projectId, photoId);
+  }
+  return { photoId };
 }
 
 /** The project's photos, newest first; only one budget chapter's with `chapterCode`. */
@@ -172,6 +210,7 @@ export async function listPhotos(
         ...mobileColumns,
         chapterCode: projectPhotos.chapterCode,
         takenOn: photoDay,
+        visibleToClient: projectPhotos.visibleToClient,
         uploaderName: users.name,
         uploaderEmail: users.email,
       })
@@ -189,11 +228,12 @@ export async function listPhotos(
       .limit(limit ?? MAX_PHOTOS),
   ]);
 
-  return rows.map(({ uploaderName, uploaderEmail, chapterCode, takenOn, ...photo }) => ({
+  return rows.map(({ uploaderName, uploaderEmail, chapterCode, takenOn, visibleToClient, ...photo }) => ({
     ...toMobilePhoto(photo),
     uploadedBy: uploaderName ?? uploaderEmail,
     chapterCode,
     takenOn,
+    visibleToClient,
   }));
 }
 
@@ -263,13 +303,14 @@ export async function openPhoto(
 
 // ─── Mobile app ──────────────────────────────────────────────────────────────
 // Called with the client's own identity (from their mobile token). A client
-// only ever reaches photos of the project they're attached to.
+// only ever reaches the visible photos of the project they're attached to.
 
 function clientProject(tenantId: string, clientUserId: string) {
   return and(
     eq(projects.id, projectPhotos.projectId),
     eq(projects.tenantId, tenantId),
     eq(projects.clientUserId, clientUserId),
+    eq(projectPhotos.visibleToClient, true),
   );
 }
 
@@ -299,7 +340,7 @@ export async function openClientPhoto(
   return openFile(photo, size);
 }
 
-/** A project's photos tagged with a budget chapter, by chapter (for the obra). */
+/** A project's visible photos tagged with a budget chapter, by chapter (for the client's obra). */
 export async function photosByChapter(
   tenantId: string,
   projectId: string,
@@ -315,6 +356,7 @@ export async function photosByChapter(
       and(
         eq(projectPhotos.projectId, projectId),
         eq(projectPhotos.tenantId, tenantId),
+        eq(projectPhotos.visibleToClient, true),
         isNotNull(projectPhotos.chapterCode),
       ),
     );

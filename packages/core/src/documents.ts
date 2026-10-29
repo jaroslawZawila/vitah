@@ -33,6 +33,7 @@ import {
 import { clippedText } from "./input";
 import { notifyProjectClient } from "./notifications";
 import {
+  claimFirstShown,
   fail,
   isPdf,
   openStoredFile,
@@ -91,14 +92,25 @@ type NewDocument = Pick<typeof projectDocuments.$inferInsert, "title" | "categor
 /**
  * A new PDF document: the file to store and the row to insert, kept apart so
  * the caller can insert the row in its own transaction (`storeFiles` deletes
- * the file again if that fails).
+ * the file again if that fails). A visible one counts as notified: the caller
+ * pushes it to the client.
  */
 export function newPdfDocument(ctx: Ctx, projectId: string, body: Blob, doc: NewDocument) {
   const id = crypto.randomUUID();
   const pathname = `${projectFolder(ctx.tenantId, projectId)}${id}.pdf`;
+  const clientNotifiedAt = doc.visibleToClient === false ? null : new Date();
   return {
     file: { pathname, body, contentType: "application/pdf" },
-    row: { ...doc, id, tenantId: ctx.tenantId, projectId, pathname, sizeBytes: body.size, uploadedById: ctx.userId },
+    row: {
+      ...doc,
+      id,
+      tenantId: ctx.tenantId,
+      projectId,
+      pathname,
+      sizeBytes: body.size,
+      uploadedById: ctx.userId,
+      clientNotifiedAt,
+    },
   };
 }
 
@@ -198,7 +210,8 @@ export async function deleteDocument(ctx: Ctx, projectId: string, documentId: st
 /**
  * Shows a document to the project's client, or hides it. The app only opens
  * PDFs it can download, so a budget input that isn't one (a spreadsheet, a
- * BC3, an image) or is over 4 MB stays staff-only. Body: { visibleToClient }
+ * BC3, an image) or is over 4 MB stays staff-only. The client is pushed the
+ * first time it is shown, never again. Body: { visibleToClient }
  */
 export async function setDocumentVisibility(
   ctx: Ctx,
@@ -223,7 +236,7 @@ export async function setDocumentVisibility(
     .returning({ title: projectDocuments.title });
   if (!doc) fail("not_found");
   await markChanged(ctx.tenantId, projectId, ["documents"]);
-  if (input.visibleToClient) {
+  if (input.visibleToClient && (await claimFirstShown(projectDocuments, where))) {
     await notifyProjectClient(ctx.tenantId, projectId, { kind: "document", title: doc.title });
   }
   return { documentId };

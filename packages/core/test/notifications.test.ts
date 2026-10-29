@@ -1,6 +1,7 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { db, pushTokens } from "@repo/db";
 import {
+  createTestDocument,
   createTestPhoto,
   createTestProject,
   createTestTenant,
@@ -98,15 +99,69 @@ describe("notifying the client", () => {
     expect(sendPush).toHaveBeenCalledTimes(1);
   });
 
-  it("pushes again once the last photo is over 10 minutes old", async () => {
+  it("pushes again once the last photo pushed is over 10 minutes old", async () => {
     const { tenant, project, ctx } = await setup();
     await createTestPhoto(tenant.id, project.id, {
-      createdAt: new Date(Date.now() - 11 * 60 * 1000),
+      clientNotifiedAt: new Date(Date.now() - 11 * 60 * 1000),
     });
+    // Uploaded just now but hidden: the client wasn't told of it.
+    await createTestPhoto(tenant.id, project.id, { visibleToClient: false });
 
     await addPhoto(ctx, project.id);
 
     expect(sendPush).toHaveBeenCalledTimes(1);
+  });
+
+  it("pushes a hidden document or photo when it is first shown", async () => {
+    const { tenant, project, ctx } = await setup();
+    const doc = await createTestDocument(tenant.id, project.id, { title: "Planos", visibleToClient: false });
+    const photo = await createTestPhoto(tenant.id, project.id, { visibleToClient: false });
+
+    await documentsService.setDocumentVisibility(ctx, project.id, doc.id, { visibleToClient: true });
+    await photosService.setPhotoVisibility(ctx, project.id, photo.id, { visibleToClient: true });
+
+    expect(sendPush).toHaveBeenNthCalledWith(1, [
+      expect.objectContaining({ title: "Nuevo documento", body: "«Planos» ya está en la app." }),
+    ]);
+    expect(sendPush).toHaveBeenNthCalledWith(2, [expect.objectContaining({ title: "Nuevas fotos de tu obra" })]);
+  });
+
+  it("pushes a document or photo once only, however often it is hidden and shown", async () => {
+    const { project, ctx } = await setup();
+    const { documentId } = await addDocument(ctx, project.id);
+    const { photoId } = await addPhoto(ctx, project.id);
+    vi.mocked(sendPush).mockClear();
+
+    for (const visibleToClient of [true, false, true]) {
+      await documentsService.setDocumentVisibility(ctx, project.id, documentId, { visibleToClient });
+      await photosService.setPhotoVisibility(ctx, project.id, photoId, { visibleToClient });
+    }
+
+    expect(sendPush).not.toHaveBeenCalled();
+  });
+
+  it("sends one push for a batch of photos shown together", async () => {
+    const { tenant, project, ctx } = await setup();
+    const hidden = await Promise.all(
+      [1, 2, 3].map(() => createTestPhoto(tenant.id, project.id, { visibleToClient: false })),
+    );
+
+    for (const photo of hidden) {
+      await photosService.setPhotoVisibility(ctx, project.id, photo.id, { visibleToClient: true });
+    }
+
+    expect(sendPush).toHaveBeenCalledTimes(1);
+  });
+
+  it("pushes nothing when a document or photo is hidden", async () => {
+    const { tenant, project, ctx } = await setup();
+    const doc = await createTestDocument(tenant.id, project.id);
+    const photo = await createTestPhoto(tenant.id, project.id);
+
+    await documentsService.setDocumentVisibility(ctx, project.id, doc.id, { visibleToClient: false });
+    await photosService.setPhotoVisibility(ctx, project.id, photo.id, { visibleToClient: false });
+
+    expect(sendPush).not.toHaveBeenCalled();
   });
 
   it("writes to each phone in its own language", async () => {

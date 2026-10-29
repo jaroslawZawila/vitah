@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { Download, ImagePlus, Trash2 } from "lucide-react";
+import { Download, Eye, EyeOff, ImagePlus, Trash2 } from "lucide-react";
 import { todayInSpain } from "@repo/core/obra-calc";
 import { MAX_CAPTION_LENGTH, MAX_PHOTO_BYTES, PHOTO_TYPES, type PhotoError, type PhotoSize, type ProjectPhoto } from "@repo/core/contract";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cardVariants } from "@/components/ui/card";
 import { Field, FieldDescription, FormActions } from "@/components/ui/field";
@@ -54,22 +55,26 @@ export function usePhotoGroups(
   });
 }
 
-/** The groups of photos, each a card with its thumbnails. */
+/** The groups of photos, each a card with its thumbnails. A photo hidden from the client's app is dimmed. */
 export function PhotoGroups({
   groups,
   grouping,
   fileUrl,
   photoName,
+  onToggleVisibility,
   onDelete,
-  deleting,
+  busy,
 }: {
   groups: Group[];
   grouping: PhotoGrouping;
   fileUrl: (photo: ProjectPhoto, size: PhotoSize) => string;
   photoName: (photo: ProjectPhoto) => string;
   /** Omitted for viewers. */
+  onToggleVisibility?: (photo: ProjectPhoto, visibleToClient: boolean) => void;
+  /** Omitted for viewers. */
   onDelete?: (photo: ProjectPhoto) => void;
-  deleting: boolean;
+  /** An action is running: the buttons wait. */
+  busy: boolean;
 }) {
   const t = useTranslations("construction.photos");
   const f = useControlFormat();
@@ -88,16 +93,41 @@ export function PhotoGroups({
               return (
                 <li key={photo.id}>
                   <figure className="m-0 flex flex-col gap-1.5">
-                    <a href={fileUrl(photo, "full")} target="_blank" rel="noreferrer" title={t("open")} className="block overflow-hidden rounded-lg bg-raise">
+                    <a href={fileUrl(photo, "full")} target="_blank" rel="noreferrer" title={t("open")} className="relative block overflow-hidden rounded-lg bg-raise">
                       {/* Served by our authenticated API, so next/image can't optimise it. */}
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={fileUrl(photo, "thumb")} alt={name} loading="lazy" className="block aspect-[4/3] w-full object-cover" />
+                      <img
+                        src={fileUrl(photo, "thumb")}
+                        alt={name}
+                        loading="lazy"
+                        className={cn("block aspect-[4/3] w-full object-cover", !photo.visibleToClient && "opacity-50")}
+                      />
+                      {!photo.visibleToClient && (
+                        <Badge variant="outline" className="absolute top-2 left-2">
+                          <EyeOff aria-hidden />
+                          {t("hidden")}
+                        </Badge>
+                      )}
                     </a>
                     <figcaption className="flex flex-col gap-0.5 text-[13px]">
                       <span className="font-semibold wrap-anywhere">{name}</span>
                       <span className="flex items-center justify-between gap-1 text-muted-foreground">
                         <span className="num">{meta}</span>
                         <span className="flex items-center">
+                          {onToggleVisibility && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon-sm"
+                              aria-pressed={photo.visibleToClient}
+                              disabled={busy}
+                              onClick={() => onToggleVisibility(photo, !photo.visibleToClient)}
+                              aria-label={t("visibleLabel", { name })}
+                              title={photo.visibleToClient ? t("visible") : t("hidden")}
+                            >
+                              {photo.visibleToClient ? <Eye aria-hidden /> : <EyeOff aria-hidden />}
+                            </Button>
+                          )}
                           <a
                             href={fileUrl(photo, "full")}
                             download
@@ -113,7 +143,7 @@ export function PhotoGroups({
                               variant="ghost-destructive"
                               size="icon-sm"
                               onClick={() => onDelete(photo)}
-                              disabled={deleting}
+                              disabled={busy}
                               aria-label={t("delete", { name })}
                               title={t("delete", { name })}
                             >

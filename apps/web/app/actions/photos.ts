@@ -39,6 +39,15 @@ export async function addProjectPhotoAction(
   return mutate<PhotoError>(projectId, (ctx) => svc.addPhoto(ctx, projectId, Object.fromEntries(formData)));
 }
 
+/** Shows a photo in the client's app or hides it. */
+export async function setPhotoVisibilityAction(
+  projectId: string,
+  photoId: string,
+  visibleToClient: boolean,
+): Promise<PhotosState> {
+  return mutate<PhotoError>(projectId, (ctx) => svc.setPhotoVisibility(ctx, projectId, photoId, { visibleToClient }));
+}
+
 export async function deleteProjectPhotoAction(
   projectId: string,
   photoId: string,

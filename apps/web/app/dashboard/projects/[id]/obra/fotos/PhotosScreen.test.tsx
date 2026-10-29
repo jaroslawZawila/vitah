@@ -4,10 +4,14 @@ import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import messages from "../../../../../../messages/es.json";
-import { TODAY, chapters, header, photos } from "../../../../../../test/construction-fixture";
+import { TODAY, chapters, header, photo, photos } from "../../../../../../test/construction-fixture";
 import PhotosScreen from "./PhotosScreen";
 
-vi.mock("../../../../../actions/photos", () => ({ addProjectPhotoAction: vi.fn(), deleteProjectPhotoAction: vi.fn() }));
+vi.mock("../../../../../actions/photos", () => ({
+  addProjectPhotoAction: vi.fn(),
+  deleteProjectPhotoAction: vi.fn(),
+  setPhotoVisibilityAction: vi.fn(),
+}));
 const actions = await import("../../../../../actions/photos");
 
 const options = chapters.map(({ code, name }) => ({ code, name }));
@@ -28,6 +32,7 @@ const groups = () =>
 beforeEach(() => {
   vi.mocked(actions.addProjectPhotoAction).mockReset().mockResolvedValue({ success: true });
   vi.mocked(actions.deleteProjectPhotoAction).mockReset().mockResolvedValue({ success: true });
+  vi.mocked(actions.setPhotoVisibilityAction).mockReset().mockResolvedValue({ success: true });
 });
 
 describe("PhotosScreen", () => {
@@ -106,9 +111,32 @@ describe("PhotosScreen", () => {
     expect(actions.deleteProjectPhotoAction).toHaveBeenCalledWith("p-1", "photo-1");
   });
 
-  it("is read-only for viewers", () => {
-    renderScreen({ canManage: false });
+  it("hides a photo from the client's app, or shows a hidden one", async () => {
+    renderScreen({ photos: [photo(), photo({ id: "photo-2", caption: "Tabiquería", visibleToClient: false })] });
+
+    const shown = screen.getByRole("button", { name: "Visible en la app del cliente: Fachada norte" });
+    expect(shown).toHaveAttribute("aria-pressed", "true");
+    await userEvent.click(shown);
+    expect(actions.setPhotoVisibilityAction).toHaveBeenCalledWith("p-1", "photo-1", false);
+
+    const hidden = screen.getByRole("button", { name: "Visible en la app del cliente: Tabiquería" });
+    expect(hidden).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getAllByText("Solo equipo")).toHaveLength(1);
+    await userEvent.click(hidden);
+    await waitFor(() => expect(actions.setPhotoVisibilityAction).toHaveBeenCalledWith("p-1", "photo-2", true));
+  });
+
+  it("explains when changing a photo fails", async () => {
+    vi.mocked(actions.setPhotoVisibilityAction).mockResolvedValue({ error: "not_found" });
+    renderScreen();
+    await userEvent.click(screen.getByRole("button", { name: "Visible en la app del cliente: Fachada norte" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Foto no encontrada.");
+  });
+
+  it("is read-only for viewers, who still see which photos are hidden", () => {
+    renderScreen({ canManage: false, photos: [photo({ visibleToClient: false })] });
     expect(screen.queryByRole("form")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Eliminar/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Eliminar|Visible en la app/ })).not.toBeInTheDocument();
+    expect(screen.getByText("Solo equipo")).toBeInTheDocument();
   });
 });
