@@ -8,8 +8,7 @@ import { notificationsAllowed, registerForPush } from "../lib/push";
 import { useClientData } from "../lib/use-client-data";
 import { ToggleRow } from "./toggle-row";
 
-// Perfil's "Notificaciones" section (A-Settings.dc.html). Shown only when
-// PUSH_NOTIFICATIONS (lib/features.ts) is on.
+// Perfil's "Notificaciones" section (A-Settings.dc.html).
 
 const NOTIFICATIONS: { id: keyof NotificationPrefs; label: MessageKey; hint: MessageKey }[] = [
   { id: "progress", label: "profile.progress", hint: "profile.progressHint" },

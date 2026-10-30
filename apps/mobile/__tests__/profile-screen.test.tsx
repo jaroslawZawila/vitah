@@ -15,6 +15,13 @@ jest.mock("../lib/auth", () => ({
 }));
 jest.mock("../lib/app-lock", () => ({ useAppLock: () => mockLock }));
 jest.mock("expo-router", () => ({ useRouter: () => ({ push: mockPush }) }));
+jest.mock("../components/notification-settings", () => ({
+  NotificationSettings: ({ token }: { token: string }) => {
+    const { createElement } = jest.requireActual<typeof import("react")>("react");
+    const { Text } = jest.requireActual<typeof import("react-native")>("react-native");
+    return createElement(Text, null, `notifications for ${token}`);
+  },
+}));
 jest.mock("expo-constants", () => ({ __esModule: true, default: { expoConfig: { version: "1.2.0" } } }));
 /** Renders and waits until the stored language has loaded. */
 async function renderProfile() {
@@ -74,10 +81,10 @@ describe("ProfileScreen", () => {
     expect(screen.queryByRole("switch", { name: "Acceso biométrico" })).toBeNull();
   });
 
-  it("hides notifications until push is set up", async () => {
+  it("shows the notification settings for the signed-in client", async () => {
     await renderProfile();
 
-    expect(screen.queryByText("NOTIFICACIONES")).toBeNull();
+    expect(screen.getByText("notifications for tok")).toBeOnTheScreen();
   });
 
   it("opens Change password and signs out", async () => {

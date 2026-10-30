@@ -9,12 +9,10 @@ import { ToggleRow, styles as rowStyles } from "../../../components/toggle-row";
 import { colors, spacing, type } from "../../../constants/theme";
 import { useAppLock } from "../../../lib/app-lock";
 import { useAuth } from "../../../lib/auth";
-import { PUSH_NOTIFICATIONS } from "../../../lib/features";
 import { useI18n } from "../../../lib/i18n";
 
 // Tab "Perfil" — doc/mobile-app-design/A-Settings.dc.html. Help and privacy
-// links are left out until those pages exist; notifications until push is
-// set up (PUSH_NOTIFICATIONS in lib/features.ts).
+// links are left out until those pages exist.
 
 const LANGUAGES: { id: AppLanguage; label: string }[] = [
   { id: "es", label: "Español" },
@@ -94,7 +92,7 @@ export default function ProfileScreen() {
         )}
       </View>
 
-      {PUSH_NOTIFICATIONS && token && <NotificationSettings token={token} />}
+      {token && <NotificationSettings token={token} />}
 
       <Pressable
         onPress={() => void signOut()}

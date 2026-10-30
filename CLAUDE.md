@@ -418,7 +418,9 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
 - The mobile app keeps offline copies (`apps/mobile/lib/document-store.ts`), syncs on app open / foreground / pull-to-refresh, and wipes them on sign-out
 - Photos are visible to the client by default too; staff hide or show each on Obra › Fotos (`project_photos.visible_to_client`,
   `setPhotoVisibility`, `PATCH /api/v1/projects/:id/photos/:photoId`). Prod SQL: `packages/db/sql/2026-10-client-visibility.sql`
-- A photo or document the client can see pushes a notification to the project's client (`packages/core/src/notifications.ts`, via Expo's push service) when uploaded visible or first shown, **once only** (`client_notified_at`: hiding and showing it again pushes nothing; photos one push per 10-minute batch), if their Perfil toggle is on; a failed push never fails the upload. Push needs an EAS project id (`npx eas init`) and, on Android, a development/store build
+- A photo or document the client can see pushes a notification to the project's client (`packages/core/src/notifications.ts`, via Expo's push service) when uploaded visible or first shown, **once only** (`client_notified_at`: hiding and showing it again pushes nothing; photos one push per 10-minute batch), if their Perfil toggle is on; a failed push never fails the upload. Push needs an EAS project id (`npx eas init`) and a development/store build (not Expo Go); Android sends through
+  Firebase project `vitah-es` (`apps/mobile/google-services.json` + its FCM V1 service-account key in EAS credentials),
+  iOS needs an APNs key (`eas credentials -p ios`)
 - Tests swap storage for an in-memory one: `vi.mock("@repo/core/storage", () => import("@repo/core/testing"))`
 - Drizzle Kit for migrations: `pnpm db:generate`, `pnpm db:migrate`, `pnpm db:push`
 - Seed script: `pnpm db:seed` creates the tenant, the admin user, project VTH-26-001 (with the Caviedes budget, accepted, its obra half built, subcontractors and orders) and its mobile app client

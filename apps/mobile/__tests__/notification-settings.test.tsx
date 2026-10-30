@@ -3,9 +3,6 @@ import { NotificationSettings } from "../components/notification-settings";
 import { api } from "../lib/api";
 import { registerForPush } from "../lib/push";
 
-// The section is hidden in Perfil for now (PUSH_NOTIFICATIONS); it stays
-// tested so it's ready to switch on.
-
 // Stable, like the real AuthProvider's: useClientData reloads when it changes.
 const mockAuth = { token: "tok", signOut: jest.fn() };
 jest.mock("../lib/auth", () => ({ useAuth: () => mockAuth }));
