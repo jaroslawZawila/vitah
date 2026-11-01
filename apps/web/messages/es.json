@@ -1383,8 +1383,11 @@
       "overhead": "Gastos asociados",
       "profitLabel": "Porcentaje de beneficio industrial",
       "overheadLabel": "Porcentaje de gastos asociados",
-      "onCost": "{pct} sobre el coste",
-      "onCostInput": "sobre el coste",
+      "overheadOn": "{pct} sobre el coste",
+      "overheadOnInput": "sobre el coste",
+      "profitOn": "{pct} sobre la venta",
+      "profitOnInput": "sobre la venta",
+      "grossMargin": "Margen bruto {pct} sobre la venta",
       "perBuilt": "€/m² construido",
       "noArea": "Sin superficie",
       "area": "{area} m² construidos",
@@ -1411,8 +1414,8 @@
       "total": "TOTAL PEC (sin IVA) · Rev.{number}",
       "vatNote": "El importe de cada capítulo incluye su parte de los gastos asociados y del beneficio industrial, como en el PDF. IVA {rate}: {vat} · Total con IVA: {total}.",
       "costTotal": "Coste de ejecución (capítulos 01–20)",
-      "overhead": "Gastos asociados · {pct}",
-      "profit": "Beneficio industrial · {pct}"
+      "overhead": "Gastos asociados · {pct} del coste",
+      "profit": "Beneficio industrial · {pct} de la venta"
     },
     "options": {
       "summaryTitle": "Partidas opcionales",
@@ -1452,7 +1455,7 @@
     },
     "picker": {
       "title": "Base de precios FRAMER 2026",
-      "hint": "P.U. con gastos generales y beneficio",
+      "hint": "P.U. a coste: los gastos asociados y el beneficio se suman en el presupuesto",
       "search": "Buscar en la base de precios",
       "scope": "Dónde buscar",
       "inChapter": "Capítulo {code}",

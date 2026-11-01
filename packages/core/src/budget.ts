@@ -571,7 +571,8 @@ export async function updateRevision(
   if ("usefulAreaM2" in input) changes.usefulAreaCm2 = area(input.usefulAreaM2);
   if ("contingencyPct" in input) changes.contingencyBp = scaled(input.contingencyPct, 50, 100);
   if ("overheadPct" in input) changes.overheadBp = scaled(input.overheadPct, 100, 100);
-  if ("profitPct" in input) changes.profitBp = scaled(input.profitPct, 100, 100);
+  // A margin on the price: at 100 % there would be no price.
+  if ("profitPct" in input) changes.profitBp = scaled(input.profitPct, 50, 100);
   if ("texts" in input) changes.texts = parseTexts(input.texts, readTexts(revision.texts));
   if ("exclusions" in input) {
     // /api/v1's one-per-line string: a FRAMER revision keeps them in its texts.

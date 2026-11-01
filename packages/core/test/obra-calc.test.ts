@@ -9,6 +9,7 @@ import {
   priceLines,
   progressOf,
   todayInSpain,
+  unitCost,
   unitPrice,
   withPrices,
 } from "../src/obra-calc";
@@ -27,18 +28,38 @@ describe("margins", () => {
   const margins = { overheadBp: 1300, profitBp: 600 };
   const line = (quantity: number, unitPriceCents: number) => ({ quantity, unitPriceCents, amountCents: lineAmountCents(quantity, unitPriceCents) });
 
-  it("puts both margins in a unit price, to the cent", () => {
-    expect(unitPrice(1_000, margins)).toBe(1_190);
-    expect(unitPrice(322, margins)).toBe(383); // 383,18
-    expect(unitPrice(-1_000, margins)).toBe(-1_190);
+  it("puts both margins in a unit price, to the cent: gastos on the cost, beneficio on the price", () => {
+    expect(unitPrice(1_000, margins)).toBe(1_202); // 1.000 × 1,13 ÷ 0,94 = 1.202,13
+    expect(unitPrice(322, margins)).toBe(387); // 387,09
+    expect(unitPrice(-1_000, margins)).toBe(-1_202);
     expect(unitPrice(500, { overheadBp: 0, profitBp: 0 })).toBe(500);
+    expect(unitPrice(0, margins)).toBe(0);
+    expect(unitPrice(1_000, { overheadBp: 1300 } as typeof margins)).toBeNaN(); // a missing margin shows, never 0 €
+  });
+
+  it("follows Formulas_margen_obra: 15 % recargo on 100.000 € is 115.000 €, a 15 % margen 117.647,06 €", () => {
+    expect(unitPrice(10_000_000, { overheadBp: 1500, profitBp: 0 })).toBe(11_500_000);
+    expect(unitPrice(10_000_000, { overheadBp: 0, profitBp: 1500 })).toBe(11_764_706);
+  });
+
+  it("finds the unit cost that comes back to a price", () => {
+    expect(unitCost(1_202, margins)).toBe(1_000);
+    expect(unitCost(-1_202, margins)).toBe(-1_000);
+    // 3,84 € can't be reached exactly (3,19 → 3,83 €, 3,20 → 3,85 €): a tie keeps the first guess.
+    expect(unitPrice(unitCost(384, margins), margins)).toBe(383);
+  });
+
+  it("rounds halves away from zero, as linesPriceSql does", () => {
+    const half = { overheadBp: 5000, profitBp: 0 }; // × 1,5: 1 → 1,5 and −1 → −1,5
+    expect(unitPrice(1, half)).toBe(2);
+    expect(unitPrice(-1, half)).toBe(-2);
   });
 
   it("prices lines so each is its quantity × its unit price", () => {
     const priced = priceLines([line(400, 322), line(1, 66_176)], margins);
     expect(priced.map((l) => [l.unitPriceCents, l.amountCents])).toEqual([
-      [383, 153_200],
-      [78_749, 78_749],
+      [387, 154_800],
+      [79_552, 79_552],
     ]);
     expect(priceLines([], margins)).toEqual([]);
   });
@@ -48,24 +69,26 @@ describe("margins", () => {
       [{ lines: [line(400, 322), line(1, 66_176)] as BudgetLine[] }, { lines: [line(1, -100_000)] as BudgetLine[] }],
       margins,
     );
-    expect(chapter!.priceCents).toBe(153_200 + 78_749);
-    expect(option!.priceCents).toBe(-119_000);
+    expect(chapter!.priceCents).toBe(154_800 + 79_552);
+    expect(option!.priceCents).toBe(-120_213);
   });
 
-  it("splits what the margins came to by their %", () => {
-    expect(marginsOn(1_000_000, 1_190_003, margins)).toEqual({ overheadCents: 130_002, profitCents: 60_001 });
+  it("splits what the margins came to: beneficio is its % of the price, gastos the rest", () => {
+    expect(marginsOn(1_000_000, 1_202_131, margins)).toEqual({ overheadCents: 130_003, profitCents: 72_128 });
+    expect(marginsOn(1_000_000, 1_064_000, { overheadBp: 0, profitBp: 600 })).toEqual({ overheadCents: 0, profitCents: 64_000 });
+    expect(marginsOn(1_000_000, 1_130_000, { overheadBp: 1300, profitBp: 0 })).toEqual({ overheadCents: 130_000, profitCents: 0 });
     expect(marginsOn(1_000, 1_000, { overheadBp: 0, profitBp: 0 })).toEqual({ overheadCents: 0, profitCents: 0 });
   });
 
   it("gives the client's view of a revision: chapters and options at their price, lines priced", () => {
     const revision = {
       ...margins,
-      chapters: [{ totalCents: 1_000, priceCents: 1_190, lines: [line(1, 1_000)] }],
-      options: [{ totalCents: -1_000, priceCents: -1_190, lines: [line(2, -500)] }],
+      chapters: [{ totalCents: 1_000, priceCents: 1_202, lines: [line(1, 1_000)] }],
+      options: [{ totalCents: -1_000, priceCents: -1_202, lines: [line(2, -500)] }],
     } as unknown as BudgetRevision;
     const client = forClient(revision);
-    expect(client.chapters[0]).toMatchObject({ totalCents: 1_190, lines: [{ amountCents: 1_190, unitPriceCents: 1_190 }] });
-    expect(client.options[0]).toMatchObject({ totalCents: -1_190, lines: [{ amountCents: -1_190, unitPriceCents: -595 }] });
+    expect(client.chapters[0]).toMatchObject({ totalCents: 1_202, lines: [{ amountCents: 1_202, unitPriceCents: 1_202 }] });
+    expect(client.options[0]).toMatchObject({ totalCents: -1_202, lines: [{ amountCents: -1_202, unitPriceCents: -601 }] });
   });
 });
 

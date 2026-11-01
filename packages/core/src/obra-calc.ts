@@ -56,6 +56,9 @@ export function addBusinessDays(date: string, days: number): string {
 export const shareBp = (part: number, whole: number) =>
   whole > 0 ? Math.round((part * 10_000) / whole) : 0;
 
+/** Rounds half away from zero, as SQL's `round` does, so a negative amount mirrors its positive (+ 0 turns −0 into 0). */
+export const roundHalfAway = (value: number) => Math.sign(value) * Math.round(Math.abs(value)) + 0;
+
 /** `bp` basis points of `cents`, rounded to the cent. */
 export const ofBp = (cents: number, bp: number) => Math.round((cents * bp) / 10_000);
 
@@ -65,18 +68,27 @@ export const perM2Cents = (cents: number, areaCm2: number | null) =>
 
 // ─── Margins ─────────────────────────────────────────────────────────────────
 // Budget lines are priced at cost; the client pays the cost plus gastos
-// asociados and beneficio industrial. Both go into each unit price, to the
-// cent, so every priced line is its quantity × its unit price and chapters and
-// the PEC are plain sums (`linesPriceSql` in obra-data.ts is the same in SQL).
-// Only the portal's budget shows the margins apart; the PDFs, obra, hitos and
-// the app see the priced lines.
+// asociados and beneficio industrial. Gastos asociados are a markup on the cost
+// and beneficio industrial a margin on the selling price, so the profit is its %
+// of what the client pays: price = cost × (1 + gastos) ÷ (1 − beneficio). Both go
+// into each unit price, to the cent, so every priced line is its quantity × its
+// unit price and chapters and the PEC are plain sums (`linesPriceSql` in
+// obra-data.ts is the same in SQL). Only the portal's budget shows the margins
+// apart; the PDFs, obra, hitos and the app see the priced lines.
 
-/** Gastos asociados (overhead) and beneficio industrial (profit), in bp of the cost. */
+/** Gastos asociados (overhead, bp of the cost) and beneficio industrial (profit, bp of the price). */
 export type Margins = { overheadBp: number; profitBp: number };
 
 /** A unit cost with both margins in, to the cent. */
 export const unitPrice = (unitCostCents: number, { overheadBp, profitBp }: Margins) =>
-  ofBp(unitCostCents, 10_000 + overheadBp + profitBp);
+  roundHalfAway((unitCostCents * (10_000 + overheadBp)) / (10_000 - profitBp));
+
+/** The unit cost whose price, with the margins in, comes back to `unitPriceCents` (or as near as the cent allows). */
+export function unitCost(unitPriceCents: number, margins: Margins) {
+  const guess = roundHalfAway((unitPriceCents * (10_000 - margins.profitBp)) / (10_000 + margins.overheadBp));
+  const off = (cost: number) => Math.abs(unitPrice(cost, margins) - unitPriceCents);
+  return [guess, guess - 1, guess + 1].reduce((best, cost) => (off(cost) < off(best) ? cost : best));
+}
 
 /** Lines at the client's price: each unit price with the margins in, its amount recomputed. */
 export function priceLines<L extends { quantity: number; unitPriceCents: number; amountCents: number }>(lines: L[], margins: Margins): L[] {
@@ -91,11 +103,14 @@ export function withPrices<C extends { lines: BudgetLine[] }>(chapters: C[], mar
   return chapters.map((c) => ({ ...c, priceCents: priceLines(c.lines, margins).reduce((sum, l) => sum + l.amountCents, 0) }));
 }
 
-/** What the margins came to on `costCents` priced at `priceCents`, split between them by their %. */
+/**
+ * What the margins came to on `costCents` priced at `priceCents`: beneficio is its % of the price, gastos the rest
+ * (its % of the cost, give or take each line's rounding). A margin at 0 % comes to nothing.
+ */
 export function marginsOn(costCents: number, priceCents: number, { overheadBp, profitBp }: Margins) {
   const marginCents = priceCents - costCents;
-  const overheadCents = overheadBp + profitBp === 0 ? 0 : Math.round((marginCents * overheadBp) / (overheadBp + profitBp));
-  return { overheadCents, profitCents: marginCents - overheadCents };
+  const profitCents = overheadBp === 0 ? marginCents : ofBp(priceCents, profitBp);
+  return { overheadCents: marginCents - profitCents, profitCents };
 }
 
 /** A revision at the client's prices: each chapter and option at its price, its lines priced. */

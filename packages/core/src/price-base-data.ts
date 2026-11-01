@@ -1,8 +1,8 @@
 // Base de precios FRAMER 2026: the unit costs the AI and the line picker use.
-// Gastos asociados and beneficio industrial go on top, per budget (13 % + 6 %
-// by default, DEFAULT_MARGINS): these are the FRAMER prototype's prices, which
-// included both, divided by 1.19. Fixed data for now; editing it in the portal
-// is a later feature.
+// Gastos asociados and beneficio industrial go on top, per budget (`unitPrice`
+// in obra-calc.ts): these are the FRAMER prototype's prices divided by 1.19, as
+// the margins were first taken. Fixed data for now; editing it in the portal is
+// a later feature.
 
 /** [code, description, unit, unit cost in cents] */
 export const PRICE_BASE_2026: readonly (readonly [string, string, string, number])[] = [

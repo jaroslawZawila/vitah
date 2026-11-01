@@ -93,13 +93,13 @@ describe("budget actions", () => {
 
     let current = await revision(project.id);
     // At cost, 01: 661,76 € + 400 × 3,22 € = 1.949,76 €; 20 = 4 % of that (77,99 €).
-    // Priced with 18 % in each unit price: 780,88 € + 400 × 3,80 € + 92,03 € = 2.392,91 €,
-    // 364,16 € over the cost, split 12 : 6 into gastos asociados and beneficio industrial.
-    expect(current).toMatchObject({ contingencyBp: 400, costCents: 194_976 + 7_799, overheadCents: 24_344, profitCents: 12_172, totalCents: 239_291 });
+    // Each unit price × 1,12 ÷ 0,94: 788,48 € + 400 × 3,84 € + 92,92 € = 2.417,40 €, 389,65 € over
+    // the cost: 145,04 € of beneficio industrial (6 % of the price) and the rest gastos asociados.
+    expect(current).toMatchObject({ contingencyBp: 400, costCents: 194_976 + 7_799, overheadCents: 24_461, profitCents: 14_504, totalCents: 241_740 });
     expect(current.chapters[0]).toMatchObject({ pdfNote: "Sobre parcela llana." });
     const [deduction, garage] = current.options;
     expect(deduction).toMatchObject({ optionKind: "deduction", totalCents: -66_176 });
-    expect(garage).toMatchObject({ name: "Puerta de garaje seccional motorizada", totalCents: 269_118, priceCents: 317_559 });
+    expect(garage).toMatchObject({ name: "Puerta de garaje seccional motorizada", totalCents: 269_118, priceCents: 320_651 });
     expect(await updateOptionAction(project.id, garage!.id, { name: "Puerta de garaje" })).toEqual({ success: true });
     expect(revalidatePath).toHaveBeenCalledWith(`/dashboard/projects/${project.id}`, "layout");
 
@@ -121,7 +121,7 @@ describe("budget actions", () => {
     form.set("signed", new File(["%PDF-1.7 firmado"], "firmado.pdf", { type: "application/pdf" }));
     expect(await acceptRevisionAction(project.id, draft.id, form)).toEqual({ success: true });
     current = await revision(project.id);
-    expect(current).toMatchObject({ status: "accepted", acceptedBy: "Ana", contractTotalCents: current.totalCents + 317_559 });
+    expect(current).toMatchObject({ status: "accepted", acceptedBy: "Ana", contractTotalCents: current.totalCents + 320_651 });
     // The signed copy is filed with the contracts.
     expect((await getProjectDocuments(project.id)).documents.find((d) => d.category === "contract")).toMatchObject({ title: "Presupuesto 041/2026 · Rev.0 · firmado" });
 

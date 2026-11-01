@@ -352,9 +352,10 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
 ### Budget (Presupuesto)
 
 - Spec: `features/budget/TECH_DESIGN.md` (decisions in §17); PDF template and AI prompts in the same folder
-- Lines are priced at **cost**; gastos asociados and beneficio industrial (`overhead_bp` / `profit_bp`, default 13 % +
-  6 %, §18) go into each unit price, and the PEC is the sum of the priced lines (`priceLines` in `obra-calc.ts`,
-  `linesPriceSql` in SQL). Only the portal's summary shows the margins apart; the PDFs (`forClient`), obra, hitos and
+- Lines are priced at **cost**; gastos asociados (`overhead_bp`, a markup on the cost) and beneficio industrial
+  (`profit_bp`, a margin on the selling price), default 13 % + 6 % (§18), go into each unit price: price = cost ×
+  (1 + gastos) ÷ (1 − beneficio), as in the client's document "Fórmulas margen obra". The PEC is the sum of the
+  priced lines (`priceLines` in `obra-calc.ts`, `linesPriceSql` in SQL). Only the portal's summary shows the margins apart; the PDFs (`forClient`), obra, hitos and
   app see the priced lines
 - Model `framer20`: always the 20 fixed chapters 01–20 (`budget-template.ts`); chapter 20 is one computed line,
   `contingency_bp` × chapters 01–19, kept in sync by `syncDraft` (`budget-draft.ts`) inside every draft write.

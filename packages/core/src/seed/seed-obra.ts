@@ -2,7 +2,7 @@ import { budgetChapters, budgetLines, eq } from "@repo/db";
 import type { Ctx } from "../context";
 import * as budget from "../budget";
 import { DEFAULT_MARGINS } from "../contract";
-import { unitPrice } from "../obra-calc";
+import { unitCost } from "../obra-calc";
 import { inDraft } from "../budget-draft";
 import * as options from "../budget-options";
 import * as hitos from "../hitos";
@@ -40,15 +40,10 @@ const PROGRESS: Record<string, number> = {
  * holds costs and adds the default margins on top. Each cost is the one whose
  * price comes back to the document's (or as near as the cent allows).
  */
-const atCost = <L extends { unitPriceCents: number }>(line: L): L => {
-  const price = line.unitPriceCents;
-  const markup = 10_000 + DEFAULT_MARGINS.overheadBp + DEFAULT_MARGINS.profitBp;
-  const guess = Math.round((price * 10_000) / markup);
-  const [unitPriceCents] = [guess, guess - 1, guess + 1].sort(
-    (a, b) => Math.abs(unitPrice(a, DEFAULT_MARGINS) - price) - Math.abs(unitPrice(b, DEFAULT_MARGINS) - price),
-  );
-  return { ...line, unitPriceCents: unitPriceCents! };
-};
+const atCost = <L extends { unitPriceCents: number }>(line: L): L => ({
+  ...line,
+  unitPriceCents: unitCost(line.unitPriceCents, DEFAULT_MARGINS),
+});
 
 const pdf = (text: string) => new File([`%PDF-1.4\n% ${text}\n`], `${text}.pdf`, { type: "application/pdf" });
 

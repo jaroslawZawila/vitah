@@ -13,7 +13,7 @@ import {
   type PurchaseTerms,
   type PurchaseVatKind,
 } from "./contract";
-import { addDays } from "./obra-calc";
+import { addDays, roundHalfAway } from "./obra-calc";
 import { daysBetween } from "./subcontractor-rules";
 
 // ─── Supplier invoices: arithmetic ───────────────────────────────────────────
@@ -23,7 +23,7 @@ import { daysBetween } from "./subcontractor-rules";
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** `cents` × `bp` / 10 000, rounded half away from zero, so a credit note mirrors its invoice. */
-export const percentOf = (cents: number, bp: number) => Math.sign(cents) * Math.round((Math.abs(cents) * bp) / 10_000) || 0;
+export const percentOf = (cents: number, bp: number) => roundHalfAway((cents * bp) / 10_000);
 
 /** An order's invoicing terms: its own, else the defaults. */
 export const termsOf = (order: {

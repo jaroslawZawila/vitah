@@ -165,9 +165,9 @@ describe("pipeline", () => {
     expect(lines).toHaveLength(19);
     expect(lines[0]).toMatchObject({ code: "01.01", unitPriceCents: 1_000, source: "estimated" });
     expect(lines[1]).toMatchObject({ code: "02.01", source: "base", baseCode: "02.01" });
-    // The lines at cost, then the default margins: 13 % + 6 % on top.
-    expect(revision).toMatchObject({ costCents: 190_00 * 10 + 9_500, overheadBp: 1300, overheadCents: 25_935, profitBp: 600, profitCents: 11_970 });
-    expect(revision!.totalCents).toBe(237_405);
+    // The lines at cost, then the default margins: 13 % on the cost and 6 % on the price.
+    expect(revision).toMatchObject({ costCents: 190_00 * 10 + 9_500, overheadBp: 1300, overheadCents: 25_935, profitBp: 600, profitCents: 14_389 });
+    expect(revision!.totalCents).toBe(239_824);
     expect(revision!.chapters[2]!.pdfNote).toBe("Sustituye a los muros de termoarcilla");
     expect(revision!.texts).toMatchObject({
       cover: { promoter: "D. Roberto Guzmán Mesa", site: "C/ de la Arboleda 3, Zarzalejo (Madrid)", surfaces: "184,91 m² construidos · 139,7 m² útiles · terrazas 40,5 m²" },

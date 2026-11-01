@@ -1383,8 +1383,11 @@
       "overhead": "Associated costs",
       "profitLabel": "Industrial profit percentage",
       "overheadLabel": "Associated costs percentage",
-      "onCost": "{pct} on cost",
-      "onCostInput": "on cost",
+      "overheadOn": "{pct} on cost",
+      "overheadOnInput": "on cost",
+      "profitOn": "{pct} on the selling price",
+      "profitOnInput": "on the selling price",
+      "grossMargin": "Gross margin {pct} on the selling price",
       "perBuilt": "€/m² built",
       "noArea": "No floor area",
       "area": "{area} m² built",
@@ -1411,8 +1414,8 @@
       "total": "TOTAL PEC (ex VAT) · Rev.{number}",
       "vatNote": "Each chapter's amount includes its share of the associated costs and industrial profit, as in the PDF. VAT {rate}: {vat} · Total with VAT: {total}.",
       "costTotal": "Construction cost (chapters 01–20)",
-      "overhead": "Associated costs · {pct}",
-      "profit": "Industrial profit · {pct}"
+      "overhead": "Associated costs · {pct} of cost",
+      "profit": "Industrial profit · {pct} of the selling price"
     },
     "options": {
       "summaryTitle": "Optional line items",
@@ -1452,7 +1455,7 @@
     },
     "picker": {
       "title": "FRAMER 2026 price base",
-      "hint": "Unit prices with overheads and profit",
+      "hint": "Unit costs: associated costs and profit go on top in the budget",
       "search": "Search the price base",
       "scope": "Where to search",
       "inChapter": "Chapter {code}",

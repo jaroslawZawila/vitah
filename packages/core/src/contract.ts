@@ -265,7 +265,7 @@ export const CONTINGENCY_CHAPTER = "20";
 export const CONTINGENCY_LINE = "20.01";
 /**
  * Lines are priced at cost; the PEC adds gastos asociados and beneficio
- * industrial on top, as % of the cost. A new budget starts from these.
+ * industrial on top (`unitPrice` in obra-calc.ts). A new budget starts from these.
  */
 export const DEFAULT_MARGINS = { overheadBp: 1300, profitBp: 600 };
 
@@ -426,7 +426,7 @@ export type BudgetRevision = BudgetRevisionSummary & {
   perM2Cents: number | null;
   /** Chapters 01–20 at cost (ejecución material): the PEC before the margins. */
   costCents: number;
-  /** Gastos asociados and beneficio industrial: % of the cost (bp) and amount. */
+  /** Gastos asociados (bp of the cost) and beneficio industrial (bp of the PEC), and their amounts. */
   overheadBp: number;
   overheadCents: number;
   profitBp: number;

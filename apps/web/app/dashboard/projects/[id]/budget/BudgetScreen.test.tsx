@@ -112,13 +112,14 @@ describe("BudgetScreen", () => {
     const work = screen.getByText("Importe de la obra").parentElement!;
     expect(work).toHaveTextContent(/38\.554,78/);
     expect(work).toHaveTextContent(/Coste 32\.398,97/);
+    expect(work).toHaveTextContent(/Margen bruto 15,97\s%\ssobre la venta/);
     expect(screen.getByText("Beneficio industrial").parentElement).toHaveTextContent(/1943,94/);
     expect(screen.getByText("Gastos asociados").parentElement).toHaveTextContent(/4211,87/);
     expect(screen.getByText("€/m² construido").parentElement).toHaveTextContent("184,91 m² construidos");
     // Under the chapters: the cost, then each margin in % and €.
     expect(screen.getByText(/Coste de ejecución/)).toBeInTheDocument();
-    expect(screen.getByText(/Gastos asociados · 13/)).toBeInTheDocument();
-    expect(screen.getByText(/Beneficio industrial · 6/)).toBeInTheDocument();
+    expect(screen.getByText(/Gastos asociados · 13\s%\sdel coste/)).toBeInTheDocument();
+    expect(screen.getByText(/Beneficio industrial · 6\s%\sde la venta/)).toBeInTheDocument();
     const chapters = screen.getByRole("table", { name: "Resumen por capítulos" });
     expect(chapters.compareDocumentPosition(screen.getByText("1 de 2 revisados")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 
@@ -145,7 +146,8 @@ describe("BudgetScreen", () => {
     renderScreen({ budget: issued });
 
     expect(screen.queryByLabelText("Porcentaje de beneficio industrial")).not.toBeInTheDocument();
-    expect(screen.getByText("Beneficio industrial").parentElement).toHaveTextContent(/6\s%\ssobre el coste/);
+    expect(screen.getByText("Beneficio industrial").parentElement).toHaveTextContent(/6\s%\ssobre la venta/);
+    expect(screen.getByText("Gastos asociados").parentElement).toHaveTextContent(/13\s%\ssobre el coste/);
   });
 
   it("folds the AI checks into one row once all are reviewed, and opens them again", async () => {

@@ -459,16 +459,22 @@ Draft edits, options, texts and generations → none: the app only sees accepted
 Budgets are built from **costs**, then a % of **gastos asociados** and of **beneficio industrial** goes on top.
 Both matter more to staff than VAT, so they lead the summary tab.
 
-- `budget_revisions.overhead_bp` / `profit_bp` (bp of the cost). A new revision starts at 13 % + 6 %
+- `budget_revisions.overhead_bp` (bp of the cost) / `profit_bp` (bp of the price). A new revision starts at 13 % + 6 %
   (`DEFAULT_MARGINS`), a copy keeps its source's, and existing rows got 0 (their unit prices already included both;
   `packages/db/sql/2026-10-budget-margins.sql`). PATCH takes `overheadPct` / `profitPct` on drafts.
-- The FRAMER 2026 price base is now at cost: the prototype's prices ÷ 1.19. The AI prompt says the P.U. are costs.
+- The FRAMER 2026 price base is now at cost: the prototype's prices ÷ 1.19 (kept as the costs when the formula
+  below came in, so its lines now sell about 1 % above the prototype). The AI prompt says the P.U. are costs.
   The Caviedes seed takes, for each line, the cost whose price comes back to the document's unit price; its PEC
   lands within a few euros of the document.
 - Lines stay at cost. Prices are per line: the unit price with both margins in, to the cent (`unitPrice` /
   `priceLines` in `obra-calc.ts`; `linesPriceSql` in SQL), amount = quantity × unit price. A chapter's or option's
   `priceCents` and the PEC are plain sums, so every printed row multiplies out. The portal shows what the margins
-  came to (PEC − cost) split between gastos and beneficio by their % (`marginsOn`).
+  came to (PEC − cost): beneficio is its % of the PEC, gastos the rest (`marginsOn`), and the gross margin on sales.
+- **The formula (2026-11-01, client document "Fórmulas margen obra"):** gastos asociados are a markup on the cost,
+  beneficio industrial a margin on the selling price, kept apart: unit price = unit cost × (1 + gastos) ÷
+  (1 − beneficio), rounded half away from zero. At 13 % + 6 %, 100.000 € of cost sells at 120.212,77 €: 13.000 € of
+  gastos and 6 % of the price as beneficio (it was cost × 1,19 before, beneficio 5 % of the price). Beneficio is at
+  most 50 %. Not live yet, so every budget moved to it; the Caviedes seed still comes back to the document's prices.
 - **The client never sees the margins apart.** Both PDFs (the detailed one carries the contract) print the priced
   lines (`forClient`), and the obra, hitos and the app read the contract the same way (`loadBudget`). Only the
   portal's summary shows cost, gastos and beneficio. A draft at 0 % shows a warning: its lines are at cost (budgets

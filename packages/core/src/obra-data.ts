@@ -199,10 +199,10 @@ export const linesTotalSql = () =>
 /**
  * The same at the client's price, as `priceLines` (obra-calc.ts): each unit
  * price with its revision's margins in, to the cent. Lines joined to their
- * revision; chapters only (never negative, so SQL and JS round alike).
+ * revision; chapters only.
  */
 export const linesPriceSql = () =>
-  sql<string>`coalesce(sum(round(${budgetLines.quantityMilli}::numeric * round(${budgetLines.unitPriceCents}::numeric * (10000 + ${budgetRevisions.overheadBp} + ${budgetRevisions.profitBp}) / 10000) / 1000)), 0)`;
+  sql<string>`coalesce(sum(round(${budgetLines.quantityMilli}::numeric * round(${budgetLines.unitPriceCents}::numeric * (10000 + ${budgetRevisions.overheadBp}) / (10000 - ${budgetRevisions.profitBp})) / 1000)), 0)`;
 
 export function nextPosition(table: PgTable, position: AnyColumn, where: SQL | undefined) {
   return sql<number>`(select coalesce(max(${position}), -1) + 1 from ${table} where ${where})`;

@@ -324,32 +324,33 @@ describe("margins", () => {
     return draft;
   }
 
-  it("puts gastos asociados and beneficio industrial on the cost: the PEC, its chapters and VAT", async () => {
+  it("puts gastos asociados on the cost and beneficio industrial on the price: the PEC, its chapters and VAT", async () => {
     const { project, ctx } = await setup();
     const { revisionId } = await withMargins(ctx, project.id);
     await svc.updateRevision(ctx, project.id, revisionId, { builtAreaM2: 100 });
 
     const revision = await revisionOf(ctx, project.id);
-    // 19 % in each unit price, to the cent: 3,50 → 4,17 €, 72,50 → 86,28 €, 1.000 → 1.190 €
-    // and chapter 20 132,63 → 157,83 €. The PEC, 3.315,68 €, is 530,55 € over the cost:
-    // 363,01 € of gastos asociados and 167,54 € of beneficio industrial (13 : 6).
+    // Each unit price is cost × 1,13 ÷ 0,94, to the cent: 3,50 → 4,21 €, 72,50 → 87,15 €,
+    // 1.000 → 1.202,13 € and chapter 20 132,63 → 159,44 €. The PEC, 3.348,72 €, is 563,59 €
+    // over the cost: 200,92 € of beneficio industrial (6 % of the PEC) and 362,67 € of gastos
+    // asociados (13 % of the cost, 362,07 €, and each line's rounding).
     expect(revision).toMatchObject({
       costCents: 278_513,
       overheadBp: 1300,
-      overheadCents: 36_301,
+      overheadCents: 36_267,
       profitBp: 600,
-      profitCents: 16_754,
-      totalCents: 331_568,
-      contractTotalCents: 331_568,
-      vatCents: 33_157,
-      perM2Cents: 3_316,
+      profitCents: 20_092,
+      totalCents: 334_872,
+      contractTotalCents: 334_872,
+      vatCents: 33_487,
+      perM2Cents: 3_349,
     });
-    expect((await svc.getBudget(ctx, project.id)).revisions[0]!.totalCents).toBe(331_568);
+    expect((await svc.getBudget(ctx, project.id)).revisions[0]!.totalCents).toBe(334_872);
     // Each chapter keeps its cost; its price is the sum of its priced lines.
     const [c1, c2] = revision.chapters;
-    expect(c1).toMatchObject({ totalCents: 165_250, priceCents: 110_505 + 86_280, perM2Cents: 1_968 });
-    expect(c2).toMatchObject({ totalCents: 100_000, priceCents: 119_000 });
-    expect(revision.chapters.reduce((sum, c) => sum + c.priceCents, 0)).toBe(331_568);
+    expect(c1).toMatchObject({ totalCents: 165_250, priceCents: 111_565 + 87_150, perM2Cents: 1_987 });
+    expect(c2).toMatchObject({ totalCents: 100_000, priceCents: 120_213 });
+    expect(revision.chapters.reduce((sum, c) => sum + c.priceCents, 0)).toBe(334_872);
     // Lines stay at cost.
     expect(c1!.lines.map((l) => l.amountCents)).toEqual([92_750, 72_500]);
   });
@@ -364,26 +365,26 @@ describe("margins", () => {
 
     let revision = await revisionOf(ctx, project.id);
     expect(revision.options.map((o) => [o.totalCents, o.priceCents])).toEqual([
-      [1_000_000, 1_190_000],
-      [-100_000, -119_000],
+      [1_000_000, 1_202_128],
+      [-100_000, -120_213],
     ]);
-    expect(revision.optionTotals).toEqual({ adding: { count: 1, cents: 1_190_000 }, subtracting: { count: 1, cents: -119_000 } });
+    expect(revision.optionTotals).toEqual({ adding: { count: 1, cents: 1_202_128 }, subtracting: { count: 1, cents: -120_213 } });
 
     await issue.issueRevision(ctx, project.id, revisionId, { shareWithClient: false });
     await svc.acceptRevision(ctx, project.id, revisionId, { acceptedOn: "2026-10-21", chosenOptionIds: [pool] });
 
     revision = await revisionOf(ctx, project.id);
-    expect(revision.contractTotalCents).toBe(331_568 + 1_190_000);
+    expect(revision.contractTotalCents).toBe(334_872 + 1_202_128);
     // The obra and the hitos follow the price: every line priced, quantity × unit price.
     const obra = await obraService.getObra(ctx, project.id);
-    expect(obra.budget!.totalCents).toBe(1_521_568);
-    expect(obra.chapters.find((c) => c.code === "01")!.totalCents).toBe(196_785);
-    expect(obra.chapters.reduce((sum, c) => sum + c.totalCents, 0)).toBe(1_521_568);
-    expect((await hitosService.listHitos(ctx, project.id))[0]).toMatchObject({ amountCents: 76_078 });
+    expect(obra.budget!.totalCents).toBe(1_537_000);
+    expect(obra.chapters.find((c) => c.code === "01")!.totalCents).toBe(198_715);
+    expect(obra.chapters.reduce((sum, c) => sum + c.totalCents, 0)).toBe(1_537_000);
+    expect((await hitosService.listHitos(ctx, project.id))[0]).toMatchObject({ amountCents: 76_850 });
     const chapter = await obraService.getChapter(ctx, project.id, "01");
     expect(chapter.chapter.lines.map((l) => [l.amountCents, l.unitPriceCents])).toEqual([
-      [265 * 417, 417],
-      [10 * 8_628, 8_628],
+      [265 * 421, 421],
+      [10 * 8_715, 8_715],
     ]);
   });
 
@@ -397,6 +398,8 @@ describe("margins", () => {
       await expect(svc.updateRevision(ctx, project.id, revisionId, { overheadPct: bad })).rejects.toMatchObject({ code: "invalid_input" });
       await expect(svc.updateRevision(ctx, project.id, revisionId, { profitPct: bad })).rejects.toMatchObject({ code: "invalid_input" });
     }
+    // Beneficio is a margin on the price: up to 50 %, never the whole price.
+    await expect(svc.updateRevision(ctx, project.id, revisionId, { profitPct: 51 })).rejects.toMatchObject({ code: "invalid_input" });
 
     await issue.issueRevision(ctx, project.id, revisionId, { shareWithClient: false });
     await expect(svc.updateRevision(ctx, project.id, revisionId, { profitPct: 6 })).rejects.toMatchObject({ code: "not_draft" });
@@ -735,9 +738,9 @@ describe("checks before issuing", () => {
   it("lists the AI's inconsistencies and assumptions, estimated lines and chapters off the tenant's ratios", async () => {
     const { tenant, project, ctx } = await setup();
     // Another project's issued budget: 01 at 100 €/m² built, at price (80 € of
-    // cost and 25 % of margins; budgets compare at what the client pays).
+    // cost × 1,15 ÷ 0,92; budgets compare at what the client pays).
     const reference = await createTestProject(tenant.id);
-    const { revisionId: refRev, chapterId: refChapter } = await framerDraft(ctx, reference.id, [], 0, { overheadPct: 15, profitPct: 10 });
+    const { revisionId: refRev, chapterId: refChapter } = await framerDraft(ctx, reference.id, [], 0, { overheadPct: 15, profitPct: 8 });
     await svc.addLine(ctx, reference.id, refChapter("01"), line("01.01", 100, 8_000));
     await svc.updateRevision(ctx, reference.id, refRev, { builtAreaM2: 100 });
     await issue.issueRevision(ctx, reference.id, refRev, { shareWithClient: false });

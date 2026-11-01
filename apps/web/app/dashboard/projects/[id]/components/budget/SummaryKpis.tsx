@@ -7,10 +7,10 @@ import Kpi from "../obra/Kpi";
 import InlinePct from "./InlinePct";
 
 /**
- * Presentational: the works' price (the PEC), its two margins over the cost
- * (beneficio industrial and gastos asociados, % and €; the % editable on a
- * draft via `onMargins`, e.g. `{ profitPct: 6 }`) and €/m² built against the
- * tenant's average.
+ * Presentational: the works' price (the PEC) and its gross margin on it, its two
+ * margins (beneficio industrial, % of the price, and gastos asociados, % of the
+ * cost, with their €; the % editable on a draft via `onMargins`, e.g.
+ * `{ profitPct: 6 }`) and €/m² built against the tenant's average.
  */
 export default function SummaryKpis({
   revision,
@@ -37,10 +37,10 @@ export default function SummaryKpis({
           onMargins ? (
             <span className="inline-flex items-center gap-1.5">
               <InlinePct label={t(`${kind}Label`)} bp={bp} onCommit={(pct) => onMargins({ [`${kind}Pct`]: pct })} />
-              {t("onCostInput")}
+              {t(`${kind}OnInput`)}
             </span>
           ) : (
-            t("onCost", { pct: f.share(bp) })
+            t(`${kind}On`, { pct: f.share(bp) })
           ),
           // Lines are priced at cost: without a margin the work is sold at cost.
           ...(onMargins && bp === 0 ? [<span key="no-margin" className="font-semibold text-warn">{t("noMargin")}</span>] : []),
@@ -57,6 +57,7 @@ export default function SummaryKpis({
         value={f.money(revision.totalCents)}
         hints={[
           t("workHint", { cost: f.money(revision.costCents), count: revision.lineCount }),
+          t("grossMargin", { pct: f.ratio(revision.totalCents - revision.costCents, revision.totalCents) }),
           t("withVat", { rate: f.share(revision.vatRateBp), total: f.money(revision.totalCents + revision.vatCents) }),
           ...(withOptions ? [t("contract", { amount: f.money(revision.contractTotalCents) })] : []),
         ]}
