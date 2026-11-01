@@ -21,7 +21,7 @@ function renderAt(
   purchases: PurchasingCounts | null = null,
 ) {
   navigation.pathname = pathname;
-  navigation.params = /^\/dashboard\/projects\/(?!new$|compras$)[^/]+/.test(pathname)
+  navigation.params = /^\/dashboard\/projects\/(?!new$|compras$|presupuestos$)[^/]+/.test(pathname)
     ? { id: pathname.split("/")[3] }
     : {};
   return render(
@@ -96,6 +96,14 @@ describe("Sidebar", () => {
     cleanup();
     renderAt("/dashboard/projects/p-1/compras");
     expect(screen.queryByRole("list", { name: "Secciones de proyectos" })).not.toBeInTheDocument();
+  });
+
+  it("offers Proyectos › Presupuestos, every obra's budget", () => {
+    renderAt("/dashboard/projects/presupuestos");
+    const sections = within(screen.getByRole("list", { name: "Secciones de proyectos" }));
+    expect(sections.getAllByRole("link").map((l) => l.textContent)).toEqual(["Presupuestos", "Compras de obra"]);
+    expect(sections.getByRole("link", { name: "Presupuestos" })).toHaveAttribute("href", "/dashboard/projects/presupuestos");
+    expect(sections.getByRole("link", { name: "Presupuestos" })).toHaveAttribute("aria-current", "page");
   });
 
   it("has the company-wide Compras in the Red group for every staff member", () => {

@@ -18,6 +18,7 @@ import {
   registerBudgetInputAction,
 } from "../../../../actions/documents";
 import FormError from "../../../components/FormError";
+import { OpenProjectLink } from "../components/budget/BudgetFrame";
 import GenerationView from "../components/budget/GenerationView";
 import StartView, { type GenerateInput } from "../components/budget/StartView";
 import TabHeader from "../components/TabHeader";
@@ -96,7 +97,12 @@ export default function BudgetStartScreen({
 
   return (
     <div className="flex flex-col gap-5">
-      <TabHeader projectRef={projectRef} title={t("title")} summary={active ? t("start.generatingSummary") : t("start.summary")} />
+      <TabHeader
+        projectRef={projectRef}
+        title={t("title")}
+        summary={active ? t("start.generatingSummary") : t("start.summary")}
+        action={<OpenProjectLink projectId={projectId} />}
+      />
       <FormError namespace="budget.start.errors" error={uploadError ?? docs.state?.error} />
       {active && generation ? (
         <GenerationView

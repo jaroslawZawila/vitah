@@ -17,6 +17,7 @@ export * as budgetService from "./budget";
 export * as budgetOptionsService from "./budget-options";
 export * as budgetIssueService from "./budget-issue";
 export * as budgetGenerationsService from "./budget-generations";
+export * as budgetOverviewService from "./budget-overview";
 export { searchPriceBase } from "./price-base";
 export * as hitosService from "./hitos";
 export * as obraService from "./obra";

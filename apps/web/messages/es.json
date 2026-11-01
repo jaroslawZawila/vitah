@@ -56,6 +56,7 @@
     },
     "projectSections": {
       "label": "Secciones de proyectos",
+      "budgets": "Presupuestos",
       "purchases": "Compras de obra"
     }
   },
@@ -3721,5 +3722,101 @@
     "list": "Obras",
     "none": "Todavía no hay obras.",
     "noMatch": "Ninguna obra coincide."
+  },
+  "budgetsOverview": {
+    "eyebrow": "Proyectos",
+    "title": "Presupuestos",
+    "description": "El presupuesto de cada obra, en su última revisión. Abre uno y cambia de obra desde la lista de al lado, sin volver al proyecto.",
+    "search": "Código, cliente o dirección",
+    "filterLabel": "Filtrar por estado",
+    "filters": {
+      "all": "Todas",
+      "draft": "Borrador",
+      "issued": "Emitidos",
+      "accepted": "Aceptados",
+      "rejected": "Rechazados",
+      "none": "Sin presupuesto"
+    },
+    "kpis": {
+      "drafts": "Por emitir",
+      "draftsValue": "{count, plural, one {# borrador} other {# borradores}}",
+      "generating": "{count} con la IA en marcha",
+      "openChecks": "{count, plural, one {# comprobación abierta} other {# comprobaciones abiertas}}",
+      "noDrafts": "Nada por emitir",
+      "issued": "Esperando al cliente",
+      "issuedCount": "{count, plural, =0 {Ninguno emitido} one {# emitido} other {# emitidos}}",
+      "expiring": "{count, plural, one {# vence en {days} días o ya venció} other {# vencen en {days} días o ya vencieron}}",
+      "contract": "Contratado",
+      "accepted": "{count, plural, =0 {Ninguno aceptado} one {# aceptado, con las opciones elegidas} other {# aceptados, con las opciones elegidas}}",
+      "perM2": "Media €/m² construido",
+      "perM2Hint": "De los aceptados",
+      "noAverage": "Sin aceptados con superficie",
+      "aboveAverage": "{count, plural, one {# obra más de un {pct} por encima} other {# obras más de un {pct} por encima}}"
+    },
+    "table": {
+      "label": "Presupuestos de las obras",
+      "obra": "Obra",
+      "revision": "Revisión",
+      "price": "Precio (PEC)",
+      "margin": "Margen",
+      "perM2": "€/m²",
+      "situation": "Situación",
+      "activity": "Actividad",
+      "open": "Abrir"
+    },
+    "contract": "Contrato {amount}",
+    "delta": "{delta} vs media",
+    "openBudget": "Presupuesto de {ref}",
+    "project": "Proyecto",
+    "openProject": "Abrir proyecto",
+    "openProjectOf": "Abrir el proyecto {ref}",
+    "footnote": "Ordenadas por la última actividad del presupuesto. Importes sin IVA. La fila abre el presupuesto; «Proyecto», la ficha de la obra.",
+    "none": "Todavía no hay obras.",
+    "noMatch": "Ninguna obra coincide con la búsqueda.",
+    "pill": {
+      "generating": "IA en marcha",
+      "none": "Sin presupuesto"
+    },
+    "situation": {
+      "generating": "La IA prepara el borrador",
+      "generatingSub": "Paso {step} de 5",
+      "failed": "La IA no pudo terminar",
+      "failedSub": "Vuelve a intentarlo desde el presupuesto",
+      "none": "Sin presupuesto",
+      "noneSub": "Sube la documentación para empezar",
+      "checks": "{count, plural, one {# comprobación por revisar} other {# comprobaciones por revisar}}",
+      "checksSub": "Antes de emitir Rev.{number}",
+      "draft": "En borrador",
+      "draftSub": "Rev.{number} por emitir",
+      "expired": "Caducado",
+      "expiring": "{days, plural, =0 {Vence hoy} one {Vence mañana} other {Vence en # días}}",
+      "waiting": "Esperando al cliente",
+      "issuedSub": "Emitido el {issued} · válido hasta el {valid}",
+      "issuedOnly": "Emitido el {issued}",
+      "rejected": "Rechazado por el cliente",
+      "rejectedSub": "El {date} · prepara Rev.{next}",
+      "accepted": "Aceptado",
+      "acceptedSub": "{options, plural, =0 {El {date}} one {El {date} · # opción elegida} other {El {date} · # opciones elegidas}}"
+    },
+    "short": {
+      "failed": "La IA no terminó",
+      "checks": "{count} por revisar",
+      "draft": "Por emitir",
+      "waiting": "Esperando",
+      "rejected": "Rechazado",
+      "perM2High": "€/m² alto"
+    },
+    "switcher": {
+      "label": "Obras",
+      "position": "{index} de {total}",
+      "previous": "Obra anterior",
+      "next": "Obra siguiente",
+      "search": "Buscar obra",
+      "noMatch": "Ninguna obra coincide.",
+      "hint": "Cambiar de obra mantiene la pestaña y el capítulo. Teclado: Alt ↑ / Alt ↓",
+      "back": "Todos los presupuestos",
+      "previousKey": "Obra anterior (Alt ↑)",
+      "nextKey": "Obra siguiente (Alt ↓)"
+    }
   }
 }

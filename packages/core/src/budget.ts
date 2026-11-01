@@ -43,6 +43,7 @@ import {
   DEFAULT_MARGINS,
   MAX_CHAPTER_CODE,
   type BudgetChapter,
+  type BudgetCheck,
   type BudgetConditions,
   type BudgetLineChange,
   type BudgetOption,
@@ -201,7 +202,7 @@ function toOptions(
   }));
 }
 
-function toSummary(row: RevisionRow, totalCents: number): BudgetRevisionSummary {
+export function toSummary(row: RevisionRow, totalCents: number): BudgetRevisionSummary {
   return {
     id: row.id,
     number: row.number,
@@ -323,6 +324,22 @@ export async function revisionView(
     ratios,
     lineChanges: before ? lineChanges(loaded, before) : [],
   };
+}
+
+/**
+ * A FRAMER draft's review checks, as its Budget tab works them out (`revisionView`) without the rest of it,
+ * against the tenant's `ratios` for its project.
+ */
+export async function revisionChecks(row: RevisionRow, ratios: Record<string, number>): Promise<BudgetCheck[]> {
+  const loaded = await loadChapters(row.id);
+  const chapters = withPrices(loaded, row).filter((c) => c.kind === "chapter");
+  const totalCents = chapters.reduce((sum, c) => sum + c.priceCents, 0);
+  return computeChecks({
+    texts: readTexts(row.texts),
+    chapters: toBudgetChapters(chapters, null, totalCents, new Map(), { framer: true, builtAreaCm2: row.builtAreaCm2 }),
+    ratios,
+    done: reviewedKeys(row.review),
+  });
 }
 
 /** All revisions, newest first, one of them in full (default: the newest), and the newest AI run. */

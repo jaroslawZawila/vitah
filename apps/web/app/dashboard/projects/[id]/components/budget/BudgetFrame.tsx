@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FileText, Lock } from "lucide-react";
+import { FileText, FolderOpen, Lock } from "lucide-react";
 import { useTranslations } from "next-intl";
 import type { BudgetRevision, BudgetRevisionSummary } from "@repo/core/contract";
 import { buttonVariants } from "@/components/ui/button";
@@ -27,6 +27,17 @@ function steps(newest: BudgetRevisionSummary, inputCount: number, t: ReturnType<
     },
     { key: "accepted", label: t("steps.accepted"), meta: t("steps.acceptedMeta"), state: at === 3 ? "done" : "todo" },
   ];
+}
+
+/** "Abrir proyecto": the project's own page (General, then Obra, Compras…), from its budget. */
+export function OpenProjectLink({ projectId }: { projectId: string }) {
+  const t = useTranslations("budgetsOverview");
+  return (
+    <Link href={`/dashboard/projects/${projectId}`} className={buttonVariants({ variant: "outline" })}>
+      <FolderOpen aria-hidden />
+      {t("openProject")}
+    </Link>
+  );
 }
 
 /**
@@ -109,6 +120,7 @@ export default function BudgetFrame({
           </p>
         </div>
         <div className="flex flex-wrap gap-2 print:hidden">
+          <OpenProjectLink projectId={projectId} />
           {(["general", "detailed"] as const).map((kind) => (
             <Link key={kind} href={budgetHref(projectId, "/pdf", revisionParam, { kind })} className={buttonVariants({ variant: "outline" })}>
               <FileText aria-hidden />

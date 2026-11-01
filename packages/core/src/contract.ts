@@ -523,6 +523,66 @@ export type ProjectBudget = {
   generation: BudgetGeneration | null;
 };
 
+// ─── Every obra's budget (Proyectos › Presupuestos) ──────────────────────────
+
+export * from "./budget-overview-rules";
+
+/** An obra's newest revision as the list shows it, at the client's price (the PEC, margins in). */
+export type BudgetOverviewRevision = BudgetRevisionSummary & {
+  costCents: number;
+  /** PEC + the options the client chose; the PEC until accepted. */
+  contractTotalCents: number;
+  chosenOptions: number;
+  perM2Cents: number | null;
+  /** Its €/m² against the tenant's average, in bp (+600 = 6 % above); null without either. */
+  perM2DeltaBp: number | null;
+  validUntil: string | null;
+  acceptedOn: string | null;
+  rejectedOn: string | null;
+  /** A FRAMER draft's review checks not ticked yet; null for any other. */
+  openChecks: number | null;
+  /** Days from today to `validUntil` while issued (negative once past); else null. */
+  daysLeft: number | null;
+};
+
+export type BudgetOverviewItem = {
+  projectId: string;
+  ref: string;
+  address: string;
+  clientName: string | null;
+  /** The newest revision; null before the first. */
+  revision: BudgetOverviewRevision | null;
+  /** Before the first revision: the AI's newest run drafting it, if any. */
+  generation: { status: BudgetGenerationStatus; step: number } | null;
+  /** When the budget last changed (ISO): a line or the revision, else its AI run, else the project's creation. */
+  updatedAt: string;
+};
+
+export type BudgetOverview = {
+  /** Every obra of the tenant, the budget changed last first. */
+  items: BudgetOverviewItem[];
+  summary: {
+    /** Newest revisions in draft. */
+    drafts: number;
+    /** Obras whose first revision the AI is drafting (the list's draft filter counts them as drafts too). */
+    generating: number;
+    openChecks: number;
+    issued: number;
+    issuedCents: number;
+    /** Issued ones within BUDGET_EXPIRY_WARNING_DAYS of expiring, or past it (`expiresSoon`). */
+    expiring: number;
+    accepted: number;
+    contractCents: number;
+    /**
+     * The accepted ones' average €/m² built (cents; null with none): the obras compared as a whole. Not the
+     * Budget tab's per-chapter averages (`tenantRatios`: issued and accepted budgets of the other projects).
+     */
+    averagePerM2Cents: number | null;
+    /** Obras more than BUDGET_PER_M2_WARNING_BP above it (`perM2High`). */
+    aboveAverage: number;
+  };
+};
+
 export type Hito = {
   id: string;
   code: string;

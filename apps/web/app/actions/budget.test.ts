@@ -17,6 +17,7 @@ import {
   deleteLineAction,
   deleteOptionAction,
   deleteRevisionAction,
+  getBudgetsOverview,
   getGenerationAction,
   getProjectBudget,
   issueRevisionAction,
@@ -220,5 +221,20 @@ describe("budget actions", () => {
 
     await setup();
     expect(await getProjectBudget(project.id)).toBeNull();
+  });
+
+  it("lists every obra's budget of the caller's tenant, nothing when signed out", async () => {
+    const { project, ctx } = await setup("viewer");
+    await budgetService.createBudget({ ...ctx, role: "manager" }, project.id, {});
+    const other = await setup();
+
+    signInAs(ctx);
+    const overview = await getBudgetsOverview();
+    expect(overview!.items.map((i) => i.projectId)).toEqual([project.id]);
+    expect(overview!.items[0]!.revision).toMatchObject({ number: 0, status: "draft" });
+    expect(overview!.items.map((i) => i.projectId)).not.toContain(other.project.id);
+
+    signInAs(null);
+    expect(await getBudgetsOverview()).toBeNull();
   });
 });

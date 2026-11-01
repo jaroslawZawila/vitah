@@ -7,6 +7,7 @@ import {
   budgetGenerationsService as generations,
   budgetIssueService as issue,
   budgetOptionsService as options,
+  budgetOverviewService as overview,
   budgetService as svc,
   searchPriceBase,
 } from "@repo/core";
@@ -20,6 +21,11 @@ type Input = Record<string, unknown>;
 export async function getProjectBudget(projectId: string, revisionId?: string) {
   const result = await read((ctx) => svc.getBudget(ctx, projectId, revisionId));
   return result && { budget: result.data, canManage: result.canManage };
+}
+
+/** Every obra's newest budget (Proyectos › Presupuestos, and the obras beside a budget); null when signed out. */
+export async function getBudgetsOverview() {
+  return (await read((ctx) => overview.listBudgets(ctx)))?.data ?? null;
 }
 
 /** The AI run's progress, for the portal to poll while it runs. */

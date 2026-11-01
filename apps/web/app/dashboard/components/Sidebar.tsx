@@ -40,8 +40,11 @@ const PROJECT_TABS = [
   { key: "documents", path: "/documents" },
 ] as const;
 
-/** Proyectos' sections entered first, the obra picked after (Compras: `projects/compras`). */
-const PROJECT_SECTIONS = [{ key: "purchases", href: "/dashboard/projects/compras" }] as const;
+/** Proyectos' sections across the obras (Presupuestos, `projects/presupuestos`; Compras, `projects/compras`). */
+const PROJECT_SECTIONS = [
+  { key: "budgets", href: "/dashboard/projects/presupuestos" },
+  { key: "purchases", href: "/dashboard/projects/compras" },
+] as const;
 
 const SUBCONTRACTORS_HREF = "/dashboard/subcontratas";
 

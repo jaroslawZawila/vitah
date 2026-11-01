@@ -145,6 +145,8 @@ export async function inDraft<T>(
     if (!revision) fail("not_found");
     if (revision.status !== "draft") fail("not_draft");
     const result = await write(tx);
+    // Any change to the draft is its last activity (Proyectos › Presupuestos sorts by it).
+    await tx.update(budgetRevisions).set({ updatedAt: new Date() }).where(eq(budgetRevisions.id, revisionId));
     if (sync && revision.model === BUDGET_MODEL) {
       // The write may have changed the percentage itself.
       const [{ contingencyBp }] = (await tx

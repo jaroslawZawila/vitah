@@ -75,22 +75,37 @@ export function computeChecks(input: {
  * on top) compare alike.
  */
 export async function tenantRatios(tenantId: string, projectId: string): Promise<Record<string, number>> {
+  return (await tenantRatiosByProject(tenantId))(projectId);
+}
+
+/**
+ * `tenantRatios` for any of the tenant's projects from one query: each
+ * project's chapters summed apart, then left out of its own averages.
+ */
+export async function tenantRatiosByProject(tenantId: string): Promise<(projectId: string) => Record<string, number>> {
   const rows = (await db.execute(sql`
-    select code, round(avg(total * 100.0 / area))::int as average
+    select project_id, code, sum(total * 100.0 / area) as sum, count(*)::int as count
     from (
-      select budget_chapters.code, budget_revisions.built_area_cm2 as area, ${linesPriceSql()} as total
+      select budget_revisions.project_id, budget_chapters.code, budget_revisions.built_area_cm2 as area, ${linesPriceSql()} as total
       from budget_lines
       join budget_chapters on budget_chapters.id = budget_lines.chapter_id
       join budget_revisions on budget_revisions.id = budget_chapters.revision_id
       where budget_revisions.tenant_id = ${tenantId}
-        and budget_revisions.project_id <> ${projectId}
         and budget_revisions.model = ${BUDGET_MODEL}
         and budget_revisions.status in ('issued', 'accepted')
         and budget_revisions.built_area_cm2 > 0
         and budget_chapters.kind = 'chapter'
-      group by budget_chapters.id, budget_chapters.code, budget_revisions.built_area_cm2
+      group by budget_chapters.id, budget_chapters.code, budget_revisions.project_id, budget_revisions.built_area_cm2
     ) as chapters
-    group by code
-  `)) as unknown as { code: string; average: number }[];
-  return Object.fromEntries(rows.map((r) => [r.code, Number(r.average)]));
+    group by project_id, code
+  `)) as unknown as { project_id: string; code: string; sum: string; count: number }[];
+  return (projectId) => {
+    const codes = new Map<string, { sum: number; count: number }>();
+    for (const row of rows) {
+      if (row.project_id === projectId) continue;
+      const code = codes.get(row.code) ?? { sum: 0, count: 0 };
+      codes.set(row.code, { sum: code.sum + Number(row.sum), count: code.count + Number(row.count) });
+    }
+    return Object.fromEntries([...codes].map(([code, { sum, count }]) => [code, Math.round(sum / count)]));
+  };
 }

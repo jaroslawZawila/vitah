@@ -397,6 +397,9 @@ describe("writes the client sees", () => {
     "clientConflict",
     "toBudgetChapters",
     "photosByChapter",
+    // Reads behind Proyectos › Presupuestos (budget-overview.ts).
+    "toSummary",
+    "revisionChecks",
   ]);
 
   it("covers every write of the services the app shows", () => {

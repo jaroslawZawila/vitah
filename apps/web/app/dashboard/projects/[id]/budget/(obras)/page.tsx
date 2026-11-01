@@ -1,11 +1,11 @@
 import { redirect } from "next/navigation";
-import { getProjectDocuments } from "../../../../actions/documents";
-import { getProjectObra } from "../../../../actions/obra";
-import { getProject } from "../../../../actions/projects";
-import { getProjectBudget } from "../../../../actions/budget";
-import BudgetScreen from "./BudgetScreen";
-import BudgetStartScreen from "./BudgetStartScreen";
-import type { BudgetTab } from "../components/budget/links";
+import { getProjectDocuments } from "../../../../../actions/documents";
+import { getProjectObra } from "../../../../../actions/obra";
+import { getProject } from "../../../../../actions/projects";
+import { getProjectBudget } from "../../../../../actions/budget";
+import BudgetScreen from "../BudgetScreen";
+import BudgetStartScreen from "../BudgetStartScreen";
+import type { BudgetTab } from "../../components/budget/links";
 
 type PageProps = {
   params: Promise<{ id: string }>;
