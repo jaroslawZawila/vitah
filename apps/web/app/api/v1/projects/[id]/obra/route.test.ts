@@ -4,6 +4,7 @@ import { files } from "@repo/core/testing";
 import { apiRequest, routeParams, seededObraProject, staffToken } from "../../../../../../test/api";
 import { GET, PUT } from "./route";
 import { GET as getChapter } from "./chapters/[code]/route";
+import { POST as startChapter } from "./chapters/[code]/start/route";
 
 vi.mock("@repo/auth", () => ({ auth: vi.fn() }));
 vi.mock("@repo/core/storage", () => import("@repo/core/testing"));
@@ -29,6 +30,22 @@ describe("/api/v1/projects/:id/obra", () => {
     const bad = await PUT(apiRequest(token, { method: "PUT", body: { stage: 0 } }), routeParams({ id: project.id }));
     expect(bad.status).toBe(400);
     expect(await bad.json()).toEqual({ error: "invalid_stage" });
+  });
+
+  it("raises the stage on its own when a chapter starts, and says why", async () => {
+    const { tenant, project } = await setup();
+    const { token } = await staffToken(tenant.id);
+    await PUT(apiRequest(token, { method: "PUT", body: { stage: 5 } }), routeParams({ id: project.id }));
+
+    const started = await startChapter(
+      apiRequest(token, { method: "POST", body: { date: "2026-09-21" } }),
+      routeParams({ id: project.id, code: "05" }),
+    );
+    expect(started.status).toBe(200);
+
+    const body = await (await GET(apiRequest(token), routeParams({ id: project.id }))).json();
+    expect(body.stage).toBe(6);
+    expect(body.stageEvidence).toMatchObject({ 3: expect.any(String), 4: expect.any(String), 6: expect.any(String) });
   });
 
   it("reads a chapter", async () => {

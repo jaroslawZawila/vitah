@@ -13,6 +13,7 @@ import {
   projectPhotos,
 } from "@repo/db";
 import { markChanged } from "./changes";
+import { raiseStage } from "./obra-stage";
 import { requireEditor, type Ctx } from "./context";
 import { MAX_CHAPTER_CODE, MAX_DOCUMENT_BYTES, type Hito, type HitoFileKind } from "./contract";
 import {
@@ -483,6 +484,8 @@ export async function registerPayment(
   }
   await touch(hitoId, { paidOn, paidAmountCents: amountCents });
   await obraChanged(ctx, projectId);
+  // H0 paid opens stage 5, H9 paid stage 8.
+  await raiseStage(ctx.tenantId, projectId);
   return { hitoId };
 }
 

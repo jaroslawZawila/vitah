@@ -26,6 +26,7 @@ import {
 } from "@repo/db";
 import { toCalendarDate } from "./calendar";
 import { markChanged } from "./changes";
+import { raiseStage } from "./obra-stage";
 import { requireEditor, type Ctx } from "./context";
 import {
   CONTINGENCY_CHAPTER,
@@ -660,6 +661,7 @@ export async function startChapter(ctx: Ctx, projectId: string, code: string, in
     await logEvent(tx, ctx, projectId, code, { kind: "start", previousDate: null, newDate: date, note: null });
   });
   await markChanged(ctx.tenantId, projectId, ["obra"]);
+  await raiseStage(ctx.tenantId, projectId);
   return { state: "in_progress" as const };
 }
 
@@ -680,6 +682,7 @@ export async function finishChapter(ctx: Ctx, projectId: string, code: string, i
     return requestInvoice(tx, ctx, projectId, code, plan);
   });
   await markChanged(ctx.tenantId, projectId, ["obra"]);
+  await raiseStage(ctx.tenantId, projectId);
   return { state: "finished" as const, invoiceRequested };
 }
 
@@ -731,7 +734,10 @@ export async function correctChapter(ctx: Ctx, projectId: string, code: string, 
     const invoiceRequested = finishedNow ? await requestInvoice(tx, ctx, projectId, code, plan) : null;
     return { changed, state: chapterState(after), invoiceRequested };
   });
-  if (result.changed) await markChanged(ctx.tenantId, projectId, ["obra"]);
+  if (result.changed) {
+    await markChanged(ctx.tenantId, projectId, ["obra"]);
+    await raiseStage(ctx.tenantId, projectId);
+  }
   const { changed: _, ...outcome } = result;
   return outcome;
 }

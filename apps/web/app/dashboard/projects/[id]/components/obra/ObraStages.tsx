@@ -23,11 +23,22 @@ export default function ObraStages({
     if (stage === 3 && obra.budget) {
       return t("stageMeta.budget", { number: obra.budget.number, total: f.money(obra.budget.totalCents) });
     }
-    if (stage === 6 && obra.term) return t("stageMeta.from", { date: f.date(obra.term.startDate) });
+    // The works' actual start once Avance has one, else the planned one.
+    const worksFrom = obra.stageEvidence[6] ?? obra.term?.startDate;
+    if (stage === 6 && worksFrom) return t("stageMeta.from", { date: f.date(worksFrom) });
     const hito = obra.hitos.find((h) => h.code === STAGE_HITOS[stage]);
     if (hito?.paidOn) return t("stageMeta.paid", { code: hito.code, date: f.date(hito.paidOn) });
     return t(`stageHints.${stage}`);
   }
+
+  // The stage moves up on its own with the evidence: say since when, and what moves it next
+  // (not when that is already in, the stage having been set back by hand).
+  const since = obra.stageEvidence[obra.stage];
+  const next = OBRA_STAGES.find((stage) => stage === obra.stage + 1 && !obra.stageEvidence[stage]);
+  const auto = [
+    since && t("stageAuto.since", { date: f.date(since), evidence: t(`stageAuto.evidence.${obra.stage}`) }),
+    next && t("stageAuto.next", { name: t(`stages.${next}`), evidence: t(`stageAuto.evidence.${next}`) }),
+  ].filter(Boolean);
 
   return (
     <section className={cardVariants()}>
@@ -46,6 +57,7 @@ export default function ObraStages({
           };
         })}
       />
+      {auto.length > 0 && <p className="text-[12.5px] text-muted-foreground">{auto.join(" · ")}</p>}
     </section>
   );
 }

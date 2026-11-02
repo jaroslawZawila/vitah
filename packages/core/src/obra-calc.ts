@@ -9,8 +9,9 @@ import type {
   ObraStage,
   ObraTerm,
   ProgressStatus,
+  StageEvidence,
 } from "./contract";
-import { EXECUTION_STAGE, lineAmountCents } from "./contract";
+import { EXECUTION_STAGE, STAGE_HITOS, lineAmountCents } from "./contract";
 
 // ─── Obra arithmetic ─────────────────────────────────────────────────────────
 // Pure functions behind the budget, hitos and obra services: progress, dates,
@@ -265,3 +266,49 @@ export function buildPhases(
   }
   return phases;
 }
+
+// ─── The process's stage, from the evidence ─────────────────────────────────
+
+/** What the platform holds that opens a stage (PROCESS.md §2). */
+export type StageFacts = {
+  /** When the first of the project's files (plans, basic or execution project, measurements) was registered. */
+  firstInputOn: string | null;
+  /** When the first budget revision was drafted (by hand or by the AI). */
+  firstDraftOn: string | null;
+  /** When the client accepted the current contract. */
+  acceptedOn: string | null;
+  /** The days the hitos were paid, by code. */
+  paidOn: ReadonlyMap<string, string>;
+  /** The chapters of the contract (chapter 20 aside). */
+  contractCodes: readonly string[];
+  /** The actual dates recorded on Avance, by chapter code. */
+  progress: ReadonlyMap<string, { actualStart: string | null; actualEnd: string | null }>;
+};
+
+/**
+ * The day each stage's evidence appeared: 2 the project's files, 3 a budget
+ * draft, 4 the accepted revision, 5 H0 paid, 6 a contract chapter started (the
+ * works begun), 7 every contract chapter finished (on the last finish), 8 H9 paid.
+ */
+export function stageEvidence(facts: StageFacts): StageEvidence {
+  const contract = facts.contractCodes.map((code) => facts.progress.get(code));
+  const starts = contract.flatMap((p) => p?.actualStart ?? []).sort();
+  const ends = contract.flatMap((p) => p?.actualEnd ?? []).sort();
+  // The hito that closes a stage opens the next: H0 (stage 4) opens 5, H9 (7) opens 8.
+  // Not H1: once the licence is paid the works still wait for their acta de inicio.
+  const paidAfter = (stage: ObraStage) => facts.paidOn.get(STAGE_HITOS[stage]!) ?? null;
+  const opened: Record<Exclude<ObraStage, 1>, string | null> = {
+    2: facts.firstInputOn,
+    3: facts.firstDraftOn,
+    4: facts.acceptedOn,
+    5: paidAfter(4),
+    6: starts[0] ?? null,
+    7: contract.length > 0 && ends.length === contract.length ? ends.at(-1)! : null,
+    8: paidAfter(7),
+  };
+  return Object.fromEntries(Object.entries(opened).filter(([, on]) => on !== null)) as StageEvidence;
+}
+
+/** The furthest stage the evidence reaches; 1 without any. */
+export const evidenceStage = (evidence: StageEvidence): ObraStage =>
+  Math.max(1, ...Object.keys(evidence).map(Number)) as ObraStage;

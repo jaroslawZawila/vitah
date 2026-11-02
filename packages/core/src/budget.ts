@@ -34,6 +34,7 @@ import {
 } from "./budget-draft";
 import { computeChecks, reviewedKeys, tenantRatios } from "./budget-review";
 import { markChanged } from "./changes";
+import { raiseStage } from "./obra-stage";
 import { requireEditor, type Ctx } from "./context";
 import {
   ANNEX_KINDS,
@@ -442,6 +443,7 @@ export async function createBudget(ctx: Ctx, projectId: string, input: Record<st
   });
   // The app shows the new hitos.
   await markChanged(ctx.tenantId, projectId, ["obra"]);
+  await raiseStage(ctx.tenantId, projectId);
   return created;
 }
 
@@ -737,6 +739,7 @@ export async function acceptRevision(
     await accept();
     await markChanged(ctx.tenantId, projectId, ["obra"]);
   }
+  await raiseStage(ctx.tenantId, projectId);
   return { revisionId };
 }
 

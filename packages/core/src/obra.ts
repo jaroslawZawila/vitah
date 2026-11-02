@@ -20,6 +20,7 @@ import {
   type ObraProject,
 } from "./obra-data";
 import { buildPhases, obraTerm, shareBp, todayInSpain } from "./obra-calc";
+import { evidenceOf, loadFirstDays } from "./obra-stage";
 import { clientDates } from "./planning-calc";
 import { listPhotos, photosByChapter } from "./photos";
 
@@ -44,16 +45,19 @@ const hitoByChapter = (hitos: Hito[]) =>
   new Map(hitos.flatMap((h) => h.chapters.map((c) => [c.code, h.code] as const)));
 
 export async function getObra(ctx: Ctx, projectId: string): Promise<ProjectObra> {
-  const [project, { revision, chapters, progress, vatRateBp, hitos }] = await Promise.all([
+  const [project, obra, firsts] = await Promise.all([
     requireProject(ctx.tenantId, projectId),
     loadObra(ctx.tenantId, projectId),
+    loadFirstDays(ctx.tenantId, projectId),
   ]);
+  const { revision, chapters, progress, vatRateBp, hitos } = obra;
   const hitoOf = hitoByChapter(hitos);
   const paidCents = sumAmounts(hitos, "paid");
   const invoicedUnpaidCents = sumAmounts(hitos, "invoiced");
 
   return {
     stage: asStage(project.obraStage),
+    stageEvidence: evidenceOf(obra, firsts),
     budget: revision && {
       revisionId: revision.id,
       number: revision.number,
@@ -83,7 +87,10 @@ export async function getObra(ctx: Ctx, projectId: string): Promise<ProjectObra>
   };
 }
 
-/** Body: { stage: 1–8 } */
+/**
+ * Body: { stage: 1–8 }. The stage moves up on its own as the evidence comes
+ * in (./obra-stage); this sets it by hand, up or down.
+ */
 export async function setStage(ctx: Ctx, projectId: string, input: Record<string, unknown>) {
   requireEditor(ctx);
   await requireProject(ctx.tenantId, projectId);

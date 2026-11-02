@@ -249,6 +249,14 @@ export const isAwaitingPayment = (status: HitoStatus) => status === "signed" || 
 
 /** The stages of the process that a standard hito closes (PROCESS.md §2). */
 export const STAGE_HITOS: Partial<Record<ObraStage, string>> = { 4: "H0", 5: "H1", 7: "H9" };
+/**
+ * The day the platform first held the evidence that opens each stage from 2
+ * on (YYYY-MM-DD): the project's files registered, a budget draft, a revision
+ * accepted, H0 paid, a chapter started, every chapter finished, H9 paid. The
+ * stage rises to the last of them on its own (never down); staff may still
+ * set it by hand.
+ */
+export type StageEvidence = Partial<Record<ObraStage, string>>;
 export type HitoFileKind = "acta" | "invoice";
 
 /** Longest budget chapter or line code ("05", "05.01"); also tags photos. */
@@ -637,6 +645,8 @@ export type ObraTerm = {
 /** GET /api/v1/projects/:id/obra: the Obra page. */
 export type ProjectObra = {
   stage: ObraStage;
+  /** What has moved the stage on its own, by the stage it opened. */
+  stageEvidence: StageEvidence;
   /** The accepted revision, or null before one is accepted. */
   budget: {
     revisionId: string;

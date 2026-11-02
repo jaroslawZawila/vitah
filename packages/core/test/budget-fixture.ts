@@ -1,4 +1,18 @@
-import { budgetService, type Ctx } from "../src";
+import { budgetService, documentsService, type Ctx } from "../src";
+import { files } from "../src/testing";
+
+/** Asks for a pathname, "uploads" a budget input to it (in-memory storage) and registers it. */
+export async function uploadBudgetInput(
+  ctx: Ctx,
+  projectId: string,
+  filename = "planos.pdf",
+  content = "%PDF-1.7 planos",
+  budgetInput = "plans",
+) {
+  const { pathname } = await documentsService.budgetInputUpload(ctx, projectId, filename);
+  files.set(pathname, new Blob([content]));
+  return { pathname, ...(await documentsService.registerBudgetInput(ctx, projectId, { pathname, budgetInput, filename })) };
+}
 
 /**
  * A FRAMER draft (twenty chapters) with one line of 1 × `cents` in each of

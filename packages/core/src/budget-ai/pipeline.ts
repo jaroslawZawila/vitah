@@ -11,6 +11,7 @@ import { insertFramerRevision } from "../budget";
 import { lockForFirstBudget, syncDraft } from "../budget-draft";
 import type { GenerationOptions, GenerationRow } from "../budget-generations";
 import { markChanged } from "../changes";
+import { raiseStage } from "../obra-stage";
 import { CoreError } from "../errors";
 import { ACTIVE_GENERATION_STATUSES, lineAmountCents, type BudgetGenerationLogEntry, type BudgetInput } from "../contract";
 import { budgetInputs, setClaudeFileId } from "../documents";
@@ -252,6 +253,7 @@ export async function saveDraft(generationId: string) {
   await log(generationId, { step: 5, kind: "done", code: "saved", params: { lines: lines.length } });
   // The app shows the new hitos.
   await markChanged(row.tenantId, row.projectId, ["obra"]);
+  await raiseStage(row.tenantId, row.projectId);
   return { revisionId };
 }
 

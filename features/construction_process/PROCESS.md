@@ -208,7 +208,7 @@ any work). Hitos measure payments. Chapters measure progress.
 
 | | Client, **app** (Obra tab) | Staff, **portal** |
 |---|---|---|
-| Stage of the process (1–8) | ✔ which stage the project is in | ✔ and moves it forward |
+| Stage of the process (1–8) | ✔ which stage the project is in | ✔ it moves on its own with the evidence; staff can correct it |
 | Phases (pre-construction + H2–H9) | ✔ the Obra tab, all on one screen | ✔ |
 | Chapters (§2) | ✔ inside each phase: name, amount and % executed | ✔ |
 | Partidas (§3) | ✘ ("nosotros vemos el punto 3") | ✔ edit budget, set executed % |

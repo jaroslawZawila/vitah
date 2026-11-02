@@ -2,7 +2,7 @@ import ExcelJS from "exceljs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { aiUsage, budgetGenerations, db, eq, projectDocuments, tenants } from "@repo/db";
 import { createTestDocument, createTestProject, createTestTenant, createTestUser, resetDatabase } from "@repo/db/testing";
-import { budgetGenerationsService as svc, budgetService, type Ctx } from "../src";
+import { budgetGenerationsService as svc, budgetService, obraService, type Ctx } from "../src";
 import * as claude from "../src/budget-ai/claude";
 import { measurementText, parseBc3, parseXlsx } from "../src/budget-ai/measurements";
 import {
@@ -158,6 +158,8 @@ describe("pipeline", () => {
 
     const { revisionId } = await run(generationId);
 
+    // Its inputs opened Estudio; the draft opens Presupuesto.
+    expect((await obraService.getObra(ctx, project.id)).stage).toBe(3);
     const { revision, generation } = await budgetService.getBudget(ctx, project.id);
     expect(revision).toMatchObject({ id: revisionId, number: 0, status: "draft", reference: "041/2026", builtAreaM2: 184.91, usefulAreaM2: 139.7 });
     // One line per chapter 01–19 at 10 € × its number, the zero-quantity ones dropped.

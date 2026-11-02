@@ -2,12 +2,14 @@ import { describe, expect, it } from "vitest";
 import {
   addBusinessDays,
   buildPhases,
+  evidenceStage,
   forClient,
   hitoStatus,
   obraTerm,
   marginsOn,
   priceLines,
   progressOf,
+  stageEvidence,
   todayInSpain,
   unitCost,
   unitPrice,
@@ -293,5 +295,73 @@ describe("buildPhases", () => {
     const unpaid = [hito("H0"), hito("H1"), ...hitos.slice(2)];
     expect(buildPhases(4, unpaid, photos)[0]).toMatchObject({ status: "active", progressPct: 0 });
     expect(buildPhases(6, unpaid, photos)[0]).toMatchObject({ status: "done", progressPct: 100 });
+  });
+});
+
+describe("stageEvidence", () => {
+  type Dates = { actualStart: string | null; actualEnd: string | null };
+  const none = {
+    firstInputOn: null,
+    firstDraftOn: null,
+    acceptedOn: null,
+    paidOn: new Map<string, string>(),
+    contractCodes: [] as string[],
+    progress: new Map<string, Dates>(),
+  };
+
+  it("has none for a new project, which stays at stage 1", () => {
+    expect(stageEvidence(none)).toEqual({});
+    expect(evidenceStage({})).toBe(1);
+  });
+
+  it("dates each stage by what opens it", () => {
+    const evidence = stageEvidence({
+      firstInputOn: "2026-03-02",
+      firstDraftOn: "2026-03-20",
+      acceptedOn: "2026-06-12",
+      paidOn: new Map([
+        ["H0", "2026-06-20"],
+        ["H1", "2026-07-01"],
+        ["H9", "2027-03-10"],
+      ]),
+      contractCodes: ["01", "02"],
+      progress: new Map([
+        ["01", { actualStart: "2026-07-08", actualEnd: "2026-08-01" }],
+        ["02", { actualStart: "2026-07-06", actualEnd: "2027-02-20" }],
+      ]),
+    });
+
+    // H1 opens no stage: the works start with the first chapter.
+    expect(evidence).toEqual({
+      2: "2026-03-02",
+      3: "2026-03-20",
+      4: "2026-06-12",
+      5: "2026-06-20",
+      6: "2026-07-06",
+      7: "2027-02-20",
+      8: "2027-03-10",
+    });
+    expect(evidenceStage(evidence)).toBe(8);
+  });
+
+  it("opens 7 only once every contract chapter is finished", () => {
+    const started: Dates = { actualStart: "2026-07-08", actualEnd: null };
+    const finished: Dates = { actualStart: "2026-07-08", actualEnd: "2026-08-01" };
+    const contract = { ...none, contractCodes: ["01", "02"] };
+
+    expect(stageEvidence({ ...contract, progress: new Map([["01", finished], ["02", started]]) })).toEqual({ 6: "2026-07-08" });
+    // A chapter not started yet isn't finished either.
+    expect(stageEvidence({ ...contract, progress: new Map([["01", finished]]) })).toEqual({ 6: "2026-07-08" });
+    expect(stageEvidence({ ...contract, progress: new Map([["01", finished], ["02", finished]]) })).toEqual({
+      6: "2026-07-08",
+      7: "2026-08-01",
+    });
+    // Dates of chapters outside the contract don't count.
+    expect(stageEvidence({ ...none, progress: new Map([["01", finished]]) })).toEqual({});
+  });
+
+  it("reaches the furthest stage, even past a gap", () => {
+    expect(evidenceStage(stageEvidence({ ...none, paidOn: new Map([["H0", "2026-06-20"]]) }))).toBe(5);
+    expect(evidenceStage({ 2: "2026-03-02", 4: "2026-06-12" })).toBe(4);
   });
 });

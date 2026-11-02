@@ -377,6 +377,19 @@
       "7": "Acta de recepción, llaves y CFO · H9",
       "8": "LOE: 1, 3 y 10 años"
     },
+    "stageAuto": {
+      "since": "Desde el {date}: {evidence}",
+      "next": "Pasa sola a {name} con: {evidence}",
+      "evidence": {
+        "2": "documentos del proyecto registrados",
+        "3": "primer borrador del presupuesto",
+        "4": "revisión aceptada",
+        "5": "H0 pagado",
+        "6": "primer capítulo iniciado en Avance",
+        "7": "todos los capítulos terminados",
+        "8": "H9 pagado"
+      }
+    },
     "stageMeta": {
       "budget": "Rev.{number} aceptada · {total}",
       "paid": "{code} pagado {date}",

@@ -187,9 +187,15 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
 
 ### Obra (construction process)
 
-- The process is `features/construction_process/PROCESS.md`: 8 stages (`projects.obra_stage`, set by staff), a
+- The process is `features/construction_process/PROCESS.md`: 8 stages (`projects.obra_stage`), a
   budget in the FRAMER model, and payment hitos H0–H9. Designs: `doc/mobile-app-design/A-Progress|A-Fase|A-Obra-Pagos|A-Hito`
   and `doc/platform-design/P-*`
+- The stage moves **up on its own**, never down (`obra-stage.ts` › `raiseStage`, rule `stageEvidence` in `obra-calc.ts`):
+  2 a budget input registered, 3 a budget revision (by hand or the AI), 4 a revision accepted, 5 H0 paid, 6 a contract
+  chapter started on Avance, 7 every contract chapter finished, 8 H9 paid. Each of those writes calls `raiseStage`
+  after it (a new one that adds evidence must too); it marks `obra` when it moves. Staff can still set it by hand,
+  up or down; the next event brings a lowered one back up. `getObra`'s `stageEvidence` dates each, shown under the
+  stepper. Prod SQL (catch-up, after deploying): `packages/db/sql/2026-11-obra-stage-auto.sql`
 - Budget (`packages/core/src/budget.ts`): revisions → chapters → lines (partidas), money in cents, quantities in
   thousandths. Staff then record each line's executed %; a change is a new revision (copied, compared with the
   previous). Only the accepted revision drives prices and progress. The budget itself is under "Budget" below
@@ -394,7 +400,7 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
   read with `useSearchParams`, so the browser's back and the rail's Proyectos win; the project layout's "Volver a
   proyectos", `ProjectsBackLink`, returns to the list as last filtered in the tab):
   **Presupuesto** by the newest revision's state (`BUDGET_FILTERS`/`budgetFilterOf`; the AI drafting counts as a draft)
-  and **Obra** by the stage staff set (`OBRA_FILTERS`/`obraFilterOf` in core `project-filters.ts`: stages 1–5 not
+  and **Obra** by the project's stage (`OBRA_FILTERS`/`obraFilterOf` in core `project-filters.ts`: stages 1–5 not
   started, 6 under construction, 7–8 finished). Each option counts given the other filter and the search. The data is
   core `listProjectsWithBudget` (`budget-overview.ts`: each project with its `BudgetState`, the newest revision and AI
   run, none of the overview's figures), also `GET /api/v1/projects` (the `budget` field). Rows add the budget pill

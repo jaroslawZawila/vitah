@@ -29,6 +29,40 @@ describe("ProjectStages", () => {
     expect(steps.getByText("Rev.3 aceptada · 448.205,03 €")).toBeInTheDocument();
   });
 
+  it("says since when the stage moved on its own, and what moves it next", () => {
+    renderStages();
+    expect(
+      screen.getByText(
+        "Desde el 6 jul 2026: primer capítulo iniciado en Avance · Pasa sola a Recepción y entrega con: todos los capítulos terminados",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("names only what moves it next when the stage was set by hand", () => {
+    render(
+      <NextIntlClientProvider locale="es" messages={messages} timeZone="Europe/Madrid">
+        <ProjectStages projectId="p-1" obra={{ ...obra, stage: 7 }} canManage />
+      </NextIntlClientProvider>,
+    );
+    expect(screen.getByText("Pasa sola a Garantía con: H9 pagado")).toBeInTheDocument();
+  });
+
+  it("promises nothing when what moves it next is already in (the stage set back by hand)", () => {
+    render(
+      <NextIntlClientProvider locale="es" messages={messages} timeZone="Europe/Madrid">
+        <ProjectStages projectId="p-1" obra={{ ...obra, stage: 4 }} canManage />
+      </NextIntlClientProvider>,
+    );
+    expect(screen.getByText("Desde el 12 jun 2026: revisión aceptada")).toBeInTheDocument();
+    expect(screen.queryByText(/Pasa sola/)).not.toBeInTheDocument();
+  });
+
+  it("dates the works from their actual start, not the planned one", () => {
+    renderStages();
+    const works = screen.getByText("6 · Ejecución de obra").closest("li")!;
+    expect(within(works).getByText("Desde el 6 jul 2026")).toBeInTheDocument();
+  });
+
   it("moves the project to another stage", async () => {
     renderStages();
     await userEvent.click(screen.getByRole("button", { name: "Pasar a la etapa 7: Recepción y entrega" }));

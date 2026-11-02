@@ -339,6 +339,17 @@ describe("writes the client sees", () => {
     ).toEqual(["obra"]);
   });
 
+  it("a staff-only write moves the obra when it raises the stage (obra-stage.ts)", async () => {
+    const { ctx, tenant } = await setup();
+    const project = await createTestProject(tenant.id);
+    const doc = await createTestDocument(tenant.id, project.id);
+    const mark = () => documentsService.markBudgetInput(ctx, project.id, doc.id, { budgetInput: "plans" });
+
+    expect(await areasMovedBy(project.id, mark)).toEqual(["obra"]);
+    // Stage 2 already: nothing for the app.
+    expect(await areasMovedBy(project.id, mark)).toEqual([]);
+  });
+
   // Writes that need no mark: the app sees a new, lost or deleted project through
   // its id (createProject, deleteProject, unassignProjectClient); createBudget
   // marks for createDefaultHitos; the client never sees a budget draft.
@@ -368,7 +379,8 @@ describe("writes the client sees", () => {
     "optionFromLine",
     "rejectRevision",
     "revisionPdf",
-    // Staff-only: the budget's inputs and its AI runs.
+    // Staff-only: the budget's inputs and its AI runs (an input marks the obra
+    // only when it raises the stage, checked above).
     "budgetInputUpload",
     "authorizeBudgetInputUpload",
     "registerBudgetInput",

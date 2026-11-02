@@ -16,6 +16,7 @@ import {
   type Ctx,
 } from "../src";
 import { files } from "../src/testing";
+import { uploadBudgetInput } from "./budget-fixture";
 
 vi.mock("../src/storage", () => import("../src/testing"));
 
@@ -364,12 +365,7 @@ describe("visibility", () => {
 });
 
 describe("budget inputs", () => {
-  /** Asks for a pathname, "uploads" to it and registers the file. */
-  async function uploadInput(ctx: Ctx, projectId: string, filename: string, content: string, budgetInput = "plans") {
-    const { pathname } = await svc.budgetInputUpload(ctx, projectId, filename);
-    files.set(pathname, new Blob([content]));
-    return { pathname, ...(await svc.registerBudgetInput(ctx, projectId, { pathname, budgetInput, filename })) };
-  }
+  const uploadInput = uploadBudgetInput;
 
   it("registers files the browser uploaded, staff-only", async () => {
     const { tenant, client, project, ctx } = await setup();

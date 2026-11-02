@@ -60,7 +60,7 @@ describe("getControl", () => {
       ["02", "pending", "H2"],
       ["03", "pending", "H3"],
     ]);
-    expect(control.project).toMatchObject({ ref: project.ref, clientName: "Marta Ruiz", startDate: "2026-06-01", stage: 1 });
+    expect(control.project).toMatchObject({ ref: project.ref, clientName: "Marta Ruiz", startDate: "2026-06-01", stage: 4 });
     const first = control.chapters[0]!;
     expect(first.plannedStart).toBe("2026-06-01");
     expect(first.plannedEnd! < "2027-03-31").toBe(true);
@@ -117,7 +117,8 @@ describe("getControlHeader", () => {
 
     expect(await svc.getControlHeader(ctx, project.id)).toEqual({
       ref: project.ref,
-      stage: 1,
+      // The accepted budget moved it to Contrato y reserva.
+      stage: 4,
       budgetNumber: 0,
       openIssues: 1,
       chapters: [

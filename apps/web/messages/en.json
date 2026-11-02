@@ -377,6 +377,19 @@
       "7": "Handover certificate, keys and CFO · H9",
       "8": "LOE: 1, 3 and 10 years"
     },
+    "stageAuto": {
+      "since": "Since {date}: {evidence}",
+      "next": "Moves on to {name} by itself on: {evidence}",
+      "evidence": {
+        "2": "project files registered",
+        "3": "first budget draft",
+        "4": "revision accepted",
+        "5": "H0 paid",
+        "6": "first chapter started in Progress",
+        "7": "every chapter finished",
+        "8": "H9 paid"
+      }
+    },
     "stageMeta": {
       "budget": "Rev.{number} accepted · {total}",
       "paid": "{code} paid {date}",

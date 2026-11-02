@@ -99,6 +99,7 @@ export const hitos: Hito[] = [
 
 export const obra: ProjectObra = {
   stage: 6,
+  stageEvidence: { 2: "2026-03-02", 3: "2026-03-20", 4: "2026-06-12", 5: "2026-06-20", 6: "2026-07-06" },
   budget: {
     revisionId: "rev-3",
     number: 3,

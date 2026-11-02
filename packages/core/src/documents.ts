@@ -32,6 +32,7 @@ import {
 } from "./contract";
 import { clippedText } from "./input";
 import { notifyProjectClient } from "./notifications";
+import { raiseStage } from "./obra-stage";
 import {
   claimFirstShown,
   fail,
@@ -325,6 +326,7 @@ export async function registerBudgetInput(ctx: Ctx, projectId: string, input: Re
     .onConflictDoNothing({ target: projectDocuments.pathname })
     .returning({ id: projectDocuments.id });
   if (!doc) fail("not_found");
+  await raiseStage(ctx.tenantId, projectId);
   return { documentId: doc.id };
 }
 
@@ -342,6 +344,7 @@ export async function markBudgetInput(ctx: Ctx, projectId: string, documentId: s
     .where(and(documentInProject(ctx, projectId, documentId), isNull(projectDocuments.budgetRevisionId)))
     .returning({ id: projectDocuments.id });
   if (!doc) fail("not_found");
+  await raiseStage(ctx.tenantId, projectId);
   return { documentId };
 }
 
