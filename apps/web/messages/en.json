@@ -3768,7 +3768,6 @@
     "delta": "{delta} vs average",
     "openBudget": "Budget of {ref}",
     "project": "Project",
-    "openProject": "Open project",
     "openProjectOf": "Open project {ref}",
     "footnote": "Sorted by the budget's latest activity. Amounts without VAT. The row opens the budget; “Project”, the obra's page.",
     "none": "There are no obras yet.",

@@ -3768,7 +3768,6 @@
     "delta": "{delta} vs media",
     "openBudget": "Presupuesto de {ref}",
     "project": "Proyecto",
-    "openProject": "Abrir proyecto",
     "openProjectOf": "Abrir el proyecto {ref}",
     "footnote": "Ordenadas por la última actividad del presupuesto. Importes sin IVA. La fila abre el presupuesto; «Proyecto», la ficha de la obra.",
     "none": "Todavía no hay obras.",
