@@ -40,12 +40,6 @@ const PROJECT_TABS = [
   { key: "documents", path: "/documents" },
 ] as const;
 
-/** Proyectos' sections across the obras (Presupuestos, `projects/presupuestos`; Compras, `projects/compras`). */
-const PROJECT_SECTIONS = [
-  { key: "budgets", href: "/dashboard/projects/presupuestos" },
-  { key: "purchases", href: "/dashboard/projects/compras" },
-] as const;
-
 const SUBCONTRACTORS_HREF = "/dashboard/subcontratas";
 
 /** The Subcontratas section's pages, nested under it in the rail's "Red" group. */
@@ -140,7 +134,6 @@ export default function Sidebar({
               {item.key === "projects" && projectId && active && (
                 <ProjectTabs projectId={projectId} pathname={pathname} />
               )}
-              {item.key === "projects" && !projectId && active && <ProjectSections pathname={pathname} />}
             </div>
           );
         })}
@@ -358,25 +351,6 @@ const subLinkClass = (current: boolean) =>
     "flex min-h-11 items-center rounded-full px-3 text-[13px] whitespace-nowrap text-rail-muted transition-colors hover:text-rail-foreground lg:-ml-px lg:min-h-9 lg:rounded-none lg:border-l-2 lg:border-transparent lg:px-3.5 lg:text-[13.5px]",
     current && "bg-white/10 font-semibold text-white lg:border-rail-accent lg:bg-transparent",
   );
-
-/** Proyectos' sections entered before an obra (the doc's Proyectos › Compras), then picked by its filter. */
-function ProjectSections({ pathname }: { pathname: string }) {
-  const t = useTranslations("sidebar.projectSections");
-  return (
-    <ul className={subListClass} aria-label={t("label")}>
-      {PROJECT_SECTIONS.map((section) => {
-        const current = pathname === section.href;
-        return (
-          <li key={section.key} className="flex-none">
-            <Link href={section.href} className={subLinkClass(current)} aria-current={current ? "page" : undefined}>
-              {t(section.key)}
-            </Link>
-          </li>
-        );
-      })}
-    </ul>
-  );
-}
 
 function ProjectTabs({ projectId, pathname }: { projectId: string; pathname: string }) {
   const t = useTranslations("sidebar.projectTabs");

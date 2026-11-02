@@ -523,9 +523,16 @@ export type ProjectBudget = {
   generation: BudgetGeneration | null;
 };
 
-// ─── Every obra's budget (Proyectos › Presupuestos) ──────────────────────────
+// ─── Every obra's budget (the project list, GET /api/v1/budgets) ─────────
 
 export * from "./budget-overview-rules";
+export * from "./project-filters";
+
+/** A budget as the project list shows it: its newest revision, else the AI's run drafting the first. */
+export type BudgetState = {
+  revision: Pick<BudgetRevisionSummary, "number" | "status"> | null;
+  generation: { status: BudgetGenerationStatus; step: number } | null;
+};
 
 /** An obra's newest revision as the list shows it, at the client's price (the PEC, margins in). */
 export type BudgetOverviewRevision = BudgetRevisionSummary & {

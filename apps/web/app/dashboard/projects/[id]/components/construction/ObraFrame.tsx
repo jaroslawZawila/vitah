@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import type { ComponentProps, ReactNode } from "react";
 import { useTranslations } from "next-intl";
 import type { ObraStage } from "@repo/core/contract";
 import { Badge } from "@/components/ui/badge";
@@ -31,17 +32,34 @@ export const chapterHref = (projectId: string, code: string) =>
 /** What every Obra page's header needs. */
 export type ObraHeader = { ref: string; stage: ObraStage; openIssues: number };
 
+/** Presentational: an obra's stage as a pill, "Etapa 6 · Ejecución de obra" (what comes first: `children`). */
+export function StagePill({
+  stage,
+  variant,
+  children,
+}: {
+  stage: ObraStage;
+  variant?: ComponentProps<typeof Badge>["variant"];
+  children?: ReactNode;
+}) {
+  const t = useTranslations("obra");
+  return (
+    <Badge variant={variant}>
+      {children}
+      {t("stagePill", { number: stage, name: t(`stages.${stage}`) })}
+    </Badge>
+  );
+}
+
 /** Presentational: the project ref and its stage, as the Obra pages' eyebrow. */
 export function StageEyebrow({ label, stage }: { label: string; stage?: ObraStage }) {
-  const t = useTranslations("obra");
   return (
     <div className="flex flex-wrap items-center gap-2.5">
       <span className="eyebrow text-brand-ink">{label}</span>
       {stage !== undefined && (
-        <Badge>
+        <StagePill stage={stage}>
           <Dot />
-          {t("stagePill", { number: stage, name: t(`stages.${stage}`) })}
-        </Badge>
+        </StagePill>
       )}
     </div>
   );

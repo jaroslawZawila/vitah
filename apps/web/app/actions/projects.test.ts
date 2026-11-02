@@ -11,6 +11,7 @@ import {
   createProject,
   deleteProject,
   getProject,
+  getProjectList,
   getProjects,
   updateProject,
 } from "./projects";
@@ -49,12 +50,24 @@ describe("project actions", () => {
     expect(await getProject(project.id)).toMatchObject({ id: project.id });
   });
 
+  it("lists the tenant's projects with each budget's state, never another tenant's", async () => {
+    const other = await createTestTenant();
+    await createTestProject(other.id, { ref: "VTH-9" });
+    const { tenant } = await setup();
+    const project = await createTestProject(tenant.id);
+
+    expect(await getProjectList()).toEqual([
+      expect.objectContaining({ id: project.id, budget: { revision: null, generation: null } }),
+    ]);
+  });
+
   it("returns nothing without a session", async () => {
     const { tenant } = await setup();
     const project = await createTestProject(tenant.id);
     signInAs(null);
 
     expect(await getProjects()).toEqual([]);
+    expect(await getProjectList()).toEqual([]);
     expect(await getProject(project.id)).toBeNull();
     await expect(
       createProject({ ref: "VTH-1", address: "Calle 1" }),

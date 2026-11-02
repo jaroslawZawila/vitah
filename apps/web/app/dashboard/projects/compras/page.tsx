@@ -1,9 +1,6 @@
-import { getProjects } from "../../../actions/projects";
-import { toObraOptions } from "../components/obra-options";
-import ObraPurchasesEntry from "./ObraPurchasesEntry";
+import { redirect } from "next/navigation";
 
-/** Proyectos › Compras: first the section, then the obra (by code, client or address). */
-export default async function ObraPurchasesPage() {
-  const projects = await getProjects();
-  return <ObraPurchasesEntry options={toObraOptions(projects)} />;
+/** The old Proyectos › Compras de obra: the project list (Compras is a project tab, from any stage). */
+export default function ObraPurchasesPage() {
+  redirect("/dashboard/projects");
 }

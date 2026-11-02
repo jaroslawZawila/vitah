@@ -22,7 +22,7 @@ export default async function ProjectPurchasesPage({
   searchParams: Promise<{ vista?: string }>;
 }) {
   const [{ id }, { vista }] = await Promise.all([params, searchParams]);
-  // The obra picker on top (Proyectos › Compras): another obra opens on the same view.
+  // The obra picker on top: another obra opens on the same view.
   const [options, view] = await Promise.all([getProjects().then(toObraOptions), purchasesView(id, vista)]);
   return (
     <>

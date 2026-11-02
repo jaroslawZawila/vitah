@@ -291,10 +291,10 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
 - The obra's Compras by budget line (`getProjectPurchaseLines`) gives each line one of four states
   (`PURCHASE_PROGRESS`): to_contract → contracted → invoiced → paid (closed, all invoiced, nothing owed; retention
   aside), with its orders, their milestones and invoices; money there is without VAT (`settle`'s `base`)
-- Proyectos › Compras as the doc has it: the rail's Proyectos offers "Compras de obra" (`dashboard/projects/compras`,
-  every obra filtered by code, client or address); the project's Compras list views open with the same picker at the
-  top (`compras/page.tsx` › `ComprasObraBar`, `projects/components/ObraPicker` + `obra-options.ts`), and choosing
-  another obra keeps the view (`?vista=`). Its data is the project list (`GET /api/v1/projects`)
+- The project's Compras list views open with an obra picker at the top (`compras/page.tsx` › `ComprasObraBar`,
+  `projects/components/ObraPicker` + `obra-options.ts`), and choosing another obra keeps the view (`?vista=`). Its data
+  is the project list (`GET /api/v1/projects`). The rail's old Proyectos › "Compras de obra"
+  (`dashboard/projects/compras`) now redirects to the project list
 - Portal: the project tab opens by budget line (`compras`, `PurchaseLinesScreen`; `?vista=solicitudes` the requests,
   `?vista=pedidos` the orders list); a request's page `compras/solicitudes/[requestId]` (+ `editar`, `solicitudes/nueva`)
   decides it and opens the order form on it (`nuevo?solicitud=`); an order's page shows its milestones (editable) and
@@ -380,11 +380,27 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
 - Portal: Budget tab pages under `dashboard/projects/[id]/budget/` (summary, lines, options, texts, conditions,
   pdf; `?revision=` shows an older one, picked from the menu on the revision pill); `BudgetScreen` / `BudgetStartScreen` are the containers, views in
   `components/budget/`. Web-only: the app only sees the general PDF (Documentos) and the contract via the obra
-- Proyectos › Presupuestos (`dashboard/projects/presupuestos`, `BudgetsScreen`): every obra's newest revision at its
-  price, what it waits for (AI, open checks, the client, an offer expiring within 7 days) and the totals; a row opens
-  the budget, "Proyecto" the project. Every budget page but the PDF sits in the route group `budget/(obras)/`, whose
-  layout links back to it ("Todos los presupuestos"); no obra switcher beside a budget (removed: too much space). Core `budget-overview.ts` (`listBudgets`), pure rules in
-  `budget-overview-rules.ts` (via `@repo/core/contract`); API `GET /api/v1/budgets`. Staff-only, read-only, web-only
+- Every obra's budget: core `budget-overview.ts` (`listBudgets`: each obra's newest revision at its price, what it
+  waits for and the totals; pure rules in `budget-overview-rules.ts` via `@repo/core/contract`), served only by
+  `GET /api/v1/budgets` now; the portal's project list filters by the budget instead (below). No obra switcher beside a
+  budget (removed: too much space); the budget pages (route group `budget/(obras)/`, no layout of its own) go back with
+  the project's "Volver a proyectos". The old Proyectos › Presupuestos page (`dashboard/projects/presupuestos`)
+  redirects to the project list. Staff-only, read-only, web-only
+
+### Project list (Proyectos)
+
+- `dashboard/projects` (`ProjectsListClient` container, views `components/ProjectFilterBar` + `ProjectsTable`, pure
+  `project-list.ts`): every project with two filters, kept in the URL (`?presupuesto=&obra=&q=`, replaced, not pushed;
+  read with `useSearchParams`, so the browser's back and the rail's Proyectos win; the project layout's "Volver a
+  proyectos", `ProjectsBackLink`, returns to the list as last filtered in the tab):
+  **Presupuesto** by the newest revision's state (`BUDGET_FILTERS`/`budgetFilterOf`; the AI drafting counts as a draft)
+  and **Obra** by the stage staff set (`OBRA_FILTERS`/`obraFilterOf` in core `project-filters.ts`: stages 1–5 not
+  started, 6 under construction, 7–8 finished). Each option counts given the other filter and the search. The data is
+  core `listProjectsWithBudget` (`budget-overview.ts`: each project with its `BudgetState`, the newest revision and AI
+  run, none of the overview's figures), also `GET /api/v1/projects` (the `budget` field). Rows add the budget pill
+  (opens the budget; a failed AI run says so, filed under no budget) and the stage pill (`StagePill`, opens Obra); a
+  table from 768 px, cards and a `FilterSelect` per filter below 640 px. The rail's Proyectos has no sections of its
+  own. Web-only: the client's app has no project list
 
 ### Subcontratas (CAE)
 

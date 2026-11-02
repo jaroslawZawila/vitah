@@ -77,6 +77,8 @@ describe("GET /api/v1/projects", () => {
         client: { id: client.id, name: "Ana", email: client.email },
         createdAt: expect.any(String),
         updatedAt: expect.any(String),
+        // Added for the portal's project list; older clients ignore it.
+        budget: { revision: null, generation: null },
       },
     ]);
   });

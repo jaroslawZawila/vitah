@@ -53,11 +53,6 @@
       "dueCount": "{count, plural, one {# invoice overdue or due soon} other {# invoices overdue or due soon}}",
       "requests": "Requests",
       "suppliers": "Suppliers"
-    },
-    "projectSections": {
-      "label": "Project sections",
-      "budgets": "Budgets",
-      "purchases": "Site purchasing"
     }
   },
   "topbar": {
@@ -84,7 +79,33 @@
       "noClient": "No app access",
       "startDate": "Start",
       "completionDate": "Completion",
-      "view": "View"
+      "view": "View",
+      "budget": "Budget",
+      "obra": "Works"
+    },
+    "countFiltered": "{shown} of {total, plural, one {# project} other {# projects}}",
+    "listLabel": "Projects",
+    "noMatch": "No project matches these filters.",
+    "filters": {
+      "search": "Code, client or address",
+      "clear": "Clear filters",
+      "budget": "Budget",
+      "obra": "Works",
+      "optionCount": "{label} ({count})",
+      "budgetOptions": {
+        "all": "All",
+        "draft": "Draft",
+        "issued": "Issued",
+        "accepted": "Accepted",
+        "rejected": "Rejected",
+        "none": "No budget"
+      },
+      "obraOptions": {
+        "all": "All",
+        "not_started": "Not started",
+        "execution": "Under construction",
+        "finished": "Finished"
+      }
     }
   },
   "projectDetailPage": {
@@ -3714,97 +3735,11 @@
     "current": "current site",
     "count": "{count, plural, =0 {No site} one {# site} other {# sites}}"
   },
-  "obraPurchases": {
-    "eyebrow": "Projects",
-    "title": "Purchasing",
-    "description": "Pick the site by its code, the client’s name or the address to see its purchasing: lines, requests and orders.",
-    "search": "Code, client or address",
-    "list": "Sites",
-    "none": "No sites yet.",
-    "noMatch": "No site matches."
-  },
   "budgetsOverview": {
-    "eyebrow": "Projects",
-    "title": "Budgets",
-    "description": "Every obra's budget, in its latest revision. Open one and switch obra from the list beside it, without going back to the project.",
-    "search": "Code, client or address",
-    "filterLabel": "Filter by status",
-    "filters": {
-      "all": "All",
-      "draft": "Draft",
-      "issued": "Issued",
-      "accepted": "Accepted",
-      "rejected": "Rejected",
-      "none": "No budget"
-    },
-    "kpis": {
-      "drafts": "To issue",
-      "draftsValue": "{count, plural, one {# draft} other {# drafts}}",
-      "generating": "{count} with the AI at work",
-      "openChecks": "{count, plural, one {# open check} other {# open checks}}",
-      "noDrafts": "Nothing to issue",
-      "issued": "Waiting for the client",
-      "issuedCount": "{count, plural, =0 {None issued} one {# issued} other {# issued}}",
-      "expiring": "{count, plural, one {# expires within {days} days or has} other {# expire within {days} days or have}}",
-      "contract": "Contracted",
-      "accepted": "{count, plural, =0 {None accepted} one {# accepted, with the options chosen} other {# accepted, with the options chosen}}",
-      "perM2": "Average €/m² built",
-      "perM2Hint": "Of the accepted ones",
-      "noAverage": "No accepted ones with an area",
-      "aboveAverage": "{count, plural, one {# obra over {pct} above it} other {# obras over {pct} above it}}"
-    },
-    "table": {
-      "label": "The obras' budgets",
-      "obra": "Obra",
-      "revision": "Revision",
-      "price": "Price (PEC)",
-      "margin": "Margin",
-      "perM2": "€/m²",
-      "situation": "Status",
-      "activity": "Activity",
-      "open": "Open"
-    },
-    "contract": "Contract {amount}",
-    "delta": "{delta} vs average",
-    "openBudget": "Budget of {ref}",
-    "project": "Project",
-    "openProjectOf": "Open project {ref}",
-    "footnote": "Sorted by the budget's latest activity. Amounts without VAT. The row opens the budget; “Project”, the obra's page.",
-    "none": "There are no obras yet.",
-    "noMatch": "No obra matches the search.",
     "pill": {
       "generating": "AI at work",
-      "none": "No budget"
-    },
-    "situation": {
-      "generating": "The AI is drafting it",
-      "generatingSub": "Step {step} of 5",
-      "failed": "The AI couldn't finish",
-      "failedSub": "Try again from the budget",
       "none": "No budget",
-      "noneSub": "Upload the documents to start",
-      "checks": "{count, plural, one {# check to review} other {# checks to review}}",
-      "checksSub": "Before issuing Rev.{number}",
-      "draft": "In draft",
-      "draftSub": "Rev.{number} to issue",
-      "expired": "Expired",
-      "expiring": "{days, plural, =0 {Expires today} one {Expires tomorrow} other {Expires in # days}}",
-      "waiting": "Waiting for the client",
-      "issuedSub": "Issued {issued} · valid until {valid}",
-      "issuedOnly": "Issued {issued}",
-      "rejected": "Rejected by the client",
-      "rejectedSub": "On {date} · prepare Rev.{next}",
-      "accepted": "Accepted",
-      "acceptedSub": "{options, plural, =0 {On {date}} one {On {date} · # option chosen} other {On {date} · # options chosen}}"
-    },
-    "short": {
-      "failed": "AI didn't finish",
-      "checks": "{count} to review",
-      "draft": "To issue",
-      "waiting": "Waiting",
-      "rejected": "Rejected",
-      "perM2High": "High €/m²"
-    },
-    "allBudgets": "All budgets"
+      "failed": "AI didn't finish"
+    }
   }
 }

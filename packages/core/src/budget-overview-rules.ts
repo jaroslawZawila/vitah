@@ -1,10 +1,11 @@
-import { ACTIVE_GENERATION_STATUSES, type BudgetOverviewItem } from "./contract";
+import { ACTIVE_GENERATION_STATUSES, type BudgetOverviewItem, type BudgetState } from "./contract";
 
 // ─── Budget overview rules ───────────────────────────────────────────────────
-// What Proyectos › Presupuestos says of each obra's budget, pure: the status
-// filter it falls under and what it waits for (the AI, checks to tick, the
-// client, an offer about to expire). Shared by ./budget-overview.ts (the
-// totals) and the portal (the list), through @repo/core/contract.
+// What the portal says of each obra's budget, pure: the status filter it falls
+// under (the project list's Presupuesto) and what it waits for (the AI, checks
+// to tick, the client, an offer about to expire: GET /api/v1/budgets).
+// Shared by ./budget-overview.ts (the totals) and the portal, through
+// @repo/core/contract.
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** An issued budget this close to its "válido hasta" day (or past it) is flagged. */
@@ -16,7 +17,7 @@ export const BUDGET_FILTERS = ["all", "draft", "issued", "accepted", "rejected",
 export type BudgetFilter = (typeof BUDGET_FILTERS)[number];
 
 /** Whether the AI is drafting an obra's first revision. */
-export const isGenerating = (item: Pick<BudgetOverviewItem, "generation">) =>
+export const isGenerating = (item: Pick<BudgetState, "generation">) =>
   item.generation !== null && ACTIVE_GENERATION_STATUSES.includes(item.generation.status);
 
 /** Whether an issued budget expires within the week, or has (`daysLeft` from today to its validity). */
@@ -26,19 +27,11 @@ export const expiresSoon = (daysLeft: number | null) => daysLeft !== null && day
 export const perM2High = (deltaBp: number | null | undefined) => (deltaBp ?? 0) > BUDGET_PER_M2_WARNING_BP;
 
 /** The filter an obra falls under: the AI drafting its first revision counts as a draft. */
-export function budgetFilterOf(item: BudgetOverviewItem): Exclude<BudgetFilter, "all"> {
+export function budgetFilterOf(item: BudgetState): Exclude<BudgetFilter, "all"> {
   const status = item.revision?.status;
   if (!status) return isGenerating(item) ? "draft" : "none";
   // Only an older revision is ever superseded; the newest one never is.
   return status === "superseded" ? "accepted" : status;
-}
-
-/** Each filter's count. */
-export function budgetFilterCounts(items: BudgetOverviewItem[]): Record<BudgetFilter, number> {
-  const counts = Object.fromEntries(BUDGET_FILTERS.map((f) => [f, 0])) as Record<BudgetFilter, number>;
-  for (const item of items) counts[budgetFilterOf(item)] += 1;
-  counts.all = items.length;
-  return counts;
 }
 
 /** What an obra's budget waits for. */

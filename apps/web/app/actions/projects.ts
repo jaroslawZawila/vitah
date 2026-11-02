@@ -4,7 +4,7 @@
 // live in packages/core/src/projects.ts (shared with /api/v1);
 // this file only resolves the session and revalidates portal pages.
 
-import { CoreError, projectsService as svc, type Ctx } from "@repo/core";
+import { budgetOverviewService, CoreError, projectsService as svc, type Ctx } from "@repo/core";
 import { getSessionContext } from "@repo/auth/context";
 import { revalidatePath } from "next/cache";
 
@@ -38,6 +38,13 @@ export async function getProjects() {
   const ctx = await getSessionContext();
   if (!ctx) return [];
   return svc.listProjects(ctx);
+}
+
+/** The project list: every project with its budget's state (Presupuesto filter and pill). */
+export async function getProjectList() {
+  const ctx = await getSessionContext();
+  if (!ctx) return [];
+  return budgetOverviewService.listProjectsWithBudget(ctx);
 }
 
 export async function getProject(id: string) {

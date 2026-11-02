@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  budgetFilterCounts,
   budgetFilterOf,
   budgetSituation,
   perM2High,
@@ -48,7 +47,6 @@ describe("budget overview rules", () => {
   it("file the AI's first draft under drafts, and a failed or missing one under no budget", () => {
     const items = [draft, issued(5), running, item({ revision: revision({ status: "accepted" }) }), none, failed];
     expect(items.map(budgetFilterOf)).toEqual(["draft", "issued", "draft", "accepted", "none", "none"]);
-    expect(budgetFilterCounts(items)).toEqual({ all: 6, draft: 2, issued: 1, accepted: 1, rejected: 0, none: 2 });
   });
 
   it("say what each budget waits for", () => {

@@ -11,6 +11,7 @@ import {
   type BudgetOverview,
   type BudgetOverviewItem,
   type BudgetOverviewRevision,
+  type BudgetState,
 } from "./contract";
 import { perM2Cents, priceLines, shareBp, todayInSpain } from "./obra-calc";
 import type { RevisionRow } from "./obra-data";
@@ -18,10 +19,11 @@ import { listProjects } from "./projects";
 import { daysBetween } from "./subcontractor-rules";
 
 // ─── Budget overview ─────────────────────────────────────────────────────────
-// Proyectos › Presupuestos: every obra's budget in its newest revision, as the
-// Budget tab shows it (the PEC at the client's price, margins in), with what it
-// waits for: the AI, unticked review checks, the client, an expiring offer.
-// The same list lets staff switch obra beside a budget. Read-only, all staff.
+// Every obra's budget in its newest revision, as the Budget tab shows it (the
+// PEC at the client's price, margins in), with what it waits for: the AI,
+// unticked review checks, the client, an expiring offer (GET /api/v1/budgets).
+// The portal's project list needs only each budget's state
+// (`listProjectsWithBudget`). Read-only, all staff.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const sum = (values: number[]) => values.reduce((total, value) => total + value, 0);
@@ -47,6 +49,31 @@ function newestGenerations(tenantId: string) {
     .from(budgetGenerations)
     .where(eq(budgetGenerations.tenantId, tenantId))
     .orderBy(budgetGenerations.projectId, desc(budgetGenerations.createdAt));
+}
+
+/**
+ * Every project (as `listProjects`) with its budget's state: the newest revision's number and status, else
+ * the AI's newest run drafting the first. The project list's Presupuesto filter and pill: the overview's own
+ * newest revision and AI run, none of its figures (lines, checks, ratios).
+ */
+export async function listProjectsWithBudget(ctx: Ctx) {
+  const [projects, revisions, generations] = await Promise.all([
+    listProjects(ctx),
+    newestRevisions(ctx.tenantId),
+    newestGenerations(ctx.tenantId),
+  ]);
+  const revisionOf = new Map(revisions.map((r) => [r.projectId, r]));
+  const generationOf = new Map(generations.map((g) => [g.projectId, g]));
+  return projects.map((project) => {
+    const revision = revisionOf.get(project.id);
+    // As `listBudgets`: the AI's run only before the first revision.
+    const generation = revision ? undefined : generationOf.get(project.id);
+    const budget: BudgetState = {
+      revision: revision ? { number: revision.number, status: revision.status } : null,
+      generation: generation ? { status: generation.status, step: generation.step } : null,
+    };
+    return { ...project, budget };
+  });
 }
 
 type Line = { quantity: number; unitPriceCents: number; amountCents: number };

@@ -1,5 +1,6 @@
-// The obras a section's picker chooses from (Proyectos › Compras): code,
-// client and address, and how a typed search matches them.
+// The obras a picker or the project list searches (the Compras and budget
+// pickers, Proyectos): code, client and address, and how a typed search
+// matches them.
 
 export type ObraOption = {
   id: string;
@@ -18,14 +19,13 @@ export function toObraOption(obra: Omit<ObraOption, "search">): ObraOption {
   return { ...obra, search: fold([obra.ref, obra.clientName ?? "", obra.address].join(" ")) };
 }
 
-/** The projects as the picker shows them: the client by name, else by email. */
-export function toObraOptions(
-  projects: { id: string; ref: string; address: string; client: { name: string | null; email: string } | null }[],
-): ObraOption[] {
-  return projects.map((p) =>
-    toObraOption({ id: p.id, ref: p.ref, address: p.address, clientName: p.client ? (p.client.name ?? p.client.email) : null }),
-  );
-}
+type ProjectLike = { id: string; ref: string; address: string; client: { name: string | null; email: string } | null };
+
+/** A project as the picker shows it: the client by name, else by email. */
+export const projectObraOption = (p: ProjectLike): ObraOption =>
+  toObraOption({ id: p.id, ref: p.ref, address: p.address, clientName: p.client ? (p.client.name ?? p.client.email) : null });
+
+export const toObraOptions = (projects: ProjectLike[]): ObraOption[] => projects.map(projectObraOption);
 
 /** Whether every word typed is in the obra's code, client or address. */
 export function matchesObra(option: ObraOption, query: string) {

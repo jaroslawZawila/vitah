@@ -27,6 +27,41 @@ const setRevision = (id: string, values: Partial<typeof budgetRevisions.$inferIn
 const generation = (tenantId: string, projectId: string, status: "running" | "failed", step = 2) =>
   db.insert(budgetGenerations).values({ tenantId, projectId, status, step, options: {}, documentIds: [] });
 
+describe("listProjectsWithBudget", () => {
+  it("gives each project its newest revision's number and status, else the AI's run, else none", async () => {
+    const { tenant, ctx } = await setup();
+    const accepted = await createTestProject(tenant.id, { ref: "VTH-1" });
+    await framerDraft(ctx, accepted.id, ["01"], 100_000);
+    const [rev0] = await db.select().from(budgetRevisions).where(eq(budgetRevisions.projectId, accepted.id));
+    await setRevision(rev0!.id, { status: "superseded" });
+    await db.insert(budgetRevisions).values({ tenantId: tenant.id, projectId: accepted.id, number: 1, status: "accepted" });
+    const drafting = await createTestProject(tenant.id, { ref: "VTH-2" });
+    await generation(tenant.id, drafting.id, "running", 3);
+    const bare = await createTestProject(tenant.id, { ref: "VTH-3" });
+
+    // Every staff member reads it, viewers too.
+    const rows = await svc.listProjectsWithBudget({ ...ctx, role: "viewer" });
+
+    expect(Object.fromEntries(rows.map((r) => [r.ref, r.budget]))).toEqual({
+      "VTH-1": { revision: { number: 1, status: "accepted" }, generation: null },
+      "VTH-2": { revision: null, generation: { status: "running", step: 3 } },
+      "VTH-3": { revision: null, generation: null },
+    });
+    // The project as listProjects has it.
+    expect(rows.find((r) => r.id === bare.id)).toMatchObject({ ref: "VTH-3", obraStage: 1, client: null });
+  });
+
+  it("shows only the caller's tenant", async () => {
+    const { ctx } = await setup();
+    const other = await setup();
+    const theirs = await createTestProject(other.tenant.id, { ref: "VTH-9" });
+    await generation(other.tenant.id, theirs.id, "running");
+    await framerDraft(other.ctx, theirs.id, ["01"], 100_000);
+
+    expect(await svc.listProjectsWithBudget(ctx)).toEqual([]);
+  });
+});
+
 describe("listBudgets", () => {
   it("shows every obra's newest revision at its price, what it waits for, and the totals", async () => {
     const { tenant, ctx } = await setup();
