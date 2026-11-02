@@ -3806,17 +3806,6 @@
       "rejected": "Rechazado",
       "perM2High": "€/m² alto"
     },
-    "switcher": {
-      "label": "Obras",
-      "position": "{index} de {total}",
-      "previous": "Obra anterior",
-      "next": "Obra siguiente",
-      "search": "Buscar obra",
-      "noMatch": "Ninguna obra coincide.",
-      "hint": "Cambiar de obra mantiene la pestaña y el capítulo. Teclado: Alt ↑ / Alt ↓",
-      "back": "Todos los presupuestos",
-      "previousKey": "Obra anterior (Alt ↑)",
-      "nextKey": "Obra siguiente (Alt ↓)"
-    }
+    "allBudgets": "Todos los presupuestos"
   }
 }

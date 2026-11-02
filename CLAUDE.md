@@ -383,8 +383,7 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
 - Proyectos › Presupuestos (`dashboard/projects/presupuestos`, `BudgetsScreen`): every obra's newest revision at its
   price, what it waits for (AI, open checks, the client, an offer expiring within 7 days) and the totals; a row opens
   the budget, "Proyecto" the project. Every budget page but the PDF sits in the route group `budget/(obras)/`, whose
-  layout streams the obras beside it (`BudgetObraNav`: a list from `xl`, a bar with the picker below; Alt+↑/↓) and
-  switching keeps the tab and chapter. Core `budget-overview.ts` (`listBudgets`), pure rules in
+  layout links back to it ("Todos los presupuestos"); no obra switcher beside a budget (removed: too much space). Core `budget-overview.ts` (`listBudgets`), pure rules in
   `budget-overview-rules.ts` (via `@repo/core/contract`); API `GET /api/v1/budgets`. Staff-only, read-only, web-only
 
 ### Subcontratas (CAE)

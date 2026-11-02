@@ -3806,17 +3806,6 @@
       "rejected": "Rejected",
       "perM2High": "High €/m²"
     },
-    "switcher": {
-      "label": "Obras",
-      "position": "{index} of {total}",
-      "previous": "Previous obra",
-      "next": "Next obra",
-      "search": "Find an obra",
-      "noMatch": "No obra matches.",
-      "hint": "Switching obra keeps the tab and the chapter. Keyboard: Alt ↑ / Alt ↓",
-      "back": "All budgets",
-      "previousKey": "Previous obra (Alt ↑)",
-      "nextKey": "Next obra (Alt ↓)"
-    }
+    "allBudgets": "All budgets"
   }
 }
