@@ -366,7 +366,7 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
 
 - Spec: `features/budget/TECH_DESIGN.md` (decisions in §17); PDF template and AI prompts in the same folder
 - Lines are priced at **cost**; gastos asociados (`overhead_bp`, a markup on the cost) and beneficio industrial
-  (`profit_bp`, a margin on the selling price), default 16 % + 6 % (§18), go into each unit price: price = cost ×
+  (`profit_bp`, a margin on the selling price), default 16 % + 6 % (§18; prod SQL for the drafts at 13 %: `packages/db/sql/2026-11-budget-overhead-16.sql`), go into each unit price: price = cost ×
   (1 + gastos) ÷ (1 − beneficio), as in the client's document "Fórmulas margen obra". The PEC is the sum of the
   priced lines (`priceLines` in `obra-calc.ts`, `linesPriceSql` in SQL). Only the portal's summary shows the margins apart; the PDFs (`forClient`), obra, hitos and
   app see the priced lines

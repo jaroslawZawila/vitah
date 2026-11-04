@@ -460,7 +460,8 @@ Budgets are built from **costs**, then a % of **gastos asociados** and of **bene
 Both matter more to staff than VAT, so they lead the summary tab.
 
 - `budget_revisions.overhead_bp` (bp of the cost) / `profit_bp` (bp of the price). A new revision starts at 16 % + 6 %
-  (`DEFAULT_MARGINS`; 13 % + 6 % until 2026-11-04), a copy keeps its source's, and existing rows got 0 (their unit prices already included both;
+  (`DEFAULT_MARGINS`; 13 % + 6 % until 2026-11-04, when the drafts still at 13 % moved too:
+  `packages/db/sql/2026-11-budget-overhead-16.sql`), a copy keeps its source's, and existing rows got 0 (their unit prices already included both;
   `packages/db/sql/2026-10-budget-margins.sql`). PATCH takes `overheadPct` / `profitPct` on drafts.
 - The FRAMER 2026 price base is now at cost: the prototype's prices ÷ 1.19 (kept as the costs when the formula
   below came in, so its lines now sell about 1 % above the prototype). The AI prompt says the P.U. are costs.
