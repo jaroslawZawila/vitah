@@ -2,7 +2,7 @@ import {
   DOCUMENT_CATEGORIES,
   photoSizeQuery,
   type AccountError,
-  type MobileChanges,
+  type MobileChangesReply,
   type HitoFileKind,
   type MobileObra,
   type AppLanguage,
@@ -40,6 +40,12 @@ function authed<T>(path: string, token: string, method = "GET", body?: unknown) 
     },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
+}
+
+/** `?projectId=`: which of the client's homes a call is about (none: the server's default one). */
+function forProject(path: string, projectId: string | null | undefined) {
+  if (!projectId) return path;
+  return `${path}${path.includes("?") ? "&" : "?"}projectId=${encodeURIComponent(projectId)}`;
 }
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<Result<T>> {
@@ -87,18 +93,23 @@ export const api = {
     });
   },
 
-  getProject(token: string) {
-    return authed<{ project: Project | null }>("/api/mobile/project", token);
+  /** Every home of the client, the one to open on first (the newest not yet handed over). */
+  listProjects(token: string) {
+    return authed<{ projects: Project[] }>("/api/mobile/projects", token);
   },
 
-  /** A counter per part of the app; one that moved means reload that part. Null without a project. */
-  getChanges(token: string) {
-    return authed<{ changes: MobileChanges | null }>("/api/mobile/changes", token);
+  /**
+   * A counter per part of the app for the home shown; one that moved means
+   * reload that part (null without a home). `projects` moves when the list of
+   * homes does.
+   */
+  getChanges(token: string, projectId?: string | null) {
+    return authed<MobileChangesReply>(forProject("/api/mobile/changes", projectId), token);
   },
 
   /** The Obra tab: stage, progress, phases and payment hitos; null without a project. */
-  getObra(token: string) {
-    return authed<{ obra: MobileObra | null }>("/api/mobile/obra", token);
+  getObra(token: string, projectId?: string | null) {
+    return authed<{ obra: MobileObra | null }>(forProject("/api/mobile/obra", projectId), token);
   },
 
   /** A hito's signed acta or invoice (PDF); fetch it with the same Bearer token. */
@@ -107,8 +118,11 @@ export const api = {
   },
 
   /** The categories it knows go along, so newer ones arrive as "other" until the app learns them. */
-  listDocuments(token: string) {
-    return authed<{ documents: MobileDocument[] }>(`/api/mobile/documents?categories=${DOCUMENT_CATEGORIES.join(",")}`, token);
+  listDocuments(token: string, projectId?: string | null) {
+    return authed<{ documents: MobileDocument[] }>(
+      forProject(`/api/mobile/documents?categories=${DOCUMENT_CATEGORIES.join(",")}`, projectId),
+      token,
+    );
   },
 
   /** The PDF itself; fetch it with the same Bearer token. */
@@ -116,8 +130,8 @@ export const api = {
     return `${API_BASE}/api/mobile/documents/${encodeURIComponent(id)}`;
   },
 
-  listPhotos(token: string) {
-    return authed<{ photos: MobilePhoto[] }>("/api/mobile/photos", token);
+  listPhotos(token: string, projectId?: string | null) {
+    return authed<{ photos: MobilePhoto[] }>(forProject("/api/mobile/photos", projectId), token);
   },
 
   /** The image itself (or its small WebP thumbnail); load it with the same Bearer token. */

@@ -6,6 +6,21 @@ import { groupByWeek } from "../lib/photo-weeks";
 import { usePhotos } from "../lib/use-photos";
 
 jest.mock("../lib/use-photos", () => ({ usePhotos: jest.fn() }));
+const mockHome = (id: string, ref: string, address: string) => ({
+  id,
+  ref,
+  address,
+  startDate: "2026-03-10",
+  completionDate: "2027-01-15",
+  handedOver: false,
+  progressPct: 62 as number | null,
+});
+// The client's homes: one unless a test says otherwise.
+let mockHomes = [mockHome("p1", "VTH-26-001", "Calle Castelar 12, Santander")];
+const mockSelect = jest.fn();
+jest.mock("../lib/use-project", () => ({
+  useProject: () => ({ projectId: mockHomes[0]?.id, project: mockHomes[0], projects: mockHomes, select: mockSelect }),
+}));
 jest.mock("../lib/auth", () => ({ useAuth: () => ({ token: "tok" }) }));
 
 const photo = (overrides: Partial<MobilePhoto>): MobilePhoto => ({

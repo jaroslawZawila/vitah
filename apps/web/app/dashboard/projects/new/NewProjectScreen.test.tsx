@@ -185,8 +185,8 @@ describe("NewProjectScreen client step", () => {
     );
   });
 
-  it("returns to the client step when the client was taken meanwhile", async () => {
-    vi.mocked(createProject).mockResolvedValue({ error: "client_has_project" });
+  it("returns to the client step when the client is no longer available", async () => {
+    vi.mocked(createProject).mockResolvedValue({ error: "client_not_found" });
     renderScreen(adminOptions);
     await fillDetails();
     await next();
@@ -195,16 +195,16 @@ describe("NewProjectScreen client step", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Crear proyecto" }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("ya está asignado a otro proyecto");
+    expect(await screen.findByRole("alert")).toHaveTextContent("El cliente ya no está disponible");
     expect(screen.getByText("Paso 2 de 3 · Cliente")).toBeInTheDocument();
   });
 
-  it("explains when there are no free clients", async () => {
+  it("explains when there are no clients", async () => {
     renderScreen({ canAssignClient: true, clients: [] });
     await fillDetails();
     await next();
 
-    expect(screen.getByText(/No hay clientes libres/)).toBeInTheDocument();
+    expect(screen.getByText(/No hay clientes\. Créalos/)).toBeInTheDocument();
     expect(screen.getByRole("radio", { name: /Sin cliente por ahora/ })).toBeChecked();
   });
 

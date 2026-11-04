@@ -6,6 +6,7 @@ import { PhotosProvider } from "../lib/use-photos";
 import { ObraProvider } from "../lib/use-obra";
 import { ProjectProvider } from "../lib/use-project";
 import { obra } from "../test-utils/obra-fixture";
+import { secureStore } from "../test-utils/secure-store";
 
 const mockSignOut = jest.fn();
 const mockNavigate = jest.fn();
@@ -16,7 +17,7 @@ jest.mock("../lib/auth", () => ({
 }));
 jest.mock("../lib/api", () => ({
   api: {
-    getProject: jest.fn(),
+    listProjects: jest.fn(),
     listPhotos: jest.fn(),
     getObra: jest.fn(),
     photoUrl: (id: string) => `/photos/${id}`,
@@ -24,7 +25,7 @@ jest.mock("../lib/api", () => ({
 }));
 jest.mock("expo-router", () => ({ useRouter: () => ({ navigate: mockNavigate }) }));
 
-const getProject = jest.mocked(api.getProject);
+const listProjects = jest.mocked(api.listProjects);
 const listPhotos = jest.mocked(api.listPhotos);
 const getObra = jest.mocked(api.getObra);
 
@@ -34,6 +35,8 @@ const project: Project = {
   address: "Calle del Sol 5, Santander",
   startDate: "2026-03-10",
   completionDate: "2027-01-15",
+  handedOver: false,
+  progressPct: 40,
 };
 
 const photo = (id: string, uploadedAt: string, caption: string | null = null) => ({
@@ -45,8 +48,9 @@ const photo = (id: string, uploadedAt: string, caption: string | null = null) =>
 
 beforeEach(() => {
   jest.clearAllMocks();
+  secureStore.clear();
   mockUser = { name: "Ana García" };
-  getProject.mockResolvedValue({ ok: true, data: { project } });
+  listProjects.mockResolvedValue({ ok: true, data: { projects: [project] } });
   listPhotos.mockResolvedValue({ ok: true, data: { photos: [] } });
   getObra.mockResolvedValue({ ok: true, data: { obra: null } });
   // 25 Sept 2026, 16:00 in Madrid.
@@ -98,9 +102,9 @@ describe("HomeScreen", () => {
   });
 
   it("leaves out the countdown once the date has passed or isn't set", async () => {
-    getProject.mockResolvedValue({
+    listProjects.mockResolvedValue({
       ok: true,
-      data: { project: { ...project, startDate: null, completionDate: null } },
+      data: { projects: [{ ...project, startDate: null, completionDate: null }] },
     });
     render(<Home />);
 
@@ -151,7 +155,7 @@ describe("HomeScreen", () => {
   });
 
   it("explains when no project is assigned yet", async () => {
-    getProject.mockResolvedValue({ ok: true, data: { project: null } });
+    listProjects.mockResolvedValue({ ok: true, data: { projects: [] } });
     render(<Home />);
 
     expect(await screen.findByText("Hola, Ana")).toBeOnTheScreen();
@@ -160,7 +164,7 @@ describe("HomeScreen", () => {
   });
 
   it("offers a retry when the first load fails", async () => {
-    getProject.mockResolvedValueOnce({ ok: false, error: "network_error" });
+    listProjects.mockResolvedValueOnce({ ok: false, error: "network_error" });
     render(<Home />);
 
     fireEvent.press(await screen.findByRole("button", { name: "Reintentar" }));
@@ -171,7 +175,7 @@ describe("HomeScreen", () => {
   it("keeps the project visible when a refresh fails", async () => {
     const view = render(<Home />);
     await screen.findByText("VTH-2026-014");
-    getProject.mockResolvedValueOnce({ ok: false, error: "network_error" });
+    listProjects.mockResolvedValueOnce({ ok: false, error: "network_error" });
 
     const scroll = view.UNSAFE_getByType(ScrollView);
     await act(async () => scroll.props.refreshControl.props.onRefresh());
@@ -181,10 +185,86 @@ describe("HomeScreen", () => {
   });
 
   it("signs out when the session is rejected", async () => {
-    getProject.mockResolvedValue({ ok: false, error: "unauthorized" });
+    listProjects.mockResolvedValue({ ok: false, error: "unauthorized" });
     render(<Home />);
 
     await waitFor(() => expect(mockSignOut).toHaveBeenCalled());
+  });
+});
+
+describe("HomeScreen with several homes", () => {
+  const older: Project = {
+    id: "p0",
+    ref: "VTH-24-007",
+    address: "Barrio La Sierra 4, 39120 Liencres",
+    startDate: "2024-02-01",
+    completionDate: "2025-06-12",
+    handedOver: true,
+    progressPct: null,
+  };
+
+  beforeEach(() => {
+    listProjects.mockResolvedValue({ ok: true, data: { projects: [project, older] } });
+  });
+
+  it("opens on the first (the newest open one) and lists the other below", async () => {
+    render(<Home />);
+
+    expect(await screen.findByText("VTH-2026-014")).toBeOnTheScreen();
+    expect(screen.getByText("2 viviendas")).toBeOnTheScreen();
+    expect(screen.getByText("Tu otra vivienda")).toBeOnTheScreen();
+    expect(screen.getByText("Barrio La Sierra 4")).toBeOnTheScreen();
+    expect(screen.getByText(/^Entregada · jun\.? 2025$/)).toBeOnTheScreen();
+    await waitFor(() => expect(listPhotos).toHaveBeenCalledWith("tok", "p1"));
+    expect(getObra).toHaveBeenCalledWith("tok", "p1");
+  });
+
+  it("shows the other home when tapped, and remembers it", async () => {
+    render(<Home />);
+    await screen.findByText("Tu otra vivienda");
+
+    fireEvent.press(screen.getByText("Barrio La Sierra 4"));
+
+    expect(await screen.findByText("Barrio La Sierra 4, 39120 Liencres")).toBeOnTheScreen();
+    expect(screen.getByText("Calle del Sol 5")).toBeOnTheScreen();
+    await waitFor(() => expect(listPhotos).toHaveBeenLastCalledWith("tok", "p0"));
+    expect(getObra).toHaveBeenLastCalledWith("tok", "p0");
+    expect(secureStore.get("vitah_project")).toBe("p0");
+  });
+
+  it("switches from the pill's sheet", async () => {
+    render(<Home />);
+    fireEvent.press(await screen.findByRole("button", { name: "2 viviendas. Cambiar de vivienda" }));
+
+    expect(screen.getByText("Mis viviendas")).toBeOnTheScreen();
+    expect(screen.getByRole("radio", { name: /VTH-2026-014/ })).toBeSelected();
+    fireEvent.press(screen.getByRole("radio", { name: /VTH-24-007/ }));
+
+    expect(await screen.findByText("Barrio La Sierra 4, 39120 Liencres")).toBeOnTheScreen();
+    expect(screen.queryByText("Mis viviendas")).toBeNull();
+  });
+
+  it("opens on the home chosen before, while it is still theirs", async () => {
+    secureStore.set("vitah_project", "p0");
+    const { unmount } = render(<Home />);
+    expect(await screen.findByText("Barrio La Sierra 4, 39120 Liencres")).toBeOnTheScreen();
+    unmount();
+
+    listProjects.mockResolvedValue({ ok: true, data: { projects: [project] } });
+    render(<Home />);
+    expect(await screen.findByText("Calle del Sol 5, Santander")).toBeOnTheScreen();
+    expect(screen.queryByText("Tu otra vivienda")).toBeNull();
+  });
+});
+
+describe("HomeScreen with one home", () => {
+  it("shows no switch and no other homes", async () => {
+    render(<Home />);
+    await screen.findByText("VTH-2026-014");
+
+    expect(screen.queryByText(/viviendas?$/)).toBeNull();
+    expect(screen.queryByText("Tu otra vivienda")).toBeNull();
+    await waitFor(() => expect(listPhotos).toHaveBeenCalledWith("tok", "p1"));
   });
 });
 

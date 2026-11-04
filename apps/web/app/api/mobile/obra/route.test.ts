@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createTestTenant, createTestUser, resetDatabase } from "@repo/db/testing";
+import { createTestProject, createTestTenant, createTestUser, resetDatabase } from "@repo/db/testing";
 import { db, eq, projects } from "@repo/db";
 import { files } from "@repo/core/testing";
 import { clientToken, routeParams, seededObraProject } from "../../../../test/api";
@@ -11,8 +11,8 @@ import { GET as getFile } from "./hitos/[id]/[kind]/route";
 vi.mock("@repo/auth", () => ({ auth: vi.fn() }));
 vi.mock("@repo/core/storage", () => import("@repo/core/testing"));
 
-const request = (token?: string) =>
-  new Request("http://localhost/api/mobile/obra", {
+const request = (token?: string, query = "") =>
+  new Request(`http://localhost/api/mobile/obra${query}`, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
 
@@ -47,6 +47,18 @@ describe("GET /api/mobile/obra", () => {
     const lonely = await createTestUser(tenant.id, { role: "client" });
     const res = await GET(request(await clientToken(tenant.id, lonely.id, lonely.email)));
     expect(await res.json()).toEqual({ obra: null });
+  });
+
+  it("gives the obra of the client's project asked for, and 404 for another's", async () => {
+    const { tenant, client, token } = await setup();
+    const other = await createTestProject(tenant.id, { clientUserId: client.id, obraStage: 8 });
+    const someoneElses = await createTestProject(tenant.id);
+
+    expect((await (await GET(request(token, `?projectId=${other.id}`))).json()).obra).toMatchObject({
+      stage: 8,
+      phases: [],
+    });
+    expect((await GET(request(token, `?projectId=${someoneElses.id}`))).status).toBe(404);
   });
 
   it("needs a client token", async () => {

@@ -37,9 +37,9 @@ describe("normalizeEmail", () => {
 });
 
 describe("listAssignableClients", () => {
-  it("lists active clients without a project", async () => {
+  it("lists every active client, those with a project too", async () => {
     const { tenant, project, client, ctx } = await setup();
-    const assigned = await createTestUser(tenant.id, { role: "client" });
+    const assigned = await createTestUser(tenant.id, { role: "client", name: "Bea Ruiz" });
     await db.update(projects).set({ clientUserId: assigned.id }).where(eq(projects.id, project.id));
     await createTestUser(tenant.id, { role: "client", active: false });
     await createTestUser(tenant.id, { role: "manager" });
@@ -47,6 +47,7 @@ describe("listAssignableClients", () => {
 
     expect(await svc.listAssignableClients(ctx)).toEqual([
       { id: client.id, name: "Ana García", email: client.email },
+      { id: assigned.id, name: "Bea Ruiz", email: assigned.email },
     ]);
   });
 
@@ -118,14 +119,15 @@ describe("assignProjectClient", () => {
     ).rejects.toMatchObject({ code: "client_already_attached", status: 409 });
   });
 
-  it("rejects a client already on another project", async () => {
+  it("attaches a client who already has another project", async () => {
     const { tenant, project, client, ctx } = await setup();
     const otherProject = await createTestProject(tenant.id);
     await svc.assignProjectClient(ctx, project.id, { clientId: client.id });
 
-    await expect(
-      svc.assignProjectClient(ctx, otherProject.id, { clientId: client.id }),
-    ).rejects.toMatchObject({ code: "client_has_project", status: 409 });
+    await svc.assignProjectClient(ctx, otherProject.id, { clientId: client.id });
+
+    expect((await findProject(project.id))?.clientUserId).toBe(client.id);
+    expect((await findProject(otherProject.id))?.clientUserId).toBe(client.id);
   });
 
   it.each(["manager", "viewer"] as const)("is admin only (%s is forbidden)", async (role) => {
@@ -177,50 +179,5 @@ describe("unassignProjectClient", () => {
     await expect(
       svc.unassignProjectClient({ ...ctx, role: "viewer" }, project.id),
     ).rejects.toMatchObject({ code: "forbidden" });
-  });
-});
-
-describe("getClientProject", () => {
-  it("returns the project attached to the client in mobile shape", async () => {
-    const { tenant, client, ctx } = await setup();
-    const project = await createTestProject(tenant.id, {
-      ref: "VTH-2026-014",
-      address: "Calle del Sol 5, Santander",
-      startDate: new Date("2026-03-01T00:00:00Z"),
-      completionDate: new Date("2026-11-15T00:00:00Z"),
-    });
-    await svc.assignProjectClient(ctx, project.id, { clientId: client.id });
-
-    expect(await svc.getClientProject(tenant.id, client.id)).toEqual({
-      id: project.id,
-      ref: "VTH-2026-014",
-      address: "Calle del Sol 5, Santander",
-      startDate: "2026-03-01",
-      completionDate: "2026-11-15",
-    });
-  });
-
-  it("returns null dates when they are not set", async () => {
-    const { tenant, project, client, ctx } = await setup();
-    await svc.assignProjectClient(ctx, project.id, { clientId: client.id });
-
-    expect(await svc.getClientProject(tenant.id, client.id)).toMatchObject({
-      startDate: null,
-      completionDate: null,
-    });
-  });
-
-  it("returns null when the client has no project", async () => {
-    const { tenant, client } = await setup();
-
-    expect(await svc.getClientProject(tenant.id, client.id)).toBeNull();
-  });
-
-  it("does not return a project from another tenant", async () => {
-    const { project, client, ctx } = await setup();
-    await svc.assignProjectClient(ctx, project.id, { clientId: client.id });
-    const other = await createTestTenant();
-
-    expect(await svc.getClientProject(other.id, client.id)).toBeNull();
   });
 });

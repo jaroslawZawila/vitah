@@ -6,7 +6,7 @@ import {
   createTestUser,
   resetDatabase,
 } from "@repo/db/testing";
-import { budgetService, hitosService, obraService as svc, planningService, projectClientService, type Ctx } from "../src";
+import { budgetService, clientProjectsService, hitosService, obraService as svc, planningService, projectClientService, type Ctx } from "../src";
 import { framerDraft } from "./budget-fixture";
 
 /** The seed's overall progress (seed-obra.ts PROGRESS), weighted by amount. */
@@ -166,7 +166,7 @@ describe("getClientObra", () => {
     const obra = (await svc.getClientObra(tenant.id, client.id))!;
     expect(obra.term).toMatchObject({ startDate: "2026-05-18", completionDate: baseline!.endDate, week: 19 });
     expect(obra.term?.totalWeeks).not.toBe(before.term?.totalWeeks);
-    expect(await projectClientService.getClientProject(tenant.id, client.id)).toMatchObject({
+    expect(await clientProjectsService.getClientProject(tenant.id, client.id)).toMatchObject({
       startDate: "2026-05-18",
       completionDate: baseline!.endDate,
     });

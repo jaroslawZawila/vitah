@@ -14,7 +14,11 @@ const mockReload = {
   photos: jest.fn(async () => {}),
   documents: jest.fn(async () => {}),
 };
-jest.mock("../lib/use-project", () => ({ useProject: () => ({ reload: mockReload.project }) }));
+// The home shown: `undefined` while unknown.
+let mockProjectId: string | null | undefined = "p1";
+jest.mock("../lib/use-project", () => ({
+  useProject: () => ({ reload: mockReload.project, projectId: mockProjectId }),
+}));
 jest.mock("../lib/use-obra", () => ({ useObra: () => ({ reload: mockReload.obra }) }));
 jest.mock("../lib/use-photos", () => ({ usePhotos: () => ({ reload: mockReload.photos }) }));
 jest.mock("../lib/documents", () => ({ useDocuments: () => ({ reload: mockReload.documents }) }));
@@ -23,9 +27,9 @@ const getChanges = jest.mocked(api.getChanges);
 
 const base: MobileChanges = { projectId: "p1", project: 0, obra: 3, photos: 1, documents: 2 };
 
-/** The server's next answer. */
-function serve(changes: MobileChanges | null) {
-  getChanges.mockResolvedValue({ ok: true, data: { changes } });
+/** The server's next answer; `projects` is the key of the client's list of homes. */
+function serve(changes: MobileChanges | null, projects = "p1:0") {
+  getChanges.mockResolvedValue({ ok: true, data: { changes, projects } });
 }
 
 const reloaded = () =>
@@ -44,6 +48,7 @@ let appStateListener: ((status: AppStateStatus) => void) | undefined;
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockProjectId = "p1";
   jest.useFakeTimers();
   serve(base);
   jest.spyOn(AppState, "addEventListener").mockImplementation((_type, listener) => {
@@ -74,7 +79,7 @@ describe("useLiveUpdates", () => {
     renderHook(useLiveUpdates);
     await advance(0);
 
-    expect(getChanges).toHaveBeenCalledWith("tok");
+    expect(getChanges).toHaveBeenCalledWith("tok", "p1");
     expect(reloaded()).toEqual([]);
   });
 
@@ -166,15 +171,51 @@ describe("useLiveUpdates", () => {
   });
 
   it("drops a reply that arrives after the app went to the background", async () => {
-    let answer: (result: Result<{ changes: MobileChanges | null }>) => void = () => {};
+    let answer: (result: Result<{ changes: MobileChanges | null; projects: string }>) => void = () => {};
     renderHook(useLiveUpdates);
     await advance(0);
 
     getChanges.mockImplementationOnce(() => new Promise((resolve) => (answer = resolve)));
     await advance(POLL_MS);
     act(() => appStateListener?.("background"));
-    await act(async () => answer({ ok: true, data: { changes: { ...base, photos: 5 } } }));
+    await act(async () => answer({ ok: true, data: { changes: { ...base, photos: 5 }, projects: "p1:0" } }));
 
+    expect(reloaded()).toEqual([]);
+  });
+
+  it("reloads the list of homes when it moved", async () => {
+    renderHook(useLiveUpdates);
+    await advance(0);
+
+    serve(base, "p1:0,p2:0");
+    await advance(POLL_MS);
+
+    expect(reloaded()).toEqual(["project"]);
+  });
+
+  it("waits until the home shown is known, then polls for it", async () => {
+    mockProjectId = undefined;
+    const { rerender } = renderHook(useLiveUpdates);
+    await advance(POLL_MS);
+    expect(getChanges).not.toHaveBeenCalled();
+
+    mockProjectId = "p2";
+    rerender({});
+    await advance(0);
+    expect(getChanges).toHaveBeenCalledWith("tok", "p2");
+  });
+
+  it("starts afresh for another home shown, without reloading", async () => {
+    const { rerender } = renderHook(useLiveUpdates);
+    await advance(0);
+
+    mockProjectId = "p2";
+    serve({ ...base, projectId: "p2", photos: 7 });
+    rerender({});
+    await advance(0);
+
+    expect(getChanges).toHaveBeenLastCalledWith("tok", "p2");
+    // The providers load the home shown on their own.
     expect(reloaded()).toEqual([]);
   });
 

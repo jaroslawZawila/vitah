@@ -143,9 +143,14 @@ const useLastNotificationResponse =
 
 /**
  * After sign-in: registers the phone (asking once, and again when the
- * language changes) and opens the right tab when a notification is tapped.
+ * language changes) and opens the right tab when a notification is tapped,
+ * on the home it is about (`showProject`; pushes from older servers name none).
  */
-export function usePushNotifications(authToken: string | null, language: AppLanguage) {
+export function usePushNotifications(
+  authToken: string | null,
+  language: AppLanguage,
+  showProject?: (projectId: string) => void,
+) {
   const router = useRouter();
   const response = useLastNotificationResponse();
 
@@ -158,7 +163,8 @@ export function usePushNotifications(authToken: string | null, language: AppLang
     const { identifier, content } = response.notification.request;
     if (identifier === handledNotification) return;
     handledNotification = identifier;
-    const screen = content.data?.screen;
+    const { screen, projectId } = content.data ?? {};
+    if (typeof projectId === "string") showProject?.(projectId);
     if (screen === "photos" || screen === "documents" || screen === "obra") router.navigate(SCREENS[screen]);
-  }, [authToken, response, router]);
+  }, [authToken, response, router, showProject]);
 }

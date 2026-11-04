@@ -14,6 +14,7 @@ import {
   users,
 } from "@repo/db";
 import { markChanged } from "./changes";
+import { clientProjectsWhere, resolveClientProject } from "./client-projects";
 import { requireEditor, type Ctx } from "./context";
 import {
   ACTIVE_GENERATION_STATUSES,
@@ -402,8 +403,7 @@ export async function openDocument(ctx: Ctx, projectId: string, documentId: stri
 function clientProject(tenantId: string, clientUserId: string) {
   return and(
     eq(projects.id, projectDocuments.projectId),
-    eq(projects.tenantId, tenantId),
-    eq(projects.clientUserId, clientUserId),
+    clientProjectsWhere(tenantId, clientUserId),
     eq(projectDocuments.visibleToClient, true),
   );
 }
@@ -412,19 +412,22 @@ function clientProject(tenantId: string, clientUserId: string) {
 const FIRST_CATEGORIES: readonly string[] = ["contract", "plans", "certificates", "other"];
 
 /**
- * The client's visible documents. `categories` are the ones the app knows
- * (it says so in `?categories=`); a document in another one is listed as
- * "other", or an older build would label it "undefined".
+ * The visible documents of the client's project `projectId` (else their
+ * default one). `categories` are the ones the app knows (it says so in
+ * `?categories=`); a document in another one is listed as "other", or an
+ * older build would label it "undefined".
  */
 export async function listClientDocuments(
   tenantId: string,
   clientUserId: string,
-  categories: readonly string[] = FIRST_CATEGORIES,
+  { categories = FIRST_CATEGORIES, projectId }: { categories?: readonly string[]; projectId?: string | null } = {},
 ): Promise<MobileDocument[]> {
+  const project = await resolveClientProject(tenantId, clientUserId, projectId);
+  if (!project) return [];
   const rows = await db
     .select(mobileColumns)
     .from(projectDocuments)
-    .innerJoin(projects, clientProject(tenantId, clientUserId))
+    .where(and(eq(projectDocuments.projectId, project.id), eq(projectDocuments.visibleToClient, true)))
     .orderBy(desc(projectDocuments.createdAt));
   return rows.map((row) => toMobileDocument(categories.includes(row.category) ? row : { ...row, category: "other" }));
 }

@@ -91,4 +91,29 @@ describe("useClientData reload", () => {
     await act(async () => slow({ ok: true, data: ["a"] }));
     expect(result.current).toMatchObject({ data: ["a", "b"], refreshing: false });
   });
+
+  it("waits while there is nothing to load yet", async () => {
+    const { result } = renderHook(() => useClientData(null));
+
+    await act(async () => {});
+    expect(result.current.data).toBeUndefined();
+    expect(load).not.toHaveBeenCalled();
+  });
+
+  it("drops what the last fetch loaded when another one takes over", async () => {
+    const other = jest.fn<Promise<Result<string[]>>, [string]>();
+    load.mockResolvedValue({ ok: true, data: ["first home"] });
+    let answer: (result: Result<string[]>) => void = () => {};
+    other.mockImplementation(() => new Promise((resolve) => (answer = resolve)));
+    const { result, rerender } = renderHook(({ fetch }: { fetch: typeof load }) => useClientData(fetch), {
+      initialProps: { fetch: load },
+    });
+    await waitFor(() => expect(result.current.data).toEqual(["first home"]));
+
+    rerender({ fetch: other });
+    expect(result.current.data).toBeUndefined();
+
+    await act(async () => answer({ ok: true, data: ["second home"] }));
+    expect(result.current.data).toEqual(["second home"]);
+  });
 });

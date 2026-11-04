@@ -16,6 +16,15 @@ const mockReplace = jest.fn();
 let mockCanGoBack = true;
 let mockParams: Record<string, string> = {};
 
+// One home shown (Fase, Pagos and Hito never switch home).
+jest.mock("../lib/use-project", () => {
+  const { useMemo } = jest.requireActual<typeof import("react")>("react");
+  const { useClientData } = jest.requireActual<typeof import("../lib/use-client-data")>("../lib/use-client-data");
+  return {
+    useProject: () => ({ projectId: "p1", project: null, projects: [], select: jest.fn() }),
+    useProjectData: (fetch: (token: string, projectId: string) => never) => useClientData(useMemo(() => (token: string) => fetch(token, "p1"), [fetch])),
+  };
+});
 jest.mock("../lib/auth", () => ({
   useAuth: () => ({ token: "tok", user: { name: "Ana" }, signOut: jest.fn() }),
 }));

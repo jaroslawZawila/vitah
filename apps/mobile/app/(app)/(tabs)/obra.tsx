@@ -4,6 +4,7 @@ import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "r
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { AppLanguage, MobileObra, MobilePhase } from "@repo/core/contract";
 import { LoadState } from "../../../components/load-state";
+import { ProjectEyebrow } from "../../../components/project-switch";
 import { Bar, BigPct, Figure, Marker } from "../../../components/obra-parts";
 import { card, colors, radius, spacing, type } from "../../../constants/theme";
 import {
@@ -17,7 +18,6 @@ import { useI18n } from "../../../lib/i18n";
 import { currentPhaseIndex, nextPayment, phaseName } from "../../../lib/obra";
 import { useObra } from "../../../lib/use-obra";
 import { usePhotos } from "../../../lib/use-photos";
-import { useProject } from "../../../lib/use-project";
 
 // Tab "Obra" — doc/mobile-app-design/A-Progress.dc.html: everything on one
 // screen (no scrolling on a standard phone); a phase opens A-Fase.
@@ -25,7 +25,6 @@ import { useProject } from "../../../lib/use-project";
 export default function ObraScreen() {
   const insets = useSafeAreaInsets();
   const { t } = useI18n();
-  const { project } = useProject();
   const { obra, error, refreshing, refresh, retry } = useObra();
   const photos = usePhotos();
   const loaded = obra !== undefined;
@@ -57,11 +56,7 @@ export default function ObraScreen() {
       }
     >
       <View style={{ gap: 4 }}>
-        {project && (
-          <Text style={type.label}>
-            {[project.ref, project.address.split(",")[0]?.toUpperCase()].filter(Boolean).join(" · ")}
-          </Text>
-        )}
+        <ProjectEyebrow withAddress />
         <Text accessibilityRole="header" style={[type.display, { fontSize: 28 }]}>
           {t("obra.title")}
         </Text>

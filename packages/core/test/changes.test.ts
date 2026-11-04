@@ -22,6 +22,7 @@ import {
   photosService,
   planningService,
   projectClientService,
+  clientProjectsService,
   projectsService,
   type ChangeArea,
   type Ctx,
@@ -404,9 +405,10 @@ describe("writes the client sees", () => {
     "requirePdf",
     "newPdfDocument",
     "projectInTenant",
-    "clientProjectWhere",
+    "clientProjectsWhere",
+    "resolveClientProject",
+    "DEFAULT_FIRST",
     "requireAssignableClient",
-    "clientConflict",
     "toBudgetChapters",
     "photosByChapter",
     // Reads behind Proyectos › Presupuestos (budget-overview.ts).
@@ -418,6 +420,7 @@ describe("writes the client sees", () => {
     const services = [
       projectsService,
       projectClientService,
+      clientProjectsService,
       obraService,
       photosService,
       documentsService,
@@ -494,7 +497,7 @@ describe("getClientChanges", () => {
 
     const { project: p, obra, photos, documents } = await counters(project.id);
 
-    expect(await svc.getClientChanges(tenant.id, client.id)).toEqual({
+    expect((await svc.getClientChanges(tenant.id, client.id)).changes).toEqual({
       projectId: project.id,
       project: p,
       obra: obra + p + photos,
@@ -507,7 +510,7 @@ describe("getClientChanges", () => {
     const tenant = await createTestTenant();
     const client = await createTestUser(tenant.id, { role: "client" });
 
-    expect(await svc.getClientChanges(tenant.id, client.id)).toBeNull();
+    expect((await svc.getClientChanges(tenant.id, client.id)).changes).toBeNull();
   });
 
   it("returns null once the client is removed from the project", async () => {
@@ -515,19 +518,19 @@ describe("getClientChanges", () => {
 
     await projectClientService.unassignProjectClient(ctx, project.id);
 
-    expect(await svc.getClientChanges(tenant.id, client.id)).toBeNull();
+    expect((await svc.getClientChanges(tenant.id, client.id)).changes).toBeNull();
   });
 
   it("never reaches across tenants", async () => {
     const { client } = await setup();
     const other = await createTestTenant();
 
-    expect(await svc.getClientChanges(other.id, client.id)).toBeNull();
+    expect((await svc.getClientChanges(other.id, client.id)).changes).toBeNull();
   });
 
   it("moves the obra with the project and its photos, which it shows too", async () => {
     const { tenant, client, project } = await setup();
-    const obra = async () => (await svc.getClientChanges(tenant.id, client.id))!.obra;
+    const obra = async () => (await svc.getClientChanges(tenant.id, client.id)).changes!.obra;
     const start = await obra();
 
     await svc.markChanged(tenant.id, project.id, ["project"]);

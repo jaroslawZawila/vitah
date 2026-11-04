@@ -8,9 +8,9 @@ import { GET } from "./route";
 // itself can't load outside Next.js.
 vi.mock("@repo/auth", () => ({ auth: vi.fn() }));
 
-function get(token?: string) {
+function get(token?: string, query = "") {
   return GET(
-    new Request("http://localhost/api/mobile/changes", {
+    new Request(`http://localhost/api/mobile/changes${query}`, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     }),
   );
@@ -20,7 +20,7 @@ async function clientWithProject() {
   const tenant = await createTestTenant();
   const client = await createTestUser(tenant.id, { role: "client" });
   const project = await createTestProject(tenant.id, { clientUserId: client.id });
-  return { tenant, project, token: await clientToken(tenant.id, client.id, client.email) };
+  return { tenant, client, project, token: await clientToken(tenant.id, client.id, client.email) };
 }
 
 beforeEach(async () => {
@@ -36,7 +36,28 @@ describe("GET /api/mobile/changes", () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({
       changes: { projectId: project.id, project: 0, obra: 0, photos: 0, documents: 0 },
+      projects: `${project.id}:0:1`,
     });
+  });
+
+  it("returns the counters of the project asked for, and moves the key when one is added", async () => {
+    const { tenant, client, project, token } = await clientWithProject();
+    const before = (await (await get(token)).json()).projects;
+    const older = await createTestProject(tenant.id, { clientUserId: client.id, obraStage: 8 });
+    await changesService.markChanged(tenant.id, older.id, ["photos"]);
+
+    const body = await (await get(token, `?projectId=${older.id}`)).json();
+
+    expect(body.changes).toMatchObject({ projectId: older.id, photos: 1 });
+    expect(body.projects).not.toBe(before);
+    expect((await (await get(token)).json()).changes.projectId).toBe(project.id);
+  });
+
+  it("returns null changes for a project that is no longer the client's", async () => {
+    const { tenant, token } = await clientWithProject();
+    const someoneElses = await createTestProject(tenant.id);
+
+    expect((await (await get(token, `?projectId=${someoneElses.id}`)).json()).changes).toBeNull();
   });
 
   it("shows a change staff made", async () => {
@@ -65,7 +86,7 @@ describe("GET /api/mobile/changes", () => {
 
     const res = await get(await clientToken(tenant.id, client.id, client.email));
 
-    expect(await res.json()).toEqual({ changes: null });
+    expect(await res.json()).toEqual({ changes: null, projects: "" });
   });
 
   it("returns 401 without a token", async () => {

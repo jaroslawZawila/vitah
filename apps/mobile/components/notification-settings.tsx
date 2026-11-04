@@ -18,8 +18,11 @@ const NOTIFICATIONS: { id: keyof NotificationPrefs; label: MessageKey; hint: Mes
 
 const getSettings = (token: string) => api.getSettings(token);
 
-/** The three notification toggles, saved to the server as they change. */
-export function NotificationSettings({ token }: { token: string }) {
+/**
+ * The three notification toggles, saved to the server as they change.
+ * `allHomes`: the client has several homes, and the toggles apply to all.
+ */
+export function NotificationSettings({ token, allHomes = false }: { token: string; allHomes?: boolean }) {
   const { t, language } = useI18n();
   const { data: saved } = useClientData(getSettings);
   // What the client last set here, else what the server has.
@@ -50,7 +53,9 @@ export function NotificationSettings({ token }: { token: string }) {
 
   return (
     <View>
-      <Text style={[type.label, { marginBottom: 6 }]}>{t("profile.notifications")}</Text>
+      <Text style={[type.label, { marginBottom: 6 }]}>
+        {t(allHomes ? "profile.notificationsAllHomes" : "profile.notifications")}
+      </Text>
       {!allowed && (
         <View style={{ gap: spacing.sm, paddingBottom: spacing.sm }}>
           <Text style={[type.subhead, { fontSize: 13 }]}>{t("profile.notificationsOff")}</Text>

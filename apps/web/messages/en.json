@@ -145,7 +145,6 @@
         "project_not_found": "Project not found.",
         "client_not_found": "Client not found or inactive.",
         "client_already_attached": "This project already has a client.",
-        "client_has_project": "This client is already assigned to another project.",
         "no_client": "This project has no client assigned.",
         "forbidden": "Only admins can manage app access."
       }
@@ -337,7 +336,6 @@
       "invalid_date": "Enter a valid date.",
       "generic": "The project couldn't be created. Please try again.",
       "client_not_found": "That client is no longer available. Choose another one.",
-      "client_has_project": "That client is already assigned to another project. Choose another one.",
       "forbidden": "Only admins can assign clients.",
       "dates_out_of_order": "The completion date can't be before the start date.",
       "too_long": "The reference or address is too long."
@@ -349,7 +347,7 @@
       "noneHint": "Can be assigned later",
       "search": "Search clients",
       "searchPlaceholder": "Name or email",
-      "noClients": "There are no free clients. Create them on the Clients tab.",
+      "noClients": "There are no clients. Create them on the Clients tab.",
       "noMatches": "No client matches your search."
     }
   },

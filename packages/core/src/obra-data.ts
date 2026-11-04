@@ -32,7 +32,6 @@ import { CoreError } from "./errors";
 import { hitoStatus, ofBp, paymentDueOn, priceLines, progressOf, todayInSpain, type Margins, type Progress } from "./obra-calc";
 import { requireProject as requireProjectRow } from "./project-files";
 import { approvedPlanDates } from "./planning-data";
-import { clientProjectWhere } from "./project-client";
 
 // ─── Obra: shared loading and checks ─────────────────────────────────────────
 // What the budget, hitos and obra services share: errors, input parsing, and
@@ -86,15 +85,6 @@ export function fail(code: ObraError): never {
 // Project lookup is the same as for the project's files.
 export const requireProject = requireProjectRow;
 export type ObraProject = Awaited<ReturnType<typeof requireProjectRow>>;
-
-/** The project attached to a mobile-app client, if any. */
-export async function clientProject(tenantId: string, clientUserId: string) {
-  const project = await db.query.projects.findFirst({
-    where: clientProjectWhere(tenantId, clientUserId),
-    columns: { id: true, obraStage: true, startDate: true, completionDate: true },
-  });
-  return project ?? null;
-}
 
 export const asStage = (stage: number) => stage as ObraStage;
 

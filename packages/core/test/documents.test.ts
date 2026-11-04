@@ -281,7 +281,7 @@ describe("client documents", () => {
     await createTestDocument(tenant.id, project.id, { title: "Presupuesto", category: "budget" });
 
     expect((await svc.listClientDocuments(tenant.id, client.id))[0]).toMatchObject({ title: "Presupuesto", category: "other" });
-    const current = await svc.listClientDocuments(tenant.id, client.id, ["contract", "plans", "certificates", "other", "budget"]);
+    const current = await svc.listClientDocuments(tenant.id, client.id, { categories: ["contract", "plans", "certificates", "other", "budget"] });
     expect(current[0]).toMatchObject({ category: "budget" });
   });
 

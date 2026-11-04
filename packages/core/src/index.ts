@@ -6,6 +6,7 @@ export * from "./contract";
 export * as projectsService from "./projects";
 export type { ProjectListItem, ProjectDetail } from "./projects";
 export * as projectClientService from "./project-client";
+export * as clientProjectsService from "./client-projects";
 export * as usersService from "./users";
 export type { UserListItem } from "./users";
 export * as clientsService from "./clients";

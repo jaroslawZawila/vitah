@@ -85,6 +85,19 @@ describe("GET /api/mobile/documents", () => {
     expect(current.find((d: { title: string }) => d.title === "Presupuesto")).toMatchObject({ category: "budget" });
   });
 
+  it("lists the documents of the client's project asked for", async () => {
+    const { client, documentId, token } = await setup();
+    const other = await createTestProject(client.tenantId!, { clientUserId: client.id, obraStage: 8 });
+    const older = await createTestDocument(client.tenantId!, other.id, { title: "Planos" });
+
+    const ids = async (query = "") =>
+      (await (await list(request(token, query))).json()).documents.map((d: { id: string }) => d.id);
+
+    expect(await ids()).toEqual([documentId]);
+    expect(await ids(`?projectId=${other.id}`)).toEqual([older.id]);
+    expect((await list(request(token, "?projectId=someone-elses"))).status).toBe(404);
+  });
+
   it("requires a valid token", async () => {
     expect((await list(request())).status).toBe(401);
     expect((await list(request("garbage"))).status).toBe(401);

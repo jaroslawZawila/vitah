@@ -5,6 +5,7 @@ import * as SecureStore from "expo-secure-store";
 import { api, type AuthUser } from "./api";
 import { clearDocuments } from "./document-store";
 import { clearHitoFiles } from "./hito-files";
+import { clearProjectChoice } from "./project-choice";
 import { retryPendingRemoval, unregisterPush } from "./push";
 
 const TOKEN_KEY = "vitah_token";
@@ -116,7 +117,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Offline is fine (the app works from its saved data); a rejected
     // session means the password is needed again.
-    const result = await api.getProject(saved.token);
+    const result = await api.getChanges(saved.token);
     if (!result.ok && result.error === "unauthorized") {
       await SecureStore.deleteItemAsync(BIOMETRIC_KEY).catch(() => {});
       setState((s) => ({ ...s, biometric: false }));
@@ -161,6 +162,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // The phone may be shared: don't leave the client's documents or photos behind.
     clearDocuments();
     clearHitoFiles();
+    await clearProjectChoice();
     await Promise.all([Image.clearDiskCache(), Image.clearMemoryCache()]);
     // Biometric sign-in stays on: it's how the client gets back in.
     setState((s) => ({ ...s, token: null, user: null, isLoading: false, signedOut: true }));

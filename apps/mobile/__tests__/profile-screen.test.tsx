@@ -16,11 +16,27 @@ jest.mock("../lib/auth", () => ({
 jest.mock("../lib/app-lock", () => ({ useAppLock: () => mockLock }));
 jest.mock("expo-router", () => ({ useRouter: () => ({ push: mockPush }) }));
 jest.mock("../components/notification-settings", () => ({
-  NotificationSettings: ({ token }: { token: string }) => {
+  NotificationSettings: ({ token, allHomes }: { token: string; allHomes?: boolean }) => {
     const { createElement } = jest.requireActual<typeof import("react")>("react");
     const { Text } = jest.requireActual<typeof import("react-native")>("react-native");
-    return createElement(Text, null, `notifications for ${token}`);
+    return createElement(Text, null, `notifications for ${token}${allHomes ? " (all homes)" : ""}`);
   },
+}));
+const home = (id: string, ref: string, address: string, handedOver: boolean) => ({
+  id,
+  ref,
+  address,
+  startDate: "2024-02-01",
+  completionDate: "2025-06-12",
+  handedOver,
+  progressPct: handedOver ? null : 62,
+});
+const mockSelect = jest.fn();
+const castelar = home("p1", "VTH-26-001", "Calle Castelar 12, Santander", false);
+const sierra = home("p0", "VTH-24-007", "Barrio La Sierra 4, Liencres", true);
+let mockHomes = [castelar];
+jest.mock("../lib/use-project", () => ({
+  useProject: () => ({ project: mockHomes[0], projects: mockHomes, select: mockSelect }),
 }));
 jest.mock("expo-constants", () => ({ __esModule: true, default: { expoConfig: { version: "1.2.0" } } }));
 /** Renders and waits until the stored language has loaded. */
@@ -38,6 +54,7 @@ const toggle = (name: string) => screen.getByRole("switch", { name });
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockHomes = [castelar];
   secureStore.clear();
   secureStore.set("vitah_language", "es");
   mockLock.available = true;
@@ -95,5 +112,28 @@ describe("ProfileScreen", () => {
 
     fireEvent.press(screen.getByRole("button", { name: "Cerrar sesión" }));
     expect(mockSignOut).toHaveBeenCalled();
+  });
+});
+
+describe("ProfileScreen › Mis viviendas", () => {
+  it("is left out with one home", async () => {
+    await renderProfile();
+
+    expect(screen.queryByText("Mis viviendas")).toBeNull();
+    expect(screen.getByText("notifications for tok")).toBeOnTheScreen();
+  });
+
+  it("lists every home, marks the one shown and shows another when picked", async () => {
+    mockHomes = [castelar, sierra];
+    await renderProfile();
+
+    expect(screen.getByText("Mis viviendas")).toBeOnTheScreen();
+    expect(screen.getByRole("radio", { name: /Calle Castelar 12/ })).toBeSelected();
+    expect(screen.getByText("Viendo")).toBeOnTheScreen();
+    expect(screen.getByText(/^VTH-24-007 · Entregada · jun\.? 2025$/)).toBeOnTheScreen();
+    expect(screen.getByText("notifications for tok (all homes)")).toBeOnTheScreen();
+
+    fireEvent.press(screen.getByRole("radio", { name: /Barrio La Sierra 4/ }));
+    expect(mockSelect).toHaveBeenCalledWith("p0");
   });
 });

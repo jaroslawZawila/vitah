@@ -14,6 +14,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { DocumentCategory } from "@repo/core/contract";
 import { Button } from "../../../components/button";
+import { ProjectEyebrow } from "../../../components/project-switch";
 import { colors, radius, spacing, type } from "../../../constants/theme";
 import type { LocalDocument } from "../../../lib/document-store";
 import { useDocuments } from "../../../lib/documents";
@@ -41,9 +42,7 @@ export default function DocumentsScreen() {
   const header = (
     <View style={{ gap: spacing.lg, paddingBottom: spacing.md }}>
       <View style={{ gap: spacing.sm }}>
-        <Text style={type.label}>
-          {t("documents.count", { count: documents?.length ?? 0 })}
-        </Text>
+        <ProjectEyebrow after={t("documents.count", { count: documents?.length ?? 0 })} />
         <Text accessibilityRole="header" style={type.display}>
           {t("documents.title")}
         </Text>

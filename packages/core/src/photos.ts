@@ -1,5 +1,6 @@
 import { and, db, desc, eq, gt, isNotNull, ne, projectPhotos, projects, sql, users } from "@repo/db";
 import { markChanged } from "./changes";
+import { clientProjectsWhere, resolveClientProject } from "./client-projects";
 import { requireEditor, type Ctx } from "./context";
 import {
   MAX_CAPTION_LENGTH,
@@ -303,25 +304,28 @@ export async function openPhoto(
 
 // ─── Mobile app ──────────────────────────────────────────────────────────────
 // Called with the client's own identity (from their mobile token). A client
-// only ever reaches the visible photos of the project they're attached to.
+// only ever reaches the visible photos of the projects they're attached to.
 
 function clientProject(tenantId: string, clientUserId: string) {
   return and(
     eq(projects.id, projectPhotos.projectId),
-    eq(projects.tenantId, tenantId),
-    eq(projects.clientUserId, clientUserId),
+    clientProjectsWhere(tenantId, clientUserId),
     eq(projectPhotos.visibleToClient, true),
   );
 }
 
+/** The visible photos of the client's project `projectId` (else their default one), newest first. */
 export async function listClientPhotos(
   tenantId: string,
   clientUserId: string,
+  projectId?: string | null,
 ): Promise<MobilePhoto[]> {
+  const project = await resolveClientProject(tenantId, clientUserId, projectId);
+  if (!project) return [];
   const rows = await db
     .select(mobileColumns)
     .from(projectPhotos)
-    .innerJoin(projects, clientProject(tenantId, clientUserId))
+    .where(and(eq(projectPhotos.projectId, project.id), eq(projectPhotos.visibleToClient, true)))
     .orderBy(desc(projectPhotos.createdAt));
   return rows.map(toMobilePhoto);
 }

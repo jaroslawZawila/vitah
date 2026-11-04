@@ -149,6 +149,19 @@ describe("usePushNotifications", () => {
     renderHook(() => usePushNotifications("tok", "es"));
     expect(mockNavigate).toHaveBeenCalledWith("/obra");
   });
+
+  it("shows the home a notification is about before opening its tab", () => {
+    const showProject = jest.fn();
+    jest.mocked(Notifications.useLastNotificationResponse).mockReturnValue({
+      notification: { request: { identifier: "n-home", content: { data: { screen: "documents", projectId: "p2" } } } },
+    } as never);
+
+    renderHook(() => usePushNotifications("tok", "es", showProject));
+
+    expect(showProject).toHaveBeenCalledWith("p2");
+    expect(mockNavigate).toHaveBeenCalledWith("/documents");
+    expect(showProject.mock.invocationCallOrder[0]).toBeLessThan(mockNavigate.mock.invocationCallOrder[0]!);
+  });
 });
 
 describe("in Expo Go on Android", () => {

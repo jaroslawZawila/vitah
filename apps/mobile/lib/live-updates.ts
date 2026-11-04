@@ -25,26 +25,30 @@ export function changedAreas(
 }
 
 /**
- * While the app is in the foreground, polls the server's change counters and
- * quietly reloads what staff changed. The first reading after the app opens
- * only sets the baseline: every part loads then anyway. Back in the
- * foreground the first reading is compared with the last one from before, so
- * a change that lands while the parts reload on their own isn't missed.
- * Needs the project, photos, documents and obra providers above it.
+ * While the app is in the foreground, polls the server's change counters of
+ * the home shown and quietly reloads what staff changed, and the list of homes
+ * when it moved (a home added or removed, or one's stage or progress). The
+ * first reading after the app opens (or another home is shown) only sets the
+ * baseline: every part loads then anyway. Back in the foreground the first
+ * reading is compared with the last one from before, so a change that lands
+ * while the parts reload on their own isn't missed. Needs the project, photos,
+ * documents and obra providers above it.
  */
 export function useLiveUpdates() {
   const { token, signOut } = useAuth();
   // Stable while the token is: a new token starts polling afresh anyway.
-  const { reload: project } = useProject();
+  // `project` reloads the list of homes, which holds the one shown.
+  const { reload: project, projectId } = useProject();
   const { reload: obra } = useObra();
   const { reload: photos } = usePhotos();
   const { reload: documents } = useDocuments();
 
   useEffect(() => {
     const reloaders: Record<ChangeArea, () => Promise<void>> = { project, obra, photos, documents };
-    if (!token) return;
+    if (!token || projectId === undefined) return;
     // `undefined`: no reading yet.
     let last: MobileChanges | null | undefined;
+    let lastProjects: string | undefined;
     let timer: ReturnType<typeof setInterval> | undefined;
     let polling = false;
     // Bumped on every start and stop, so a reply that arrives late is dropped.
@@ -55,18 +59,21 @@ export function useLiveUpdates() {
       if (polling) return;
       polling = true;
       const current = epoch;
-      const result = await api.getChanges(token).finally(() => (polling = false));
+      const result = await api.getChanges(token, projectId).finally(() => (polling = false));
       if (current !== epoch) return;
       if (!result.ok) {
         // Access revoked in the portal: nothing else is loading to notice.
         if (result.error === "unauthorized") await signOut();
         return; // Any other failure is left to the next poll.
       }
-      const next = result.data.changes;
+      const { changes: next, projects } = result.data;
       if (last !== undefined) {
-        for (const area of changedAreas(last, next)) void reloaders[area]();
+        const areas = changedAreas(last, next);
+        for (const area of areas) void reloaders[area]();
+        if (projects !== lastProjects && !areas.includes("project")) void project();
       }
       last = next;
+      lastProjects = projects;
     };
     const stop = () => {
       epoch++;
@@ -87,7 +94,7 @@ export function useLiveUpdates() {
       stop();
       subscription.remove();
     };
-  }, [token, signOut, project, obra, photos, documents]);
+  }, [token, signOut, projectId, project, obra, photos, documents]);
 }
 
 /** Runs `useLiveUpdates` inside the app's data providers. */

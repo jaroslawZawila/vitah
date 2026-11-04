@@ -59,8 +59,31 @@ describe("GET /api/mobile/project", () => {
         address: "Calle del Sol 5, Santander",
         startDate: "2026-03-01",
         completionDate: "2026-11-15",
+        handedOver: false,
+        progressPct: null,
       },
     });
+  });
+
+  it("returns the project asked for, or 404 for one that isn't the client's", async () => {
+    const tenant = await createTestTenant();
+    const client = await createTestUser(tenant.id, { email: "ana@example.com", role: "client" });
+    const older = await createTestProject(tenant.id, { clientUserId: client.id, startDate: new Date("2025-01-10") });
+    const newest = await createTestProject(tenant.id, { clientUserId: client.id, startDate: new Date("2026-03-10") });
+    const someoneElses = await createTestProject(tenant.id);
+    const token = await tokenFor("ana@example.com");
+    const asked = (projectId?: string) =>
+      GET(
+        new Request(`http://localhost/api/mobile/project${projectId ? `?projectId=${projectId}` : ""}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+      );
+
+    expect((await (await asked()).json()).project.id).toBe(newest.id);
+    expect((await (await asked(older.id)).json()).project.id).toBe(older.id);
+    const res = await asked(someoneElses.id);
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: "project_not_found" });
   });
 
   it("returns null when no project is attached", async () => {

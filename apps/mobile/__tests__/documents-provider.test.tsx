@@ -14,7 +14,11 @@ jest.mock("../lib/document-store", () => ({
   syncDocuments: jest.fn(),
   markSeen: jest.fn(),
   documentFile: jest.fn(),
+  pruneDocuments: jest.fn(),
 }));
+// The home shown (`undefined` while unknown) and the client's homes.
+let mockProject: { projectId: string | null | undefined; projects?: { id: string }[] };
+jest.mock("../lib/use-project", () => ({ useProject: () => mockProject }));
 jest.mock("../lib/open-pdf", () => ({ openPdf: jest.fn() }));
 
 const readDocuments = jest.mocked(store.readDocuments);
@@ -38,6 +42,7 @@ const wrapper = ({ children }: { children: ReactNode }) => (
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockProject = { projectId: "p1", projects: [{ id: "p1" }, { id: "p2" }] };
   readDocuments.mockResolvedValue([contract]);
   syncDocuments.mockResolvedValue({ documents: [contract] });
   jest.spyOn(AppState, "addEventListener").mockImplementation((_type, listener) => {
@@ -51,7 +56,8 @@ describe("DocumentsProvider", () => {
     const { result } = renderHook(useDocuments, { wrapper });
 
     await waitFor(() => expect(result.current.syncing).toBe(false));
-    expect(syncDocuments).toHaveBeenCalledWith("tok");
+    expect(syncDocuments).toHaveBeenCalledWith("tok", "p1", expect.any(Function));
+    expect(readDocuments).toHaveBeenCalledWith("p1");
     expect(result.current.documents).toEqual([contract]);
     expect(result.current.offline).toBe(false);
   });
@@ -134,7 +140,8 @@ describe("DocumentsProvider", () => {
     });
 
     expect(opened).toBe(true);
-    expect(store.markSeen).toHaveBeenCalledWith("d1");
+    expect(store.markSeen).toHaveBeenCalledWith("p1", "d1");
+    expect(store.documentFile).toHaveBeenCalledWith("p1", "d1");
     expect(openPdf).toHaveBeenCalledWith(file);
     expect(result.current.documents?.[0]?.isNew).toBe(false);
   });
@@ -151,5 +158,51 @@ describe("DocumentsProvider", () => {
 
     expect(opened).toBe(false);
     expect(openPdf).not.toHaveBeenCalled();
+  });
+
+  it("waits until the home shown is known", async () => {
+    mockProject = { projectId: undefined };
+    renderHook(useDocuments, { wrapper });
+
+    await act(async () => {});
+    expect(syncDocuments).not.toHaveBeenCalled();
+    expect(readDocuments).not.toHaveBeenCalled();
+  });
+
+  it("shows another home's documents when it is shown, dropping a sync of the last one", async () => {
+    const plans = { ...contract, id: "d2", title: "Planos" };
+    let finish: (value: { documents: store.LocalDocument[] }) => void = () => {};
+    syncDocuments.mockImplementationOnce(() => new Promise((resolve) => (finish = resolve)));
+    const { result, rerender } = renderHook(useDocuments, { wrapper });
+
+    mockProject = { ...mockProject, projectId: "p2" };
+    readDocuments.mockResolvedValue([plans]);
+    syncDocuments.mockResolvedValue({ documents: [plans] });
+    rerender({});
+    await act(async () => finish({ documents: [contract] }));
+
+    await waitFor(() => expect(syncDocuments).toHaveBeenLastCalledWith("tok", "p2", expect.any(Function)));
+    await waitFor(() => expect(result.current.syncing).toBe(false));
+    expect(result.current.documents).toEqual([plans]);
+  });
+
+  it("tells a running sync to stop once another home is shown", async () => {
+    let finish: (value: { documents: store.LocalDocument[] }) => void = () => {};
+    syncDocuments.mockImplementationOnce(() => new Promise((resolve) => (finish = resolve)));
+    const { rerender } = renderHook(useDocuments, { wrapper });
+    const wanted = syncDocuments.mock.calls[0]![2]!;
+    expect(wanted()).toBe(true);
+
+    mockProject = { ...mockProject, projectId: "p2" };
+    rerender({});
+
+    expect(wanted()).toBe(false);
+    await act(async () => finish({ documents: [contract] }));
+  });
+
+  it("drops the copies of homes that are no longer the client's", async () => {
+    renderHook(useDocuments, { wrapper });
+
+    await waitFor(() => expect(store.pruneDocuments).toHaveBeenCalledWith(["p1", "p2"]));
   });
 });

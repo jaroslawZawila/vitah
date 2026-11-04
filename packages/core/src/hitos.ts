@@ -11,14 +11,15 @@ import {
   obraHitos,
   or,
   projectPhotos,
+  projects,
 } from "@repo/db";
 import { markChanged } from "./changes";
+import { clientProjectsWhere } from "./client-projects";
 import { raiseStage } from "./obra-stage";
 import { requireEditor, type Ctx } from "./context";
 import { MAX_CHAPTER_CODE, MAX_DOCUMENT_BYTES, type Hito, type HitoFileKind } from "./contract";
 import {
   calendarDate,
-  clientProject,
   fail,
   integer,
   loadObra,
@@ -448,19 +449,22 @@ export async function openHitoFile(
   return openFile(await findHito(ctx, projectId, hitoId), kind);
 }
 
-/** A hito's acta or invoice, for the client of its project (mobile app). */
+/** A hito's acta or invoice, for the client of its project (mobile app): any of their projects. */
 export async function openClientHitoFile(
   tenantId: string,
   clientUserId: string,
   hitoId: string,
   kind: HitoFileKind,
 ) {
-  const project = await clientProject(tenantId, clientUserId);
-  const hito = project
-    ? await db.query.obraHitos.findFirst({
-        where: and(eq(obraHitos.id, hitoId), eq(obraHitos.projectId, project.id)),
-      })
-    : undefined;
+  const hito = await db.query.obraHitos.findFirst({
+    where: and(
+      eq(obraHitos.id, hitoId),
+      inArray(
+        obraHitos.projectId,
+        db.select({ id: projects.id }).from(projects).where(clientProjectsWhere(tenantId, clientUserId)),
+      ),
+    ),
+  });
   return openFile(hito, kind);
 }
 

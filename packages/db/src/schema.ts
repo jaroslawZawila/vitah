@@ -246,10 +246,9 @@ export const projects = pgTable(
     // Construction control: the accepted budget revision whose added and
     // removed chapters staff have reviewed (null: none reviewed yet).
     obraReviewedRevisionId: text("obra_reviewed_revision_id"),
-    // Homeowner with mobile app access. At most one project per client.
-    clientUserId: text("client_user_id")
-      .unique("projects_client_user_unique")
-      .references(() => users.id, { onDelete: "set null" }),
+    // Homeowner with mobile app access. A client may have several projects
+    // (packages/core/src/client-projects.ts).
+    clientUserId: text("client_user_id").references(() => users.id, { onDelete: "set null" }),
     // Change counters the client's open app polls (packages/core/src/changes.ts):
     // each goes up after a write to that part of the app.
     projectRev: integer("project_rev").default(0).notNull(),
@@ -264,6 +263,7 @@ export const projects = pgTable(
       table.tenantId,
       table.ref,
     ),
+    clientUserIdx: index("projects_client_user_idx").on(table.clientUserId),
   }),
 );
 

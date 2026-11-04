@@ -3,8 +3,9 @@ import type { MobilePhoto } from "@repo/core/contract";
 import { api } from "./api";
 import { groupByWeek, type PhotoWeek } from "./photo-weeks";
 import { useClientData } from "./use-client-data";
+import { useProjectData } from "./use-project";
 
-const listPhotos = (token: string) => api.listPhotos(token);
+const listPhotos = (token: string, projectId: string | null) => api.listPhotos(token, projectId);
 
 type PhotosValue = Omit<ReturnType<typeof useClientData>, "data"> & {
   /** Newest first; `undefined` until loaded. */
@@ -17,9 +18,9 @@ type PhotosValue = Omit<ReturnType<typeof useClientData>, "data"> & {
 
 const PhotosContext = createContext<PhotosValue | null>(null);
 
-/** One copy of the client's photos for every screen (Inicio and Fotos). */
+/** One copy of the photos of the home shown, for every screen (Inicio and Fotos). */
 export function PhotosProvider({ children }: { children: React.ReactNode }) {
-  const { data, ...state } = useClientData(listPhotos);
+  const { data, ...state } = useProjectData(listPhotos);
   const photos = data?.photos;
   const weeks = useMemo(() => groupByWeek(photos ?? []), [photos]);
   const byId = useMemo(() => new Map((photos ?? []).map((p) => [p.id, p])), [photos]);
@@ -27,7 +28,7 @@ export function PhotosProvider({ children }: { children: React.ReactNode }) {
   return <PhotosContext value={value}>{children}</PhotosContext>;
 }
 
-/** Site photos of the signed-in client's project. */
+/** Site photos of the home shown. */
 export function usePhotos(): PhotosValue {
   const ctx = use(PhotosContext);
   if (!ctx) throw new Error("usePhotos must be used within PhotosProvider");

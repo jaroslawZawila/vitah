@@ -11,9 +11,9 @@ import {
   type ProjectPhoto,
 } from "./contract";
 import { toBudgetChapters } from "./budget";
+import { resolveClientProject } from "./client-projects";
 import {
   asStage,
-  clientProject,
   fail,
   loadObra,
   requireProject,
@@ -132,14 +132,16 @@ export async function getChapter(
 // ─── Mobile app ──────────────────────────────────────────────────────────────
 
 /**
- * The Obra tab of the client's app: null when no project is attached. Called
- * with the client's own identity (from their mobile token).
+ * The Obra tab of the client's app, for their project `projectId` (else their
+ * default one): null when none is attached. Called with the client's own
+ * identity (from their mobile token).
  */
 export async function getClientObra(
   tenantId: string,
   clientUserId: string,
+  projectId?: string | null,
 ): Promise<MobileObra | null> {
-  const project = await clientProject(tenantId, clientUserId);
+  const project = await resolveClientProject(tenantId, clientUserId, projectId);
   if (!project) return null;
   const stage = asStage(project.obraStage);
   const [{ progress, vatRateBp, hitos, planDates }, photos] = await Promise.all([

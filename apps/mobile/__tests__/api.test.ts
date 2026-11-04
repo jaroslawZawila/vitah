@@ -35,52 +35,48 @@ describe("api.signIn", () => {
   });
 });
 
-describe("api.getProject", () => {
+describe("api.listProjects", () => {
   const project = {
     id: "p",
     ref: "VTH-2026-014",
     address: "Calle del Sol 5",
     startDate: "2026-03-01",
     completionDate: null,
+    handedOver: false,
+    progressPct: 40,
   };
 
-  it("sends the bearer token and returns the project", async () => {
-    respond(200, { project });
+  it("sends the bearer token and returns the client's homes", async () => {
+    respond(200, { projects: [project] });
 
-    expect(await api.getProject("tok")).toEqual({ ok: true, data: { project } });
+    expect(await api.listProjects("tok")).toEqual({ ok: true, data: { projects: [project] } });
     const [url, init] = fetchMock.mock.calls[0];
-    expect(url).toMatch(/\/api\/mobile\/project$/);
+    expect(url).toMatch(/\/api\/mobile\/projects$/);
     expect(init.headers).toEqual({ Authorization: "Bearer tok" });
-  });
-
-  it("returns a null project", async () => {
-    respond(200, { project: null });
-
-    expect(await api.getProject("tok")).toEqual({ ok: true, data: { project: null } });
   });
 
   it("maps 401 to unauthorized", async () => {
     respond(401, { error: "unauthorized" });
 
-    expect(await api.getProject("tok")).toEqual({ ok: false, error: "unauthorized" });
+    expect(await api.listProjects("tok")).toEqual({ ok: false, error: "unauthorized" });
   });
 
   it("maps a 401 without a JSON body to unauthorized", async () => {
     respond(401);
 
-    expect(await api.getProject("tok")).toEqual({ ok: false, error: "unauthorized" });
+    expect(await api.listProjects("tok")).toEqual({ ok: false, error: "unauthorized" });
   });
 
   it("maps server errors", async () => {
     respond(500, { error: "boom" });
 
-    expect(await api.getProject("tok")).toEqual({ ok: false, error: "server_error" });
+    expect(await api.listProjects("tok")).toEqual({ ok: false, error: "server_error" });
   });
 
   it("maps a non-JSON success body to a server error", async () => {
     respond(200);
 
-    expect(await api.getProject("tok")).toEqual({ ok: false, error: "server_error" });
+    expect(await api.listProjects("tok")).toEqual({ ok: false, error: "server_error" });
   });
 });
 
@@ -96,6 +92,13 @@ describe("api.listDocuments", () => {
     // It names the categories it knows, so newer ones arrive as "other".
     expect(url).toMatch(/\/api\/mobile\/documents\?categories=contract,plans,certificates,other,budget$/);
     expect(init.headers).toEqual({ Authorization: "Bearer tok" });
+  });
+
+  it("asks for the home shown", async () => {
+    respond(200, { documents: [] });
+
+    await api.listDocuments("tok", "p 1");
+    expect(fetchMock.mock.calls[0][0]).toMatch(/\/api\/mobile\/documents\?categories=[a-z,]+&projectId=p%201$/);
   });
 
   it("maps an expired session", async () => {
@@ -122,6 +125,21 @@ describe("api.listPhotos", () => {
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toMatch(/\/api\/mobile\/photos$/);
     expect(init.headers).toEqual({ Authorization: "Bearer tok" });
+  });
+
+  it("asks for the home shown, and the obra and changes too", async () => {
+    respond(200, { photos: [] });
+    respond(200, { obra: null });
+    respond(200, { changes: null, projects: "" });
+
+    await api.listPhotos("tok", "p1");
+    await api.getObra("tok", "p1");
+    await api.getChanges("tok", "p1");
+    expect(fetchMock.mock.calls.map(([url]) => url.replace(/^.*\/api\/mobile/, ""))).toEqual([
+      "/photos?projectId=p1",
+      "/obra?projectId=p1",
+      "/changes?projectId=p1",
+    ]);
   });
 
   it("maps an expired session", async () => {

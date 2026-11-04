@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { AppLanguage, MobilePhoto } from "@repo/core/contract";
 import { Button } from "../../../components/button";
 import { PhotoImage } from "../../../components/photo-image";
+import { ProjectEyebrow } from "../../../components/project-switch";
 import { colors, spacing, type } from "../../../constants/theme";
 import { formatShortDate } from "../../../lib/format";
 import { useI18n, type Translate } from "../../../lib/i18n";
@@ -33,9 +34,7 @@ export default function PhotosScreen() {
 
   const header = (
     <View style={{ gap: spacing.sm, paddingBottom: spacing.lg }}>
-      <Text style={type.label}>
-        {t("photos.count", { count: photos?.length ?? 0 })}
-      </Text>
+      <ProjectEyebrow after={t("photos.count", { count: photos?.length ?? 0 })} />
       <Text accessibilityRole="header" style={type.display}>
         {t("photos.title")}
       </Text>

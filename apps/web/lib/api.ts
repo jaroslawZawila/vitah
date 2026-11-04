@@ -72,6 +72,15 @@ export async function withMobileClient(
   return respond(() => handler(client), 200);
 }
 
+/**
+ * `?projectId=`: which of the client's projects an /api/mobile call is about.
+ * Builds from before clients had several projects don't send it and get the
+ * default one (the newest not yet handed over).
+ */
+export function projectParam(request: Request): string | undefined {
+  return new URL(request.url).searchParams.get("projectId") || undefined;
+}
+
 export async function readJson(request: Request): Promise<Record<string, unknown>> {
   try {
     const body: unknown = await request.json();

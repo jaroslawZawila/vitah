@@ -1,6 +1,7 @@
 import { db, projects, sql } from "@repo/db";
-import { CHANGE_AREAS, type ChangeArea, type MobileChanges } from "./contract";
-import { clientProjectWhere, projectInTenant } from "./project-client";
+import { CHANGE_AREAS, type ChangeArea, type MobileChangesReply } from "./contract";
+import { clientProjectsWhere, DEFAULT_FIRST } from "./client-projects";
+import { projectInTenant } from "./project-client";
 
 // ─── Change counters ─────────────────────────────────────────────────────────
 // What the client's app polls while it is open (GET /api/mobile/changes): one
@@ -56,16 +57,35 @@ export async function markChanged(
 }
 
 /**
- * The counters of the client's project; null when none is attached. Called
- * with the client's own identity (from their mobile token).
+ * What the client's open app polls (GET /api/mobile/changes), in one query:
+ * the counters of their project `projectId` (else their default one; null
+ * without one, or once `projectId` is no longer theirs, and the app then
+ * reloads everything), and `projects`, a key of their homes that moves when
+ * one is added or removed, or its dates or stage change (another home's
+ * progress refreshes when the app comes back to the foreground). Called with
+ * the client's own identity (from their mobile token).
  */
 export async function getClientChanges(
   tenantId: string,
   clientUserId: string,
-): Promise<MobileChanges | null> {
-  const [row] = await db
-    .select({ projectId: projects.id, ...reading })
+  projectId?: string | null,
+): Promise<MobileChangesReply> {
+  const rows = await db
+    .select({
+      projectId: projects.id,
+      listed: sql<string>`${projects.projectRev} || ':' || ${projects.obraStage}`,
+      ...reading,
+    })
     .from(projects)
-    .where(clientProjectWhere(tenantId, clientUserId));
-  return (row as MobileChanges | undefined) ?? null;
+    .where(clientProjectsWhere(tenantId, clientUserId))
+    .orderBy(...DEFAULT_FIRST);
+  const shown = projectId ? rows.find((row) => row.projectId === projectId) : rows[0];
+  const { listed: _, ...changes } = shown ?? {};
+  return {
+    changes: shown ? (changes as MobileChangesReply["changes"]) : null,
+    projects: rows
+      .map(({ projectId: id, listed }) => `${id}:${listed}`)
+      .sort()
+      .join(","),
+  };
 }

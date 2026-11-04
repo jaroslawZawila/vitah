@@ -1,5 +1,6 @@
 import Feather, { type FeatherIconName } from "@react-native-vector-icons/feather";
 import { useRouter } from "expo-router";
+import { useEffect, useRef, useState } from "react";
 import {
   Alert,
   Pressable,
@@ -11,8 +12,9 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LoadState } from "../../../components/load-state";
-import { BigPct, SectionHeader, SegmentedBar } from "../../../components/obra-parts";
+import { BigPct, Marker, SectionHeader, SegmentedBar } from "../../../components/obra-parts";
 import { PhotoImage } from "../../../components/photo-image";
+import { HomeText, ProjectSheet } from "../../../components/project-switch";
 import { card, colors, radius, spacing, type } from "../../../constants/theme";
 import type { MobileObra } from "@repo/core/contract";
 import type { Project } from "../../../lib/api";
@@ -28,7 +30,8 @@ import { useProject } from "../../../lib/use-project";
 
 // Tab "Inicio" — doc/mobile-app-design/A-Home.dc.html. The notifications
 // bell is left out until push is on; Garantía and Contactar say they're
-// coming soon.
+// coming soon. A client with several homes sees the one shown, a pill to
+// switch and their other homes below (A-Viviendas.dc.html).
 
 /** "Buenos días" until noon, "Buenas tardes" until 8 pm, then "Buenas noches". */
 export function greetingKey(hour: number): MessageKey {
@@ -47,11 +50,18 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const { t } = useI18n();
-  const { project, error, refreshing, refresh, retry } = useProject();
+  const { project, projects, error, refreshing, refresh, retry, select } = useProject();
   const photos = usePhotos();
   const obra = useObra();
   const loaded = project !== undefined;
   const firstName = user?.name?.split(" ")[0];
+  const others = projects?.filter((p) => p.id !== project?.id) ?? [];
+
+  // Another home shown: start from its top.
+  const scroll = useRef<ScrollView>(null);
+  useEffect(() => {
+    scroll.current?.scrollTo({ y: 0, animated: false });
+  }, [project?.id]);
 
   function refreshAll() {
     refresh();
@@ -61,6 +71,7 @@ export default function HomeScreen() {
 
   return (
     <ScrollView
+      ref={scroll}
       style={{ flex: 1, backgroundColor: colors.grafito }}
       contentContainerStyle={{
         flexGrow: 1,
@@ -108,17 +119,19 @@ export default function HomeScreen() {
         </Text>
       )}
 
-      {project && <ProjectCard project={project} />}
+      {project && <ProjectCard project={project} homes={others.length + 1} />}
       {project && <LatestUpdate weeks={photos.weeks} />}
       {project && <Shortcuts />}
+      {project && others.length > 0 && <OtherHomes homes={others} onPick={select} />}
     </ScrollView>
   );
 }
 
-function ProjectCard({ project }: { project: Project }) {
+function ProjectCard({ project, homes }: { project: Project; homes: number }) {
   const router = useRouter();
   const { t, language } = useI18n();
   const { obra } = useObra();
+  const [switching, setSwitching] = useState(false);
   // The construction progress, once the obra has phases.
   const progress = obra?.phases.length ? obra : null;
   const days = project.completionDate ? daysUntil(project.completionDate) : null;
@@ -126,14 +139,30 @@ function ProjectCard({ project }: { project: Project }) {
 
   return (
     <View style={styles.card}>
-      <View style={{ gap: 6 }}>
-        <Text selectable style={styles.ref}>
-          {project.ref}
-        </Text>
-        <Text selectable style={[type.row, { lineHeight: 21 }]}>
-          {project.address}
-        </Text>
+      <View style={styles.cardTop}>
+        <View style={{ flex: 1, gap: 6 }}>
+          <Text selectable style={styles.ref}>
+            {project.ref}
+          </Text>
+          <Text selectable style={[type.row, { lineHeight: 21 }]}>
+            {project.address}
+          </Text>
+        </View>
+        {homes > 1 && (
+          <Pressable
+            onPress={() => setSwitching(true)}
+            accessibilityRole="button"
+            accessibilityLabel={t("homes.switch", { name: t("homes.count", { count: homes }) })}
+            style={({ pressed }) => [styles.homesPill, pressed && { opacity: 0.6 }]}
+          >
+            <View style={styles.homesPillInner}>
+              <Text style={styles.homesPillText}>{t("homes.count", { count: homes })}</Text>
+              <Feather name="chevron-down" size={14} color={colors.muted} />
+            </View>
+          </Pressable>
+        )}
       </View>
+      {homes > 1 && <ProjectSheet visible={switching} onClose={() => setSwitching(false)} />}
 
       <View style={styles.heroRow}>
         {progress && <BigPct value={progress.progressPct} />}
@@ -230,6 +259,30 @@ function LatestUpdate({ weeks }: { weeks: PhotoWeek[] }) {
   );
 }
 
+/** "Tu otra vivienda": the client's other homes; tapping one shows it. */
+function OtherHomes({ homes, onPick }: { homes: Project[]; onPick: (id: string) => void }) {
+  const { t } = useI18n();
+  return (
+    <View style={{ gap: 14 }}>
+      <Text accessibilityRole="header" style={type.label}>
+        {t("homes.other", { count: homes.length })}
+      </Text>
+      {homes.map((home) => (
+        <Pressable
+          key={home.id}
+          onPress={() => onPick(home.id)}
+          accessibilityRole="button"
+          style={({ pressed }) => [styles.otherHome, pressed && { opacity: 0.6 }]}
+        >
+          <Marker state={home.handedOver ? "done" : home.progressPct !== null ? "current" : "todo"} />
+          <HomeText home={home} />
+          <Feather name="chevron-right" size={18} color={colors.muted} />
+        </Pressable>
+      ))}
+    </View>
+  );
+}
+
 type Shortcut = {
   label: MessageKey;
   icon: FeatherIconName;
@@ -271,6 +324,32 @@ function Shortcuts() {
 const styles = StyleSheet.create({
   wordmark: { fontSize: 16, fontWeight: "400", letterSpacing: 6.4, color: colors.blancoCalido },
   card: { ...card, padding: spacing.lg, gap: 22 },
+  cardTop: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 12 },
+  // 44 pt to touch, drawn as a small pill.
+  homesPill: { minHeight: 44, marginTop: -10, marginRight: -6, justifyContent: "center" },
+  homesPillInner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderWidth: 1,
+    borderColor: colors.chipBorder,
+    borderRadius: 999,
+    paddingVertical: 7,
+    paddingLeft: 12,
+    paddingRight: 10,
+  },
+  homesPillText: { ...type.label, fontSize: 11, letterSpacing: 1.5, color: colors.blancoCalido },
+  otherHome: {
+    minHeight: 76,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    paddingVertical: 14,
+    paddingHorizontal: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.surfaceBorder,
+    borderRadius: radius.lg,
+  },
   ref: { ...type.label, color: colors.verdeOlivaLight },
   heroRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end" },
   hero: { fontSize: 72, fontWeight: "200", lineHeight: 76, color: colors.blancoCalido },

@@ -170,8 +170,15 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
 - Login page is `/`, authenticated users redirect to `/dashboard` (which redirects to `/dashboard/projects`)
 - `proxy.ts` protects all routes except `/`, `/api/auth/*`, `/api/mobile/*`, `/api/v1/*` (these authenticate per request), and static assets
 - User roles: `admin`, `manager`, `viewer` (staff, portal only) and `client` (homeowner, mobile app only) — Postgres enum. Use `isStaffUser` / `isClientUser` / `STAFF_ROLES` from `@repo/db`. `Ctx` is staff-only: client tokens are rejected by `/api/v1`
-- Clients are created on the **Clients** tab (`/dashboard/clients`, admin only): first name, surnames, date of birth, address, phone, email and app password. Personal details live in `client_profiles`; login data stays on `users`. Client emails are unique across tenants. A project has at most one client, picked from the existing clients on the project page ("Client app access" card); removing them only detaches, the account stays
-- Mobile client API: `POST /api/mobile/auth` (clients only, returns a 30d JWT), `GET /api/mobile/project`, `GET /api/mobile/documents` and `GET /api/mobile/documents/:id` (the PDF), `GET /api/mobile/photos` and `GET /api/mobile/photos/:id` (`?size=thumb`), `POST /api/mobile/password`, `GET`/`PUT /api/mobile/settings` (notification toggles), `POST`/`DELETE /api/mobile/push-token` (the phone's Expo push token + app language), `GET /api/mobile/obra` (the Obra tab: stage, progress, phases, payment hitos), `GET /api/mobile/obra/hitos/:id/:kind` (a hito's signed `acta` or `invoice` PDF) and `GET /api/mobile/changes` (change counters, see "Live updates") — all `Authorization: Bearer`, via `withMobileClient` in `apps/web/lib/api.ts`. Each request re-checks the client is still active
+- Clients are created on the **Clients** tab (`/dashboard/clients`, admin only): first name, surnames, date of birth, address, phone, email and app password. Personal details live in `client_profiles`; login data stays on `users`. Client emails are unique across tenants. A project has at most one client, picked from the existing clients on the project page ("Client app access" card); removing them only detaches, the account stays. A client may have **several projects** (homes): see "Several homes" below
+- Mobile client API: `POST /api/mobile/auth` (clients only, returns a 30d JWT), `GET /api/mobile/projects` (all their homes, the default first), `GET /api/mobile/project`, `GET /api/mobile/documents` and `GET /api/mobile/documents/:id` (the PDF), `GET /api/mobile/photos` and `GET /api/mobile/photos/:id` (`?size=thumb`), `POST /api/mobile/password`, `GET`/`PUT /api/mobile/settings` (notification toggles), `POST`/`DELETE /api/mobile/push-token` (the phone's Expo push token + app language), `GET /api/mobile/obra` (the Obra tab: stage, progress, phases, payment hitos), `GET /api/mobile/obra/hitos/:id/:kind` (a hito's signed `acta` or `invoice` PDF) and `GET /api/mobile/changes` (change counters, see "Live updates") — all `Authorization: Bearer`, via `withMobileClient` in `apps/web/lib/api.ts`. Each request re-checks the client is still active. `project`, `obra`, `photos`, `documents` and `changes` take `?projectId=` (`projectParam`), else the default home
+- Several homes: core `client-projects.ts` (`clientProjectsService`): `resolveClientProject` picks the one asked for (404
+  `project_not_found` if not theirs) or the default, the newest not handed over (stage < 8, by start date, else created),
+  else the newest of all. A file (photo, document, hito PDF) opens for any of the client's homes. The app
+  (`lib/use-project.tsx`) shows one home everywhere; the client's choice is kept on the phone (`vitah_project`, forgotten on sign-out; a tapped
+  push shows its home without changing it), each home's documents offline in their own folder. With one home the app looks as it always did. Pushes name the home (ref in the
+  title) when there are several and carry `projectId`. Design `doc/mobile-app-design/A-*Viviendas*.dc.html`. Prod SQL:
+  `packages/db/sql/2026-11-client-several-projects.sql` (drops `projects_client_user_unique`)
 - Admin-only server actions guarded by `requireAdmin()` check
 
 ### Database
@@ -182,7 +189,7 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
   Subcontratas tables `subcontractors`, `subcontractor_workers`, `subcontractor_documents`, `subcontractor_document_versions`,
   `subcontractor_assignments`, `subcontractor_audit`, Compras' `purchase_orders`, `purchase_order_lines`,
   `purchase_order_events`, `purchase_order_documents`, `purchase_order_document_versions`, `purchase_order_milestones`, `purchase_invoices`, `purchase_invoice_lines`, `purchase_invoice_files`,
-  `purchase_payments`, `purchase_requests`, `purchase_request_lines`, `purchase_request_events`, `purchase_order_amendments`, `purchase_document_checks`, and Planning's `planning_versions`, `planning_items`. A project is deliberately minimal — exactly what the mobile app shows: `ref`, `address`, `start_date`, `completion_date`, plus `client_user_id` linking it to its mobile app client
+  `purchase_payments`, `purchase_requests`, `purchase_request_lines`, `purchase_request_events`, `purchase_order_amendments`, `purchase_document_checks`, and Planning's `planning_versions`, `planning_items`. A project is deliberately minimal — exactly what the mobile app shows: `ref`, `address`, `start_date`, `completion_date`, plus `client_user_id` linking it to its mobile app client (a client may have several)
 - Prod migrations are additive SQL files in `packages/db/sql/`, applied by hand (no plain `db:push` on prod)
 
 ### Obra (construction process)
@@ -430,7 +437,9 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
 ### Live updates (app open)
 
 - While the app is in the foreground it polls `GET /api/mobile/changes` every 30 s (`apps/mobile/lib/live-updates.ts`)
-  and quietly reloads only the parts whose counter moved; it also reloads everything on open and foreground
+  and quietly reloads only the parts whose counter moved; it also reloads everything on open and foreground. The
+  counters are the home shown's (`?projectId=`); the reply's `projects` key moves when the client's list of homes does
+  (one added or removed, or its dates or stage), and the app reloads that list
 - The counters are `projects.project_rev|obra_rev|photos_rev|documents_rev`, bumped by `markChanged()`
   (`packages/core/src/changes.ts`) **after** each write the client can see, naming only what it wrote. Which
   counters each app part reads is declared once there (`READS`: the obra also shows the dates and photos). A new

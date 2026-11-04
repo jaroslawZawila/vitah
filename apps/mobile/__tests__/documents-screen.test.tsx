@@ -5,6 +5,22 @@ import type { LocalDocument } from "../lib/document-store";
 import { useDocuments } from "../lib/documents";
 
 jest.mock("../lib/documents", () => ({ useDocuments: jest.fn() }));
+const mockHome = (id: string, ref: string, address: string) => ({
+  id,
+  ref,
+  address,
+  startDate: "2026-03-10",
+  completionDate: "2027-01-15",
+  handedOver: false,
+  progressPct: 62 as number | null,
+});
+// The client's homes: one unless a test says otherwise.
+let mockHomes = [mockHome("p1", "VTH-26-001", "Calle Castelar 12, Santander")];
+const mockSelect = jest.fn();
+jest.mock("../lib/use-project", () => ({
+  useProject: () => ({ projectId: mockHomes[0]?.id, project: mockHomes[0], projects: mockHomes, select: mockSelect }),
+}));
+
 
 const doc = (overrides: Partial<LocalDocument>): LocalDocument => ({
   id: "d1",
@@ -140,5 +156,37 @@ describe("DocumentsScreen", () => {
     render(<DocumentsScreen />);
 
     expect(screen.getByText(/Todavía no hay documentos/)).toBeOnTheScreen();
+  });
+});
+
+describe("DocumentsScreen with several homes", () => {
+  afterEach(() => {
+    mockHomes = [mockHome("p1", "VTH-26-001", "Calle Castelar 12, Santander")];
+  });
+
+  it("names the home shown and switches from it", () => {
+    mockHomes = [
+      mockHome("p1", "VTH-26-001", "Calle Castelar 12, Santander"),
+      { ...mockHome("p0", "VTH-24-007", "Barrio La Sierra 4, Liencres"), handedOver: true, progressPct: null },
+    ];
+    state();
+    render(<DocumentsScreen />);
+
+    expect(screen.getByText(" · 2 documentos")).toBeOnTheScreen();
+    fireEvent.press(screen.getByRole("button", { name: "VTH-26-001. Cambiar de vivienda" }));
+    expect(screen.getByText("Mis viviendas")).toBeOnTheScreen();
+    expect(screen.getByText("62 %")).toBeOnTheScreen();
+    expect(screen.getByText(/^En obra · entrega 15 ene 2027$/)).toBeOnTheScreen();
+
+    fireEvent.press(screen.getByRole("radio", { name: /VTH-24-007/ }));
+    expect(mockSelect).toHaveBeenCalledWith("p0");
+  });
+
+  it("shows just the count with one home", () => {
+    state();
+    render(<DocumentsScreen />);
+
+    expect(screen.getByText("2 documentos")).toBeOnTheScreen();
+    expect(screen.queryByRole("button", { name: /Cambiar de vivienda/ })).toBeNull();
   });
 });

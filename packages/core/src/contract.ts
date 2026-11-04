@@ -4,7 +4,10 @@
 
 export const MIN_PASSWORD_LENGTH = 8;
 
-/** Project data exposed to the mobile app. Dates are calendar dates (YYYY-MM-DD). */
+/**
+ * A project of the client, as the mobile app shows it (GET /api/mobile/project
+ * and /api/mobile/projects). Dates are calendar dates (YYYY-MM-DD).
+ */
 export type MobileProject = {
   id: string;
   ref: string;
@@ -12,6 +15,10 @@ export type MobileProject = {
   /** The works' start and handover the client is told: the approved Planning baseline's, else the project's dates. */
   startDate: string | null;
   completionDate: string | null;
+  /** Stage 8: the home has been handed over. */
+  handedOver: boolean;
+  /** The works' progress while they're under way (stages 6–7), else null. */
+  progressPct: number | null;
 };
 
 /** The parts of the app that reload on their own when staff change them. */
@@ -24,12 +31,18 @@ export type ChangeArea = (typeof CHANGE_AREAS)[number];
  */
 export type MobileChanges = { projectId: string } & Record<ChangeArea, number>;
 
+/**
+ * GET /api/mobile/changes (`?projectId=`): the counters of that project (else
+ * the default one), and `projects`, a key that moves when the client's
+ * project list changes (one added or removed, or what the list shows).
+ */
+export type MobileChangesReply = { changes: MobileChanges | null; projects: string };
+
 export type ProjectClientError =
   | "missing_fields"
   | "project_not_found"
   | "client_not_found"
   | "client_already_attached"
-  | "client_has_project"
   | "no_client"
   | "forbidden";
 
@@ -233,6 +246,8 @@ export const OBRA_STAGES = [1, 2, 3, 4, 5, 6, 7, 8] as const;
 export type ObraStage = (typeof OBRA_STAGES)[number];
 /** Stage 6: the works themselves, from the acta de inicio. */
 export const EXECUTION_STAGE: ObraStage = 6;
+/** Stage 8: H9 paid, the home handed over. */
+export const HANDED_OVER_STAGE: ObraStage = 8;
 
 export type BudgetRevisionStatus = "draft" | "issued" | "accepted" | "rejected" | "superseded";
 /** A chapter's, phase's or line's progress. */

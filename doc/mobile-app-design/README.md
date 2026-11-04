@@ -30,6 +30,24 @@ seed. In the app every string goes through i18n (`es` + `en`), and data comes fr
 | `A-Warranty.dc.html` | Solicitud de garantía | LOE coverage (1/3/10 años), type chips, room, description, photos, urgent flag, "Mis solicitudes" | Home shortcut, Contact |
 | `A-Contact.dc.html` | Contacto | Site manager card (call / message / email), book a site visit, office info | Home shortcut |
 
+### Several homes (approved 2026-11-04)
+
+A client may own more than one home (project). Canvas: https://claude.ai/artifact/Wg1prD6ZXwN2Vzj6MLzMZs.
+
+| File | Screen | What changes |
+|------|--------|--------------|
+| `A-Home-Viviendas.dc.html` | Inicio | A "2 VIVIENDAS ⌄" pill on the project card; "Tu otra vivienda" rows (ref, street, status) below the shortcuts — tapping one shows it |
+| `A-Viviendas.dc.html` | Mis viviendas (sheet) | Every home: ref, street, status ("En obra · entrega …", "Entregada · jun 2025", "En preparación · inicio …"), % and bar while under construction; the one shown has a green ring and outline |
+| `A-Progress-Viviendas.dc.html` | Obra | The eyebrow "REF · STREET" turns verde oliva with a ⌄ and opens the sheet |
+| `A-Documents-Viviendas.dc.html` | Documentos / Fotos | The eyebrow "REF ⌄ · 24 DOCUMENTOS" (Fotos: "· 86 FOTOS") |
+| `A-Settings-Viviendas.dc.html` | Perfil | A "MIS VIVIENDAS" list (the one shown says "VIENDO"); notifications say "TODAS TUS VIVIENDAS" |
+
+Rules: with **one** home nothing of this shows — the app is exactly as above. With two or more, the app
+opens on the home the client last chose on this phone, else the newest one not handed over (the newest
+of all when every one is). One home is shown across Inicio, Obra, Fotos and Documentos; pushed screens
+(Fase, Pagos, Hito) belong to it and have no switch. A notification names its home (its ref after the
+title) and opens the app on it. Each home's documents are kept offline.
+
 Navigation: bottom tab bar with 5 tabs (Inicio · Obra · Fotos · Documentos · Perfil). Warranty,
 Contact and Password are pushed screens with a back chevron and no tab bar. Primary actions in
 pushed screens sit in a fixed bottom bar.

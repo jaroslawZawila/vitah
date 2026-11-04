@@ -4,7 +4,7 @@ import { markChanged } from "./changes";
 import { requireAdmin, requireEditor, type Ctx } from "./context";
 import { invalid, notFound } from "./errors";
 import { MAX_TEXT, text } from "./input";
-import { clientConflict, projectInTenant, requireAssignableClient } from "./project-client";
+import { projectInTenant, requireAssignableClient } from "./project-client";
 import { projectFolder } from "./project-files";
 import { deleteFolder } from "./storage";
 
@@ -96,28 +96,24 @@ export async function createProject(ctx: Ctx, input: Record<string, unknown>) {
   });
   if (existing) throw invalid("ref_exists");
 
-  try {
-    return await db.transaction(async (tx) => {
-      if (clientId) await requireAssignableClient(tx, ctx.tenantId, clientId);
+  return db.transaction(async (tx) => {
+    if (clientId) await requireAssignableClient(tx, ctx.tenantId, clientId);
 
-      const [created] = await tx
-        .insert(projects)
-        .values({
-          tenantId: ctx.tenantId,
-          ref,
-          address,
-          startDate,
-          completionDate,
-          clientUserId: clientId,
-        })
-        .returning({ id: projects.id });
-      if (!created) throw new Error("Project insert returned no row");
+    const [created] = await tx
+      .insert(projects)
+      .values({
+        tenantId: ctx.tenantId,
+        ref,
+        address,
+        startDate,
+        completionDate,
+        clientUserId: clientId,
+      })
+      .returning({ id: projects.id });
+    if (!created) throw new Error("Project insert returned no row");
 
-      return { id: created.id };
-    });
-  } catch (error) {
-    throw clientConflict(error);
-  }
+    return { id: created.id };
+  });
 }
 
 /**

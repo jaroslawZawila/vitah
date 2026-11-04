@@ -59,13 +59,13 @@ describe("ClientAccessCard without a client", () => {
   });
 
   it("shows a translated error", async () => {
-    vi.mocked(actions.assignProjectClientAction).mockResolvedValue({ error: "client_has_project" });
+    vi.mocked(actions.assignProjectClientAction).mockResolvedValue({ error: "client_not_found" });
     renderCard({ assignableClients: [ana] });
 
     await userEvent.selectOptions(screen.getByLabelText("Cliente"), "client-1");
     await userEvent.click(screen.getByRole("button", { name: "Asignar cliente" }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("ya está asignado a otro proyecto");
+    expect(await screen.findByRole("alert")).toHaveTextContent("Cliente no encontrado o inactivo.");
   });
 });
 

@@ -96,19 +96,14 @@ describe("createProject with a client", () => {
     },
   );
 
-  it("rejects a client already on another project", async () => {
+  it("takes a client who already has another project", async () => {
     const { tenant, ctx } = await setup();
     const client = await createTestUser(tenant.id, { role: "client" });
     await svc.createProject(ctx, { ...base, clientId: client.id });
 
-    await expect(
-      svc.createProject(ctx, {
-        ...base,
-        ref: "VTH-26-021",
-        clientId: client.id,
-      }),
-    ).rejects.toMatchObject({ code: "client_has_project", status: 409 });
-    expect(await svc.listProjects(ctx)).toHaveLength(1);
+    await svc.createProject(ctx, { ...base, ref: "VTH-26-021", clientId: client.id });
+
+    expect(await svc.listProjects(ctx)).toHaveLength(2);
   });
 });
 

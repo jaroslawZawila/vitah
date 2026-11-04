@@ -11,26 +11,33 @@ type State<T> = {
   refreshing: boolean;
 };
 
+const INITIAL = { data: undefined, error: false, refreshing: false };
+
 /**
  * Loads data for the signed-in client with `fetch` (keep it stable, e.g. a
- * module-level function), and again quietly whenever the app returns to the
- * foreground. Signs out when the server rejects the session (e.g. access was
- * revoked in the portal). `reload` loads again without showing a refresh, e.g.
- * when the server says the data changed.
+ * module-level function or a memo), and again quietly whenever the app
+ * returns to the foreground. Signs out when the server rejects the session
+ * (e.g. access was revoked in the portal). `reload` loads again without
+ * showing a refresh, e.g. when the server says the data changed. A null
+ * `fetch` waits (e.g. until the home to show is known); another `fetch` (e.g.
+ * for another home) drops what the last one loaded.
  */
-export function useClientData<T>(fetch: (token: string) => Promise<Result<T>>) {
+export function useClientData<T>(fetch: ((token: string) => Promise<Result<T>>) | null) {
   const { token, signOut } = useAuth();
-  const [state, setState] = useState<State<T>>({
-    data: undefined,
-    error: false,
-    refreshing: false,
-  });
+  const [state, setState] = useState<State<T>>(INITIAL);
 
   // Loads can overlap (a pull-to-refresh and a reload): only the latest one's answer counts.
   const latest = useRef(0);
 
+  // Another home's data must never show under this one.
+  const [loadedBy, setLoadedBy] = useState(() => fetch);
+  if (loadedBy !== fetch) {
+    setLoadedBy(() => fetch);
+    setState(INITIAL);
+  }
+
   const load = useCallback(async () => {
-    if (!token) return;
+    if (!token || !fetch) return;
     const request = ++latest.current;
     const result = await fetch(token);
     if (request !== latest.current) return;

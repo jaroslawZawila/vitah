@@ -57,14 +57,21 @@ export class Directory {
   constructor(parent: string | Directory, name?: string) {
     this.uri = join(parent, name);
   }
+  get name() {
+    return this.uri.split("/").pop()!;
+  }
   get exists() {
     return [...disk.keys()].some((uri) => uri.startsWith(`${this.uri}/`));
   }
   create() {}
+  /** Its files, and its folders (those holding a file). */
   list() {
-    return [...disk.keys()]
-      .filter((uri) => uri.startsWith(`${this.uri}/`) && !uri.slice(this.uri.length + 1).includes("/"))
-      .map((uri) => new File(uri));
+    const inside = [...disk.keys()].filter((uri) => uri.startsWith(`${this.uri}/`)).map((uri) => uri.slice(this.uri.length + 1));
+    const folders = [...new Set(inside.filter((rest) => rest.includes("/")).map((rest) => rest.split("/")[0]!))];
+    return [
+      ...inside.filter((rest) => !rest.includes("/")).map((rest) => new File(this, rest)),
+      ...folders.map((name) => new Directory(this, name)),
+    ];
   }
   delete() {
     for (const uri of [...disk.keys()]) if (uri.startsWith(`${this.uri}/`)) disk.delete(uri);

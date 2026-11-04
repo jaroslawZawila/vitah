@@ -60,7 +60,7 @@ describe("notifying the client", () => {
         to: TOKEN,
         title: "Nueva fecha de entrega",
         body: "La entrega prevista de tu vivienda es ahora el 23 de diciembre de 2026.",
-        data: { screen: "obra" },
+        data: { screen: "obra", projectId: project.id },
       },
     ]);
 
@@ -81,11 +81,32 @@ describe("notifying the client", () => {
         to: TOKEN,
         title: "Nuevas fotos de tu obra",
         body: "Tu equipo de ViTAH ha compartido fotos nuevas.",
-        data: { screen: "photos" },
+        data: { screen: "photos", projectId: project.id },
       },
     ]);
     expect(sendPush).toHaveBeenNthCalledWith(2, [
       expect.objectContaining({ title: "Nuevo documento", body: "«Planos» ya está en la app." }),
+    ]);
+  });
+
+  it("names the home when the client has several", async () => {
+    const { tenant, client, project, ctx } = await setup();
+    const older = await createTestProject(tenant.id, { clientUserId: client.id, ref: "VTH-24-007" });
+
+    await addDocument(ctx, older.id);
+    await addPhoto(ctx, project.id);
+
+    expect(sendPush).toHaveBeenNthCalledWith(1, [
+      expect.objectContaining({
+        title: "Nuevo documento · VTH-24-007",
+        data: { screen: "documents", projectId: older.id },
+      }),
+    ]);
+    expect(sendPush).toHaveBeenNthCalledWith(2, [
+      expect.objectContaining({
+        title: `Nuevas fotos de tu obra · ${project.ref}`,
+        data: { screen: "photos", projectId: project.id },
+      }),
     ]);
   });
 

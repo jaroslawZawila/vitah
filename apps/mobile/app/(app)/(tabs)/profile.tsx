@@ -5,14 +5,18 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { AppLanguage } from "@repo/core/contract";
 import { NotificationSettings } from "../../../components/notification-settings";
+import { Marker } from "../../../components/obra-parts";
+import { homeStatus, street, useSeveralHomes } from "../../../components/project-switch";
 import { ToggleRow, styles as rowStyles } from "../../../components/toggle-row";
 import { colors, spacing, type } from "../../../constants/theme";
 import { useAppLock } from "../../../lib/app-lock";
 import { useAuth } from "../../../lib/auth";
 import { useI18n } from "../../../lib/i18n";
+import { useProject } from "../../../lib/use-project";
 
 // Tab "Perfil" — doc/mobile-app-design/A-Settings.dc.html. Help and privacy
-// links are left out until those pages exist.
+// links are left out until those pages exist. A client with several homes
+// also picks the one shown here (A-Viviendas.dc.html, "Mis viviendas").
 
 const LANGUAGES: { id: AppLanguage; label: string }[] = [
   { id: "es", label: "Español" },
@@ -25,6 +29,8 @@ export default function ProfileScreen() {
   const { user, token, signOut } = useAuth();
   const { t, language, setLanguage } = useI18n();
   const lock = useAppLock();
+  const { project: shown, projects = [], select } = useProject();
+  const several = useSeveralHomes();
   const displayName = user?.name || user?.email || "";
 
   return (
@@ -48,6 +54,33 @@ export default function ProfileScreen() {
           {user?.name ? <Text style={[type.subhead, { fontSize: 14 }]}>{user.email}</Text> : null}
         </View>
       </View>
+
+      {several && (
+        <View accessibilityRole="radiogroup">
+          <Text accessibilityRole="header" style={[type.label, styles.sectionLabel]}>
+            {t("homes.title")}
+          </Text>
+          {projects.map((home) => {
+            const selected = home.id === shown?.id;
+            return (
+              <Pressable
+                key={home.id}
+                onPress={() => select(home.id)}
+                accessibilityRole="radio"
+                accessibilityState={{ selected }}
+                style={({ pressed }) => [rowStyles.row, styles.homeRow, pressed && { opacity: 0.6 }]}
+              >
+                <Marker state={selected ? "current" : "todo"} />
+                <View style={{ flex: 1, gap: 3 }}>
+                  <Text style={styles.rowText}>{street(home.address)}</Text>
+                  <Text style={type.meta}>{`${home.ref} · ${homeStatus(home, t, language)}`}</Text>
+                </View>
+                {selected && <Text style={styles.viewing}>{t("homes.viewing")}</Text>}
+              </Pressable>
+            );
+          })}
+        </View>
+      )}
 
       <View style={{ gap: 12 }}>
         <Text style={type.label}>{t("profile.language")}</Text>
@@ -92,7 +125,7 @@ export default function ProfileScreen() {
         )}
       </View>
 
-      {token && <NotificationSettings token={token} />}
+      {token && <NotificationSettings token={token} allHomes={several} />}
 
       <Pressable
         onPress={() => void signOut()}
@@ -134,6 +167,8 @@ const styles = StyleSheet.create({
   segmentSelected: { backgroundColor: colors.blancoCalido },
   segmentText: { fontSize: 15, color: colors.blancoCalido },
   rowText: { flex: 1, fontSize: 15, color: colors.blancoCalido },
+  homeRow: { minHeight: 68, paddingVertical: 10 },
+  viewing: { ...type.label, letterSpacing: 1.8, color: colors.verdeOlivaLight },
   signOut: { minHeight: 52, justifyContent: "center" },
   signOutText: { fontSize: 15, color: colors.destructive },
   version: { textAlign: "center", fontSize: 10, letterSpacing: 3, color: colors.faint },

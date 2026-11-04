@@ -1,5 +1,6 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  createTestPhoto,
   createTestProject,
   createTestTenant,
   createTestUser,
@@ -73,6 +74,19 @@ describe("GET /api/mobile/photos", () => {
         },
       ],
     });
+  });
+
+  it("lists the photos of the client's project asked for", async () => {
+    const { client, photoId, token } = await setup();
+    const other = await createTestProject(client.tenantId!, { clientUserId: client.id, obraStage: 8 });
+    const older = await createTestPhoto(client.tenantId!, other.id);
+
+    const ids = async (query = "") =>
+      (await (await list(request(token, query))).json()).photos.map((p: { id: string }) => p.id);
+
+    expect(await ids()).toEqual([photoId]);
+    expect(await ids(`?projectId=${other.id}`)).toEqual([older.id]);
+    expect((await list(request(token, "?projectId=someone-elses"))).status).toBe(404);
   });
 
   it("requires a valid token", async () => {

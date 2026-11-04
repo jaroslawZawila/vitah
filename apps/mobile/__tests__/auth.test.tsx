@@ -8,7 +8,7 @@ import { clearDocuments } from "../lib/document-store";
 import { clearHitoFiles } from "../lib/hito-files";
 import { secureStore } from "../test-utils/secure-store";
 
-jest.mock("../lib/api", () => ({ api: { signIn: jest.fn(), getProject: jest.fn() } }));
+jest.mock("../lib/api", () => ({ api: { signIn: jest.fn(), getChanges: jest.fn() } }));
 jest.mock("../lib/document-store", () => ({ clearDocuments: jest.fn() }));
 jest.mock("../lib/hito-files", () => ({ clearHitoFiles: jest.fn() }));
 jest.mock("expo-image", () => ({
@@ -77,6 +77,9 @@ describe("AuthProvider", () => {
   it("clears the session on sign-out", async () => {
     store.set("vitah_token", "stored-token");
     store.set("vitah_user", JSON.stringify(user));
+    // The homes shown on this phone are forgotten too: the next client starts afresh.
+    store.set("vitah_project", "p1");
+    store.set("vitah_project_shown", "p1");
     const { result } = renderHook(useAuth, { wrapper });
     await waitFor(() => expect(result.current.token).toBe("stored-token"));
 
@@ -98,7 +101,7 @@ describe("biometric sign-in", () => {
 
   it("signs back in with the saved session after biometrics", async () => {
     saved();
-    jest.mocked(api.getProject).mockResolvedValue({ ok: true, data: { project: null } });
+    jest.mocked(api.getChanges).mockResolvedValue({ ok: true, data: { changes: null, projects: "" } });
     const { result } = renderHook(() => useAuth(), { wrapper });
     await waitFor(() => expect(result.current.biometric).toBe(true));
 
@@ -129,7 +132,7 @@ describe("biometric sign-in", () => {
 
   it("forgets an expired session and asks for the password", async () => {
     saved();
-    jest.mocked(api.getProject).mockResolvedValue({ ok: false, error: "unauthorized" });
+    jest.mocked(api.getChanges).mockResolvedValue({ ok: false, error: "unauthorized" });
     const { result } = renderHook(() => useAuth(), { wrapper });
     await waitFor(() => expect(result.current.biometric).toBe(true));
 

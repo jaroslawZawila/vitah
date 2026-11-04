@@ -13,11 +13,11 @@ const mockPush = jest.fn();
 jest.mock("../lib/auth", () => ({
   useAuth: () => ({ token: "tok", user: { name: "Ana" }, signOut: mockSignOut }),
 }));
-jest.mock("../lib/api", () => ({ api: { getProject: jest.fn(), getObra: jest.fn(), listPhotos: jest.fn() } }));
+jest.mock("../lib/api", () => ({ api: { listProjects: jest.fn(), getObra: jest.fn(), listPhotos: jest.fn() } }));
 jest.mock("expo-router", () => ({ useRouter: () => ({ push: mockPush }) }));
 
 const getObra = jest.mocked(api.getObra);
-const getProject = jest.mocked(api.getProject);
+const listProjects = jest.mocked(api.listProjects);
 
 const project: Project = {
   id: "p1",
@@ -25,6 +25,8 @@ const project: Project = {
   address: "El Llordal, Castrillón",
   startDate: "2026-05-04",
   completionDate: "2027-02-05",
+  handedOver: false,
+  progressPct: 33,
 };
 
 const Obra = () => (
@@ -39,7 +41,7 @@ const Obra = () => (
 
 beforeEach(() => {
   jest.clearAllMocks();
-  getProject.mockResolvedValue({ ok: true, data: { project } });
+  listProjects.mockResolvedValue({ ok: true, data: { projects: [project] } });
   getObra.mockResolvedValue({ ok: true, data: { obra } });
   jest.mocked(api.listPhotos).mockResolvedValue({ ok: true, data: { photos: [] } });
 });
@@ -101,7 +103,7 @@ describe("ObraScreen", () => {
     view.unmount();
 
     getObra.mockResolvedValue({ ok: true, data: { obra: null } });
-    getProject.mockResolvedValue({ ok: true, data: { project: null } });
+    listProjects.mockResolvedValue({ ok: true, data: { projects: [] } });
     render(<Obra />);
     expect(await screen.findByText(/Todavía no tienes un proyecto asignado/)).toBeOnTheScreen();
   });

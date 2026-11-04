@@ -1,18 +1,14 @@
-import { and, asc, db, eq, isClientUser, isNotNull, isNull, projects, users } from "@repo/db";
-import { isUniqueViolation } from "./accounts";
-import { toCalendarDate } from "./calendar";
+import { and, asc, db, eq, isClientUser, isNotNull, projects, users } from "@repo/db";
 import { markChanged } from "./changes";
 import { requireAdmin, type Ctx } from "./context";
-import { CHANGE_AREAS, type ClientOption, type MobileProject, type ProjectClientError } from "./contract";
+import { CHANGE_AREAS, type ClientOption, type ProjectClientError } from "./contract";
 import { CoreError } from "./errors";
-import { clientDates } from "./planning-calc";
-import { approvedPlanDates } from "./planning-data";
 
 // ─── Project client access ────────────────────────────────────────────────────
 // A "client" is the homeowner of a project. They sign in to the mobile app
-// only, and each client is attached to at most one project. Clients are
-// created on the Clients tab (./clients.ts); here an admin picks one for a
-// project or removes them from it.
+// only, and a client may be attached to several projects (the app shows one
+// at a time: ./client-projects.ts). Clients are created on the Clients tab
+// (./clients.ts); here an admin picks one for a project or removes them from it.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const STATUS: Record<ProjectClientError, number> = {
@@ -20,7 +16,6 @@ const STATUS: Record<ProjectClientError, number> = {
   project_not_found: 404,
   client_not_found: 404,
   client_already_attached: 409,
-  client_has_project: 409,
   no_client: 404,
   forbidden: 403,
 };
@@ -37,45 +32,9 @@ export function projectInTenant(tenantId: string, projectId: string) {
   return and(eq(projects.id, projectId), eq(projects.tenantId, tenantId));
 }
 
-/** The project attached to a mobile-app client. */
-export function clientProjectWhere(tenantId: string, clientUserId: string) {
-  return and(eq(projects.tenantId, tenantId), eq(projects.clientUserId, clientUserId));
-}
-
-/**
- * The project attached to a client, in the mobile app's shape. Called with the
- * client's own identity (from their mobile token), not a staff `Ctx`. Its
- * dates are the ones the client is told: the approved plan's start and end
- * (the handover), else the dates staff set on the project.
- */
-export async function getClientProject(
-  tenantId: string,
-  clientUserId: string,
-): Promise<MobileProject | null> {
-  const project = await db.query.projects.findFirst({
-    where: clientProjectWhere(tenantId, clientUserId),
-    columns: { id: true, ref: true, address: true, startDate: true, completionDate: true },
-  });
-  if (!project) return null;
-
-  return {
-    id: project.id,
-    ref: project.ref,
-    address: project.address,
-    ...clientDates(await approvedPlanDates(tenantId, project.id), {
-      startDate: toCalendarDate(project.startDate),
-      completionDate: toCalendarDate(project.completionDate),
-    }),
-  };
-}
-
 export type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
-/**
- * Throws `client_not_found` unless `clientId` is an active client of the
- * tenant. Whether they're free is enforced by the unique `client_user_id`
- * (see `clientConflict`).
- */
+/** Throws `client_not_found` unless `clientId` is an active client of the tenant. */
 export async function requireAssignableClient(tx: Tx, tenantId: string, clientId: string) {
   const client = await tx.query.users.findFirst({
     where: and(
@@ -89,29 +48,14 @@ export async function requireAssignableClient(tx: Tx, tenantId: string, clientId
   if (!client) fail("client_not_found");
 }
 
-/** Maps "client already on another project" to `client_has_project`. */
-export function clientConflict(error: unknown): unknown {
-  return isUniqueViolation(error, "projects_client_user_unique")
-    ? new CoreError("client_has_project", STATUS.client_has_project)
-    : error;
-}
-
-/** Active clients of the tenant that aren't attached to any project yet. */
+/** Every active client of the tenant: one may have several projects. */
 export async function listAssignableClients(ctx: Ctx): Promise<ClientOption[]> {
   requireAdmin(ctx);
 
   return db
     .select({ id: users.id, name: users.name, email: users.email })
     .from(users)
-    .leftJoin(projects, eq(projects.clientUserId, users.id))
-    .where(
-      and(
-        eq(users.tenantId, ctx.tenantId),
-        isClientUser,
-        eq(users.active, true),
-        isNull(projects.id),
-      ),
-    )
+    .where(and(eq(users.tenantId, ctx.tenantId), isClientUser, eq(users.active, true)))
     .orderBy(asc(users.name), asc(users.email));
 }
 
@@ -126,26 +70,22 @@ export async function assignProjectClient(
   const clientId = text(input.clientId);
   if (!clientId) fail("missing_fields");
 
-  try {
-    await db.transaction(async (tx) => {
-      const [project] = await tx
-        .select({ clientUserId: projects.clientUserId })
-        .from(projects)
-        .where(projectInTenant(ctx.tenantId, projectId))
-        .for("update");
-      if (!project) fail("project_not_found");
-      if (project.clientUserId) fail("client_already_attached");
+  await db.transaction(async (tx) => {
+    const [project] = await tx
+      .select({ clientUserId: projects.clientUserId })
+      .from(projects)
+      .where(projectInTenant(ctx.tenantId, projectId))
+      .for("update");
+    if (!project) fail("project_not_found");
+    if (project.clientUserId) fail("client_already_attached");
 
-      await requireAssignableClient(tx, ctx.tenantId, clientId);
+    await requireAssignableClient(tx, ctx.tenantId, clientId);
 
-      await tx
-        .update(projects)
-        .set({ clientUserId: clientId, updatedAt: new Date() })
-        .where(eq(projects.id, projectId));
-    });
-  } catch (error) {
-    throw clientConflict(error);
-  }
+    await tx
+      .update(projects)
+      .set({ clientUserId: clientId, updatedAt: new Date() })
+      .where(eq(projects.id, projectId));
+  });
   // A client removed and attached again between two polls still reloads.
   await markChanged(ctx.tenantId, projectId, CHANGE_AREAS);
 
@@ -154,7 +94,7 @@ export async function assignProjectClient(
 
 /**
  * Detaches the project's client. Their account stays (see the Clients tab);
- * the app just shows them no project until they get another one.
+ * the app shows them their other projects, or none until they get another one.
  */
 export async function unassignProjectClient(ctx: Ctx, projectId: string) {
   requireAdmin(ctx);

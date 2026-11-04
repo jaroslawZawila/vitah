@@ -25,7 +25,7 @@ export const PROJECT_STEPS: readonly WizardStep<ProjectDraft, ProjectFlowOptions
     Summary: ClientSummary,
     // Optional: "no client" is a valid choice.
     isComplete: () => true,
-    errorCodes: ["client_not_found", "client_has_project", "forbidden"],
+    errorCodes: ["client_not_found", "forbidden"],
     when: (options) => options.canAssignClient,
   },
 ];

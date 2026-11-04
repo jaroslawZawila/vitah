@@ -145,7 +145,6 @@
         "project_not_found": "Proyecto no encontrado.",
         "client_not_found": "Cliente no encontrado o inactivo.",
         "client_already_attached": "Este proyecto ya tiene un cliente.",
-        "client_has_project": "Este cliente ya está asignado a otro proyecto.",
         "no_client": "Este proyecto no tiene ningún cliente asignado.",
         "forbidden": "Solo los administradores pueden gestionar el acceso."
       }
@@ -337,7 +336,6 @@
       "invalid_date": "Introduce una fecha válida.",
       "generic": "No se ha podido crear el proyecto. Inténtalo de nuevo.",
       "client_not_found": "El cliente ya no está disponible. Elige otro.",
-      "client_has_project": "Ese cliente ya está asignado a otro proyecto. Elige otro.",
       "forbidden": "Solo los administradores pueden asignar clientes.",
       "dates_out_of_order": "La fecha de finalización no puede ser anterior a la de inicio.",
       "too_long": "La referencia o la dirección son demasiado largas."
@@ -349,7 +347,7 @@
       "noneHint": "Se puede asignar más tarde",
       "search": "Buscar cliente",
       "searchPlaceholder": "Nombre o email",
-      "noClients": "No hay clientes libres. Créalos en la pestaña Clientes.",
+      "noClients": "No hay clientes. Créalos en la pestaña Clientes.",
       "noMatches": "Ningún cliente coincide con la búsqueda."
     }
   },
