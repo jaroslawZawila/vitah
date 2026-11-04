@@ -290,7 +290,7 @@ export const CONTINGENCY_LINE = "20.01";
  * Lines are priced at cost; the PEC adds gastos asociados and beneficio
  * industrial on top (`unitPrice` in obra-calc.ts). A new budget starts from these.
  */
-export const DEFAULT_MARGINS = { overheadBp: 1300, profitBp: 600 };
+export const DEFAULT_MARGINS = { overheadBp: 1600, profitBp: 600 };
 
 export const OPTION_KINDS = ["extra", "alternative", "deduction"] as const;
 export type OptionKind = (typeof OPTION_KINDS)[number];

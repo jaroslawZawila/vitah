@@ -61,7 +61,7 @@ describe("/api/v1/projects/:id/budget", () => {
     const { revisionId } = await created.json();
     expect((await patchRevision(patch({ vatRateBp: 1000 }), routeParams({ id, revisionId }))).status).toBe(200);
     // Priced at cost, with gastos asociados and beneficio industrial on top (in %).
-    expect((await read()).revision).toMatchObject({ overheadBp: 1300, profitBp: 600 });
+    expect((await read()).revision).toMatchObject({ overheadBp: 1600, profitBp: 600 });
     expect((await patchRevision(patch({ overheadPct: 10, profitPct: 5 }), routeParams({ id, revisionId }))).status).toBe(200);
     expect((await patchRevision(patch({ profitPct: -1 }), routeParams({ id, revisionId }))).status).toBe(400);
     // One review check at a time.
@@ -140,7 +140,7 @@ describe("/api/v1/projects/:id/budget", () => {
 
     expect((await accept(post({ acceptedBy: "Ana", chosenOptionIds: [optionId] }), routeParams({ id, revisionId }))).status).toBe(200);
     const accepted = (await read()).revision;
-    expect(accepted).toMatchObject({ status: "accepted", acceptedBy: "Ana", contractTotalCents: accepted.totalCents + 3_005_319 }); // the pool × 1,13 ÷ 0,94
+    expect(accepted).toMatchObject({ status: "accepted", acceptedBy: "Ana", contractTotalCents: accepted.totalCents + 3_085_106 }); // the pool × 1,16 ÷ 0,94
   }, 60_000);
 
   it("records that the client rejected an issued revision", async () => {

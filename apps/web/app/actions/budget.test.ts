@@ -77,7 +77,7 @@ describe("budget actions", () => {
     expect(draft.chapters.map((c) => c.code)).toHaveLength(20);
 
     expect(await updateRevisionAction(project.id, draft.id, { contingencyPct: 4, builtAreaM2: 200 })).toEqual({ success: true });
-    // The margins, in % of the cost (a new budget starts at 13 % + 6 %).
+    // The margins, in % of the cost (a new budget starts at 16 % + 6 %).
     expect(await updateRevisionAction(project.id, draft.id, { overheadPct: 12, profitPct: 6 })).toEqual({ success: true });
     expect(await updateRevisionAction(project.id, draft.id, { profitPct: 101 })).toEqual({ error: "invalid_input" });
     expect(await updateRevisionAction(project.id, draft.id, { reviewed: { key: "annex:i1", done: true } })).toEqual({ success: true });

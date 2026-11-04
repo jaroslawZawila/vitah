@@ -76,7 +76,7 @@ describe("createBudget", () => {
     const revision = budget.revision!;
     expect(revision).toMatchObject({ reference: "036/2026", vatRateBp: 1000, model: "framer20", contingencyBp: 500, options: [] });
     // Priced at cost: gastos asociados and beneficio industrial go on top.
-    expect(revision).toMatchObject({ overheadBp: 1300, profitBp: 600, costCents: 0, overheadCents: 0, profitCents: 0 });
+    expect(revision).toMatchObject({ overheadBp: 1600, profitBp: 600, costCents: 0, overheadCents: 0, profitCents: 0 });
     expect(revision.chapters.map((c) => [c.code, c.name])).toEqual(BUDGET_CHAPTER_CODES.map((code) => [code, CHAPTER_NAMES[code]]));
     // Chapter 20 is one computed line, at 0 while 01–19 are empty.
     expect(revision.chapters[19]!.lines).toMatchObject([{ code: "20.01", source: "computed", amountCents: 0 }]);
