@@ -97,7 +97,7 @@ jobs:
       - name: Scan the whole history
         run: |
           "$RUNNER_TEMP/gitleaks" git --redact --verbose --no-banner --exit-code 1 \
-            --gitleaks-ignore-path .github .
+            --config .github/gitleaks.toml --gitleaks-ignore-path .github .
 
   # Not blocking: the audit has open advisories today (see the job's log), so
   # a red result here must not hide the gate's. Make it blocking once it is clean.

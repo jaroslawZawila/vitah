@@ -1,0 +1,17 @@
+# Secret scan settings (the "Secret scan" job of .github/workflows/ci.yml).
+# The default rules, plus one exception: tests are full of made-up secrets
+# (authenticator secrets, recovery codes, tokens, password hashes), which the
+# two generic rules cannot tell from real ones. Those two rules skip test
+# files; every rule for a specific provider's key still applies there.
+title = "ViTAH"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Made-up values in test fixtures: generic rules only"
+targetRules = ["generic-api-key", "jwt"]
+paths = [
+  '''(^|/)(test|__tests__)/''',
+  '''\.test\.(ts|tsx)$''',
+]
