@@ -9,6 +9,7 @@ import {
 import { files } from "@repo/core/testing";
 import { seedObra } from "@repo/core/seed";
 import { signInAs } from "../../test/session";
+import { NOT_FOUND, TO_LOGIN } from "../../test/navigation";
 import {
   addCheckAction,
   cancelPaymentAction,
@@ -75,14 +76,14 @@ describe("reading the obra", () => {
     expect(hito).toMatchObject({ hito: { code: "H4", events: [] }, photos: [{ id: photo.id }], canManage: true });
   });
 
-  it("returns null for another tenant's project or when signed out", async () => {
+  it("is not found for another tenant's project, and the login page when signed out", async () => {
     const { project } = await setup();
     await setup();
-    expect(await getProjectObra(project.id)).toBeNull();
-    expect(await getProjectChapter(project.id, "05")).toBeNull();
+    await expect(getProjectObra(project.id)).rejects.toEqual(NOT_FOUND);
+    await expect(getProjectChapter(project.id, "05")).rejects.toEqual(NOT_FOUND);
 
     signInAs(null);
-    expect(await getProjectObra(project.id)).toBeNull();
+    await expect(getProjectObra(project.id)).rejects.toEqual(TO_LOGIN);
   });
 });
 

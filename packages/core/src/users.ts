@@ -1,13 +1,20 @@
 import { db, users, and, eq, isStaffUser, STAFF_ROLES } from "@repo/db";
-import { EMAIL_PATTERN, hashPassword, isUniqueViolation } from "./accounts";
+import {
+  changeOwnPassword,
+  EMAIL_PATTERN,
+  hashPassword,
+  isUniqueViolation,
+  newPassword,
+  replacePassword,
+} from "./accounts";
 import { requireAdmin, type Ctx, type UserRole } from "./context";
-import { isAppLanguage, MIN_PASSWORD_LENGTH } from "./contract";
+import { isAppLanguage } from "./contract";
 import { invalid, notFound } from "./errors";
 import { MAX_TEXT, text } from "./input";
 
 // Staff management within the caller's tenant. Admin only. Clients (mobile
 // app users) are managed from their project (./project-client.ts). Except
-// `getMe` / `updateMe`: every staff user's own settings.
+// `getMe` / `updateMe` / `changeMyPassword`: every staff user's own settings.
 
 function role(value: unknown): UserRole | undefined {
   return STAFF_ROLES.includes(value as UserRole) ? (value as UserRole) : undefined;
@@ -35,7 +42,8 @@ export type UserListItem = Awaited<ReturnType<typeof listUsers>>[number];
 
 /**
  * Body: { email, name, password, role }. The portal login finds staff by
- * email alone, so a staff email is unique across tenants (any case).
+ * email alone, so a staff email is unique across tenants (any case). The
+ * password must meet the policy (`weak_password` otherwise).
  */
 export async function createUser(ctx: Ctx, input: Record<string, unknown>) {
   requireAdmin(ctx);
@@ -50,7 +58,7 @@ export async function createUser(ctx: Ctx, input: Record<string, unknown>) {
   if (!email || !name || !password || !userRole)
     throw invalid("missing_fields");
   if (!EMAIL_PATTERN.test(email)) throw invalid("invalid_email");
-  if (password.length < MIN_PASSWORD_LENGTH) throw invalid("password_too_short");
+  newPassword(password);
 
   try {
     const [created] = await db
@@ -90,6 +98,10 @@ export async function updateUser(
   if (input.active !== undefined) {
     if (typeof input.active !== "boolean") throw invalid("invalid_active");
     set.active = input.active;
+    // Deactivating signs the user out for good: the sessions they had don't
+    // come back if the account is activated again (`passwordChangedAt` is
+    // when sessions were last revoked; see @repo/auth's ./session.ts).
+    if (!input.active) set.passwordChangedAt = set.updatedAt;
   }
 
   // An admin can't demote or deactivate themselves — that could leave the
@@ -136,6 +148,25 @@ export async function updateUser(
   });
 }
 
+/**
+ * An admin sets a new password for another staff user of the tenant, e.g. one
+ * forgotten or leaked. Body: { password }, within the policy. Signs that user
+ * out everywhere (`replacePassword`). Not for the admin's own: that needs the
+ * current password (`changeMyPassword`). The password is only ever stored
+ * hashed: it is never returned or logged.
+ */
+export async function resetUserPassword(ctx: Ctx, userId: string, input: Record<string, unknown>) {
+  requireAdmin(ctx);
+  if (userId === ctx.userId) throw invalid("cannot_reset_own_password");
+
+  const updated = await replacePassword(
+    and(eq(users.id, userId), eq(users.tenantId, ctx.tenantId), isStaffUser),
+    newPassword(input.password),
+  );
+  if (updated.length === 0) throw notFound();
+  return { id: userId };
+}
+
 /** The caller's own row: they must still be active staff of their tenant. */
 const self = (ctx: Ctx) =>
   and(eq(users.id, ctx.userId), eq(users.tenantId, ctx.tenantId), eq(users.active, true), isStaffUser);
@@ -166,4 +197,16 @@ export async function updateMe(ctx: Ctx, input: Record<string, unknown>) {
     .returning(ME);
   if (!me) throw notFound();
   return me;
+}
+
+/**
+ * The caller changes their own password. Body: { currentPassword, newPassword }:
+ * the current one must be right (`wrong_password`; `too_many_attempts` after
+ * ten wrong ones), the new one within the policy (`weak_password`) and another
+ * one (`same_password`). Signs the caller out everywhere, this session
+ * included: the portal signs it in again (see `changePasswordAction`).
+ */
+export async function changeMyPassword(ctx: Ctx, input: Record<string, unknown>) {
+  await changeOwnPassword(self(ctx), ctx.userId, input, { refuseSame: true });
+  return { success: true };
 }

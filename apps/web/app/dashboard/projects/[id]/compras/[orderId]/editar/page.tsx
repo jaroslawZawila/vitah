@@ -1,4 +1,5 @@
 import { notFound, redirect } from "next/navigation";
+import { forbidden } from "@/lib/access";
 import { getPurchaseForm } from "../../../../../../actions/purchasing";
 import { orderHref } from "../../../components/purchasing/links";
 import OrderFormScreen from "../../OrderFormScreen";
@@ -8,6 +9,8 @@ export default async function EditPurchaseOrderPage({ params }: { params: Promis
   const { id, orderId } = await params;
   const result = await getPurchaseForm(id, orderId);
   if (!result?.form.editing) notFound();
-  if (!result.canManage || result.form.editing.status === "cancelled") redirect(orderHref(id, orderId));
+  if (!result.canManage) forbidden();
+  // A cancelled order is no longer edited: its page says so.
+  if (result.form.editing.status === "cancelled") redirect(orderHref(id, orderId));
   return <OrderFormScreen projectId={id} form={result.form} />;
 }

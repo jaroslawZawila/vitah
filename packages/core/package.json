@@ -6,6 +6,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./contract": "./src/contract.ts",
+    "./log": "./src/log.ts",
+    "./health": "./src/health.ts",
     "./obra-calc": "./src/obra-calc.ts",
     "./control-calc": "./src/control-calc.ts",
     "./planning-calc": "./src/planning-calc.ts",

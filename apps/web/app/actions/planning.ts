@@ -13,9 +13,9 @@ export async function getPlanning(projectId: string) {
   return result && { planning: result.data, canManage: result.canManage };
 }
 
-/** The open draft; null when there is none (or it can't be read). */
+/** The open draft; null when there is none: the editor then goes back to the plan. */
 export async function getPlanningDraft(projectId: string) {
-  const result = await read((ctx) => svc.getPlanningDraft(ctx, projectId));
+  const result = await read((ctx) => svc.getPlanningDraft(ctx, projectId), { optional: true });
   return result && { draft: result.data, canManage: result.canManage };
 }
 

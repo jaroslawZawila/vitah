@@ -1,0 +1,105 @@
+{
+  "$comment": "Differences between a database and schema.ts that `pnpm db:drift` accepts, each with its reason. Format: packages/db/sql/README.md, \"Drift check\".",
+  "ignore": [
+    {
+      "item": "table project_activity_log",
+      "reason": "Legacy, from before the project model was cut down (commit c20b19f): no code reads it; kept on purpose (owner's decision, additive-only on production). Dropping it needs the owner's go-ahead."
+    },
+    {
+      "item": "table project_invoices",
+      "reason": "Legacy, from before the project model was cut down (commit c20b19f): no code reads it; kept on purpose (owner's decision, additive-only on production). Dropping it needs the owner's go-ahead."
+    },
+    {
+      "item": "table project_material_orders",
+      "reason": "Legacy, from before the project model was cut down (commit c20b19f): no code reads it; kept on purpose (owner's decision, additive-only on production). Dropping it needs the owner's go-ahead."
+    },
+    {
+      "item": "table project_milestones",
+      "reason": "Legacy, from before the project model was cut down (commit c20b19f): no code reads it; kept on purpose (owner's decision, additive-only on production). Dropping it needs the owner's go-ahead."
+    },
+    {
+      "item": "table project_quality_checks",
+      "reason": "Legacy, from before the project model was cut down (commit c20b19f): no code reads it; kept on purpose (owner's decision, additive-only on production). Dropping it needs the owner's go-ahead."
+    },
+    {
+      "item": "table project_tasks",
+      "reason": "Legacy, from before the project model was cut down (commit c20b19f): no code reads it; kept on purpose (owner's decision, additive-only on production). Dropping it needs the owner's go-ahead."
+    },
+    {
+      "item": "column projects.advisor_id",
+      "reason": "Legacy, from before the project model was cut down (commit c20b19f): no code reads it; kept on purpose (owner's decision, additive-only on production). Dropping it needs the owner's go-ahead."
+    },
+    {
+      "item": "column projects.area_m2",
+      "reason": "Legacy, from before the project model was cut down (commit c20b19f): no code reads it; kept on purpose (owner's decision, additive-only on production). Dropping it needs the owner's go-ahead."
+    },
+    {
+      "item": "column projects.budget_total",
+      "reason": "Legacy, from before the project model was cut down (commit c20b19f): no code reads it; kept on purpose (owner's decision, additive-only on production). Dropping it needs the owner's go-ahead."
+    },
+    {
+      "item": "column projects.client_name",
+      "reason": "Legacy, from before the project model was cut down (commit c20b19f): no code reads it; kept on purpose (owner's decision, additive-only on production). Dropping it needs the owner's go-ahead."
+    },
+    {
+      "item": "column projects.construction_week_current",
+      "reason": "Legacy, from before the project model was cut down (commit c20b19f): no code reads it; kept on purpose (owner's decision, additive-only on production). Dropping it needs the owner's go-ahead."
+    },
+    {
+      "item": "column projects.construction_week_total",
+      "reason": "Legacy, from before the project model was cut down (commit c20b19f): no code reads it; kept on purpose (owner's decision, additive-only on production). Dropping it needs the owner's go-ahead."
+    },
+    {
+      "item": "column projects.phase",
+      "reason": "Legacy, from before the project model was cut down (commit c20b19f): no code reads it; kept on purpose (owner's decision, additive-only on production). Dropping it needs the owner's go-ahead."
+    },
+    {
+      "item": "column projects.progress_pct",
+      "reason": "Legacy, from before the project model was cut down (commit c20b19f): no code reads it; kept on purpose (owner's decision, additive-only on production). Dropping it needs the owner's go-ahead."
+    },
+    {
+      "item": "column projects.quality_level",
+      "reason": "Legacy, from before the project model was cut down (commit c20b19f): no code reads it; kept on purpose (owner's decision, additive-only on production). Dropping it needs the owner's go-ahead."
+    },
+    {
+      "item": "column projects.type",
+      "reason": "Legacy, from before the project model was cut down (commit c20b19f): no code reads it; kept on purpose (owner's decision, additive-only on production). Dropping it needs the owner's go-ahead."
+    },
+    {
+      "item": "foreign key projects(advisor_id) -> users(id)",
+      "reason": "Legacy, from before the project model was cut down (commit c20b19f): no code reads it; kept on purpose (owner's decision, additive-only on production). Dropping it needs the owner's go-ahead."
+    },
+    {
+      "item": "enum invoice_status",
+      "reason": "Legacy, from before the project model was cut down (commit c20b19f): no code reads it; kept on purpose (owner's decision, additive-only on production). Dropping it needs the owner's go-ahead."
+    },
+    {
+      "item": "enum milestone_status",
+      "reason": "Legacy, from before the project model was cut down (commit c20b19f): no code reads it; kept on purpose (owner's decision, additive-only on production). Dropping it needs the owner's go-ahead."
+    },
+    {
+      "item": "enum order_status",
+      "reason": "Legacy, from before the project model was cut down (commit c20b19f): no code reads it; kept on purpose (owner's decision, additive-only on production). Dropping it needs the owner's go-ahead."
+    },
+    {
+      "item": "enum project_phase",
+      "reason": "Legacy, from before the project model was cut down (commit c20b19f): no code reads it; kept on purpose (owner's decision, additive-only on production). Dropping it needs the owner's go-ahead."
+    },
+    {
+      "item": "enum project_type",
+      "reason": "Legacy, from before the project model was cut down (commit c20b19f): no code reads it; kept on purpose (owner's decision, additive-only on production). Dropping it needs the owner's go-ahead."
+    },
+    {
+      "item": "enum qc_result",
+      "reason": "Legacy, from before the project model was cut down (commit c20b19f): no code reads it; kept on purpose (owner's decision, additive-only on production). Dropping it needs the owner's go-ahead."
+    },
+    {
+      "item": "enum task_priority",
+      "reason": "Legacy, from before the project model was cut down (commit c20b19f): no code reads it; kept on purpose (owner's decision, additive-only on production). Dropping it needs the owner's go-ahead."
+    },
+    {
+      "item": "enum task_status",
+      "reason": "Legacy, from before the project model was cut down (commit c20b19f): no code reads it; kept on purpose (owner's decision, additive-only on production). Dropping it needs the owner's go-ahead."
+    }
+  ]
+}

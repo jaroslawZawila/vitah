@@ -1,0 +1,34 @@
+# The smoke test done by hand after every deploy, run by itself: Vercel's
+# GitHub integration records each deployment here, and reports it as a success
+# once it is ready.
+name: Smoke test
+
+on:
+  deployment_status:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    name: Smoke test production
+    # Preview deployments and the "pending" / "failure" reports are skipped.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.deployment_status.state == 'success' &&
+      github.event.deployment.environment == 'Production')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      # Vercel reports the deployment ready a moment before portal.vitah.es
+      # points at it.
+      - name: Wait for the domain to move to the new deployment
+        if: github.event_name == 'deployment_status'
+        run: sleep 30
+
+      - run: scripts/smoke.sh https://portal.vitah.es

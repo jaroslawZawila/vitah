@@ -28,7 +28,7 @@ export default function SetPasswordForm({
   return (
     <form action={action} className={cardVariants()} aria-labelledby="password-form-title">
       <h2 id="password-form-title">{t("title", { name: displayName(client) })}</h2>
-      <PasswordField id="client-new-password" label={t("password")} />
+      <PasswordField label={t("password")} />
       <FormError namespace="clientsPage.errors" error={error} />
       <FormActions>
         <Button type="button" variant="outline" onClick={onCancel}>

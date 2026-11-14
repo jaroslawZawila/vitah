@@ -5,8 +5,10 @@ import type { MobileSession } from "@repo/core/contract";
 
 // ─── POST /api/mobile/auth ────────────────────────────────────────────────────
 // Credentials auth for the mobile app (client users only). Returns a signed
-// JWT (30d) + user data. Throttled: too many failures for the email or from
-// the IP answer 429 { error: "too_many_attempts" } for a while.
+// JWT (30d) + user data. Throttled like the portal's sign-in (the scheme is in
+// @repo/core/throttle): too many failures from the caller's IP, for the email
+// or altogether, answer 429 { error: "too_many_attempts" } for a while;
+// failures from elsewhere never refuse the right password.
 // For social login, add POST /api/mobile/auth/social — same response shape.
 // ─────────────────────────────────────────────────────────────────────────────
 

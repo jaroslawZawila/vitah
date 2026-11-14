@@ -4,9 +4,10 @@
 // live in packages/core/src/projects.ts (shared with /api/v1);
 // this file only resolves the session and revalidates portal pages.
 
-import { budgetOverviewService, CoreError, projectsService as svc, type Ctx } from "@repo/core";
-import { getSessionContext } from "@repo/auth/context";
+import { budgetOverviewService, CoreError, projectsService as svc } from "@repo/core";
 import { revalidatePath } from "next/cache";
+import { notFound } from "next/navigation";
+import { requireSession } from "../../lib/access";
 
 export type { ProjectDetail } from "@repo/core";
 
@@ -15,12 +16,6 @@ export type ProjectFormState = {
   success?: boolean;
   id?: string;
 } | null;
-
-async function requireAuth(): Promise<Ctx> {
-  const ctx = await getSessionContext();
-  if (!ctx) throw new Error("Unauthorized");
-  return ctx;
-}
 
 /** Maps expected core failures to `{ error: code }` for the form. */
 async function formResult(
@@ -34,28 +29,32 @@ async function formResult(
   }
 }
 
+// The reads send a signed-out caller to the login page (`requireSession`),
+// like `read` in ./run.
+
+/** The tenant's projects. */
 export async function getProjects() {
-  const ctx = await getSessionContext();
-  if (!ctx) return [];
-  return svc.listProjects(ctx);
+  return svc.listProjects(await requireSession());
 }
 
 /** The project list: every project with its budget's state (Presupuesto filter and pill). */
 export async function getProjectList() {
-  const ctx = await getSessionContext();
-  if (!ctx) return [];
-  return budgetOverviewService.listProjectsWithBudget(ctx);
+  return budgetOverviewService.listProjectsWithBudget(await requireSession());
 }
 
+/**
+ * The project. One that isn't there (deleted, another tenant's, a stale
+ * link) is the "No encontrado" page, never null.
+ */
 export async function getProject(id: string) {
-  const ctx = await getSessionContext();
-  if (!ctx) return null;
-  return svc.getProject(ctx, id);
+  const project = await svc.getProject(await requireSession(), id);
+  if (!project) notFound();
+  return project;
 }
 
 /** Creates a project from the new-project wizard's draft (plain values). */
 export async function createProject(draft: Record<string, unknown>) {
-  const ctx = await requireAuth();
+  const ctx = await requireSession();
   return formResult(async () => {
     const { id } = await svc.createProject(ctx, draft);
     revalidatePath("/dashboard/projects");
@@ -64,7 +63,7 @@ export async function createProject(draft: Record<string, unknown>) {
 }
 
 export async function updateProject(id: string, data: Record<string, unknown>) {
-  const ctx = await requireAuth();
+  const ctx = await requireSession();
   return formResult(async () => {
     await svc.updateProject(ctx, id, data);
     revalidatePath(`/dashboard/projects/${id}`);
@@ -75,7 +74,7 @@ export async function updateProject(id: string, data: Record<string, unknown>) {
 
 /** Archives the project (nothing is erased): it leaves the portal and the client's app. Admins only. */
 export async function deleteProject(id: string) {
-  const ctx = await requireAuth();
+  const ctx = await requireSession();
   return formResult(async () => {
     await svc.deleteProject(ctx, id);
     revalidatePath("/dashboard/projects");

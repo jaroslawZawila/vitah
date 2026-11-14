@@ -1,4 +1,4 @@
-import { redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { getProjects } from "../../../../actions/projects";
 import { getRequests } from "../../../../actions/purchase-requests";
 import { getProjectPurchaseLines, getProjectPurchases } from "../../../../actions/purchasing";
@@ -37,12 +37,12 @@ async function purchasesView(id: string, vista: string | undefined) {
   const header = loadHeader(id);
   if (vista === "solicitudes") {
     const [{ ref, stage, openIssues }, result] = await Promise.all([header, getRequests(id)]);
-    if (!result) redirect("/dashboard/projects");
+    if (!result) notFound();
     return <RequestsScreen projectId={id} header={{ ref, stage, openIssues }} requests={result.requests} canManage={result.canManage} />;
   }
   if (vista === "pedidos") {
     const [{ ref, stage, openIssues, chapters }, result] = await Promise.all([header, getProjectPurchases(id)]);
-    if (!result) redirect("/dashboard/projects");
+    if (!result) notFound();
     return (
       <PurchasesScreen
         projectId={id}
@@ -54,6 +54,6 @@ async function purchasesView(id: string, vista: string | undefined) {
     );
   }
   const [{ ref, stage, openIssues }, result] = await Promise.all([header, getProjectPurchaseLines(id)]);
-  if (!result) redirect("/dashboard/projects");
+  if (!result) notFound();
   return <PurchaseLinesScreen projectId={id} header={{ ref, stage, openIssues }} lines={result.lines} canManage={result.canManage} />;
 }

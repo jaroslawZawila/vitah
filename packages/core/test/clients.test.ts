@@ -8,7 +8,7 @@ const validInput = {
   firstName: "Ana",
   surnames: "García López",
   email: "ana@example.com",
-  password: "s3cret-pass",
+  password: "S3cret-pass",
   dateOfBirth: "1985-04-12",
   address: "Calle del Sol 5, Santander",
   phone: "+34 600 123 456",
@@ -90,7 +90,9 @@ describe("createClient", () => {
     [{ ...validInput, password: "" }, "missing_fields", 400],
     [{ ...validInput, email: "not-an-email" }, "invalid_email", 400],
     [{ ...validInput, email: `${"a".repeat(200)}@example.com` }, "invalid_email", 400],
-    [{ ...validInput, password: "short" }, "password_too_short", 400],
+    [{ ...validInput, password: "Short1" }, "weak_password", 400],
+    [{ ...validInput, password: "no-uppercase-1" }, "weak_password", 400],
+    [{ ...validInput, password: "No-number-here" }, "weak_password", 400],
     [{ ...validInput, dateOfBirth: "12/04/1985" }, "invalid_date_of_birth", 400],
     [{ ...validInput, dateOfBirth: "1985-02-31" }, "invalid_date_of_birth", 400],
     [{ ...validInput, dateOfBirth: "2999-01-01" }, "invalid_date_of_birth", 400],
@@ -179,25 +181,31 @@ describe("setClientPassword", () => {
     const { id } = await svc.createClient(ctx, validInput);
     await db.insert(pushTokens).values({ token: "ExpoPushToken[lost]", userId: id, tenantId: ctx.tenantId });
 
-    await expect(svc.setClientPassword(ctx, id, { password: "brand-new-pass" })).resolves.toEqual({
+    await expect(svc.setClientPassword(ctx, id, { password: "Brand-new-pass1" })).resolves.toEqual({
       id,
     });
 
     const user = await findUser(validInput.email);
-    expect(await bcrypt.compare("brand-new-pass", user!.passwordHash!)).toBe(true);
+    expect(await bcrypt.compare("Brand-new-pass1", user!.passwordHash!)).toBe(true);
     // Signs the client out of the app on every phone, pushes included.
     expect(user!.passwordChangedAt).toBeInstanceOf(Date);
     expect(await db.select().from(pushTokens).where(eq(pushTokens.userId, id))).toEqual([]);
   });
 
-  it("rejects a short password", async () => {
-    const { ctx } = await setup();
-    const { id } = await svc.createClient(ctx, validInput);
+  it.each(["Short1", "no-uppercase-1", "No-number-here", undefined])(
+    "rejects the password %j: the policy is the same for everyone",
+    async (password) => {
+      const { ctx } = await setup();
+      const { id } = await svc.createClient(ctx, validInput);
 
-    await expect(svc.setClientPassword(ctx, id, { password: "short" })).rejects.toMatchObject({
-      code: "password_too_short",
-    });
-  });
+      await expect(svc.setClientPassword(ctx, id, { password })).rejects.toMatchObject({
+        code: "weak_password",
+        status: 400,
+      });
+      const user = await findUser(validInput.email);
+      expect(await bcrypt.compare(validInput.password, user!.passwordHash!)).toBe(true);
+    },
+  );
 
   it("does not touch staff or other tenants' clients", async () => {
     const a = await setup();
@@ -205,10 +213,10 @@ describe("setClientPassword", () => {
     const { id } = await svc.createClient(a.ctx, validInput);
 
     await expect(
-      svc.setClientPassword(b.ctx, id, { password: "brand-new-pass" }),
+      svc.setClientPassword(b.ctx, id, { password: "Brand-new-pass1" }),
     ).rejects.toMatchObject({ code: "not_found", status: 404 });
     await expect(
-      svc.setClientPassword(a.ctx, a.admin.id, { password: "brand-new-pass" }),
+      svc.setClientPassword(a.ctx, a.admin.id, { password: "Brand-new-pass1" }),
     ).rejects.toMatchObject({ code: "not_found" });
   });
 
@@ -217,7 +225,7 @@ describe("setClientPassword", () => {
     const { id } = await svc.createClient(ctx, validInput);
 
     await expect(
-      svc.setClientPassword({ ...ctx, role: "viewer" }, id, { password: "brand-new-pass" }),
+      svc.setClientPassword({ ...ctx, role: "viewer" }, id, { password: "Brand-new-pass1" }),
     ).rejects.toMatchObject({ code: "forbidden" });
   });
 });

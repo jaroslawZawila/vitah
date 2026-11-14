@@ -1,4 +1,3 @@
-import { redirect } from "next/navigation";
 import { getProjectDocuments } from "../../../../actions/documents";
 import { getProject } from "../../../../actions/projects";
 import DocumentsScreen from "./DocumentsScreen";
@@ -14,10 +13,6 @@ export default async function ProjectDocumentsPage({
     getProject(id),
     getProjectDocuments(id),
   ]);
-
-  if (!project) {
-    redirect("/dashboard/projects");
-  }
 
   return (
     <DocumentsScreen

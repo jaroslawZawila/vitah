@@ -40,6 +40,7 @@
     },
     "purchases": "Compras",
     "settings": "Ajustes",
+    "changePassword": "Cambiar contraseña",
     "language": {
       "label": "Idioma",
       "es": "Español",
@@ -53,6 +54,33 @@
       "dueCount": "{count, plural, one {# factura vencida o por vencer} other {# facturas vencidas o por vencer}}",
       "requests": "Solicitudes",
       "suppliers": "Proveedores"
+    }
+  },
+  "account": {
+    "passwordPolicy": "Mínimo {min} caracteres, con al menos una mayúscula y un número.",
+    "changePassword": {
+      "title": "Cambiar contraseña",
+      "description": "Al cambiarla se cierra tu sesión en los demás dispositivos; en este sigues dentro.",
+      "current": "Contraseña actual",
+      "new": "Nueva contraseña",
+      "repeat": "Repite la nueva contraseña",
+      "save": "Cambiar contraseña",
+      "saving": "Guardando…",
+      "cancel": "Cancelar",
+      "close": "Cerrar",
+      "done": "Entendido",
+      "success": "Contraseña cambiada. Tu sesión se ha cerrado en los demás dispositivos.",
+      "signedOut": "Contraseña cambiada. Hemos cerrado todas tus sesiones: inicia sesión de nuevo con la nueva contraseña.",
+      "signIn": "Iniciar sesión",
+      "errors": {
+        "missing_fields": "Completa los tres campos.",
+        "wrong_password": "La contraseña actual no es correcta.",
+        "weak_password": "La nueva contraseña no cumple los requisitos: longitud mínima, una mayúscula y un número.",
+        "same_password": "La nueva contraseña debe ser distinta de la actual.",
+        "mismatch": "Las dos contraseñas nuevas no coinciden.",
+        "too_many_attempts": "Demasiados intentos fallidos. Espera unos minutos e inténtalo de nuevo.",
+        "generic": "No se ha podido cambiar la contraseña. Inténtalo de nuevo."
+      }
     }
   },
   "topbar": {
@@ -224,7 +252,9 @@
     "actions": {
       "changeRole": "Cambiar rol",
       "deactivate": "Desactivar",
-      "activate": "Activar"
+      "activate": "Activar",
+      "resetPassword": "Restablecer contraseña",
+      "resetPasswordFor": "Restablecer contraseña de {name}"
     },
     "inviteForm": {
       "title": "Nuevo Usuario",
@@ -233,7 +263,6 @@
       "emailLabel": "Correo electrónico",
       "emailPlaceholder": "usuario@vitah.es",
       "passwordLabel": "Contraseña temporal",
-      "passwordPlaceholder": "Mínimo 8 caracteres",
       "roleLabel": "Rol",
       "submit": "Crear usuario",
       "submitting": "Creando…",
@@ -242,7 +271,10 @@
     "errors": {
       "missing_fields": "Todos los campos son obligatorios.",
       "email_exists": "Ya existe un usuario con este correo.",
-      "password_too_short": "La contraseña debe tener al menos 8 caracteres.",
+      "weak_password": "La contraseña no cumple los requisitos: longitud mínima, una mayúscula y un número.",
+      "cannot_reset_own_password": "Tu propia contraseña se cambia desde Ajustes › Cambiar contraseña.",
+      "not_found": "Usuario no encontrado.",
+      "forbidden": "Solo los administradores pueden gestionar usuarios.",
       "cannot_modify_self": "No puedes cambiar tu propio rol ni desactivar tu cuenta.",
       "last_admin": "La organización debe tener al menos un administrador activo.",
       "generic": "Error al procesar la solicitud.",
@@ -250,7 +282,17 @@
       "too_long": "El nombre o el correo son demasiado largos."
     },
     "success": {
-      "created": "Usuario creado correctamente."
+      "created": "Usuario creado correctamente.",
+      "passwordReset": "Contraseña de {name} restablecida. Sus sesiones se han cerrado."
+    },
+    "resetPassword": {
+      "title": "Nueva contraseña para {name}",
+      "description": "Se cerrarán todas sus sesiones. Compártela de forma segura: no se volverá a mostrar.",
+      "password": "Nueva contraseña",
+      "save": "Restablecer contraseña",
+      "saving": "Guardando…",
+      "cancel": "Cancelar",
+      "close": "Cerrar"
     }
   },
   "clientsPage": {
@@ -283,7 +325,7 @@
       "address": "Dirección",
       "email": "Email",
       "password": "Contraseña de la app",
-      "passwordHint": "Mínimo {min} caracteres. Compártela con el cliente de forma segura.",
+      "passwordHint": "Compártela con el cliente de forma segura.",
       "create": "Crear cliente",
       "creating": "Creando…",
       "cancel": "Cancelar"
@@ -299,7 +341,7 @@
       "invalid_email": "Introduce un email válido.",
       "invalid_date_of_birth": "Introduce una fecha de nacimiento válida.",
       "invalid_phone": "Introduce un teléfono válido.",
-      "password_too_short": "La contraseña debe tener al menos 8 caracteres.",
+      "weak_password": "La contraseña no cumple los requisitos: longitud mínima, una mayúscula y un número.",
       "email_exists": "Este email ya está en uso.",
       "not_found": "Cliente no encontrado.",
       "forbidden": "Solo los administradores pueden gestionar clientes."
@@ -3774,5 +3816,26 @@
       "none": "Sin presupuesto",
       "failed": "La IA no terminó"
     }
+  },
+  "errorPages": {
+    "error": {
+      "eyebrow": "Error",
+      "title": "Algo ha fallado",
+      "text": "No hemos podido cargar esta página. Vuelve a intentarlo; si sigue fallando, indica a soporte el código de abajo.",
+      "retry": "Reintentar",
+      "digest": "Código del error"
+    },
+    "notFound": {
+      "eyebrow": "404",
+      "title": "No encontrado",
+      "text": "Lo que buscas no existe, se ha eliminado o no tienes acceso."
+    },
+    "forbidden": {
+      "eyebrow": "403",
+      "title": "No tienes permiso",
+      "text": "Tu usuario no puede ver ni cambiar esto. Si lo necesitas, pide acceso a un administrador."
+    },
+    "toProjects": "Volver a Proyectos",
+    "loading": "Cargando…"
   }
 }

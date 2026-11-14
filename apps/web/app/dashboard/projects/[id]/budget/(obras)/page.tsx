@@ -1,11 +1,11 @@
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { getProjectDocuments } from "../../../../../actions/documents";
 import { getProjectObra } from "../../../../../actions/obra";
 import { getProject } from "../../../../../actions/projects";
 import { getProjectBudget } from "../../../../../actions/budget";
 import BudgetScreen from "../BudgetScreen";
 import BudgetStartScreen from "../BudgetStartScreen";
-import type { BudgetTab } from "../../components/budget/links";
+import { TAB_PATH, budgetHref, type BudgetTab } from "../../components/budget/links";
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -14,7 +14,8 @@ type PageProps = {
 
 /**
  * Loads what every Budget page needs and shows `tab`; before there is a
- * budget, the start (documents and the AI). `?revision=<id>` shows an older one.
+ * budget, the start (documents and the AI). `?revision=<id>` shows an older
+ * one; a revision that isn't there (a stale link) shows the newest instead.
  */
 export async function budgetPage({ params, searchParams }: PageProps, tab: BudgetTab) {
   const [{ id }, { revision, chapter }] = await Promise.all([params, searchParams]);
@@ -26,8 +27,11 @@ export async function budgetPage({ params, searchParams }: PageProps, tab: Budge
     getProjectDocuments(id),
     tab === "conditions" ? hitos() : null,
   ]);
-  if (!project) redirect("/dashboard/projects");
-  if (!result) redirect(`/dashboard/projects/${id}/budget`);
+  if (!result) {
+    // A stale `?revision=`: the same tab without it, which is the newest revision. Not an error.
+    if (revision) redirect(budgetHref(id, TAB_PATH[tab], null, chapter ? { chapter } : {}));
+    notFound();
+  }
   const inputs = documents.filter((d) => d.budgetInput);
   const { budget, canManage } = result;
 

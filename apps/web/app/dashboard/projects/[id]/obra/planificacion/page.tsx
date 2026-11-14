@@ -1,4 +1,4 @@
-import { redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { getPlanning } from "../../../../../actions/planning";
 import { loadHeader } from "../load";
 import PlanningScreen from "./PlanningScreen";
@@ -7,6 +7,6 @@ import PlanningScreen from "./PlanningScreen";
 export default async function ObraPlanningPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const [result, header] = await Promise.all([getPlanning(id), loadHeader(id)]);
-  if (!result) redirect("/dashboard/projects");
+  if (!result) notFound();
   return <PlanningScreen projectId={id} header={header} planning={result.planning} canManage={result.canManage} />;
 }

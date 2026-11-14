@@ -8,6 +8,7 @@ import {
 } from "@repo/db/testing";
 import { files } from "@repo/core/testing";
 import { signInAs } from "../../test/session";
+import { NOT_FOUND, TO_LOGIN } from "../../test/navigation";
 import {
   addProjectDocumentAction,
   deleteProjectDocumentAction,
@@ -96,14 +97,21 @@ describe("document actions", () => {
     expect(await deleteProjectDocumentAction(project.id, doc.id)).toEqual({ error: "not_found" });
   });
 
-  it("lists nothing for another tenant's project or when signed out", async () => {
+  it("lists nothing only for a project without documents", async () => {
+    const { project } = await setup("viewer");
+
+    expect(await getProjectDocuments(project.id)).toEqual({ documents: [], canManage: false });
+  });
+
+  it("is \"No encontrado\" for another tenant's project or a missing one, and the login page when signed out", async () => {
     const { tenant, project } = await setup();
     await createTestDocument(tenant.id, project.id);
 
     await setup();
-    expect((await getProjectDocuments(project.id)).documents).toEqual([]);
+    await expect(getProjectDocuments(project.id)).rejects.toEqual(NOT_FOUND);
+    await expect(getProjectDocuments("no-such-project")).rejects.toEqual(NOT_FOUND);
 
     signInAs(null);
-    expect(await getProjectDocuments(project.id)).toEqual({ documents: [], canManage: false });
+    await expect(getProjectDocuments(project.id)).rejects.toEqual(TO_LOGIN);
   });
 });

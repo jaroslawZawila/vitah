@@ -1,14 +1,15 @@
 import { auth } from "../../auth";
-import { redirect } from "next/navigation";
+import { redirect, unstable_rethrow } from "next/navigation";
 import { getLocale } from "next-intl/server";
 import { isAppLanguage } from "@repo/core/contract";
 import { DEFAULT_LOCALE } from "../../i18n/locale";
+import { logError } from "../../lib/log";
 import { NavigationTracker } from "./components/BackLink";
 import Sidebar from "./components/Sidebar";
 import Topbar from "./components/Topbar";
 import { getPurchasingCounts } from "../actions/purchase-invoices";
 import { getSubcontractorCounts } from "../actions/subcontractors";
-import { setLanguageAction } from "../actions/users";
+import { changePasswordAction, setLanguageAction } from "../actions/users";
 
 export default async function DashboardLayout({
   children,
@@ -21,7 +22,9 @@ export default async function DashboardLayout({
   // Only badges: a failure here (e.g. its tables not yet migrated) must not take the portal down.
   const badges = <T,>(load: Promise<T>) =>
     load.catch((error: unknown) => {
-      console.error(error);
+      // Not a failure: a read sending the visitor on (to the login page, say).
+      unstable_rethrow(error);
+      logError("dashboard.badges_failed", error);
       return null;
     });
   const [subcontractors, purchases] = await Promise.all([badges(getSubcontractorCounts()), badges(getPurchasingCounts())]);
@@ -37,6 +40,7 @@ export default async function DashboardLayout({
         purchases={purchases}
         language={isAppLanguage(locale) ? locale : DEFAULT_LOCALE}
         onLanguageChange={setLanguageAction}
+        onPasswordChange={changePasswordAction}
       />
       <div className="flex min-w-0 flex-col">
         <Topbar />

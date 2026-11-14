@@ -63,7 +63,7 @@ export default function ClientForm({
           <Label htmlFor="client-email">{t("email")}</Label>
           <Input id="client-email" name="email" type="email" required autoComplete="off" />
         </Field>
-        <PasswordField id="client-password" label={t("password")} />
+        <PasswordField label={t("password")} />
       </div>
       <FormError namespace="clientsPage.errors" error={error} />
       <FormActions>

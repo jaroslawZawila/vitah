@@ -1,7 +1,7 @@
 export { canDecideRequest, canEdit, requireAdmin, requireEditor, type Ctx, type UserRole } from "./context";
 export { CoreError, notFound, forbidden, invalid } from "./errors";
 export { hashPassword, normalizeEmail } from "./accounts";
-export { clearAttempts, overLimit } from "./throttle";
+export { countSignIn, SIGN_IN_LIMITS } from "./throttle";
 export * from "./contract";
 export * as projectsService from "./projects";
 export type { ProjectListItem, ProjectDetail } from "./projects";
@@ -34,3 +34,4 @@ export * as planningService from "./planning";
 export * as changesService from "./changes";
 export * as subcontractorsService from "./subcontractors";
 export * as subcontractorWorkersService from "./subcontractor-workers";
+export * as healthService from "./health";

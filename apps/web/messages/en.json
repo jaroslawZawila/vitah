@@ -40,6 +40,7 @@
     },
     "purchases": "Purchasing",
     "settings": "Settings",
+    "changePassword": "Change password",
     "language": {
       "label": "Language",
       "es": "Spanish",
@@ -53,6 +54,33 @@
       "dueCount": "{count, plural, one {# invoice overdue or due soon} other {# invoices overdue or due soon}}",
       "requests": "Requests",
       "suppliers": "Suppliers"
+    }
+  },
+  "account": {
+    "passwordPolicy": "At least {min} characters, with an uppercase letter and a number.",
+    "changePassword": {
+      "title": "Change password",
+      "description": "Changing it signs you out on your other devices; you stay signed in on this one.",
+      "current": "Current password",
+      "new": "New password",
+      "repeat": "Repeat the new password",
+      "save": "Change password",
+      "saving": "Saving…",
+      "cancel": "Cancel",
+      "close": "Close",
+      "done": "Done",
+      "success": "Password changed. You have been signed out on your other devices.",
+      "signedOut": "Password changed. All your sessions were closed: sign in again with the new password.",
+      "signIn": "Sign in",
+      "errors": {
+        "missing_fields": "Fill in the three fields.",
+        "wrong_password": "The current password is not correct.",
+        "weak_password": "The new password doesn't meet the requirements: minimum length, an uppercase letter and a number.",
+        "same_password": "The new password must be different from the current one.",
+        "mismatch": "The two new passwords don't match.",
+        "too_many_attempts": "Too many failed attempts. Wait a few minutes and try again.",
+        "generic": "The password could not be changed. Try again."
+      }
     }
   },
   "topbar": {
@@ -224,7 +252,9 @@
     "actions": {
       "changeRole": "Change role",
       "deactivate": "Deactivate",
-      "activate": "Activate"
+      "activate": "Activate",
+      "resetPassword": "Reset password",
+      "resetPasswordFor": "Reset the password of {name}"
     },
     "inviteForm": {
       "title": "New User",
@@ -233,7 +263,6 @@
       "emailLabel": "Email",
       "emailPlaceholder": "user@vitah.es",
       "passwordLabel": "Temporary password",
-      "passwordPlaceholder": "Minimum 8 characters",
       "roleLabel": "Role",
       "submit": "Create user",
       "submitting": "Creating…",
@@ -242,7 +271,10 @@
     "errors": {
       "missing_fields": "All fields are required.",
       "email_exists": "A user with this email already exists.",
-      "password_too_short": "Password must be at least 8 characters.",
+      "weak_password": "The password doesn't meet the requirements: minimum length, an uppercase letter and a number.",
+      "cannot_reset_own_password": "Change your own password from Settings › Change password.",
+      "not_found": "User not found.",
+      "forbidden": "Only admins can manage users.",
       "cannot_modify_self": "You can't change your own role or deactivate your own account.",
       "last_admin": "The organisation must keep at least one active administrator.",
       "generic": "Error processing the request.",
@@ -250,7 +282,17 @@
       "too_long": "The name or email is too long."
     },
     "success": {
-      "created": "User created successfully."
+      "created": "User created successfully.",
+      "passwordReset": "Password of {name} reset. Their sessions were closed."
+    },
+    "resetPassword": {
+      "title": "New password for {name}",
+      "description": "All their sessions will be closed. Share it securely: it won't be shown again.",
+      "password": "New password",
+      "save": "Reset password",
+      "saving": "Saving…",
+      "cancel": "Cancel",
+      "close": "Close"
     }
   },
   "clientsPage": {
@@ -283,7 +325,7 @@
       "address": "Address",
       "email": "Email",
       "password": "App password",
-      "passwordHint": "At least {min} characters. Share it with the client securely.",
+      "passwordHint": "Share it with the client securely.",
       "create": "Create client",
       "creating": "Creating…",
       "cancel": "Cancel"
@@ -299,7 +341,7 @@
       "invalid_email": "Enter a valid email.",
       "invalid_date_of_birth": "Enter a valid date of birth.",
       "invalid_phone": "Enter a valid phone number.",
-      "password_too_short": "The password must be at least 8 characters.",
+      "weak_password": "The password doesn't meet the requirements: minimum length, an uppercase letter and a number.",
       "email_exists": "This email is already in use.",
       "not_found": "Client not found.",
       "forbidden": "Only admins can manage clients."
@@ -3774,5 +3816,26 @@
       "none": "No budget",
       "failed": "AI didn't finish"
     }
+  },
+  "errorPages": {
+    "error": {
+      "eyebrow": "Error",
+      "title": "Something went wrong",
+      "text": "We couldn't load this page. Try again; if it keeps failing, give support the code below.",
+      "retry": "Try again",
+      "digest": "Error code"
+    },
+    "notFound": {
+      "eyebrow": "404",
+      "title": "Not found",
+      "text": "What you are looking for doesn't exist, was deleted, or you don't have access to it."
+    },
+    "forbidden": {
+      "eyebrow": "403",
+      "title": "You don't have permission",
+      "text": "Your user can't see or change this. If you need it, ask an administrator for access."
+    },
+    "toProjects": "Back to Projects",
+    "loading": "Loading…"
   }
 }

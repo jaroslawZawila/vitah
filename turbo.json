@@ -6,7 +6,7 @@
       "dependsOn": ["^build"],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
       "outputs": [".next/**", "!.next/cache/**", "app/.well-known/workflow/**"],
-      "env": ["POSTGRES_URL"]
+      "env": ["POSTGRES_URL", "POSTGRES_URL_NON_POOLING", "MIGRATE_URL", "MIGRATE_ON_DEPLOY", "VERCEL_ENV"]
     },
     "db:push": {
       "cache": false,

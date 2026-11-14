@@ -9,16 +9,18 @@ import {
   type Ctx,
   type ProjectClientError,
 } from "@repo/core";
-import { getSessionContext } from "@repo/auth/context";
 import { revalidatePath } from "next/cache";
+import { requireSession } from "../../lib/access";
+import { read } from "./run";
 
 export type ClientAccessState = { error?: ProjectClientError; success?: boolean } | null;
 
-/** Clients the admin can pick for a project; empty for everyone else. */
+/**
+ * Clients the admin can pick for a project. Admins only, like the Clients
+ * page: a page asks only for an admin, anyone else gets "No tienes permiso".
+ */
 export async function getAssignableClients() {
-  const ctx = await getSessionContext();
-  if (!ctx || ctx.role !== "admin") return [];
-  return svc.listAssignableClients(ctx);
+  return (await read((ctx) => svc.listAssignableClients(ctx)))?.data ?? [];
 }
 
 /** Runs a core mutation; returns `{ error: code }` for expected failures. */
@@ -26,8 +28,7 @@ async function mutate(
   projectId: string,
   fn: (ctx: Ctx) => Promise<unknown>,
 ): Promise<ClientAccessState> {
-  const ctx = await getSessionContext();
-  if (!ctx) throw new Error("Unauthorized");
+  const ctx = await requireSession();
   try {
     await fn(ctx);
   } catch (err) {

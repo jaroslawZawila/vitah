@@ -1,5 +1,6 @@
 import { and, asc, budgetRevisions, db, eq, isNotNull, isNull, lt, projectDocuments, projects, sql } from "@repo/db";
 import { CONTINGENCY_CHAPTER, type StageEvidence } from "./contract";
+import { logError } from "./log";
 import { evidenceStage, stageEvidence, todayInSpain } from "./obra-calc";
 import { loadObra } from "./obra-data";
 import { projectInTenant } from "./project-client";
@@ -89,7 +90,7 @@ export async function raiseStage(tenantId: string, projectId: string) {
       .returning({ id: projects.id });
     return raised ? stage : null;
   } catch (error) {
-    console.error("Failed to raise the stage of project", projectId, error);
+    logError("obra.stage_not_raised", error, { projectId });
     return null;
   }
 }

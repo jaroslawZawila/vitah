@@ -2,6 +2,7 @@ import { and, clientSettings, db, eq, inArray, projects, pushTokens, sql, users 
 import { fromCalendarDate } from "./calendar";
 import { settingsOf } from "./client-account";
 import type { AppLanguage } from "./contract";
+import { logError } from "./log";
 import { projectInTenant } from "./project-client";
 import { sendPush } from "./push";
 
@@ -88,6 +89,6 @@ export async function notifyProjectClient(tenantId: string, projectId: string, e
       await db.delete(pushTokens).where(inArray(pushTokens.token, unregistered));
     }
   } catch (error) {
-    console.error("Failed to notify the client of project", projectId, error);
+    logError("notifications.push_failed", error, { projectId });
   }
 }

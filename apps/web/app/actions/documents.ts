@@ -5,30 +5,24 @@
 
 import {
   CoreError,
-  canEdit,
   documentsService as svc,
   type DocumentError,
   type ProjectDocument,
 } from "@repo/core";
-import { getSessionContext } from "@repo/auth/context";
-import { mutate } from "./run";
+import { requireSession } from "../../lib/access";
+import { mutate, read } from "./run";
 
 export type DocumentsState = { error?: DocumentError; success?: boolean } | null;
 
 /**
- * The project's documents and whether the caller may upload/delete. Empty
- * when signed out or the project isn't in the tenant.
+ * The project's documents and whether the caller may upload/delete. A
+ * project that isn't the tenant's is the "No encontrado" page (`read`).
  */
 export async function getProjectDocuments(
   projectId: string,
 ): Promise<{ documents: ProjectDocument[]; canManage: boolean }> {
-  const ctx = await getSessionContext();
-  if (!ctx) return { documents: [], canManage: false };
-  const documents = await svc.listDocuments(ctx, projectId).catch((err: unknown) => {
-    if (err instanceof CoreError) return [];
-    throw err;
-  });
-  return { documents, canManage: canEdit(ctx.role) };
+  const result = await read((ctx) => svc.listDocuments(ctx, projectId));
+  return { documents: result?.data ?? [], canManage: result?.canManage ?? false };
 }
 
 export async function addProjectDocumentAction(
@@ -55,8 +49,7 @@ export async function budgetInputUploadAction(
   projectId: string,
   filename: string,
 ): Promise<{ pathname?: string; error?: DocumentError }> {
-  const ctx = await getSessionContext();
-  if (!ctx) throw new Error("Unauthorized");
+  const ctx = await requireSession();
   try {
     return { pathname: (await svc.budgetInputUpload(ctx, projectId, filename)).pathname };
   } catch (err) {

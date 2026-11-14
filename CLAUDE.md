@@ -43,6 +43,9 @@ pnpm db:generate                     # Generate migration files
 pnpm db:migrate                      # Apply migrations
 pnpm db:seed                         # Seed tenant, admin, one project + its app client
 pnpm db:studio                       # Open Drizzle Studio (DB browser)
+pnpm db:sql:status                   # Prod migrations: applied / pending (MIGRATE_URL); also db:sql:migrate, db:sql:baseline
+pnpm db:drift                        # Compare a database (DRIFT_URL, read-only) with schema.ts
+scripts/smoke.sh [url]               # The post-deploy smoke test (default https://portal.vitah.es)
 ```
 
 ## Ways of Working
@@ -63,7 +66,11 @@ Every change goes through this, in order. Nothing gets committed until every ste
 4. **Green, then commit.** `pnpm test`, `pnpm exec turbo check-types`, `pnpm exec turbo lint` and the
    portal build (`pnpm exec turbo build --filter=web`) must all pass (DB tests need `pnpm db:up`). A Claude
    Code hook (`.claude/hooks/commit-gate.sh`) runs all four on every `git commit` and blocks the commit if
-   any of them fail. Never bypass it or skip failing tests.
+   any of them fail. Never bypass it or skip failing tests. GitHub Actions runs the same gate on every push and pull
+   request (`.github/workflows/ci.yml`, with a secret scan and a dependency audit), the smoke test after each
+   production deploy (`smoke.yml`) and the health check on a schedule (`health.yml`: every 15 min "is it up", daily
+   "is it fully healthy"; a failure emails the repository owner). The repository is public: no workflow may read a
+   secret, upload an artifact or print data.
 
 ## Tech Stack
 
@@ -180,6 +187,16 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
   title) when there are several and carry `projectId`. Design `doc/mobile-app-design/A-*Viviendas*.dc.html`. Prod SQL:
   `packages/db/sql/2026-11-client-several-projects.sql` (drops `projects_client_user_unique`)
 - Admin-only server actions guarded by `requireAdmin()` check
+- Passwords: one policy for everyone (`MIN_PASSWORD_LENGTH` 10 + an uppercase letter + a digit, `isStrongPassword` in
+  `@repo/core/contract`); existing shorter ones still sign in. Staff change their own in the rail's settings
+  (`changeMyPassword`, `POST /api/v1/me/password`; the browser is signed in again, every other session ends); an admin
+  resets another staff user's on Usuarios (`resetUserPassword`, `PUT /api/v1/users/:id/password`). A change, a reset or
+  a deactivation sets `password_changed_at`: sessions from before it (their `authAt` claim; `iat` for Bearer tokens)
+  stop at the next 60 s re-check (cookie sessions) or request (Bearer), after a 30 s grace so the browser that
+  just changed it is not thrown out (`revokedByPasswordChange` in `@repo/auth`, the one rule for all three)
+- Sign-in throttle (`packages/core/src/throttle.ts`, portal and app): an IP gets 10 failures per email and 100 across
+  emails per window, then is refused even with the right password; failures on one email from elsewhere never lock its
+  owner out, they only cut each IP's allowance for it to 3. Only failures count
 
 ### Database
 
@@ -203,7 +220,32 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
   ref and a supplier's invoice number are unique among the rows not deleted. No restore screen yet: restoring is a
   database change. Drafts (a budget's, a plan's) and rows rewritten while editing are still deleted for real.
   Prod SQL: `packages/db/sql/2026-11-soft-delete.sql`
-- Prod migrations are additive SQL files in `packages/db/sql/`, applied by hand (no plain `db:push` on prod)
+- Prod migrations are SQL files in `packages/db/sql/` (rules in its `README.md`: additive or expand-then-contract,
+  never edit an applied file, new files named `YYYY-MM-DD-HHmm-topic.sql`), recorded once each in the table
+  `schema_migrations` by the runner (`packages/db/src/ops/migrate.ts`): `pnpm db:sql:status | db:sql:migrate |
+  db:sql:baseline` against `MIGRATE_URL`. `apps/web`'s `build` runs `db:sql:deploy` first: it migrates only when
+  `VERCEL_ENV=production` **and** `MIGRATE_ON_DEPLOY=1` (off until set on Vercel; Preview shares production's database
+  and never migrates); otherwise it only says how many files are pending. No plain `db:push` on prod. `pnpm db:drift`
+  (`DRIFT_URL`, read-only) compares a database with `schema.ts`; accepted leftovers are in `packages/db/drift-allow.json`
+
+### Operations (errors, health, logs)
+
+- Pages: `read()` in `app/actions/run.ts` sends a signed-out user to the login page, a missing record to
+  `notFound()` and a forbidden one to `/dashboard/forbidden` (`lib/access.ts`: `requireSession`, `forbidden`); it
+  returns null for a 404 only with `{ optional: true }` (something missing the page expects: no draft yet, a stale
+  `?revision=`), and always for any other `CoreError` (the 400/409 class: neither 403 nor 404), which the page must
+  handle (`if (!result) notFound()`); what is not a `CoreError` is thrown, to the error page. Don't `redirect` on a missing record. `error.tsx`, `not-found.tsx` and
+  `loading.tsx` exist at the root and under `dashboard/` (text in `errorPages`); an error page shows the digest, never
+  the error's message
+- `GET /api/health` (no session, `proxy.ts` lets it through; `healthService` in core): `status` ok | degraded | down
+  (503), `commit`, `checks` `db`, `ai` (`attention`: a budget generation failed in 24 h, a document check pending over
+  an hour, or a tenant at 90 % of its AI limit) and `migrations` (`untracked` until `schema_migrations` exists). No
+  figures, no tenant data; one result is shared for 10 s per instance (2 s when down), each check time-limited in the
+  database
+- Runbooks: `doc/ops/` (deploy, rollback, database, incident, secrets)
+- Logs: one JSON line per event on stderr (`logError` / `logWarn` in `@repo/core/log` and `apps/web/lib/log.ts`;
+  `instrumentation.ts` › `onRequestError` for unhandled server errors). Never a body, cookie, header, email or query
+  string. An API 500 answers `{ "error": "internal_error", "id" }` and logs the same id. No `console.*` in app code
 
 ### Obra (construction process)
 

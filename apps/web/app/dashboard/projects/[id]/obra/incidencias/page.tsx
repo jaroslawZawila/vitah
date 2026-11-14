@@ -1,4 +1,4 @@
-import { redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { getConstructionIssues } from "../../../../../actions/construction";
 import { loadHeader } from "../load";
 import IssuesScreen from "./IssuesScreen";
@@ -7,7 +7,7 @@ import IssuesScreen from "./IssuesScreen";
 export default async function ObraIssuesPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const [header, result] = await Promise.all([loadHeader(id), getConstructionIssues(id)]);
-  if (!result) redirect(`/dashboard/projects/${id}/obra`);
+  if (!result) notFound();
   return (
     <IssuesScreen
       projectId={id}

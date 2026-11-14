@@ -4,6 +4,7 @@ import { purchaseInvoicesService, purchasingService, subcontractorsService } fro
 import { files } from "@repo/core/testing";
 import { seedObra } from "@repo/core/seed";
 import { signInAs } from "../../test/session";
+import { NOT_FOUND, TO_LOGIN } from "../../test/navigation";
 import {
   addOrderDocumentAction,
   addOrderDocumentVersionAction,
@@ -151,8 +152,8 @@ describe("purchasing actions", () => {
     expect(await setPurchaseStatusAction(project.id, "nope", { status: "ordered" })).toEqual({ error: "not_found" });
 
     await setup();
-    expect(await getProjectPurchases(project.id)).toBeNull();
+    await expect(getProjectPurchases(project.id)).rejects.toEqual(NOT_FOUND);
     signInAs(null);
-    expect(await getPurchases()).toBeNull();
+    await expect(getPurchases()).rejects.toEqual(TO_LOGIN);
   });
 });

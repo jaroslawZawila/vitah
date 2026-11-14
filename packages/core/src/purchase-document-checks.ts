@@ -25,6 +25,7 @@ import { aiLimitReached } from "./ai-limit";
 import { ClaudeError, MODELS, structuredCall, type ContentBlock } from "./budget-ai/claude";
 import { requireEditor, type Ctx } from "./context";
 import type { DocumentFinding } from "./contract";
+import { logError } from "./log";
 import { fail } from "./obra-data";
 import { inLiveOrder, projectNotDeleted } from "./project-client";
 import { invoiceAmounts } from "./purchase-calc";
@@ -212,8 +213,8 @@ async function review(ctx: Ctx, check: CheckRow, withAi: boolean) {
   } catch (error) {
     // A duplicate is still worth telling.
     const reason = error instanceof ClaudeError ? error.code : "error";
-    if (!(error instanceof ClaudeError)) console.error("Purchase document check failed", error);
-    return finish({ status: "failed", findings: duplicates, reason }).catch((cause: unknown) => console.error("Purchase document check not saved", cause));
+    if (!(error instanceof ClaudeError)) logError("purchase.check_failed", error, { checkId: check.id });
+    return finish({ status: "failed", findings: duplicates, reason }).catch((cause: unknown) => logError("purchase.check_not_saved", cause, { checkId: check.id }));
   }
 }
 

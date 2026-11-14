@@ -1,3 +1,4 @@
+import bcrypt from "bcryptjs";
 import { beforeEach, describe, expect, it } from "vitest";
 import { db, eq, users } from "@repo/db";
 import { createTestTenant, createTestUser, resetDatabase } from "@repo/db/testing";
@@ -57,7 +58,7 @@ describe("usersService and clients", () => {
       svc.createUser(ctx, {
         email: "new@example.com",
         name: "New",
-        password: "long-enough",
+        password: "Long-enough1",
         role: "client",
       }),
     ).rejects.toMatchObject({ code: "missing_fields" });
@@ -69,7 +70,7 @@ describe("usersService and clients", () => {
     await svc.createUser(ctx, {
       email: "new@example.com",
       name: "New",
-      password: "long-enough",
+      password: "Long-enough1",
       role: "manager",
     });
 
@@ -80,7 +81,7 @@ describe("usersService and clients", () => {
 });
 
 describe("createUser emails", () => {
-  const input = { name: "New", password: "long-enough", role: "manager" };
+  const input = { name: "New", password: "Long-enough1", role: "manager" };
 
   it("stores the email lower-cased and trimmed", async () => {
     const { ctx } = await setup();
@@ -167,5 +168,223 @@ describe("usersService: the caller's own settings", () => {
     await expect(svc.getMe(ctx)).rejects.toMatchObject({ code: "not_found" });
     await expect(svc.updateMe(ctx, { language: "en" })).rejects.toMatchObject({ code: "not_found" });
     expect((await reload(admin.id))?.language).toBeNull();
+  });
+});
+
+describe("the password policy on staff accounts", () => {
+  const input = { email: "new@example.com", name: "New", role: "manager" };
+
+  it.each([
+    ["Short1Aa", "under 10 characters"],
+    ["no-uppercase-1", "no uppercase letter"],
+    ["No-number-here", "no number"],
+  ])("refuses to create a user with the password %j (%s)", async (password) => {
+    const { ctx } = await setup();
+
+    await expect(svc.createUser(ctx, { ...input, password })).rejects.toMatchObject({
+      code: "weak_password",
+      status: 400,
+    });
+    expect(await db.query.users.findFirst({ where: eq(users.email, input.email) })).toBeUndefined();
+  });
+
+  it("applies to new passwords only: an account with an older, shorter one is untouched", async () => {
+    const { tenant, ctx } = await setup();
+    // Set when the minimum was 8 characters.
+    const old = await createTestUser(tenant.id, { role: "viewer", password: "old-pass" });
+
+    await svc.updateUser(ctx, old.id, { role: "manager" });
+
+    const row = await reload(old.id);
+    expect(await bcrypt.compare("old-pass", row!.passwordHash!)).toBe(true);
+    expect(row!.passwordChangedAt).toBeNull();
+  });
+});
+
+describe("changeMyPassword", () => {
+  const CURRENT = "old-pass"; // from before the policy: still the one to enter
+  const NEXT = "CasaNordica26";
+
+  async function viewer() {
+    const { tenant, admin } = await setup();
+    const user = await createTestUser(tenant.id, { role: "viewer", password: CURRENT });
+    const ctx: Ctx = { tenantId: tenant.id, userId: user.id, role: "viewer" };
+    return { tenant, admin, user, ctx };
+  }
+
+  it("changes the caller's own password and notes when", async () => {
+    const { admin, user, ctx } = await viewer();
+    const before = Date.now();
+
+    expect(await svc.changeMyPassword(ctx, { currentPassword: CURRENT, newPassword: NEXT })).toEqual({
+      success: true,
+    });
+
+    const row = await reload(user.id);
+    expect(await bcrypt.compare(NEXT, row!.passwordHash!)).toBe(true);
+    expect(await bcrypt.compare(CURRENT, row!.passwordHash!)).toBe(false);
+    // What revokes the sessions and tokens issued before it.
+    expect(row!.passwordChangedAt!.getTime()).toBeGreaterThanOrEqual(before);
+    expect((await reload(admin.id))?.passwordChangedAt).toBeNull();
+  });
+
+  it.each([
+    ["missing_fields", { currentPassword: "", newPassword: NEXT }],
+    ["missing_fields", { newPassword: NEXT }],
+    ["missing_fields", { currentPassword: CURRENT }],
+    ["missing_fields", { currentPassword: CURRENT, newPassword: 12345678901 }],
+    ["wrong_password", { currentPassword: "not-this-one", newPassword: NEXT }],
+    ["weak_password", { currentPassword: CURRENT, newPassword: "Short1Aa" }],
+    ["weak_password", { currentPassword: CURRENT, newPassword: "no-uppercase-1" }],
+    ["weak_password", { currentPassword: CURRENT, newPassword: "No-number-here" }],
+  ])("rejects %s with 400, keeping the password and the sessions", async (code, input) => {
+    const { user, ctx } = await viewer();
+
+    await expect(svc.changeMyPassword(ctx, input)).rejects.toMatchObject({ code, status: 400 });
+
+    const row = await reload(user.id);
+    expect(await bcrypt.compare(CURRENT, row!.passwordHash!)).toBe(true);
+    expect(row!.passwordChangedAt).toBeNull();
+  });
+
+  it("refuses the same password again", async () => {
+    const { tenant } = await setup();
+    const user = await createTestUser(tenant.id, { role: "manager", password: NEXT });
+    const ctx: Ctx = { tenantId: tenant.id, userId: user.id, role: "manager" };
+
+    await expect(
+      svc.changeMyPassword(ctx, { currentPassword: NEXT, newPassword: NEXT }),
+    ).rejects.toMatchObject({ code: "same_password", status: 400 });
+    expect((await reload(user.id))?.passwordChangedAt).toBeNull();
+  });
+
+  it("refuses more guesses after 10 wrong current passwords, the right one too", async () => {
+    const { user, ctx } = await viewer();
+    for (let i = 0; i < 10; i++) {
+      await expect(
+        svc.changeMyPassword(ctx, { currentPassword: `guess-${i}`, newPassword: NEXT }),
+      ).rejects.toMatchObject({ code: "wrong_password" });
+    }
+
+    await expect(
+      svc.changeMyPassword(ctx, { currentPassword: CURRENT, newPassword: NEXT }),
+    ).rejects.toMatchObject({ code: "too_many_attempts", status: 429 });
+    expect(await bcrypt.compare(CURRENT, (await reload(user.id))!.passwordHash!)).toBe(true);
+  });
+
+  it("is for the caller only: not a deactivated user, a client or another tenant's context", async () => {
+    const { tenant, user, ctx } = await viewer();
+    const input = { currentPassword: CURRENT, newPassword: NEXT };
+    const client = await createTestUser(tenant.id, { role: "client", password: CURRENT });
+    const other = await createTestTenant();
+
+    await expect(
+      svc.changeMyPassword({ ...ctx, userId: client.id }, input),
+    ).rejects.toMatchObject({ code: "not_found" });
+    await expect(
+      svc.changeMyPassword({ ...ctx, tenantId: other.id }, input),
+    ).rejects.toMatchObject({ code: "not_found" });
+    await db.update(users).set({ active: false }).where(eq(users.id, user.id));
+    await expect(svc.changeMyPassword(ctx, input)).rejects.toMatchObject({ code: "not_found" });
+
+    expect(await bcrypt.compare(CURRENT, (await reload(user.id))!.passwordHash!)).toBe(true);
+    expect(await bcrypt.compare(CURRENT, (await reload(client.id))!.passwordHash!)).toBe(true);
+  });
+});
+
+describe("resetUserPassword", () => {
+  const NEXT = "CasaNordica26";
+
+  it("sets another staff user's password and revokes their sessions", async () => {
+    const { tenant, admin, ctx } = await setup();
+    const viewer = await createTestUser(tenant.id, { role: "viewer", password: "old-pass" });
+    const before = Date.now();
+
+    expect(await svc.resetUserPassword(ctx, viewer.id, { password: NEXT })).toEqual({ id: viewer.id });
+
+    const row = await reload(viewer.id);
+    expect(await bcrypt.compare(NEXT, row!.passwordHash!)).toBe(true);
+    expect(row!.passwordChangedAt!.getTime()).toBeGreaterThanOrEqual(before);
+    // The admin's own sessions carry on.
+    expect((await reload(admin.id))?.passwordChangedAt).toBeNull();
+  });
+
+  it("works on a deactivated user too (before letting them back in)", async () => {
+    const { tenant, ctx } = await setup();
+    const viewer = await createTestUser(tenant.id, { role: "viewer", active: false });
+
+    await expect(svc.resetUserPassword(ctx, viewer.id, { password: NEXT })).resolves.toEqual({ id: viewer.id });
+  });
+
+  it.each(["manager", "viewer"] as const)("is admin only (%s is forbidden)", async (role) => {
+    const { tenant, ctx } = await setup();
+    const viewer = await createTestUser(tenant.id, { role: "viewer", password: "old-pass" });
+
+    await expect(
+      svc.resetUserPassword({ ...ctx, role }, viewer.id, { password: NEXT }),
+    ).rejects.toMatchObject({ code: "forbidden", status: 403 });
+    expect(await bcrypt.compare("old-pass", (await reload(viewer.id))!.passwordHash!)).toBe(true);
+  });
+
+  it("finds no one in another tenant, and no client", async () => {
+    const { client, ctx } = await setup();
+    const other = await setup();
+
+    await expect(
+      svc.resetUserPassword(ctx, other.admin.id, { password: NEXT }),
+    ).rejects.toMatchObject({ code: "not_found", status: 404 });
+    await expect(
+      svc.resetUserPassword(ctx, client.id, { password: NEXT }),
+    ).rejects.toMatchObject({ code: "not_found" });
+    expect((await reload(other.admin.id))?.passwordChangedAt).toBeNull();
+    expect((await reload(client.id))?.passwordChangedAt).toBeNull();
+  });
+
+  it("is not for the admin's own password", async () => {
+    const { admin, ctx } = await setup();
+
+    await expect(svc.resetUserPassword(ctx, admin.id, { password: NEXT })).rejects.toMatchObject({
+      code: "cannot_reset_own_password",
+      status: 400,
+    });
+    expect((await reload(admin.id))?.passwordChangedAt).toBeNull();
+  });
+
+  it.each(["Short1Aa", "no-uppercase-1", "No-number-here", undefined, 1234567890])(
+    "refuses the password %j",
+    async (password) => {
+      const { tenant, ctx } = await setup();
+      const viewer = await createTestUser(tenant.id, { role: "viewer", password: "old-pass" });
+
+      await expect(svc.resetUserPassword(ctx, viewer.id, { password })).rejects.toMatchObject({
+        code: "weak_password",
+        status: 400,
+      });
+      expect(await bcrypt.compare("old-pass", (await reload(viewer.id))!.passwordHash!)).toBe(true);
+    },
+  );
+});
+
+describe("deactivating a user", () => {
+  it("revokes their sessions for good: activating them again doesn't bring them back", async () => {
+    const { tenant, ctx } = await setup();
+    const viewer = await createTestUser(tenant.id, { role: "viewer" });
+    const before = Date.now();
+
+    await svc.updateUser(ctx, viewer.id, { active: false });
+    const revokedAt = (await reload(viewer.id))!.passwordChangedAt!;
+    expect(revokedAt.getTime()).toBeGreaterThanOrEqual(before);
+
+    await svc.updateUser(ctx, viewer.id, { active: true });
+    expect((await reload(viewer.id))!.passwordChangedAt).toEqual(revokedAt);
+  });
+
+  it("leaves the sessions alone on a role change", async () => {
+    const { tenant, ctx } = await setup();
+    const viewer = await createTestUser(tenant.id, { role: "viewer" });
+
+    await svc.updateUser(ctx, viewer.id, { role: "manager" });
+
+    expect((await reload(viewer.id))!.passwordChangedAt).toBeNull();
   });
 });

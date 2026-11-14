@@ -16,7 +16,13 @@
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
-    "db:seed": "tsx src/seed.ts"
+    "db:seed": "tsx src/seed.ts",
+    "db:sql:status": "tsx src/ops/migrate-cli.ts status",
+    "db:sql:migrate": "tsx src/ops/migrate-cli.ts migrate",
+    "db:sql:baseline": "tsx src/ops/migrate-cli.ts baseline",
+    "db:sql:deploy": "tsx src/ops/migrate-cli.ts deploy",
+    "db:drift": "tsx src/ops/drift-cli.ts",
+    "test": "vitest run --configLoader runner"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -29,6 +35,7 @@
     "@types/node": "^22.15.3",
     "drizzle-kit": "^0.31.10",
     "tsx": "^4.19.0",
-    "typescript": "5.9.2"
+    "typescript": "5.9.2",
+    "vitest": "^5.0.1"
   }
 }

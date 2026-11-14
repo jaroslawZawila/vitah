@@ -1,4 +1,3 @@
-import bcrypt from "bcryptjs";
 import {
   and,
   clientSettings,
@@ -10,15 +9,9 @@ import {
   pushTokens,
   users,
 } from "@repo/db";
-import { replacePassword } from "./accounts";
-import {
-  isAppLanguage,
-  isStrongPassword,
-  type AccountError,
-  type MobileSettings,
-} from "./contract";
+import { changeOwnPassword } from "./accounts";
+import { isAppLanguage, type AccountError, type MobileSettings } from "./contract";
 import { CoreError } from "./errors";
-import { clearAttempts, overLimit } from "./throttle";
 
 // ─── Client account ──────────────────────────────────────────────────────────
 // What a signed-in client manages themselves in the app's Perfil tab: their
@@ -44,11 +37,9 @@ function fail(code: AccountError): never {
 const clientUser = (tenantId: string, clientUserId: string) =>
   and(eq(users.id, clientUserId), eq(users.tenantId, tenantId), isClientUser);
 
-/** Wrong current passwords a client may enter per throttle window. */
-const PASSWORD_ATTEMPTS = 10;
-
 /**
- * Body: { currentPassword, newPassword }. The new one must pass `isStrongPassword`.
+ * Body: { currentPassword, newPassword }. The new one must pass `isStrongPassword`;
+ * 10 wrong current ones are `too_many_attempts` for a while.
  * Revokes the client's existing mobile tokens (`passwordChangedAt`): the
  * caller hands the app a fresh one.
  */
@@ -57,24 +48,7 @@ export async function changePassword(
   clientUserId: string,
   input: Record<string, unknown>,
 ) {
-  const { currentPassword, newPassword } = input;
-  if (typeof currentPassword !== "string" || typeof newPassword !== "string" || !currentPassword) {
-    fail("missing_fields");
-  }
-  if (!isStrongPassword(newPassword)) fail("weak_password");
-
-  const throttle = [{ key: `password:${clientUserId}`, limit: PASSWORD_ATTEMPTS }];
-  if (await overLimit(throttle)) fail("too_many_attempts");
-
-  const where = clientUser(tenantId, clientUserId);
-  const user = await db.query.users.findFirst({ where, columns: { passwordHash: true } });
-  if (!user) fail("not_found");
-  if (!user.passwordHash || !(await bcrypt.compare(currentPassword, user.passwordHash))) {
-    fail("wrong_password");
-  }
-  await clearAttempts(throttle);
-
-  await replacePassword(where, newPassword);
+  await changeOwnPassword(clientUser(tenantId, clientUserId), clientUserId, input);
   return { success: true };
 }
 

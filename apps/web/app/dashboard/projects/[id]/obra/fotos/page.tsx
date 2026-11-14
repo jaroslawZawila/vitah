@@ -1,4 +1,4 @@
-import { redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { getConstructionPhotos } from "../../../../../actions/construction";
 import { loadHeader } from "../load";
 import PhotosScreen from "./PhotosScreen";
@@ -7,7 +7,7 @@ import PhotosScreen from "./PhotosScreen";
 export default async function ObraPhotosPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const [header, result] = await Promise.all([loadHeader(id), getConstructionPhotos(id)]);
-  if (!result) redirect(`/dashboard/projects/${id}/obra`);
+  if (!result) notFound();
   return (
     <PhotosScreen
       projectId={id}

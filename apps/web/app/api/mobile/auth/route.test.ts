@@ -3,11 +3,12 @@ import { createTestTenant, createTestUser, resetDatabase } from "@repo/db/testin
 import { verifyMobileToken } from "@repo/auth/mobile";
 import { POST } from "./route";
 
-function post(body: unknown) {
+/** `ip`: the caller's address, as the proxy in front reports it. */
+function post(body: unknown, ip?: string) {
   return POST(
     new Request("http://localhost/api/mobile/auth", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...(ip ? { "x-real-ip": ip } : {}) },
       body: typeof body === "string" ? body : JSON.stringify(body),
     }),
   );
@@ -74,17 +75,41 @@ describe("POST /api/mobile/auth", () => {
     },
   );
 
-  it("answers 429 after too many failures for the email", async () => {
+  it("answers 429 to an address after too many failures for the email, the right password included", async () => {
     const tenant = await createTestTenant();
     await createTestUser(tenant.id, { email: "ana@example.com", role: "client", password: "client-pass" });
     for (let i = 0; i < 10; i++) {
-      expect((await post({ email: "ana@example.com", password: `guess-${i}` })).status).toBe(401);
+      expect((await post({ email: "ana@example.com", password: `guess-${i}` }, "6.6.6.6")).status).toBe(401);
     }
 
-    const res = await post({ email: "ana@example.com", password: "client-pass" });
+    const res = await post({ email: "ana@example.com", password: "client-pass" }, "6.6.6.6");
 
     expect(res.status).toBe(429);
     expect(await res.json()).toEqual({ error: "too_many_attempts" });
+  });
+
+  it("still signs the client in from their own address while others fail for their email", async () => {
+    const tenant = await createTestTenant();
+    const client = await createTestUser(tenant.id, { email: "ana@example.com", role: "client", password: "client-pass" });
+    // Past the email's limit of 100, no address past its own 10.
+    for (let i = 0; i < 150; i++) {
+      await post({ email: "ana@example.com", password: `guess-${i}` }, `10.0.0.${Math.floor(i / 10)}`);
+    }
+
+    const res = await post({ email: "ana@example.com", password: "client-pass" }, "1.2.3.4");
+
+    expect(res.status).toBe(200);
+    expect((await res.json()).user).toMatchObject({ id: client.id });
+  });
+
+  it("gives an unknown email the same answers as a wrong password", async () => {
+    for (let i = 0; i < 10; i++) {
+      const res = await post({ email: "nobody@example.com", password: `guess-${i}` }, "6.6.6.6");
+      expect(res.status).toBe(401);
+      expect(await res.json()).toEqual({ error: "invalid_credentials" });
+    }
+
+    expect((await post({ email: "nobody@example.com", password: "x" }, "6.6.6.6")).status).toBe(429);
   });
 
   it("rejects a malformed body", async () => {

@@ -2,14 +2,17 @@ import { NextResponse } from "next/server";
 import { CoreError, type Ctx, type StoredFile } from "@repo/core";
 import { getRequestContext } from "@repo/auth/context";
 import { authenticateMobileRequest, type MobileTokenPayload } from "@repo/auth/mobile";
+import { logError, newErrorId } from "./log";
 
 // Shared plumbing for /api route handlers: resolve the caller, run the core
 // function, and map errors to JSON `{ error: code }` responses. A handler may
-// also return a ready-made `Response` (e.g. a file download).
+// also return a ready-made `Response` (e.g. a file download). An unexpected
+// error answers `{ error: "internal_error", id }`: the id is in the log line
+// (lib/log.ts), for the caller to quote.
 
 const unauthorized = () => NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
-async function respond(handler: () => Promise<unknown>, successStatus: number) {
+async function respond(request: Request, handler: () => Promise<unknown>, successStatus: number) {
   try {
     const data = await handler();
     if (data instanceof Response) return data;
@@ -19,8 +22,9 @@ async function respond(handler: () => Promise<unknown>, successStatus: number) {
     if (err instanceof CoreError) {
       return NextResponse.json({ error: err.code }, { status: err.status });
     }
-    console.error(err);
-    return NextResponse.json({ error: "internal_error" }, { status: 500 });
+    const id = newErrorId();
+    logError("api.internal_error", err, { id, method: request.method, path: new URL(request.url).pathname });
+    return NextResponse.json({ error: "internal_error", id }, { status: 500 });
   }
 }
 
@@ -59,7 +63,7 @@ export async function withContext(
   }
   const ctx = await getRequestContext(request);
   if (!ctx) return unauthorized();
-  return respond(() => handler(ctx), successStatus);
+  return respond(request, () => handler(ctx), successStatus);
 }
 
 /** /api/mobile: a signed-in, still active mobile-app client. */
@@ -69,7 +73,7 @@ export async function withMobileClient(
 ) {
   const client = await authenticateMobileRequest(request);
   if (!client) return unauthorized();
-  return respond(() => handler(client), 200);
+  return respond(request, () => handler(client), 200);
 }
 
 /**

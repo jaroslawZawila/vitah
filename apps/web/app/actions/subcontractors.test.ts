@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createTestProject, createTestTenant, createTestUser, resetDatabase } from "@repo/db/testing";
 import { files } from "@repo/core/testing";
 import { signInAs } from "../../test/session";
+import { NOT_FOUND, TO_LOGIN } from "../../test/navigation";
 import {
   assignSubcontractorAction,
   checkWorkerAccessAction,
@@ -169,20 +170,20 @@ describe("subcontractor actions", () => {
     expect(await removeSubcontractorAssignmentAction(id!, "any-obra")).toEqual({ error: "forbidden" });
   });
 
-  it("returns null for another tenant's company", async () => {
+  it("is not found for another tenant's company", async () => {
     await setup();
     const { id } = (await createSubcontractorAction(company))!;
     await setup();
 
-    expect(await getSubcontractor(id!)).toBeNull();
-    expect(await getWorker("nobody")).toBeNull();
+    await expect(getSubcontractor(id!)).rejects.toEqual(NOT_FOUND);
+    await expect(getWorker("nobody")).rejects.toEqual(NOT_FOUND);
   });
 
-  it("reads nothing and refuses writes when signed out", async () => {
+  it("goes to the login page when signed out, reading or writing", async () => {
     signInAs(null);
 
-    expect(await getSubcontractorsOverview()).toBeNull();
-    expect(await getSubcontractorCounts()).toBeNull();
-    await expect(createSubcontractorAction(company)).rejects.toThrow("Unauthorized");
+    await expect(getSubcontractorsOverview()).rejects.toEqual(TO_LOGIN);
+    await expect(getSubcontractorCounts()).rejects.toEqual(TO_LOGIN);
+    await expect(createSubcontractorAction(company)).rejects.toEqual(TO_LOGIN);
   });
 });

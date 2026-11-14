@@ -1,12 +1,12 @@
 import { canEdit } from "@repo/core";
-import { getSessionContext } from "@repo/auth/context";
+import { requireSession } from "@/lib/access";
 import { getCompanyOptions, getSubcontractorProjects, getWorkers } from "../../../actions/subcontractors";
 import WorkersScreen from "./WorkersScreen";
 
 export default async function WorkersPage({ searchParams }: { searchParams: Promise<{ obra?: string }> }) {
   const { obra = "" } = await searchParams;
   const [ctx, workers, projects, companies] = await Promise.all([
-    getSessionContext(),
+    requireSession(),
     getWorkers(obra || null),
     getSubcontractorProjects(),
     getCompanyOptions(),
@@ -17,7 +17,7 @@ export default async function WorkersPage({ searchParams }: { searchParams: Prom
       projects={projects ?? []}
       companies={companies ?? []}
       projectId={obra}
-      canManage={!!ctx && canEdit(ctx.role)}
+      canManage={canEdit(ctx.role)}
     />
   );
 }

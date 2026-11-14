@@ -2,6 +2,7 @@ import { usersService } from "@repo/core";
 import { getSessionContext } from "@repo/auth/context";
 import { getRequestConfig } from "next-intl/server";
 import { headers } from "next/headers";
+import { logError } from "../lib/log";
 import { resolveLocale } from "./locale";
 
 /** The signed-in staff member's language setting, read fresh: a change shows at once. */
@@ -12,7 +13,7 @@ async function userLanguage() {
     return (await usersService.getMe(ctx)).language ?? undefined;
   } catch (error) {
     // The page still renders, in the browser's language.
-    console.error(error);
+    logError("i18n.language_unread", error);
     return undefined;
   }
 }

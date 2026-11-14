@@ -1,7 +1,8 @@
 import { notFound, redirect } from "next/navigation";
+import { forbidden } from "@/lib/access";
 import { getRequest } from "../../../../../actions/purchase-requests";
 import { getPurchaseForm } from "../../../../../actions/purchasing";
-import { purchasesHref, requestHref } from "../../components/purchasing/links";
+import { requestHref } from "../../components/purchasing/links";
 import OrderFormScreen from "../OrderFormScreen";
 
 /**
@@ -17,8 +18,8 @@ export default async function NewPurchaseOrderPage({
 }) {
   const [{ id }, { capitulo, solicitud }] = await Promise.all([params, searchParams]);
   const [result, fromRequest] = await Promise.all([getPurchaseForm(id), solicitud ? getRequest(solicitud) : null]);
-  if (!result) redirect("/dashboard/projects");
-  if (!result.canManage) redirect(purchasesHref(id));
+  if (!result) notFound();
+  if (!result.canManage) forbidden();
   if (!solicitud) return <OrderFormScreen projectId={id} form={result.form} chapter={capitulo} />;
   if (!fromRequest || fromRequest.request.projectId !== id) notFound();
   // Only an approved request becomes an order; one ordered or withdrawn meanwhile shows why on its page.

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createTestTenant, createTestUser, resetDatabase } from "@repo/db/testing";
 import { signInAs } from "../../test/session";
+import { TO_FORBIDDEN, TO_LOGIN } from "../../test/navigation";
 import { createClientAction, getClients, setClientPasswordAction } from "./clients";
 
 // The service itself is covered in packages/core; these tests cover the
@@ -21,7 +22,7 @@ const clientForm = () =>
     firstName: "Ana",
     surnames: "García",
     email: "ana@example.com",
-    password: "client-pass",
+    password: "Client-pass1",
     dateOfBirth: "",
     address: "",
     phone: "",
@@ -53,7 +54,7 @@ describe("client actions", () => {
     const data = clientForm();
     data.set("password", "short");
 
-    expect(await createClientAction(null, data)).toEqual({ error: "password_too_short" });
+    expect(await createClientAction(null, data)).toEqual({ error: "weak_password" });
     expect(revalidatePath).not.toHaveBeenCalled();
   });
 
@@ -63,21 +64,22 @@ describe("client actions", () => {
     const [client] = await getClients();
 
     expect(
-      await setClientPasswordAction(client!.id, null, form({ password: "brand-new-pass" })),
+      await setClientPasswordAction(client!.id, null, form({ password: "Brand-new-pass1" })),
     ).toEqual({ success: true });
   });
 
-  it("returns forbidden for non-admins and lists nothing", async () => {
+  it("returns forbidden for non-admins, and shows them the no-permission page instead of the list", async () => {
     const { tenant, admin } = await setup();
     signInAs({ tenantId: tenant.id, userId: admin.id, role: "manager" });
 
     expect(await createClientAction(null, clientForm())).toEqual({ error: "forbidden" });
-    expect(await getClients()).toEqual([]);
+    await expect(getClients()).rejects.toEqual(TO_FORBIDDEN);
   });
 
   it("rejects anonymous requests", async () => {
     signInAs(null);
 
-    await expect(createClientAction(null, clientForm())).rejects.toThrow("Unauthorized");
+    await expect(createClientAction(null, clientForm())).rejects.toEqual(TO_LOGIN);
+    await expect(getClients()).rejects.toEqual(TO_LOGIN);
   });
 });

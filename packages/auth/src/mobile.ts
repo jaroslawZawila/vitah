@@ -1,22 +1,6 @@
 import { SignJWT, jwtVerify } from "jose";
 import { and, eq, isClientUser, users, type UserRole } from "@repo/db";
-import { findActiveUser } from "./credentials";
-
-/**
- * Requests with an old token still pass this long after a password change: the
- * phone that made the change may have others in flight before it gets its
- * fresh token (a 401 would sign it out).
- */
-const PASSWORD_CHANGE_GRACE_MS = 30 * 1000;
-
-/** Whether a token issued at `iat` (seconds) was revoked by the user's last password change. */
-function revokedByPasswordChange(iat: number | undefined, passwordChangedAt: Date | null) {
-  if (!passwordChangedAt || Date.now() - passwordChangedAt.getTime() < PASSWORD_CHANGE_GRACE_MS) {
-    return false;
-  }
-  // `iat` has whole seconds: a token minted in the same second as the change is kept.
-  return (iat ?? 0) < Math.floor(passwordChangedAt.getTime() / 1000);
-}
+import { findActiveUser, jwtIssuedAt, revokedByPasswordChange } from "./credentials";
 
 export type MobileTokenPayload = {
   sub: string;
@@ -66,7 +50,10 @@ export async function verifyMobileToken(
  * Authenticates a mobile API request from its `Authorization: Bearer` header.
  * Returns null unless the token is valid and still belongs to an active client
  * of an active tenant, and was issued after their last password change — so
- * deactivated clients, and phones signed in with an old password, lose access at once.
+ * deactivated clients lose access at once, and phones signed in with an old
+ * password once the change's grace is over (`revokedByPasswordChange`: the
+ * phone that made the change has requests in flight before it gets its fresh
+ * token, and a 401 would sign it out).
  */
 export async function authenticateMobileRequest(
   request: Request
@@ -83,7 +70,7 @@ export async function authenticateMobileRequest(
   const client = await findActiveUser(
     and(eq(users.id, payload.sub), eq(users.tenantId, payload.tenantId), isClientUser)
   );
-  if (!client || revokedByPasswordChange(iat, client.passwordChangedAt)) return null;
+  if (!client || revokedByPasswordChange(jwtIssuedAt(iat), client.passwordChangedAt, Date.now())) return null;
 
   return payload;
 }

@@ -1,0 +1,43 @@
+# Uptime check of production. GitHub emails the repository's owner when a
+# scheduled run fails: that email is the alert.
+#
+#   every 15 minutes  fails if /api/health doesn't answer 200, or says "down"
+#   once a day        fails if it says anything but "ok" (so a degraded portal
+#                     is one email a day, not one every 15 minutes)
+#
+# Either check tries a second time before failing (scripts/health.sh).
+name: Health
+
+on:
+  schedule:
+    # Off the hour, when GitHub's scheduler is at its slowest. If you change
+    # one of these, change the job's `if` below to match.
+    - cron: "4,19,34,49 * * * *"
+    - cron: "41 5 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  up:
+    name: Portal is up
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '4,19,34,49 * * * *'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - run: scripts/health.sh https://portal.vitah.es
+
+  ok:
+    name: Portal is fully healthy
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '41 5 * * *'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - run: scripts/health.sh --strict https://portal.vitah.es

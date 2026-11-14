@@ -1,0 +1,125 @@
+# The commit gate (.claude/hooks/commit-gate.sh), run for everyone: a push to
+# main deploys production, and until now only commits made through Claude Code
+# on one machine were checked.
+#
+# The repository is public: no job here reads a secret, uploads an artifact or
+# prints anything that isn't already in the repository.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+# A newer push to the same branch or pull request replaces the run in progress.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    name: Tests, types, lint and build
+    runs-on: ubuntu-latest
+    # About 10 minutes on a 12-core laptop; a runner has 4.
+    timeout-minutes: 45
+    services:
+      # Same image and login as docker-compose.yml. The tests create their own
+      # disposable databases on it (packages/db/src/vitest.ts).
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: vitah
+          POSTGRES_PASSWORD: vitah_dev
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U vitah"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      # pnpm 9.0.0, from "packageManager" in package.json.
+      - uses: pnpm/action-setup@v6
+
+      # Node 24.x, from "engines" in package.json (what Vercel builds and runs on); caches the pnpm store.
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: package.json
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # Storage, the Claude API and push are mocked in the tests: this needs
+      # PostgreSQL and nothing else.
+      - name: Tests, type checks and lint
+        run: pnpm exec turbo run test check-types lint --output-logs=errors-only
+        env:
+          TEST_POSTGRES_URL: postgres://vitah:vitah_dev@localhost:5432
+
+      # `next build` only needs POSTGRES_URL to be set (packages/db/src/client.ts
+      # throws without it); it never connects. Locally it comes from
+      # apps/web/.env.local.
+      - name: Portal production build
+        run: pnpm exec turbo run build --filter=web --output-logs=errors-only
+        env:
+          POSTGRES_URL: postgres://vitah:vitah_dev@localhost:5432/vitah
+
+  gitleaks:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GITLEAKS_VERSION: 8.30.1
+      GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install gitleaks
+        run: |
+          curl -sSfL --retry 3 -o "$RUNNER_TEMP/gitleaks.tar.gz" \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  ${RUNNER_TEMP}/gitleaks.tar.gz" | sha256sum --check
+          tar -xzf "$RUNNER_TEMP/gitleaks.tar.gz" -C "$RUNNER_TEMP" gitleaks
+
+      # Every commit, so a secret removed in a later commit is still found.
+      # --redact: a finding names its file, line and commit, never the secret.
+      # Checked false alarms are listed in .github/.gitleaksignore.
+      - name: Scan the whole history
+        run: |
+          "$RUNNER_TEMP/gitleaks" git --redact --verbose --no-banner --exit-code 1 \
+            --gitleaks-ignore-path .github .
+
+  # Not blocking: the audit has open advisories today (see the job's log), so
+  # a red result here must not hide the gate's. Make it blocking once it is clean.
+  audit:
+    name: Dependency audit (not blocking)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: package.json
+          package-manager-cache: false
+
+      # Reads pnpm-lock.yaml only; nothing is installed. pnpm 10 just for this:
+      # the repository's pnpm 9.0.0 runs out of memory auditing this lockfile.
+      # The --config flag stops pnpm 10 handing over to "packageManager".
+      - name: pnpm audit (production dependencies, high and critical)
+        run: >-
+          npx --yes pnpm@10.34.9 audit --prod --audit-level=high
+          --config.manage-package-manager-versions=false

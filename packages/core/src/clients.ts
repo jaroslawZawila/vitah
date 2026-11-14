@@ -3,12 +3,13 @@ import {
   EMAIL_PATTERN,
   hashPassword,
   isUniqueViolation,
+  newPassword,
   normalizeEmail,
   replacePassword,
 } from "./accounts";
 import { isCalendarDate } from "./calendar";
 import { requireAdmin, type Ctx } from "./context";
-import { MIN_PASSWORD_LENGTH, type ClientError, type ClientListItem } from "./contract";
+import type { ClientError, ClientListItem } from "./contract";
 import { CoreError } from "./errors";
 import { clippedText, MAX_TEXT, PHONE_PATTERN } from "./input";
 
@@ -23,7 +24,7 @@ const STATUS: Record<ClientError, number> = {
   invalid_email: 400,
   invalid_date_of_birth: 400,
   invalid_phone: 400,
-  password_too_short: 400,
+  weak_password: 400,
   email_exists: 409,
   not_found: 404,
   forbidden: 403,
@@ -55,13 +56,6 @@ function dateOfBirth(value: unknown): string | null {
 function phone(value: unknown): string | null {
   const raw = optional(value);
   if (raw !== null && !PHONE_PATTERN.test(raw)) fail("invalid_phone");
-  return raw;
-}
-
-function password(value: unknown): string {
-  // Passwords are not trimmed.
-  const raw = typeof value === "string" ? value : "";
-  if (raw.length < MIN_PASSWORD_LENGTH) fail("password_too_short");
   return raw;
 }
 
@@ -109,7 +103,7 @@ export async function createClient(ctx: Ctx, input: Record<string, unknown>) {
     address: optional(input.address),
     phone: phone(input.phone),
   };
-  const passwordHash = await hashPassword(password(input.password));
+  const passwordHash = await hashPassword(newPassword(input.password));
 
   try {
     const id = await db.transaction(async (tx) => {
@@ -134,7 +128,10 @@ export async function createClient(ctx: Ctx, input: Record<string, unknown>) {
   }
 }
 
-/** Sets the password the client signs in to the app with. Body: { password } */
+/**
+ * Sets the password the client signs in to the app with (within the policy,
+ * like any other). Body: { password }
+ */
 export async function setClientPassword(
   ctx: Ctx,
   clientId: string,
@@ -145,7 +142,7 @@ export async function setClientPassword(
   // A reset also signs the client out of the app on every phone.
   const updated = await replacePassword(
     and(eq(users.id, clientId), eq(users.tenantId, ctx.tenantId), isClientUser),
-    password(input.password),
+    newPassword(input.password),
   );
   if (updated.length === 0) fail("not_found");
 

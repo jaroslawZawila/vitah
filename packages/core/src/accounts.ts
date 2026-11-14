@@ -1,5 +1,8 @@
 import bcrypt from "bcryptjs";
 import { db, inArray, pushTokens, users, type SQL } from "@repo/db";
+import { isStrongPassword } from "./contract";
+import { CoreError, invalid, notFound } from "./errors";
+import { clearAttempts, overLimit } from "./throttle";
 
 // Helpers shared by everything that creates or authenticates user accounts.
 
@@ -41,10 +44,20 @@ export function hashPassword(password: string): Promise<string> {
 }
 
 /**
- * Sets the password of the user(s) matching `where` and signs them out of the
- * app everywhere: `passwordChangedAt` revokes their mobile tokens (see
- * @repo/auth/mobile) and their phones stop getting pushes. The phone that made
- * the change registers again with its fresh token. Returns the users changed.
+ * A password being set, for anyone (not trimmed): it must meet the one policy,
+ * `isStrongPassword`. Passwords already in the database are never re-checked.
+ */
+export function newPassword(value: unknown): string {
+  if (typeof value !== "string" || !isStrongPassword(value)) throw invalid("weak_password");
+  return value;
+}
+
+/**
+ * Sets the password of the user(s) matching `where` and signs them out
+ * everywhere: `passwordChangedAt` revokes the portal sessions and the tokens
+ * issued before it (see @repo/auth: `revokedByPasswordChange`) and their
+ * phones stop getting pushes. Whoever made the change for themselves signs in
+ * again (the portal) or gets a fresh token (the app). Returns the users changed.
  */
 export async function replacePassword(where: SQL | undefined, password: string) {
   const passwordHash = await hashPassword(password);
@@ -65,4 +78,41 @@ export async function replacePassword(where: SQL | undefined, password: string) 
     }
     return changed;
   });
+}
+
+/** Wrong current passwords a user may enter per throttle window. */
+const PASSWORD_ATTEMPTS = 10;
+
+/**
+ * The user matching `where` changes their own password.
+ * Body: { currentPassword, newPassword }. Needs the current one (throttled per
+ * user: `too_many_attempts` after PASSWORD_ATTEMPTS wrong ones) and a new one
+ * within the policy; `refuseSame` also refuses the current one again.
+ * Every session and token of the user is revoked (see `replacePassword`).
+ */
+export async function changeOwnPassword(
+  where: SQL | undefined,
+  userId: string,
+  input: Record<string, unknown>,
+  { refuseSame = false } = {},
+) {
+  const { currentPassword, newPassword: next } = input;
+  if (typeof currentPassword !== "string" || typeof next !== "string" || !currentPassword) {
+    throw invalid("missing_fields");
+  }
+  newPassword(next);
+
+  const throttle = [{ key: `password:${userId}`, limit: PASSWORD_ATTEMPTS }];
+  if (await overLimit(throttle)) throw new CoreError("too_many_attempts", 429);
+
+  const [user] = await db.select({ passwordHash: users.passwordHash }).from(users).where(where).limit(1);
+  if (!user) throw notFound();
+  if (!user.passwordHash || !(await bcrypt.compare(currentPassword, user.passwordHash))) {
+    // Not 401: the app treats 401 as "signed out".
+    throw invalid("wrong_password");
+  }
+  await clearAttempts(throttle);
+  if (refuseSame && next === currentPassword) throw invalid("same_password");
+
+  await replacePassword(where, next);
 }

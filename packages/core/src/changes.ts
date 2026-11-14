@@ -1,6 +1,7 @@
 import { db, projects, sql } from "@repo/db";
 import { CHANGE_AREAS, type ChangeArea, type MobileChangesReply } from "./contract";
 import { clientProjectsWhere, DEFAULT_FIRST } from "./client-projects";
+import { logError } from "./log";
 import { projectInTenant } from "./project-client";
 
 // ─── Change counters ─────────────────────────────────────────────────────────
@@ -52,7 +53,7 @@ export async function markChanged(
     );
     await db.update(projects).set(set).where(projectInTenant(tenantId, projectId));
   } catch (error) {
-    console.error("Failed to mark changes of project", projectId, error);
+    logError("changes.mark_failed", error, { projectId });
   }
 }
 

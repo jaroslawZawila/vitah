@@ -10,27 +10,20 @@ import {
   type Ctx,
   type SubcontractorError,
 } from "@repo/core";
-import { getSessionContext } from "@repo/auth/context";
 import { revalidatePath } from "next/cache";
+import { requireSession } from "../../lib/access";
+import { read as readWithAccess } from "./run";
 
 export type SubcontractorState = { error?: SubcontractorError; success?: boolean; id?: string } | null;
 
-/** A core read: null when signed out or when core rejects it (e.g. another tenant's company). */
+/** A core read's data (`read` in ./run: a missing company or worker is the "No encontrado" page). */
 async function read<T>(fn: (ctx: Ctx) => Promise<T>): Promise<T | null> {
-  const ctx = await getSessionContext();
-  if (!ctx) return null;
-  try {
-    return await fn(ctx);
-  } catch (err) {
-    if (err instanceof CoreError) return null;
-    throw err;
-  }
+  return (await readWithAccess(fn))?.data ?? null;
 }
 
 /** Runs a core mutation; returns `{ error: code }` for expected failures. */
 async function mutate(fn: (ctx: Ctx) => Promise<unknown>): Promise<SubcontractorState> {
-  const ctx = await getSessionContext();
-  if (!ctx) throw new Error("Unauthorized");
+  const ctx = await requireSession();
   const outcome = await attempt(() => fn(ctx));
   if (outcome.error) return { error: outcome.error };
   const result = outcome.result;
@@ -74,8 +67,7 @@ export async function getWorker(workerId: string) {
 }
 
 export async function checkWorkerAccessAction(input: { query: string; projectId?: string | null }) {
-  const ctx = await getSessionContext();
-  if (!ctx) throw new Error("Unauthorized");
+  const ctx = await requireSession();
   return attempt(() => workers.checkAccess(ctx, input));
 }
 

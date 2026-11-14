@@ -1,6 +1,6 @@
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
+import { forbidden } from "@/lib/access";
 import { getInvoiceForm } from "../../../../../actions/purchase-invoices";
-import { invoiceHref } from "../../../../projects/[id]/components/purchasing/links";
 import InvoiceFormScreen from "../../InvoiceFormScreen";
 
 /** Compras › Facturas › an invoice › Editar. */
@@ -8,6 +8,6 @@ export default async function EditInvoicePage({ params }: { params: Promise<{ in
   const { invoiceId } = await params;
   const result = await getInvoiceForm({ invoiceId });
   if (!result) notFound();
-  if (!result.canManage) redirect(invoiceHref(invoiceId));
+  if (!result.canManage) forbidden();
   return <InvoiceFormScreen form={result.form} />;
 }

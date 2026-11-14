@@ -2,7 +2,33 @@
 // Must not import server-only code: importing this file never pulls in the
 // database.
 
-export const MIN_PASSWORD_LENGTH = 8;
+/**
+ * The password rule for every account, staff and clients alike: at least
+ * MIN_PASSWORD_LENGTH characters, with an uppercase letter and a number.
+ * It is checked whenever a password is set (a new user or client, an admin's
+ * reset, changing one's own) and never at sign-in: a password set under an
+ * older, shorter rule keeps working until it is next changed. Nobody is
+ * forced to change theirs.
+ */
+export const MIN_PASSWORD_LENGTH = 10;
+
+export function isStrongPassword(password: string) {
+  return password.length >= MIN_PASSWORD_LENGTH && /[A-Z]/.test(password) && /\d/.test(password);
+}
+
+/**
+ * Error codes of a staff user changing their own password, or an admin
+ * resetting someone's (`{ error: code }` in the API).
+ */
+export type PasswordError =
+  | "missing_fields"
+  | "wrong_password"
+  | "too_many_attempts"
+  | "weak_password"
+  | "same_password"
+  | "cannot_reset_own_password"
+  | "not_found"
+  | "forbidden";
 
 /**
  * A project of the client, as the mobile app shows it (GET /api/mobile/project
@@ -71,7 +97,7 @@ export type ClientError =
   | "invalid_email"
   | "invalid_date_of_birth"
   | "invalid_phone"
-  | "password_too_short"
+  | "weak_password"
   | "email_exists"
   | "not_found"
   | "forbidden";
@@ -217,15 +243,6 @@ export type NotificationPrefs = {
 
 /** GET/PUT /api/mobile/settings. (The language belongs to the phone: see /push-token.) */
 export type MobileSettings = { notifications: NotificationPrefs };
-
-/**
- * The rule for a password a client picks in the app: at least 10 characters,
- * with an uppercase letter and a number. Passwords staff set in the portal
- * only need MIN_PASSWORD_LENGTH.
- */
-export function isStrongPassword(password: string) {
-  return password.length >= 10 && /[A-Z]/.test(password) && /\d/.test(password);
-}
 
 /** Error codes of the client account service (`{ error: code }` in the API). */
 export type AccountError =

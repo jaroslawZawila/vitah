@@ -15,7 +15,11 @@
     "db:migrate": "turbo run db:migrate --filter=@repo/db",
     "db:seed": "turbo run db:seed --filter=@repo/core",
     "db:studio": "turbo run db:studio --filter=@repo/db",
-    "db:setup": "docker compose up -d && sleep 2 && pnpm db:push && pnpm db:seed"
+    "db:setup": "docker compose up -d && sleep 2 && pnpm db:push && pnpm db:seed",
+    "db:sql:status": "pnpm --filter @repo/db run db:sql:status",
+    "db:sql:migrate": "pnpm --filter @repo/db run db:sql:migrate",
+    "db:sql:baseline": "pnpm --filter @repo/db run db:sql:baseline",
+    "db:drift": "pnpm --filter @repo/db run db:drift"
   },
   "devDependencies": {
     "prettier": "^3.7.4",
@@ -24,7 +28,7 @@
   },
   "packageManager": "pnpm@9.0.0",
   "engines": {
-    "node": "22.x"
+    "node": "24.x"
   },
   "pnpm": {
     "overrides": {

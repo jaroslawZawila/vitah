@@ -4,7 +4,11 @@ import { getProjectBudget } from "../../../../../actions/budget";
 import { budgetHref } from "../../components/budget/links";
 import BudgetPdfScreen from "./BudgetPdfScreen";
 
-/** A revision's PDF (`?kind=general|detailed`, `?revision=` for an older one). */
+/**
+ * A revision's PDF (`?kind=general|detailed`, `?revision=` for an older one).
+ * Without a budget yet, or with a `?revision=` that isn't there (a stale
+ * link), there is no PDF to show: back to the Budget tab, on the newest.
+ */
 export default async function BudgetPdfPage({
   params,
   searchParams,

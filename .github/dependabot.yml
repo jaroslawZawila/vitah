@@ -1,0 +1,48 @@
+# Weekly dependency updates: one pull request for all the minor and patch
+# updates together, one for each major. CI (.github/workflows/ci.yml) runs on
+# every one of them.
+version: 2
+
+updates:
+  # The pnpm workspace: one lockfile at the root covers apps/* and packages/*.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Madrid
+    open-pull-requests-limit: 5
+    groups:
+      minor-and-patch:
+        patterns: ["*"]
+        update-types: [minor, patch]
+    ignore:
+      # These move together, and only with an Expo SDK upgrade
+      # (`npx expo install expo@^<sdk> && npx expo install --fix`, see CLAUDE.md).
+      # React is one version across the monorepo, pinned by the root
+      # `pnpm.overrides`, and must stay the one React Native was built for.
+      - dependency-name: "expo"
+      - dependency-name: "expo-*"
+      - dependency-name: "@expo/*"
+      - dependency-name: "jest-expo"
+      - dependency-name: "react"
+      - dependency-name: "react-dom"
+      - dependency-name: "react-test-renderer"
+      - dependency-name: "@types/react"
+      - dependency-name: "@types/react-dom"
+      - dependency-name: "react-native"
+      - dependency-name: "react-native-*"
+      - dependency-name: "@react-native/*"
+
+  # The actions used by .github/workflows.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Madrid
+    groups:
+      actions:
+        patterns: ["*"]

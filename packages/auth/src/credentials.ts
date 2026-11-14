@@ -11,7 +11,7 @@ import {
   type SQL,
   type UserRole,
 } from "@repo/db";
-import { clearAttempts, hashPassword, normalizeEmail, overLimit } from "@repo/core";
+import { countSignIn, hashPassword, normalizeEmail } from "@repo/core";
 
 /** Staff sign in to the portal; clients sign in to the mobile app. */
 export type Audience = "portal" | "mobile";
@@ -80,25 +80,76 @@ export async function verifyCredentials(
 }
 
 /**
- * Failed sign-ins allowed per window: for an email from one IP (so a stranger
- * guessing elsewhere can't lock its owner out), for an email from anywhere (a
- * botnet), and from one IP across emails.
+ * How long what a password change revoked still passes. The device that made
+ * the change has requests under way with its old token or session (the app's
+ * other calls; the portal page re-rendering in the very request that changed
+ * it) before it holds the new one, and must not be thrown out by them.
  */
-export const SIGN_IN_LIMITS = { emailFromIp: 10, email: 100, ip: 100 };
+export const PASSWORD_CHANGE_GRACE_MS = 30 * 1000;
 
-/** The caller's IP, as set by Vercel's edge (clients can't forge x-real-ip there). */
-export function clientIp(request: Request | undefined): string | undefined {
-  const headers = request?.headers;
-  return (
-    headers?.get("x-real-ip")?.trim() ||
-    headers?.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    undefined
-  );
+/**
+ * Whether a session or token is revoked: the user's password was changed or
+ * reset, or the account deactivated (`users.password_changed_at`), at or
+ * after `issuedAt`, the moment (ms) it signed in or was issued, and
+ * PASSWORD_CHANGE_GRACE_MS have passed since. The one rule for a portal
+ * session (./session.ts), a staff Bearer token (./context.ts) and the app's
+ * token (./mobile.ts).
+ *
+ * Exact to the millisecond: what was issued in the very instant of the change
+ * goes too. What carries no issue time is older than any change.
+ */
+export function revokedByPasswordChange(
+  issuedAt: number | undefined,
+  passwordChangedAt: Date | null,
+  now: number,
+): boolean {
+  if (passwordChangedAt === null) return false;
+  const changedAt = passwordChangedAt.getTime();
+  return (issuedAt ?? 0) <= changedAt && now - changedAt >= PASSWORD_CHANGE_GRACE_MS;
 }
 
 /**
- * `verifyCredentials` behind login throttling: once the email or the IP is
- * over its limit, answers "too_many_attempts" without checking the password.
+ * A JWT's `iat` as the issue time `revokedByPasswordChange` takes. `iat` is in
+ * whole seconds, so the token may have been issued at any moment of that
+ * second: it counts as its end, and the token minted right after a password
+ * change, in the same second, is kept.
+ */
+export function jwtIssuedAt(iat: number | undefined): number | undefined {
+  return iat === undefined ? undefined : (iat + 1) * 1000;
+}
+
+const firstOf = (list: string | null | undefined) => list?.split(",")[0]?.trim() || undefined;
+const lastOf = (list: string | null | undefined) => list?.split(",").at(-1)?.trim() || undefined;
+
+/**
+ * The caller's IP, which login throttling counts by (@repo/core/throttle).
+ *
+ * On Vercel the edge sets `x-vercel-forwarded-for` and `x-real-ip` itself,
+ * overwriting whatever the client sent: they can't be forged.
+ *
+ * Anywhere else nothing vouches for these headers. We take `x-real-ip`, or
+ * the LAST `x-forwarded-for` entry: the one the nearest proxy appended, not
+ * the first, which is whatever the client claimed. That is right behind one
+ * reverse proxy that sets them, and forgeable with none (or with one that
+ * passes them through): a guesser could then claim a new address per attempt
+ * and dodge the per-IP limits (never a password check). Hosting the portal
+ * off Vercel means making this function read what that host guarantees.
+ * Without any header (local dev) there is no IP: see the throttle's notes.
+ */
+export function clientIp(request: Request | undefined): string | undefined {
+  const headers = request?.headers;
+  if (!headers) return undefined;
+  if (process.env.VERCEL) {
+    return firstOf(headers.get("x-vercel-forwarded-for")) ?? firstOf(headers.get("x-real-ip"));
+  }
+  return firstOf(headers.get("x-real-ip")) ?? lastOf(headers.get("x-forwarded-for"));
+}
+
+/**
+ * `verifyCredentials` behind login throttling (the scheme is described in
+ * @repo/core/throttle): an IP over its own limits gets "too_many_attempts"
+ * whatever the password; failures from other IPs never refuse the right one.
+ * A wrong password and an unknown email both answer null, and both count.
  */
 export async function attemptSignIn(
   email: string,
@@ -106,16 +157,9 @@ export async function attemptSignIn(
   audience: Audience,
   ip: string | undefined,
 ): Promise<AuthenticatedUser | "too_many_attempts" | null> {
-  const address = normalizeEmail(email);
-  const emailKeys = [
-    { key: `signin:${audience}:${address}:${ip ?? "unknown"}`, limit: SIGN_IN_LIMITS.emailFromIp },
-    { key: `signin:${audience}:${address}`, limit: SIGN_IN_LIMITS.email },
-  ];
-  const keys = ip ? [...emailKeys, { key: `signin-ip:${ip}`, limit: SIGN_IN_LIMITS.ip }] : emailKeys;
-
-  if (await overLimit(keys)) return "too_many_attempts";
+  const attempt = await countSignIn(audience, normalizeEmail(email), ip);
+  if (attempt.blocked) return "too_many_attempts";
   const user = await verifyCredentials(email, password, audience);
-  // The IP's count stays: signing in to one account mustn't reset guessing at others.
-  if (user) await clearAttempts(emailKeys);
+  if (user) await attempt.succeeded();
   return user;
 }

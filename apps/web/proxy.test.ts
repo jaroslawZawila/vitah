@@ -11,7 +11,7 @@ function matches(url: string) {
 }
 
 describe("proxy matcher", () => {
-  it.each(["/dashboard", "/dashboard/projects/abc", "/api/other"])("protects %s", (url) => {
+  it.each(["/dashboard", "/dashboard/projects/abc", "/api/other", "/api/health/details", "/api/healthy"])("protects %s", (url) => {
     expect(matches(url)).toBe(true);
   });
 
@@ -19,6 +19,8 @@ describe("proxy matcher", () => {
     "/api/auth/session",
     "/api/mobile/auth",
     "/api/mobile/project",
+    // The uptime check has no session.
+    "/api/health",
     "/_next/static/chunk.js",
     "/favicon.ico",
     // Vercel Speed Insights: its script and beacon must work signed out, e.g. on the login page.

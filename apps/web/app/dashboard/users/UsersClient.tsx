@@ -1,5 +1,7 @@
 "use client";
 
+// Container: the only file of the page that calls server actions.
+
 import { useState, useActionState } from "react";
 import { useFormatter, useTranslations } from "next-intl";
 import { Badge } from "@/components/ui/badge";
@@ -22,9 +24,12 @@ import {
 } from "@/components/ui/table";
 import {
   createUser,
+  resetUserPasswordAction,
   updateUserRole,
   toggleUserActive,
 } from "../../actions/users";
+import NewPasswordField from "../components/NewPasswordField";
+import ResetPasswordDialog from "./components/ResetPasswordDialog";
 
 const ROLES = ["admin", "manager", "viewer"] as const;
 type Role = (typeof ROLES)[number];
@@ -56,8 +61,13 @@ export function UsersClient({
   const [showForm, setShowForm] = useState(false);
   const [formState, formAction, isPending] = useActionState(createUser, null);
   const [rowError, setRowError] = useState<string | null>(null);
+  // Whose password the admin is setting, and whose was just set (their names only).
+  const [resetFor, setResetFor] = useState<UserRow | null>(null);
+  const [resetDone, setResetDone] = useState<string | null>(null);
+  const label = (user: UserRow) => user.name || user.email;
 
   async function runRowAction(action: Promise<{ error?: string }>) {
+    setResetDone(null);
     const result = await action;
     setRowError(result.error ?? null);
   }
@@ -89,6 +99,23 @@ export function UsersClient({
       {rowError && (
         <FormMessage role="alert">{t(`errors.${rowError}`)}</FormMessage>
       )}
+      {resetDone && (
+        <FormMessage tone="success" role="status">
+          {t("success.passwordReset", { name: resetDone })}
+        </FormMessage>
+      )}
+
+      <ResetPasswordDialog
+        key={resetFor?.id}
+        name={resetFor ? label(resetFor) : null}
+        onSubmit={(form) => resetUserPasswordAction(resetFor!.id, form)}
+        onDone={() => {
+          setRowError(null);
+          setResetDone(resetFor ? label(resetFor) : null);
+          setResetFor(null);
+        }}
+        onClose={() => setResetFor(null)}
+      />
 
       {showForm && (
         <div>
@@ -126,19 +153,7 @@ export function UsersClient({
                     required
                   />
                 </Field>
-                <Field>
-                  <Label htmlFor="password">
-                    {t("inviteForm.passwordLabel")}
-                  </Label>
-                  <Input
-                    id="password"
-                    name="password"
-                    type="password"
-                    placeholder={t("inviteForm.passwordPlaceholder")}
-                    minLength={8}
-                    required
-                  />
-                </Field>
+                <NewPasswordField label={t("inviteForm.passwordLabel")} />
                 <Field>
                   <Label htmlFor="role">{t("inviteForm.roleLabel")}</Label>
                   <NativeSelect
@@ -262,6 +277,25 @@ export function UsersClient({
                         {t("actions.activate")}
                       </Button>
                     )}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="disabled:pointer-events-auto disabled:cursor-not-allowed"
+                      disabled={user.id === currentUserId}
+                      title={
+                        user.id === currentUserId
+                          ? t("errors.cannot_reset_own_password")
+                          : undefined
+                      }
+                      aria-label={t("actions.resetPasswordFor", { name: label(user) })}
+                      onClick={() => {
+                        setResetDone(null);
+                        setResetFor(user);
+                      }}
+                    >
+                      {t("actions.resetPassword")}
+                    </Button>
                   </div>
                 </TableCell>
               </TableRow>

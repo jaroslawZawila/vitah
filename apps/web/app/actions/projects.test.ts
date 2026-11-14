@@ -7,6 +7,7 @@ import {
   resetDatabase,
 } from "@repo/db/testing";
 import { signInAs } from "../../test/session";
+import { NOT_FOUND, TO_LOGIN } from "../../test/navigation";
 import {
   createProject,
   deleteProject,
@@ -61,21 +62,36 @@ describe("project actions", () => {
     ]);
   });
 
-  it("returns nothing without a session", async () => {
+  it("lists nothing only when the tenant has no projects", async () => {
+    const other = await createTestTenant();
+    await createTestProject(other.id);
+    await setup();
+
+    expect(await getProjects()).toEqual([]);
+    expect(await getProjectList()).toEqual([]);
+  });
+
+  it("is \"No encontrado\" for a project that isn't the tenant's or isn't there, never null", async () => {
+    const other = await createTestTenant();
+    const theirs = await createTestProject(other.id);
+    await setup();
+
+    await expect(getProject(theirs.id)).rejects.toEqual(NOT_FOUND);
+    await expect(getProject("no-such-project")).rejects.toEqual(NOT_FOUND);
+  });
+
+  it("goes to the login page without a session, reads and writes alike", async () => {
     const { tenant } = await setup();
     const project = await createTestProject(tenant.id);
     signInAs(null);
 
-    expect(await getProjects()).toEqual([]);
-    expect(await getProjectList()).toEqual([]);
-    expect(await getProject(project.id)).toBeNull();
-    await expect(
-      createProject({ ref: "VTH-1", address: "Calle 1" }),
-    ).rejects.toThrow("Unauthorized");
-    await expect(updateProject(project.id, { address: "X" })).rejects.toThrow(
-      "Unauthorized",
-    );
-    await expect(deleteProject(project.id)).rejects.toThrow("Unauthorized");
+    await expect(getProjects()).rejects.toEqual(TO_LOGIN);
+    await expect(getProjectList()).rejects.toEqual(TO_LOGIN);
+    await expect(getProject(project.id)).rejects.toEqual(TO_LOGIN);
+    // A write whose session ended sends the browser to the login page.
+    await expect(createProject({ ref: "VTH-1", address: "Calle 1" })).rejects.toEqual(TO_LOGIN);
+    await expect(updateProject(project.id, { address: "X" })).rejects.toEqual(TO_LOGIN);
+    await expect(deleteProject(project.id)).rejects.toEqual(TO_LOGIN);
   });
 
   it("creates a project from the wizard draft and revalidates the list", async () => {
@@ -147,7 +163,7 @@ describe("project actions", () => {
     expect(await reload(project.id)).toMatchObject({ id: project.id, deletedAt: expect.any(Date), deletedById: admin.id });
     expect(revalidatePath).toHaveBeenCalledWith("/dashboard/projects");
     // And it is gone from the portal.
-    expect(await getProject(project.id)).toBeNull();
+    await expect(getProject(project.id)).rejects.toEqual(NOT_FOUND);
     expect((await getProjects()).map((p) => p.id)).toEqual([other.id]);
     expect((await getProjectList()).map((p) => p.id)).toEqual([other.id]);
     expect(await updateProject(project.id, { address: "Otra" })).toEqual({ error: "not_found" });

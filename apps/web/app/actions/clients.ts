@@ -3,21 +3,20 @@
 // Thin portal adapters over @repo/core (packages/core/src/clients.ts).
 
 import { CoreError, clientsService as svc, type ClientError, type Ctx } from "@repo/core";
-import { getSessionContext } from "@repo/auth/context";
 import { revalidatePath } from "next/cache";
+import { requireSession } from "../../lib/access";
+import { read } from "./run";
 
 export type ClientFormState = { error?: ClientError; success?: boolean } | null;
 
+/** The app's clients (admins only: anyone else gets the "No tienes permiso" page). */
 export async function getClients() {
-  const ctx = await getSessionContext();
-  if (!ctx || ctx.role !== "admin") return [];
-  return svc.listClients(ctx);
+  return (await read((ctx) => svc.listClients(ctx)))?.data ?? [];
 }
 
 /** Runs a core mutation; returns `{ error: code }` for expected failures. */
 async function mutate(fn: (ctx: Ctx) => Promise<unknown>): Promise<ClientFormState> {
-  const ctx = await getSessionContext();
-  if (!ctx) throw new Error("Unauthorized");
+  const ctx = await requireSession();
   try {
     await fn(ctx);
   } catch (err) {

@@ -1,5 +1,6 @@
 import { after } from "next/server";
 import { purchaseChecksService, type Ctx } from "@repo/core";
+import { logError } from "./log";
 
 /**
  * After an upload in Compras: its PDF is queued for the AI's review as the
@@ -12,11 +13,11 @@ export async function reviewDocuments(ctx: Ctx) {
     await purchaseChecksService.queueNewChecks(ctx);
   } catch (error) {
     // The upload is in: its review can be asked for later.
-    console.error("Document review not queued", error);
+    logError("purchase.review_not_queued", error);
     return;
   }
   try {
-    after(() => purchaseChecksService.runPendingChecks(ctx).catch((error: unknown) => console.error("Document review failed", error)));
+    after(() => purchaseChecksService.runPendingChecks(ctx).catch((error: unknown) => logError("purchase.review_failed", error)));
   } catch {
     // Not in a request: nothing to run after.
   }

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createTestTenant, createTestUser, resetDatabase } from "@repo/db/testing";
 import { subcontractorsService } from "@repo/core";
 import { signInAs } from "../../test/session";
+import { NOT_FOUND, TO_LOGIN } from "../../test/navigation";
 import { getSupplierPurchasing, getSuppliers } from "./purchase-suppliers";
 
 // The service is covered in packages/core; these tests cover the adapter.
@@ -40,8 +41,8 @@ describe("supplier actions", () => {
   it("show nothing of another tenant, or signed out", async () => {
     const { id } = await setup();
     await setup();
-    expect(await getSupplierPurchasing(id)).toBeNull();
+    await expect(getSupplierPurchasing(id)).rejects.toEqual(NOT_FOUND);
     signInAs(null);
-    expect(await getSuppliers()).toBeNull();
+    await expect(getSuppliers()).rejects.toEqual(TO_LOGIN);
   });
 });

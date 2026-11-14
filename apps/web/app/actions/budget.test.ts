@@ -8,6 +8,7 @@ import {
   resetDatabase,
 } from "@repo/db/testing";
 import { signInAs } from "../../test/session";
+import { NOT_FOUND, TO_LOGIN } from "../../test/navigation";
 import {
   acceptRevisionAction,
   addLineAction,
@@ -162,6 +163,7 @@ describe("budget actions", () => {
 
     expect(await revision(project.id, rev0.id)).toMatchObject({ number: 0, status: "rejected" });
     expect((await revision(project.id)).number).toBe(1);
+    // A revision that isn't there is for the page to handle (it shows the newest): null, not "No encontrado".
     expect(await getProjectBudget(project.id, "nope")).toBeNull();
   }, 60_000);
 
@@ -214,12 +216,14 @@ describe("budget actions", () => {
     expect(await budgetInputUploadAction(project.id, "planos.dwg")).toEqual({ error: "invalid_file_type" });
   });
 
-  it("searches the price base for any staff member, nothing when signed out", async () => {
+  it("searches the price base for any staff member; signed out, the login page", async () => {
     await setup("viewer");
     expect((await searchPriceBaseAction("replanteo", "01"))[0]).toMatchObject({ code: "01.01" });
+    // Nothing found is the only empty answer.
+    expect(await searchPriceBaseAction("zzzz-no-such-partida")).toEqual([]);
 
     signInAs(null);
-    expect(await searchPriceBaseAction("replanteo")).toEqual([]);
+    await expect(searchPriceBaseAction("replanteo")).rejects.toEqual(TO_LOGIN);
   });
 
   it("is read-only for viewers, and empty for other tenants", async () => {
@@ -231,6 +235,8 @@ describe("budget actions", () => {
     expect(await startGenerationAction(project.id, { documentIds: ["x"] })).toEqual({ error: "forbidden" });
 
     await setup();
-    expect(await getProjectBudget(project.id)).toBeNull();
+    await expect(getProjectBudget(project.id)).rejects.toEqual(NOT_FOUND);
+    // The open page's poll just stops following a run that is gone.
+    expect(await getGenerationAction(project.id, "nope")).toBeNull();
   });
 });

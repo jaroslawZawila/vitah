@@ -1,4 +1,5 @@
 import { notFound, redirect } from "next/navigation";
+import { forbidden } from "@/lib/access";
 import { getPurchaseForm } from "../../../../../../../actions/purchasing";
 import { getRequest } from "../../../../../../../actions/purchase-requests";
 import { requestHref } from "../../../../components/purchasing/links";
@@ -9,6 +10,8 @@ export default async function EditPurchaseRequestPage({ params }: { params: Prom
   const { id, requestId } = await params;
   const [result, form] = await Promise.all([getRequest(requestId), getPurchaseForm(id)]);
   if (!result || result.request.projectId !== id || !form) notFound();
-  if (!result.canManage || result.request.status !== "pending") redirect(requestHref(id, requestId));
+  if (!result.canManage) forbidden();
+  // Decided meanwhile: its page says how.
+  if (result.request.status !== "pending") redirect(requestHref(id, requestId));
   return <RequestFormScreen projectId={id} form={form.form} request={result.request} />;
 }

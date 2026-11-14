@@ -1,6 +1,7 @@
 import { CoreError, canEdit, type Ctx, type ObraError } from "@repo/core";
-import { getSessionContext } from "@repo/auth/context";
 import { revalidatePath } from "next/cache";
+import { notFound } from "next/navigation";
+import { forbidden, requireSession } from "../../lib/access";
 import { reviewDocuments } from "../../lib/review-documents";
 
 // Shared by the project's server actions (not itself a server action module):
@@ -10,24 +11,35 @@ export type ActionState<E extends string> = { error?: E; success?: boolean } | n
 export type ObraState = ActionState<ObraError>;
 
 /**
- * A core read for the project page: null when signed out or when core rejects
- * it (e.g. another tenant's project), with whether the caller may edit.
+ * A core read for a page, with whether the caller may edit. What it can't
+ * give, it says, instead of the page guessing:
+ * - signed out → the login page;
+ * - the record isn't there (deleted, another tenant's, a stale link: core's
+ *   404s) → the "No encontrado" page (`notFound()`);
+ * - the caller's role may not read it (403) → the "No tienes permiso" page;
+ * - any other expected failure → null, for the page to handle as it sees fit.
+ *
+ * `optional`: nothing there is an expected state the page handles itself
+ * (no draft yet → back to the plan; a stale `?revision=` → the newest), so a
+ * 404 is null too.
  */
-export async function read<T>(fn: (ctx: Ctx) => Promise<T>) {
-  const ctx = await getSessionContext();
-  if (!ctx) return null;
+export async function read<T>(fn: (ctx: Ctx) => Promise<T>, { optional = false } = {}) {
+  const ctx = await requireSession();
   try {
     return { data: await fn(ctx), canManage: canEdit(ctx.role) };
   } catch (err) {
-    if (err instanceof CoreError) return null;
-    throw err;
+    if (!(err instanceof CoreError)) throw err;
+    if (err.status === 403) forbidden();
+    if (err.status === 404 && !optional) notFound();
+    return null;
   }
 }
 
 /**
- * Runs a core mutation; returns `{ error: code }` for expected failures. With
- * a `projectId`, every tab of that project is refreshed; without, the caller
- * revalidates what it touched.
+ * Runs a core mutation; returns `{ error: code }` for expected failures (and
+ * sends a caller whose session ended to the login page). With a `projectId`,
+ * every tab of that project is refreshed; without, the caller revalidates
+ * what it touched.
  */
 export async function mutate<E extends string>(
   projectId: string | null,
@@ -35,8 +47,8 @@ export async function mutate<E extends string>(
   /** Runs once the write is in (e.g. queueing an upload's review). */
   onSuccess?: (ctx: Ctx) => Promise<void>,
 ): Promise<ActionState<E>> {
-  const ctx = await getSessionContext();
-  if (!ctx) throw new Error("Unauthorized");
+  // Signed out meanwhile: the browser goes to the login page.
+  const ctx = await requireSession();
   try {
     await fn(ctx);
   } catch (err) {

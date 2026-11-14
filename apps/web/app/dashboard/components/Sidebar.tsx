@@ -1,21 +1,24 @@
 "use client";
 
 import Link from "next/link";
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useParams, usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Contact, FolderKanban, HardHat, Settings, ShoppingCart, UserCog } from "lucide-react";
+import { Contact, FolderKanban, HardHat, KeyRound, Settings, ShoppingCart, UserCog } from "lucide-react";
 import { APP_LANGUAGES, type AppLanguage, type PurchasingCounts, type SubcontractorCounts } from "@repo/core/contract";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuGroup,
+  DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import ChangePasswordDialog, { type PasswordChangeResult } from "./ChangePasswordDialog";
 import {
   COMPANY_PURCHASES_HREF,
   INVOICES_HREF,
@@ -77,6 +80,7 @@ export default function Sidebar({
   purchases = null,
   language,
   onLanguageChange,
+  onPasswordChange,
 }: {
   name: string | null;
   email: string | null;
@@ -88,11 +92,15 @@ export default function Sidebar({
   /** The portal's language, the user's setting. */
   language: AppLanguage;
   onLanguageChange: (language: AppLanguage) => Promise<{ error?: string }>;
+  /** Changes the signed-in user's own password; the form has `currentPassword` and `newPassword`. */
+  onPasswordChange: (form: FormData) => Promise<PasswordChangeResult>;
 }) {
   const pathname = usePathname();
   const t = useTranslations("sidebar");
   // Only set on `projects/[id]` routes, so not on e.g. `projects/new`.
   const { id: projectId } = useParams<{ id?: string }>();
+  // One dialog for both settings menus (the rail's foot and the top bar's corner).
+  const [passwordOpen, setPasswordOpen] = useState(false);
 
   return (
     <aside className="flex flex-col gap-3 bg-rail px-4 py-3 text-rail-foreground lg:sticky lg:top-0 lg:h-svh lg:gap-[18px] lg:overflow-y-auto lg:px-3.5 lg:py-[22px]">
@@ -113,6 +121,7 @@ export default function Sidebar({
           email={email}
           language={language}
           onLanguageChange={onLanguageChange}
+          onChangePassword={() => setPasswordOpen(true)}
           className="ml-auto max-w-[60%] lg:hidden"
         />
       </div>
@@ -147,28 +156,34 @@ export default function Sidebar({
           email={email}
           language={language}
           onLanguageChange={onLanguageChange}
+          onChangePassword={() => setPasswordOpen(true)}
           className="w-full"
         />
       </div>
+      <ChangePasswordDialog open={passwordOpen} onOpenChange={setPasswordOpen} onSubmit={onPasswordChange} />
     </aside>
   );
 }
 
 /**
- * Who is signed in, opening their settings (the portal's language, saved on their account): at
- * the foot of the rail on desktop, in the top bar's corner on phones (avatar only below `sm`).
+ * Who is signed in, opening their settings (the portal's language, saved on their account, and
+ * changing their password): at the foot of the rail on desktop, in the top bar's corner on phones
+ * (avatar only below `sm`).
  */
 function SettingsMenu({
   name,
   email,
   language,
   onLanguageChange,
+  onChangePassword,
   className,
 }: {
   name: string | null;
   email: string | null;
   language: AppLanguage;
   onLanguageChange: (language: AppLanguage) => Promise<{ error?: string }>;
+  /** Opens the change-password dialog. */
+  onChangePassword: () => void;
   className: string;
 }) {
   const t = useTranslations("sidebar");
@@ -214,6 +229,11 @@ function SettingsMenu({
             ))}
           </DropdownMenuRadioGroup>
         </DropdownMenuGroup>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={onChangePassword}>
+          <KeyRound aria-hidden strokeWidth={1.8} />
+          {t("changePassword")}
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );

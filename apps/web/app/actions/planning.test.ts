@@ -3,6 +3,7 @@ import { createTestProject, createTestTenant, createTestUser, resetDatabase } fr
 import { files } from "@repo/core/testing";
 import { seedObra } from "@repo/core/seed";
 import { signInAs } from "../../test/session";
+import { NOT_FOUND } from "../../test/navigation";
 import {
   approvePlanningDraftAction,
   createPlanningDraftAction,
@@ -82,7 +83,9 @@ describe("planning actions", () => {
 
     const other = await createTestTenant();
     signInAs({ tenantId: other.id, userId: (await createTestUser(other.id, { role: "admin" })).id, role: "admin" });
-    expect(await getPlanning(project.id)).toBeNull();
+    await expect(getPlanning(project.id)).rejects.toEqual(NOT_FOUND);
+    // No draft is a state the editor handles (back to the plan), another tenant's project included.
+    expect(await getPlanningDraft(project.id)).toBeNull();
     expect(await createPlanningDraftAction(project.id, FIRST_PLAN)).toEqual({ error: "project_not_found" });
   });
 });

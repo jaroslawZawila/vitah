@@ -1,4 +1,5 @@
 import { notFound, redirect } from "next/navigation";
+import { forbidden } from "@/lib/access";
 import { canAmend } from "@repo/core/contract";
 import { getPurchase, getPurchaseForm } from "../../../../../../actions/purchasing";
 import { orderHref } from "../../../components/purchasing/links";
@@ -9,6 +10,8 @@ export default async function AmendPurchaseOrderPage({ params }: { params: Promi
   const { id, orderId } = await params;
   const [form, order] = await Promise.all([getPurchaseForm(id, orderId), getPurchase(orderId)]);
   if (!form?.form.editing || !order || order.order.projectId !== id) notFound();
-  if (!form.canManage || !canAmend(order.order.status)) redirect(orderHref(id, orderId));
+  if (!form.canManage) forbidden();
+  // Only a placed order takes a modificado: its page offers what it can.
+  if (!canAmend(order.order.status)) redirect(orderHref(id, orderId));
   return <AmendmentFormScreen projectId={id} form={form.form} order={order.order} />;
 }

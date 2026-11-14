@@ -3,6 +3,7 @@ import { createTestPhoto, createTestProject, createTestTenant, createTestUser, r
 import { files } from "@repo/core/testing";
 import { seedObra } from "@repo/core/seed";
 import { signInAs } from "../../test/session";
+import { NOT_FOUND, TO_LOGIN } from "../../test/navigation";
 import {
   addIssueFileAction,
   correctChapterAction,
@@ -62,14 +63,16 @@ describe("reads", () => {
     expect((await getConstructionPhotos(project.id))!.photos).toHaveLength(1);
   });
 
-  it("are null for another tenant's project or when signed out", async () => {
+  it("are not found for another tenant's project or a chapter the contract lacks, and the login page when signed out", async () => {
     const { project } = await setup();
+    await expect(getConstructionChapter(project.id, "99")).rejects.toEqual(NOT_FOUND);
+
     await setup();
-    expect(await getConstructionControl(project.id)).toBeNull();
-    expect(await getConstructionChapter(project.id, "06")).toBeNull();
+    await expect(getConstructionControl(project.id)).rejects.toEqual(NOT_FOUND);
+    await expect(getConstructionChapter(project.id, "06")).rejects.toEqual(NOT_FOUND);
 
     signInAs(null);
-    expect(await getConstructionIssues(project.id)).toBeNull();
+    await expect(getConstructionIssues(project.id)).rejects.toEqual(TO_LOGIN);
   });
 });
 

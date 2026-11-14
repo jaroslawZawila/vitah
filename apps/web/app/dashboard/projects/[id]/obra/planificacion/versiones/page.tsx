@@ -1,4 +1,4 @@
-import { redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { getPlanningVersions } from "../../../../../../actions/planning";
 import VersionsScreen from "./VersionsScreen";
 
@@ -6,6 +6,6 @@ import VersionsScreen from "./VersionsScreen";
 export default async function PlanVersionsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const data = await getPlanningVersions(id);
-  if (!data) redirect("/dashboard/projects");
+  if (!data) notFound();
   return <VersionsScreen projectId={id} data={data} />;
 }

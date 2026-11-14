@@ -2,6 +2,7 @@ import { db, eq, max, purchaseOrderAmendments, purchaseOrders } from "@repo/db";
 import { requireEditor, type Ctx } from "./context";
 import { canAmend } from "./contract";
 import { requirePdf } from "./documents";
+import { logError } from "./log";
 import { fail, optionalText, requiredText, workDate } from "./obra-data";
 import { todayInSpain } from "./obra-calc";
 import { addOrderDocument } from "./purchase-documents";
@@ -76,7 +77,7 @@ export async function amendPurchase(ctx: Ctx, orderId: string, input: Record<str
       file,
     }));
   } catch (error) {
-    console.error("Modificado PDF upload failed", error);
+    logError("purchase.amendment_file_failed", error, { orderId, amendmentId: made.amendmentId });
     return { ...made, documentFailed: true };
   }
   await db.update(purchaseOrderAmendments).set({ documentId }).where(eq(purchaseOrderAmendments.id, made.amendmentId));

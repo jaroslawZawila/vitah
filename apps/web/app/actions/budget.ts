@@ -10,27 +10,33 @@ import {
   budgetService as svc,
   searchPriceBase,
 } from "@repo/core";
-import { getSessionContext } from "@repo/auth/context";
+import { requireSession } from "../../lib/access";
 import { cancelBudgetGeneration, startBudgetGeneration } from "../../lib/budget-generation";
 import { mutate, read, type ObraState } from "./run";
 
 type Input = Record<string, unknown>;
 
-/** All revisions, one in full (default: the newest) and the newest AI run. */
+/**
+ * All revisions, one in full (default: the newest) and the newest AI run.
+ * Asked for a revision that isn't there (a stale `?revision=` link: the draft
+ * was discarded, the id is another project's) it answers null, for the page
+ * to show the newest instead; a project that isn't there is "No encontrado".
+ */
 export async function getProjectBudget(projectId: string, revisionId?: string) {
-  const result = await read((ctx) => svc.getBudget(ctx, projectId, revisionId));
+  const result = await read((ctx) => svc.getBudget(ctx, projectId, revisionId), { optional: Boolean(revisionId) });
   return result && { budget: result.data, canManage: result.canManage };
 }
 
 /** The AI run's progress, for the portal to poll while it runs. */
 export async function getGenerationAction(projectId: string, generationId: string) {
-  const result = await read((ctx) => generations.getGeneration(ctx, projectId, generationId));
+  // Polled from the open page: a run that is gone just stops being followed.
+  const result = await read((ctx) => generations.getGeneration(ctx, projectId, generationId), { optional: true });
   return result?.data ?? null;
 }
 
-/** Price base entries for the line picker (any staff member may search). */
+/** Price base entries for the line picker (any staff member may search; signed out, the login page). */
 export async function searchPriceBaseAction(query: string, chapter?: string) {
-  if (!(await getSessionContext())) return [];
+  await requireSession();
   return searchPriceBase(query, { chapter, limit: 12 });
 }
 

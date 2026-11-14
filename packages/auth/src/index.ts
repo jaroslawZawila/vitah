@@ -2,7 +2,7 @@ import "./types";
 import NextAuth, { CredentialsSignin } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { attemptSignIn, clientIp } from "./credentials";
-import { refreshSessionToken } from "./session";
+import { refreshSessionToken, signedInToken } from "./session";
 
 export { AuthError } from "next-auth";
 
@@ -36,13 +36,7 @@ const result = NextAuth({
   },
   callbacks: {
     async jwt({ token, user }) {
-      if (user) {
-        token.role = user.role;
-        token.tenantId = user.tenantId;
-        token.checkedAt = Date.now();
-        return token;
-      }
-      return refreshSessionToken(token);
+      return user ? signedInToken(token, user) : refreshSessionToken(token);
     },
     async session({ session, token }) {
       if (session.user) {

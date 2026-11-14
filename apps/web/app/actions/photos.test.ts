@@ -8,6 +8,7 @@ import {
 } from "@repo/db/testing";
 import { files, testImage } from "@repo/core/testing";
 import { signInAs } from "../../test/session";
+import { NOT_FOUND, TO_LOGIN } from "../../test/navigation";
 import { addProjectPhotoAction, deleteProjectPhotoAction, getProjectPhotos, setPhotoVisibilityAction } from "./photos";
 
 // The service itself is covered in packages/core; these tests cover the
@@ -120,14 +121,21 @@ describe("photo actions", () => {
     expect(await setPhotoVisibilityAction(project.id, photo.id, false)).toEqual({ error: "project_not_found" });
   });
 
-  it("lists nothing for another tenant's project or when signed out", async () => {
+  it("lists nothing only for a project without photos", async () => {
+    const { project } = await setup("viewer");
+
+    expect(await getProjectPhotos(project.id)).toEqual({ photos: [], canManage: false });
+  });
+
+  it("is \"No encontrado\" for another tenant's project or a missing one, and the login page when signed out", async () => {
     const { tenant, project } = await setup();
     await createTestPhoto(tenant.id, project.id);
 
     await setup();
-    expect((await getProjectPhotos(project.id)).photos).toEqual([]);
+    await expect(getProjectPhotos(project.id)).rejects.toEqual(NOT_FOUND);
+    await expect(getProjectPhotos("no-such-project")).rejects.toEqual(NOT_FOUND);
 
     signInAs(null);
-    expect(await getProjectPhotos(project.id)).toEqual({ photos: [], canManage: false });
+    await expect(getProjectPhotos(project.id)).rejects.toEqual(TO_LOGIN);
   });
 });

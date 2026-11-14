@@ -3,32 +3,20 @@
 // Thin portal adapters over @repo/core (packages/core/src/photos.ts), behind
 // the project's Photos page.
 
-import {
-  CoreError,
-  canEdit,
-  photosService as svc,
-  type PhotoError,
-  type ProjectPhoto,
-} from "@repo/core";
-import { getSessionContext } from "@repo/auth/context";
-import { mutate } from "./run";
+import { photosService as svc, type PhotoError, type ProjectPhoto } from "@repo/core";
+import { mutate, read } from "./run";
 
 export type PhotosState = { error?: PhotoError; success?: boolean } | null;
 
 /**
- * The project's photos and whether the caller may upload/delete. Empty when
- * signed out or the project isn't in the tenant.
+ * The project's photos and whether the caller may upload/delete. A project
+ * that isn't the tenant's is the "No encontrado" page (`read`).
  */
 export async function getProjectPhotos(
   projectId: string,
 ): Promise<{ photos: ProjectPhoto[]; canManage: boolean }> {
-  const ctx = await getSessionContext();
-  if (!ctx) return { photos: [], canManage: false };
-  const photos = await svc.listPhotos(ctx, projectId).catch((err: unknown) => {
-    if (err instanceof CoreError) return [];
-    throw err;
-  });
-  return { photos, canManage: canEdit(ctx.role) };
+  const result = await read((ctx) => svc.listPhotos(ctx, projectId));
+  return { photos: result?.data ?? [], canManage: result?.canManage ?? false };
 }
 
 export async function addProjectPhotoAction(

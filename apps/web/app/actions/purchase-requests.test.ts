@@ -3,6 +3,7 @@ import { createTestProject, createTestTenant, createTestUser, resetDatabase } fr
 import { purchasingService, subcontractorsService } from "@repo/core";
 import { seedObra } from "@repo/core/seed";
 import { signInAs } from "../../test/session";
+import { NOT_FOUND, TO_LOGIN } from "../../test/navigation";
 import {
   cancelRequestAction,
   createRequestAction,
@@ -110,9 +111,9 @@ describe("purchase request actions", () => {
     const other = await setup();
     const { requestId } = (await createRequestAction(other.project.id, other.request))!;
     signInAs(s.ctx);
-    expect(await getRequest(requestId!)).toBeNull();
+    await expect(getRequest(requestId!)).rejects.toEqual(NOT_FOUND);
     expect(await updateRequestAction(requestId!, { notes: "x" })).toEqual({ error: "forbidden" });
     signInAs(null);
-    expect(await getRequests()).toBeNull();
+    await expect(getRequests()).rejects.toEqual(TO_LOGIN);
   });
 });

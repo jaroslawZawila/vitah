@@ -12,6 +12,10 @@ vi.mock("next/navigation", () => ({
   useParams: () => navigation.params,
 }));
 const onLanguageChange = vi.fn(async () => ({}));
+const onPasswordChange = vi.fn(async (form: FormData) => {
+  void form;
+  return { success: true };
+});
 
 /** Next only sets `id` on `projects/[id]` routes. */
 function renderAt(
@@ -34,6 +38,7 @@ function renderAt(
         purchases={purchases}
         language="es"
         onLanguageChange={onLanguageChange}
+        onPasswordChange={onPasswordChange}
       />
     </NextIntlClientProvider>,
   );
@@ -181,5 +186,27 @@ describe("Sidebar", () => {
     fireEvent.click(settings!);
     fireEvent.click(await screen.findByRole("menuitemradio", { name: "Inglés" }));
     await waitFor(() => expect(onLanguageChange).toHaveBeenCalledWith("en"));
+  });
+
+  it("changes the user's password from the settings menu", async () => {
+    onPasswordChange.mockClear();
+    renderAt("/dashboard/projects");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    const [settings] = screen.getAllByRole("button", { name: /Ajustes/ });
+    fireEvent.click(settings!);
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Cambiar contraseña" }));
+
+    const dialog = within(await screen.findByRole("dialog", { name: "Cambiar contraseña" }));
+    fireEvent.change(dialog.getByLabelText("Contraseña actual"), { target: { value: "old-pass" } });
+    fireEvent.change(dialog.getByLabelText("Nueva contraseña"), { target: { value: "CasaNordica26" } });
+    fireEvent.change(dialog.getByLabelText("Repite la nueva contraseña"), { target: { value: "CasaNordica26" } });
+    fireEvent.click(dialog.getByRole("button", { name: "Cambiar contraseña" }));
+
+    await waitFor(() => expect(onPasswordChange).toHaveBeenCalledTimes(1));
+    expect(Object.fromEntries(onPasswordChange.mock.calls[0]![0])).toEqual({
+      currentPassword: "old-pass",
+      newPassword: "CasaNordica26",
+    });
+    expect(await dialog.findByRole("status")).toHaveTextContent("Contraseña cambiada.");
   });
 });

@@ -4,6 +4,7 @@ import { purchasingService, subcontractorsService } from "@repo/core";
 import { files } from "@repo/core/testing";
 import { seedObra } from "@repo/core/seed";
 import { signInAs } from "../../test/session";
+import { NOT_FOUND, TO_LOGIN } from "../../test/navigation";
 import { getProjectPurchaseLines } from "./purchasing";
 import {
   addInvoiceFileAction,
@@ -107,7 +108,7 @@ describe("invoice actions", () => {
     expect((await getInvoice(invoiceId))!.invoice).toMatchObject({ state: "pending", paidCents: 0, payments: [] });
     expect(await deleteInvoiceAction(invoiceId)).toEqual({ success: true });
     expect(await deleteInvoiceAction(invoiceId)).toEqual({ error: "not_found" });
-    expect(await getInvoice(invoiceId)).toBeNull();
+    await expect(getInvoice(invoiceId)).rejects.toEqual(NOT_FOUND);
     expect((await getInvoices())!.invoices.invoices).toEqual([]);
     expect(await getPurchasingCounts()).toEqual({ requests: 0, orders: 1, invoices: 0, payments: 0, suppliers: 1, dueAttention: 0 });
     expect(files.size).toBe(stored);
@@ -140,8 +141,8 @@ describe("invoice actions", () => {
     await setup();
     expect(await createInvoiceAction(orderId, formOf({ number: "X", issuedOn: "2026-10-01", baseCents: 1 }))).toEqual({ error: "not_found" });
     expect((await getInvoices())!.invoices.invoices).toEqual([]);
-    expect(await getInvoice("nope")).toBeNull();
+    await expect(getInvoice("nope")).rejects.toEqual(NOT_FOUND);
     signInAs(null);
-    expect(await getPurchasingCounts()).toBeNull();
+    await expect(getPurchasingCounts()).rejects.toEqual(TO_LOGIN);
   });
 });

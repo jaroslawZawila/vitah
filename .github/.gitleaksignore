@@ -1,0 +1,12 @@
+# Findings in the git history that gitleaks may pass over, one fingerprint per
+# line (commit:file:rule:line). Read by the "Secret scan" job of
+# .github/workflows/ci.yml (gitleaks git --gitleaks-ignore-path .github).
+# Add a line only after checking that the finding is not a secret, and say why.
+
+# Not a secret: the name of a translation in the first portal scaffold (a KPI tile).
+894cc036f0f17d40f9c4a7ef09534c331398587e:apps/web/app/dashboard/page.tsx:generic-api-key:9
+
+# The Android app's Firebase API key in google-services.json. It ships inside
+# every build of the app, so it is public by design: what protects it is its
+# restriction (Android app `app.vitah` + the Firebase APIs) in Google Cloud.
+3e84fcaa84a2435513ca7342d53d4bf722a19169:apps/mobile/google-services.json:gcp-api-key:18

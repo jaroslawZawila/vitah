@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { db, eq, projects } from "@repo/db";
 import { createTestProject, createTestTenant, createTestUser, resetDatabase } from "@repo/db/testing";
 import { signInAs } from "../../test/session";
+import { TO_FORBIDDEN, TO_LOGIN } from "../../test/navigation";
 import {
   assignProjectClientAction,
   getAssignableClients,
@@ -36,11 +37,25 @@ beforeEach(async () => {
 });
 
 describe("client access actions", () => {
-  it("lists assignable clients for admins only", async () => {
+  it("lists the tenant's assignable clients for admins: \"No tienes permiso\" for anyone else, the login page signed out", async () => {
     const { tenant, admin, client } = await setup();
+    const other = await createTestTenant();
+    await createTestUser(other.id, { role: "client" });
 
     expect((await getAssignableClients()).map((c) => c.id)).toEqual([client.id]);
-    signInAs({ tenantId: tenant.id, userId: admin.id, role: "manager" });
+    for (const role of ["manager", "viewer"] as const) {
+      signInAs({ tenantId: tenant.id, userId: admin.id, role });
+      await expect(getAssignableClients()).rejects.toEqual(TO_FORBIDDEN);
+    }
+    signInAs(null);
+    await expect(getAssignableClients()).rejects.toEqual(TO_LOGIN);
+  });
+
+  it("lists no clients only when the tenant has none", async () => {
+    const tenant = await createTestTenant();
+    const admin = await createTestUser(tenant.id, { role: "admin" });
+    signInAs({ tenantId: tenant.id, userId: admin.id, role: "admin" });
+
     expect(await getAssignableClients()).toEqual([]);
   });
 
@@ -78,9 +93,7 @@ describe("client access actions", () => {
     const { project, client } = await setup();
     signInAs(null);
 
-    await expect(assignProjectClientAction(project.id, null, pick(client.id))).rejects.toThrow(
-      "Unauthorized",
-    );
+    await expect(assignProjectClientAction(project.id, null, pick(client.id))).rejects.toEqual(TO_LOGIN);
   });
 
   it("removes the client from the project", async () => {

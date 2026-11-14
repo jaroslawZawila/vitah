@@ -1,4 +1,4 @@
-import { redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { getProjectObra } from "../../../../actions/obra";
 import { getProject } from "../../../../actions/projects";
 import HitosScreen from "./HitosScreen";
@@ -7,7 +7,7 @@ import HitosScreen from "./HitosScreen";
 export default async function ProjectPaymentsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const [project, result] = await Promise.all([getProject(id), getProjectObra(id)]);
-  if (!project || !result) redirect("/dashboard/projects");
+  if (!result) notFound();
 
   return (
     <HitosScreen
