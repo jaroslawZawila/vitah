@@ -5,7 +5,7 @@ import { reviewed } from "../../../../../../../lib/review-documents";
 // ─── /api/v1/purchases/:orderId/documents/:documentId ─────────────────────────
 // GET (?versionId: an older one) → the document's PDF, its current version
 // POST multipart { file (PDF ≤ 4 MB), note? } → { documentId, version }: its next version
-// DELETE → { documentId }: the document with all its versions
+// DELETE → { documentId }: the document with all its versions (a soft delete: it leaves the order, its files stay)
 // ─────────────────────────────────────────────────────────────────────────────
 
 type Params = { params: Promise<{ orderId: string; documentId: string }> };

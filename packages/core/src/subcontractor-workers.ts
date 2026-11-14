@@ -34,6 +34,7 @@ import {
   optional,
   phone,
   requireCaeCompany,
+  requireProjectRef,
   requireWorker,
   str,
   toDoc,
@@ -214,10 +215,13 @@ export async function updateWorker(ctx: Ctx, workerId: string, input: Record<str
 /**
  * "Comprobar acceso" at the site entrance: the worker with this DNI/NIE or TPC
  * number and their access, anywhere or on one obra. Body: { query, projectId? }.
+ * An obra that isn't the tenant's, or was deleted, is `project_not_found`.
  */
 export async function checkAccess(ctx: Ctx, input: Record<string, unknown>): Promise<AccessCheckResult> {
   const query = normalizeIdNumber(str(input.query));
   if (!query) fail("missing_fields");
+  const projectId = optional(input.projectId);
+  if (projectId) await requireProjectRef(ctx, projectId);
   const [row] = await db
     .select()
     .from(subcontractorWorkers)
@@ -231,7 +235,6 @@ export async function checkAccess(ctx: Ctx, input: Record<string, unknown>): Pro
   if (!row) return { worker: null, access: null };
 
   const net = await loadNetwork(ctx.tenantId, row.subcontractorId);
-  const projectId = optional(input.projectId);
   // On an obra the company isn't assigned to, the obra's own checks fail (no PSS adhesion, no book entry).
   const assignment = projectId
     ? (net.assignmentsOf(row.subcontractorId).find((a) => a.projectId === projectId) ?? {

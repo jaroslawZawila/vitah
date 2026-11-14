@@ -9,12 +9,15 @@ import {
   resetDatabase,
 } from "@repo/db/testing";
 import {
+  budgetService,
   changesService,
   clientProjectsService as svc,
   documentsService,
+  hitosService,
   obraService,
   photosService,
   projectClientService,
+  projectsService,
   type Ctx,
 } from "../src";
 import { files } from "../src/testing";
@@ -265,5 +268,96 @@ describe("the app's data, per project", () => {
 
     await projectClientService.unassignProjectClient(ctx, older.id);
     expect(await changes(older.id)).toBeNull();
+  });
+});
+
+describe("a deleted home", () => {
+  const pdf = () => new File(["%PDF-1.7 acta"], "acta.pdf", { type: "application/pdf" });
+
+  /** Two homes of one client, each with a photo, a document and a hito's acta the client can open. */
+  async function twoHomes() {
+    const s = await setup();
+    const home = async (startDate: string) => {
+      const project = await createTestProject(s.tenant.id, { clientUserId: s.client.id, startDate: day(startDate) });
+      const photo = await createTestPhoto(s.tenant.id, project.id);
+      const doc = await createTestDocument(s.tenant.id, project.id);
+      files.set(photo.pathname, new Blob(["jpeg"]));
+      files.set(doc.pathname, new Blob(["%PDF"]));
+      await budgetService.createBudget(s.ctx, project.id, {});
+      const [h0] = await hitosService.listHitos(s.ctx, project.id);
+      await hitosService.uploadHitoFile(s.ctx, project.id, h0!.id, "acta", { file: pdf(), date: "2026-02-03" });
+      return { project, photo, doc, hitoId: h0!.id };
+    };
+    return { ...s, older: await home("2025-01-10"), newest: await home("2026-03-10") };
+  }
+
+  it("is no longer the client's: not listed, not the default, none of its data within reach", async () => {
+    const { tenant, client, ctx, older, newest } = await twoHomes();
+    const open = (home: typeof older) =>
+      Promise.all([
+        photosService.openClientPhoto(tenant.id, client.id, home.photo.id),
+        documentsService.openClientDocument(tenant.id, client.id, home.doc.id),
+        hitosService.openClientHitoFile(tenant.id, client.id, home.hitoId, "acta"),
+      ]);
+    await expect(open(newest)).resolves.toHaveLength(3);
+    const stored = files.size;
+
+    await projectsService.deleteProject(ctx, newest.project.id);
+
+    expect((await svc.listClientProjects(tenant.id, client.id)).map((p) => p.id)).toEqual([older.project.id]);
+    expect(await svc.getClientProject(tenant.id, client.id)).toMatchObject({ id: older.project.id });
+    expect(await changesService.getClientChanges(tenant.id, client.id)).toMatchObject({
+      changes: { projectId: older.project.id },
+      projects: expect.not.stringContaining(newest.project.id),
+    });
+
+    // Asked for by its id, as an app that had it open would: not theirs any more.
+    const notTheirs = { code: "project_not_found", status: 404 };
+    await expect(svc.getClientProject(tenant.id, client.id, newest.project.id)).rejects.toMatchObject(notTheirs);
+    await expect(obraService.getClientObra(tenant.id, client.id, newest.project.id)).rejects.toMatchObject(notTheirs);
+    await expect(photosService.listClientPhotos(tenant.id, client.id, newest.project.id)).rejects.toMatchObject(notTheirs);
+    await expect(
+      documentsService.listClientDocuments(tenant.id, client.id, { projectId: newest.project.id }),
+    ).rejects.toMatchObject(notTheirs);
+    expect((await changesService.getClientChanges(tenant.id, client.id, newest.project.id)).changes).toBeNull();
+    // Its files are still stored, but no longer served.
+    expect(files.size).toBe(stored);
+    const notFound = { code: "not_found", status: 404 };
+    await expect(photosService.openClientPhoto(tenant.id, client.id, newest.photo.id)).rejects.toMatchObject(notFound);
+    await expect(documentsService.openClientDocument(tenant.id, client.id, newest.doc.id)).rejects.toMatchObject(notFound);
+    await expect(hitosService.openClientHitoFile(tenant.id, client.id, newest.hitoId, "acta")).rejects.toMatchObject(notFound);
+  });
+
+  it("leaves the client's other home working as before", async () => {
+    const { tenant, client, ctx, older, newest } = await twoHomes();
+
+    await projectsService.deleteProject(ctx, newest.project.id);
+
+    expect(await svc.getClientProject(tenant.id, client.id, older.project.id)).toMatchObject({ id: older.project.id });
+    expect((await obraService.getClientObra(tenant.id, client.id))?.hitos.map((h) => h.id)).toContain(older.hitoId);
+    expect((await photosService.listClientPhotos(tenant.id, client.id)).map((p) => p.id)).toEqual([older.photo.id]);
+    expect((await documentsService.listClientDocuments(tenant.id, client.id)).map((d) => d.id)).toEqual([older.doc.id]);
+    await expect(photosService.openClientPhoto(tenant.id, client.id, older.photo.id)).resolves.toBeDefined();
+    await expect(documentsService.openClientDocument(tenant.id, client.id, older.doc.id)).resolves.toBeDefined();
+    await expect(hitosService.openClientHitoFile(tenant.id, client.id, older.hitoId, "acta")).resolves.toBeDefined();
+  });
+
+  it("leaves a client whose only home it was with none, as when they are removed from it", async () => {
+    const { tenant, client, ctx } = await setup();
+    const project = await createTestProject(tenant.id, { clientUserId: client.id });
+    await createTestPhoto(tenant.id, project.id);
+    await createTestDocument(tenant.id, project.id);
+
+    await projectsService.deleteProject(ctx, project.id);
+
+    expect(await svc.getClientProject(tenant.id, client.id)).toBeNull();
+    expect(await svc.listClientProjects(tenant.id, client.id)).toEqual([]);
+    expect(await obraService.getClientObra(tenant.id, client.id)).toBeNull();
+    expect(await photosService.listClientPhotos(tenant.id, client.id)).toEqual([]);
+    expect(await documentsService.listClientDocuments(tenant.id, client.id)).toEqual([]);
+    expect(await changesService.getClientChanges(tenant.id, client.id)).toEqual({ changes: null, projects: "" });
+    // The client is still attached to the archived project: nothing of it was changed.
+    const [row] = await db.select().from(projects).where(eq(projects.id, project.id));
+    expect(row).toMatchObject({ clientUserId: client.id, deletedById: ctx.userId });
   });
 });

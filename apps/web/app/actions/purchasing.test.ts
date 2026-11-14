@@ -87,8 +87,13 @@ describe("purchasing actions", () => {
       hasFile: true,
       documents: [{ title: "Contrato firmado", versions: [{ version: 2, note: "Firmado" }, { version: 1 }] }],
     });
+    // A soft delete: the same answers, once; it leaves the order and the lists, and its files stay.
+    const stored = files.size;
     expect(await deleteOrderDocumentAction(project.id, orderId, documentId)).toEqual({ success: true });
     expect(await deleteOrderDocumentAction(project.id, orderId, documentId)).toEqual({ error: "not_found" });
+    expect((await getPurchase(orderId))!.order).toMatchObject({ documents: [], hasFile: false, file: null });
+    expect((await getPurchases())!.purchases.orders[0]).toMatchObject({ id: orderId, hasFile: false });
+    expect(files.size).toBe(stored);
   });
 
   it("edit an order's amount with its payment schedule following, or the error when it can't", async () => {

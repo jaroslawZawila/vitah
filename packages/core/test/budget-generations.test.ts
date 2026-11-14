@@ -1,8 +1,8 @@
 import ExcelJS from "exceljs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { aiUsage, budgetGenerations, db, eq, projectDocuments, tenants } from "@repo/db";
+import { aiUsage, budgetGenerations, budgetRevisions, db, eq, projectDocuments, tenants } from "@repo/db";
 import { createTestDocument, createTestProject, createTestTenant, createTestUser, resetDatabase } from "@repo/db/testing";
-import { budgetGenerationsService as svc, budgetService, obraService, type Ctx } from "../src";
+import { budgetGenerationsService as svc, budgetService, obraService, projectsService, type Ctx } from "../src";
 import * as claude from "../src/budget-ai/claude";
 import { measurementText, parseBc3, parseXlsx } from "../src/budget-ai/measurements";
 import {
@@ -11,6 +11,7 @@ import {
   failureOf,
   generateGroup,
   GenerationStopped,
+  isFinal,
   prepareInputs,
   saveDraft,
 } from "../src/budget-ai/pipeline";
@@ -233,6 +234,29 @@ describe("pipeline", () => {
     await expect(prepareInputs(next)).rejects.toBeInstanceOf(GenerationStopped);
     await failGeneration(next, "unexpected", "late");
     expect((await svc.getGeneration(ctx, project.id, next)).status).toBe("cancelled");
+  });
+
+  it("stops at its next step once the project is deleted: no call to Claude, no draft", async () => {
+    fakeClaude();
+    const { project, ctx, documentIds } = await setup();
+    const { generationId } = await svc.startGeneration(ctx, project.id, { documentIds });
+    await prepareInputs(generationId);
+    await projectsService.deleteProject(ctx, project.id);
+
+    const error = await extractProject(generationId).catch((e: unknown) => e);
+
+    expect(failureOf(error)).toMatchObject({ code: "not_found" });
+    // No retry: the workflow ends the run there.
+    expect(isFinal(error)).toBe(true);
+    expect(claude.structuredCall).not.toHaveBeenCalled();
+    expect(await db.select().from(aiUsage)).toEqual([]);
+    await expect(saveDraft(generationId)).rejects.toMatchObject({ code: "not_found" });
+    expect(await db.select().from(budgetRevisions).where(eq(budgetRevisions.projectId, project.id))).toEqual([]);
+    // The run is kept, like everything of the project, and is out of staff's reach with it.
+    expect(await db.select({ id: budgetGenerations.id }).from(budgetGenerations)).toEqual([{ id: generationId }]);
+    await expect(svc.getGeneration(ctx, project.id, generationId)).rejects.toMatchObject({ code: "project_not_found" });
+    await expect(svc.cancelGeneration(ctx, project.id, generationId)).rejects.toMatchObject({ code: "project_not_found" });
+    await expect(svc.startGeneration(ctx, project.id, { documentIds })).rejects.toMatchObject({ code: "project_not_found" });
   });
 
   it("won't overwrite a budget made meanwhile", async () => {

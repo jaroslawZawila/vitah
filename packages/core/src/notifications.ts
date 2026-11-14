@@ -60,7 +60,7 @@ export async function notifyProjectClient(tenantId: string, projectId: string, e
         notifyDocuments: clientSettings.notifyDocuments,
         notifyMessages: clientSettings.notifyMessages,
         ref: projects.ref,
-        homes: sql<number>`(select count(*) from ${projects} p where p.client_user_id = ${users.id})`.mapWith(Number),
+        homes: sql<number>`(select count(*) from ${projects} p where p.client_user_id = ${users.id} and p.deleted_at is null)`.mapWith(Number),
       })
       .from(projects)
       .innerJoin(users, and(eq(users.id, projects.clientUserId), eq(users.active, true)))

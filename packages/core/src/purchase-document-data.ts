@@ -1,9 +1,10 @@
-import { and, asc, db, desc, eq, inArray, purchaseOrderDocumentVersions, purchaseOrderDocuments, users } from "@repo/db";
+import { and, asc, db, desc, eq, inArray, isNull, purchaseOrderDocumentVersions, purchaseOrderDocuments, users } from "@repo/db";
 import type { PurchaseOrderDocument } from "./contract";
 import { groupBy, userName } from "./obra-data";
 
 // ─── An order's documents: loading ───────────────────────────────────────────
-// What the order's page and the lists read of ./purchase-documents.
+// What the order's page and the lists read of ./purchase-documents. A document
+// a user removed stays in its table (`deleted_at`); every read leaves it out.
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** The orders' documents with their versions (newest first), oldest document first, by order. */
@@ -13,14 +14,20 @@ export async function loadDocuments(tenantId: string, orderIds: string[]) {
     db
       .select()
       .from(purchaseOrderDocuments)
-      .where(and(eq(purchaseOrderDocuments.tenantId, tenantId), inArray(purchaseOrderDocuments.orderId, orderIds)))
+      .where(and(eq(purchaseOrderDocuments.tenantId, tenantId), isNull(purchaseOrderDocuments.deletedAt), inArray(purchaseOrderDocuments.orderId, orderIds)))
       .orderBy(asc(purchaseOrderDocuments.createdAt), asc(purchaseOrderDocuments.id)),
     db
       .select({ version: purchaseOrderDocumentVersions, by: userName })
       .from(purchaseOrderDocumentVersions)
       .innerJoin(purchaseOrderDocuments, eq(purchaseOrderDocuments.id, purchaseOrderDocumentVersions.documentId))
       .leftJoin(users, eq(users.id, purchaseOrderDocumentVersions.uploadedById))
-      .where(and(eq(purchaseOrderDocumentVersions.tenantId, tenantId), inArray(purchaseOrderDocuments.orderId, orderIds)))
+      .where(
+        and(
+          eq(purchaseOrderDocumentVersions.tenantId, tenantId),
+          isNull(purchaseOrderDocuments.deletedAt),
+          inArray(purchaseOrderDocuments.orderId, orderIds),
+        ),
+      )
       .orderBy(desc(purchaseOrderDocumentVersions.version)),
   ]);
   const byDocument = groupBy(versions, (v) => v.version.documentId);
@@ -52,7 +59,7 @@ export async function ordersWithDocuments(tenantId: string, orderIds: string[]) 
   const rows = await db
     .selectDistinct({ orderId: purchaseOrderDocuments.orderId })
     .from(purchaseOrderDocuments)
-    .where(and(eq(purchaseOrderDocuments.tenantId, tenantId), inArray(purchaseOrderDocuments.orderId, orderIds)));
+    .where(and(eq(purchaseOrderDocuments.tenantId, tenantId), isNull(purchaseOrderDocuments.deletedAt), inArray(purchaseOrderDocuments.orderId, orderIds)));
   return new Set(rows.map((r) => r.orderId));
 }
 

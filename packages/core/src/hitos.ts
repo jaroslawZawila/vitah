@@ -6,6 +6,7 @@ import {
   desc,
   eq,
   inArray,
+  isNull,
   obraHitoChapters,
   obraHitoChecks,
   obraHitoEvents,
@@ -429,6 +430,7 @@ export async function setActaPhotos(
           inArray(projectPhotos.id, ids),
           eq(projectPhotos.projectId, projectId),
           eq(projectPhotos.tenantId, ctx.tenantId),
+          isNull(projectPhotos.deletedAt),
         ),
       );
     if (found.length !== ids.length) fail("not_found");

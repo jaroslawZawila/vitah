@@ -77,7 +77,13 @@ describe("/api/v1/projects/:id/documents", () => {
 
     const deleted = await DELETE(request(token, { method: "DELETE" }), params(project.id, documentId));
     expect(deleted.status).toBe(204);
-    expect(files.size).toBe(0);
+    // Its file is kept; the document itself is gone for every request.
+    expect(files.size).toBe(1);
+    expect(await (await list(request(token), projectParams(project.id))).json()).toEqual([]);
+    expect((await download(request(token), params(project.id, documentId))).status).toBe(404);
+    const again = await DELETE(request(token, { method: "DELETE" }), params(project.id, documentId));
+    expect(again.status).toBe(404);
+    expect(await again.json()).toEqual({ error: "not_found" });
   });
 
   it("switches whether the client sees a document", async () => {

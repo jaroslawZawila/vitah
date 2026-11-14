@@ -123,7 +123,11 @@ describe("issues", () => {
 
     const [issue] = (await getConstructionIssues(project.id))!.issues;
     expect(issue).toMatchObject({ status: "resolved", files: [{ filename: "albaran.pdf" }] });
-    expect(await deleteIssueFileAction(project.id, issueId, issue!.files[0]!.id)).toEqual({ success: true });
+    const fileId = issue!.files[0]!.id;
+    expect(await deleteIssueFileAction(project.id, issueId, fileId)).toEqual({ success: true });
+    expect((await getConstructionIssues(project.id))!.issues[0]!.files).toEqual([]);
+    // Already removed: gone for the next delete too.
+    expect(await deleteIssueFileAction(project.id, issueId, fileId)).toEqual({ error: "not_found" });
   });
 
   it("returns the service's errors", async () => {

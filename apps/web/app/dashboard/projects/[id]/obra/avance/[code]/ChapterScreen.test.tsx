@@ -149,12 +149,14 @@ describe("ChapterScreen", () => {
   });
 
   it("edits an issue and removes an attachment", async () => {
-    vi.spyOn(window, "confirm").mockReturnValue(true);
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
     renderScreen();
 
     await userEvent.click(screen.getByRole("button", { name: "Editar INC-007" }));
     const dialog = within(await screen.findByRole("dialog", { name: "Editar registro" }));
     await userEvent.click(dialog.getByRole("button", { name: "Quitar albaran.pdf" }));
+    // Says what happens: it stops being shown, and the file is kept.
+    expect(confirm).toHaveBeenCalledWith("¿Quitar el adjunto albaran.pdf? Dejará de verse en el portal; el archivo se conserva.");
     expect(actions.deleteIssueFileAction).toHaveBeenCalledWith("p-1", "issue-7", "file-1");
     await userEvent.selectOptions(dialog.getByLabelText("Estado"), "resolved");
     await userEvent.click(dialog.getByRole("button", { name: "Guardar registro" }));

@@ -6,7 +6,7 @@ import {
   createTestUser,
   resetDatabase,
 } from "@repo/db/testing";
-import { budgetService, clientProjectsService, hitosService, obraService as svc, planningService, projectClientService, type Ctx } from "../src";
+import { budgetService, clientProjectsService, hitosService, obraService as svc, photosService, planningService, projectClientService, type Ctx } from "../src";
 import { framerDraft } from "./budget-fixture";
 
 /** The seed's overall progress (seed-obra.ts PROGRESS), weighted by amount. */
@@ -102,6 +102,20 @@ describe("getChapter", () => {
     expect(detail.chapter.lines).toHaveLength(9);
     expect(detail.hito).toMatchObject({ code: "H4" });
     expect(detail.photos.map((p) => p.id)).toEqual([photo.id]);
+  });
+
+  it("leaves a deleted photo out of the chapter and of the client's phase", async () => {
+    const { tenant, client, project, ctx } = await setup();
+    await seedObra(ctx, project.id);
+    const kept = await createTestPhoto(tenant.id, project.id, { chapterCode: "05" });
+    const deleted = await createTestPhoto(tenant.id, project.id, { chapterCode: "05" });
+    const phase = async () => (await svc.getClientObra(tenant.id, client.id))!.phases.find((p) => p.key === "H4")!;
+    expect(await phase()).toMatchObject({ photoCount: 2 });
+
+    await photosService.deletePhoto(ctx, project.id, deleted.id);
+
+    expect((await svc.getChapter(ctx, project.id, "05")).photos.map((p) => p.id)).toEqual([kept.id]);
+    expect(await phase()).toMatchObject({ photoCount: 1, photoIds: [kept.id] });
   });
 
   it("fails for an unknown chapter or before a budget is accepted", async () => {

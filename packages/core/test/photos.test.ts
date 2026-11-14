@@ -277,16 +277,52 @@ describe("listPhotos", () => {
 });
 
 describe("deletePhoto", () => {
-  it("removes the row and the file", async () => {
-    const { project, ctx } = await setup();
+  const rowOf = (photoId: string) => db.query.projectPhotos.findFirst({ where: eq(projectPhotos.id, photoId) });
+
+  it("marks the row as deleted, with who did it, and keeps the image and its thumbnail", async () => {
+    const { tenant, project, ctx } = await setup();
+    const manager = await createTestUser(tenant.id, { role: "manager" });
     const { photoId } = await upload(ctx, project.id);
 
-    await expect(svc.deletePhoto({ ...ctx, role: "manager" }, project.id, photoId)).resolves.toEqual(
-      { photoId },
-    );
+    await expect(
+      svc.deletePhoto({ ...ctx, userId: manager.id, role: "manager" }, project.id, photoId),
+    ).resolves.toEqual({ photoId });
 
-    expect(await svc.listPhotos(ctx, project.id)).toEqual([]);
-    expect(files.size).toBe(0);
+    const row = await rowOf(photoId);
+    expect(row).toMatchObject({ caption: "Fachada sur", deletedAt: expect.any(Date), deletedById: manager.id });
+    expect([...files.keys()].sort()).toEqual([row!.pathname, row!.pathname.replace(".jpg", ".thumb.webp")].sort());
+  });
+
+  it("leaves it out of the staff list and images, and of the client's app", async () => {
+    const { tenant, client, project, ctx } = await setup();
+    const { photoId } = await upload(ctx, project.id, { chapterCode: "05" });
+    const kept = await upload(ctx, project.id, { chapterCode: "05" });
+
+    await svc.deletePhoto(ctx, project.id, photoId);
+
+    expect((await svc.listPhotos(ctx, project.id)).map((p) => p.id)).toEqual([kept.photoId]);
+    expect((await svc.listPhotos(ctx, project.id, { chapterCode: "05" })).map((p) => p.id)).toEqual([kept.photoId]);
+    for (const size of ["full", "thumb"] as const) {
+      await expect(svc.openPhoto(ctx, project.id, photoId, size)).rejects.toMatchObject({ code: "not_found", status: 404 });
+      await expect(svc.openClientPhoto(tenant.id, client.id, photoId, size)).rejects.toMatchObject({ code: "not_found", status: 404 });
+    }
+    expect((await svc.listClientPhotos(tenant.id, client.id)).map((p) => p.id)).toEqual([kept.photoId]);
+    // The obra's phases show the chapter's photos.
+    expect((await svc.photosByChapter(tenant.id, project.id)).get("05")?.map((p) => p.id)).toEqual([kept.photoId]);
+    // The one beside it is untouched.
+    expect((await svc.openClientPhoto(tenant.id, client.id, kept.photoId, "thumb")).contentType).toBe("image/webp");
+  });
+
+  it("is not found from then on: deleting it again or showing it", async () => {
+    const { project, ctx } = await setup();
+    const { photoId } = await upload(ctx, project.id);
+    await svc.deletePhoto(ctx, project.id, photoId);
+    const { deletedAt } = (await rowOf(photoId))!;
+
+    await expect(svc.deletePhoto(ctx, project.id, photoId)).rejects.toMatchObject({ code: "not_found", status: 404 });
+    await expect(svc.setPhotoVisibility(ctx, project.id, photoId, { visibleToClient: false })).rejects.toMatchObject({ code: "not_found" });
+    // The first delete's mark stands.
+    expect(await rowOf(photoId)).toMatchObject({ deletedAt, visibleToClient: true });
   });
 
   it("is forbidden for viewers", async () => {
@@ -296,7 +332,8 @@ describe("deletePhoto", () => {
     await expect(
       svc.deletePhoto({ ...ctx, role: "viewer" }, project.id, photoId),
     ).rejects.toMatchObject({ code: "forbidden" });
-    expect(files.size).toBe(2); // the photo and its thumbnail
+    expect(await rowOf(photoId)).toMatchObject({ deletedAt: null, deletedById: null });
+    expect((await svc.listPhotos(ctx, project.id)).map((p) => p.id)).toEqual([photoId]);
   });
 
   it("does not delete another tenant's photo", async () => {
@@ -308,7 +345,29 @@ describe("deletePhoto", () => {
       code: "not_found",
       status: 404,
     });
-    expect(files.size).toBe(2); // the photo and its thumbnail
+    // Nor through a project of their own.
+    await expect(svc.deletePhoto(other.ctx, other.project.id, photoId)).rejects.toMatchObject({ code: "not_found" });
+    expect(await rowOf(photoId)).toMatchObject({ deletedAt: null, deletedById: null });
+    expect((await svc.listPhotos(ctx, project.id)).map((p) => p.id)).toEqual([photoId]);
+  });
+});
+
+describe("a deleted project's photos", () => {
+  it("are not found by their own id: image, thumbnail, delete, visibility", async () => {
+    const { project, ctx } = await setup();
+    const { photoId } = await upload(ctx, project.id);
+    await db.update(projects).set({ deletedAt: new Date() }).where(eq(projects.id, project.id));
+
+    for (const size of ["full", "thumb"] as const) {
+      await expect(svc.openPhoto(ctx, project.id, photoId, size)).rejects.toMatchObject({ code: "not_found", status: 404 });
+    }
+    await expect(svc.deletePhoto(ctx, project.id, photoId)).rejects.toMatchObject({ code: "not_found", status: 404 });
+    await expect(svc.setPhotoVisibility(ctx, project.id, photoId, { visibleToClient: false })).rejects.toMatchObject({ status: 404 });
+
+    // Nothing was written, and the files are kept.
+    const row = await db.query.projectPhotos.findFirst({ where: eq(projectPhotos.id, photoId) });
+    expect(row).toMatchObject({ deletedAt: null, deletedById: null, visibleToClient: true });
+    expect(files.size).toBe(2);
   });
 });
 
@@ -461,19 +520,30 @@ describe("client photos", () => {
 });
 
 describe("deleteProject", () => {
-  it("also deletes the project's photos", async () => {
-    const { project, ctx } = await setup();
-    await upload(ctx, project.id);
+  it("keeps the project's photos and their stored files, out of reach", async () => {
+    const { project, ctx, tenant, client } = await setup();
+    const { photoId } = await upload(ctx, project.id);
     const other = await setup();
     await upload(other.ctx, other.project.id);
+    const stored = [...files.keys()];
 
     await projectsService.deleteProject(ctx, project.id);
 
-    // Only the other project's photo and thumbnail are left.
-    expect([...files.keys()]).toEqual([
-      expect.stringContaining(other.project.id),
-      expect.stringContaining(other.project.id),
+    // Nothing is erased: each project's photo and thumbnail, and the photo's row.
+    expect([...files.keys()]).toEqual(stored);
+    expect(stored.filter((pathname) => pathname.includes(project.id))).toHaveLength(2);
+    expect(stored.filter((pathname) => pathname.includes(other.project.id))).toHaveLength(2);
+    expect(await db.select({ id: projectPhotos.id }).from(projectPhotos).where(eq(projectPhotos.projectId, project.id))).toEqual([
+      { id: photoId },
     ]);
+    // But staff can't list or add to them, and the client no longer has them.
+    await expect(svc.listPhotos(ctx, project.id)).rejects.toMatchObject({ code: "project_not_found", status: 404 });
+    await expect(upload(ctx, project.id)).rejects.toMatchObject({ code: "project_not_found", status: 404 });
+    expect(await svc.listClientPhotos(tenant.id, client.id)).toEqual([]);
+    await expect(svc.openClientPhoto(tenant.id, client.id, photoId)).rejects.toMatchObject({ code: "not_found", status: 404 });
+    expect([...files.keys()]).toEqual(stored);
+    // The other project's are untouched.
+    expect(await svc.listPhotos(other.ctx, other.project.id)).toHaveLength(1);
   });
 });
 

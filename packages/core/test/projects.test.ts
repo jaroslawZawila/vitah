@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  createTestDocument,
+  createTestPhoto,
   createTestProject,
   createTestTenant,
   createTestUser,
@@ -10,22 +10,30 @@ import {
   budgetRevisions,
   db,
   eq,
-  obraIssues,
-  purchaseInvoices,
+  obraChapterProgress,
+  obraHitoEvents,
+  obraHitos,
+  projectDocuments,
+  projectPhotos,
+  projects,
   purchaseOrders,
-  subcontractorAssignments,
-  subcontractors,
 } from "@repo/db";
 import {
   budgetIssueService,
   budgetService,
   constructionService,
+  documentsService,
   hitosService,
+  obraService,
+  photosService,
+  planningService,
+  projectClientService,
   projectsService as svc,
   purchasingService,
   subcontractorsService,
   type Ctx,
 } from "../src";
+import { files } from "../src/testing";
 import { framerDraft } from "./budget-fixture";
 
 vi.mock("../src/storage", () => import("../src/testing"));
@@ -44,6 +52,7 @@ async function otherTenantCtx(): Promise<Ctx> {
 
 beforeEach(async () => {
   await resetDatabase();
+  files.clear();
 });
 
 describe("createProject with a client", () => {
@@ -313,50 +322,14 @@ describe("updateProject", () => {
   });
 });
 
-describe("deleteProject", () => {
-  it("deletes a project in the tenant", async () => {
-    const { tenant, ctx } = await setup();
-    const project = await createTestProject(tenant.id);
-
-    await expect(svc.deleteProject(ctx, project.id)).resolves.toEqual({
-      projectId: project.id,
-    });
-    expect(await svc.getProject(ctx, project.id)).toBeNull();
-  });
-
-  it("does not delete another tenant's project", async () => {
-    const { tenant, ctx } = await setup();
-    const project = await createTestProject(tenant.id);
-
-    await expect(
-      svc.deleteProject(await otherTenantCtx(), project.id),
-    ).rejects.toMatchObject({
-      code: "not_found",
-    });
-    expect(await svc.getProject(ctx, project.id)).not.toBeNull();
-  });
-
-  it("answers not_found for another tenant's project even when it has records", async () => {
-    const { tenant, ctx } = await setup();
-    const project = await createTestProject(tenant.id);
-    await acceptedBudget(ctx, project.id);
-
-    await expect(svc.deleteProject(await otherTenantCtx(), project.id)).rejects.toMatchObject({
-      code: "not_found",
-      status: 404,
-    });
-    expect(await svc.getProject(ctx, project.id)).not.toBeNull();
-  });
-});
-
 /** Accepts a budget of chapters 01–03 (1.000 € each): the project's contract. */
 async function acceptedBudget(ctx: Ctx, projectId: string) {
   const { revisionId } = await framerDraft(ctx, projectId, ["01", "02", "03"]);
   await budgetService.acceptRevision(ctx, projectId, revisionId, {}, { unissued: true });
 }
 
-/** A material supplier and a pending order to it on the project (which needs its accepted budget). */
-async function pendingOrders(ctx: Ctx, projectId: string, count = 1) {
+/** A material supplier and an order placed with it on the project (which needs its accepted budget). */
+async function placedOrder(ctx: Ctx, projectId: string) {
   const { id: subcontractorId } = await subcontractorsService.createSubcontractor(ctx, {
     kind: "company",
     legalName: "Piedra de Liébana S.L.",
@@ -367,226 +340,196 @@ async function pendingOrders(ctx: Ctx, projectId: string, count = 1) {
     suppliesOnly: true,
   });
   const form = await purchasingService.getPurchaseForm(ctx, projectId);
-  const orderIds: string[] = [];
-  for (let i = 0; i < count; i++) {
-    const { orderId } = await purchasingService.createPurchase(ctx, projectId, {
-      kind: "material",
-      subcontractorId,
-      description: "Mampostería de piedra natural",
-      lines: [{ lineageId: form.chapters[0]!.lines[0]!.lineageId, amountCents: 40_000 }],
-    });
-    orderIds.push(orderId);
-  }
-  return { subcontractorId, orderIds };
+  const { orderId } = await purchasingService.createPurchase(ctx, projectId, {
+    kind: "material",
+    subcontractorId,
+    description: "Mampostería de piedra natural",
+    lines: [{ lineageId: form.chapters[0]!.lines[0]!.lineageId, amountCents: 40_000 }],
+  });
+  await purchasingService.setPurchaseStatus(ctx, orderId, { status: "ordered" });
+  return { subcontractorId, orderId };
 }
 
-describe("deleteProject with records to keep", () => {
-  const blocked = { code: "project_has_records", status: 409 };
+/** The project's row as the database has it, deleted or not. */
+async function stored(projectId: string) {
+  const [row] = await db.select().from(projects).where(eq(projects.id, projectId));
+  return row;
+}
 
-  async function expectKept(ctx: Ctx, projectId: string) {
-    await expect(svc.deleteProject(ctx, projectId)).rejects.toMatchObject(blocked);
-    expect(await svc.getProject(ctx, projectId)).not.toBeNull();
-  }
+const pdf = () => new File(["%PDF-1.7 contrato"], "contrato.pdf", { type: "application/pdf" });
 
-  it("deletes a project whose budget is still a draft", async () => {
+describe("deleteProject", () => {
+  it("archives the project: who deleted it and when, its row kept", async () => {
     const { tenant, ctx } = await setup();
     const project = await createTestProject(tenant.id);
-    await framerDraft(ctx, project.id, ["01"]);
+    const before = Date.now();
 
     await expect(svc.deleteProject(ctx, project.id)).resolves.toEqual({ projectId: project.id });
-    expect(await svc.getProject(ctx, project.id)).toBeNull();
+
+    const row = await stored(project.id);
+    expect(row).toMatchObject({ id: project.id, ref: project.ref, address: project.address, deletedById: ctx.userId });
+    expect(row!.deletedAt!.getTime()).toBeGreaterThanOrEqual(before - 1000);
+    expect(row!.deletedAt!.getTime()).toBeLessThanOrEqual(Date.now() + 1000);
   });
 
-  it("keeps a project with an issued budget, the budget included", async () => {
+  it("erases nothing: its documents, photos, budget, hitos and stored files stay", async () => {
     const { tenant, ctx } = await setup();
     const project = await createTestProject(tenant.id);
-    const { revisionId } = await framerDraft(ctx, project.id, ["01"]);
-    await budgetIssueService.issueRevision(ctx, project.id, revisionId);
+    const { documentId } = await documentsService.addDocument(ctx, project.id, { file: pdf(), title: "Contrato", category: "contract" });
+    const photo = await createTestPhoto(tenant.id, project.id);
+    files.set(photo.pathname, new Blob(["jpeg"]));
+    await framerDraft(ctx, project.id, ["01"]);
+    const kept = [...files.keys()].sort();
+    expect(kept).toHaveLength(2);
 
-    await expectKept(ctx, project.id);
-    expect((await budgetService.getBudget(ctx, project.id)).revision).toMatchObject({ status: "issued" });
+    await svc.deleteProject(ctx, project.id);
+
+    expect([...files.keys()].sort()).toEqual(kept);
+    expect(await db.select({ id: projectDocuments.id }).from(projectDocuments).where(eq(projectDocuments.projectId, project.id))).toEqual([
+      { id: documentId },
+    ]);
+    expect(await db.select({ id: projectPhotos.id }).from(projectPhotos).where(eq(projectPhotos.projectId, project.id))).toEqual([
+      { id: photo.id },
+    ]);
+    expect(await db.select().from(budgetRevisions).where(eq(budgetRevisions.projectId, project.id))).toHaveLength(1);
+    expect((await db.select().from(obraHitos).where(eq(obraHitos.projectId, project.id))).length).toBeGreaterThan(0);
   });
 
-  it("keeps a project with an accepted budget", async () => {
+  it("archives a project with an accepted budget, a placed order and a paid hito, all of them kept", async () => {
     const { tenant, ctx } = await setup();
     const project = await createTestProject(tenant.id);
     await acceptedBudget(ctx, project.id);
-
-    await expectKept(ctx, project.id);
-  });
-
-  // Each of the rest is checked on its own: the budget is put back to draft
-  // behind the service's back, so only the record under test blocks.
-  async function contractThenDraft(ctx: Ctx, projectId: string, record: () => Promise<unknown>) {
-    await acceptedBudget(ctx, projectId);
-    await record();
-    await db.update(budgetRevisions).set({ status: "draft" }).where(eq(budgetRevisions.projectId, projectId));
-  }
-
-  it("deletes a project whose only orders are pending or cancelled", async () => {
-    const { tenant, ctx } = await setup();
-    const project = await createTestProject(tenant.id);
-    await contractThenDraft(ctx, project.id, async () => {
-      const { orderIds } = await pendingOrders(ctx, project.id, 2);
-      await purchasingService.setPurchaseStatus(ctx, orderIds[1]!, { status: "cancelled", note: "Duplicado" });
-    });
+    const { orderId } = await placedOrder(ctx, project.id);
+    const [h0] = await hitosService.listHitos(ctx, project.id);
+    await hitosService.registerPayment(ctx, project.id, h0!.id, { paidOn: "2026-02-03" });
+    await constructionService.startChapter(ctx, project.id, "01", { date: "2026-02-03" });
 
     await expect(svc.deleteProject(ctx, project.id)).resolves.toEqual({ projectId: project.id });
+
     expect(await svc.getProject(ctx, project.id)).toBeNull();
+    expect(await db.select({ status: budgetRevisions.status }).from(budgetRevisions).where(eq(budgetRevisions.projectId, project.id))).toEqual([
+      { status: "accepted" },
+    ]);
+    expect(
+      await db.select({ id: purchaseOrders.id, status: purchaseOrders.status }).from(purchaseOrders).where(eq(purchaseOrders.projectId, project.id)),
+    ).toEqual([{ id: orderId, status: "ordered" }]);
+    expect(await db.select({ paidOn: obraHitos.paidOn }).from(obraHitos).where(eq(obraHitos.id, h0!.id))).toEqual([{ paidOn: "2026-02-03" }]);
+    expect(await db.select().from(obraHitoEvents).where(eq(obraHitoEvents.hitoId, h0!.id))).toHaveLength(1);
+    expect(await db.select().from(obraChapterProgress).where(eq(obraChapterProgress.projectId, project.id))).toHaveLength(1);
   });
 
-  it("keeps a project with a placed order", async () => {
+  it("takes it off the list and the detail, the tenant's other projects untouched", async () => {
     const { tenant, ctx } = await setup();
     const project = await createTestProject(tenant.id);
-    await contractThenDraft(ctx, project.id, async () => {
-      const { orderIds } = await pendingOrders(ctx, project.id);
-      await purchasingService.setPurchaseStatus(ctx, orderIds[0]!, { status: "ordered" });
+    const other = await createTestProject(tenant.id);
+
+    await svc.deleteProject(ctx, project.id);
+
+    expect(await svc.getProject(ctx, project.id)).toBeNull();
+    expect((await svc.listProjects(ctx)).map((p) => p.id)).toEqual([other.id]);
+    expect(await svc.getProject(ctx, other.id)).toMatchObject({ id: other.id });
+    expect((await stored(other.id))!.deletedAt).toBeNull();
+  });
+
+  it("can't be read or written any more, through any module", async () => {
+    const { tenant, ctx } = await setup();
+    const project = await createTestProject(tenant.id);
+    const client = await createTestUser(tenant.id, { role: "client" });
+    await acceptedBudget(ctx, project.id);
+    const [h0] = await hitosService.listHitos(ctx, project.id);
+    const { documentId } = await documentsService.addDocument(ctx, project.id, { file: pdf(), title: "Planos", category: "plans" });
+    const { revisionId } = await budgetService.createRevision(ctx, project.id);
+    await budgetService.updateRevision(ctx, project.id, revisionId, { changeReason: "Cambio de carpintería" });
+    await budgetIssueService.issueRevision(ctx, project.id, revisionId);
+    const kept = files.size;
+    const before = await stored(project.id);
+
+    await svc.deleteProject(ctx, project.id);
+
+    const gone = { code: "project_not_found", status: 404 };
+    await expect(svc.updateProject(ctx, project.id, { address: "Otra" })).rejects.toMatchObject({ code: "not_found", status: 404 });
+    // Reads.
+    await expect(budgetService.getBudget(ctx, project.id)).rejects.toMatchObject(gone);
+    await expect(obraService.getObra(ctx, project.id)).rejects.toMatchObject(gone);
+    await expect(hitosService.listHitos(ctx, project.id)).rejects.toMatchObject(gone);
+    await expect(hitosService.getHito(ctx, project.id, h0!.id)).rejects.toMatchObject(gone);
+    await expect(planningService.getPlanning(ctx, project.id)).rejects.toMatchObject(gone);
+    await expect(constructionService.getControl(ctx, project.id)).rejects.toMatchObject(gone);
+    await expect(documentsService.listDocuments(ctx, project.id)).rejects.toMatchObject(gone);
+    // The issued PDFs are among its documents: not served either.
+    await expect(budgetIssueService.revisionPdf(ctx, project.id, revisionId, "general")).rejects.toMatchObject(gone);
+    await expect(photosService.listPhotos(ctx, project.id)).rejects.toMatchObject(gone);
+    await expect(purchasingService.getPurchaseForm(ctx, project.id)).rejects.toMatchObject(gone);
+    // Writes.
+    await expect(
+      documentsService.addDocument(ctx, project.id, { file: pdf(), title: "Contrato", category: "contract" }),
+    ).rejects.toMatchObject(gone);
+    await expect(budgetService.createRevision(ctx, project.id)).rejects.toMatchObject(gone);
+    await expect(obraService.setStage(ctx, project.id, { stage: 7 })).rejects.toMatchObject(gone);
+    await expect(hitosService.registerPayment(ctx, project.id, h0!.id, { paidOn: "2026-02-03" })).rejects.toMatchObject(gone);
+    await expect(constructionService.startChapter(ctx, project.id, "01", { date: "2026-02-03" })).rejects.toMatchObject(gone);
+    await expect(planningService.createPlanningDraft(ctx, project.id, { from: "template", startDate: "2026-03-02" })).rejects.toMatchObject(gone);
+    await expect(projectClientService.assignProjectClient(ctx, project.id, { clientId: client.id })).rejects.toMatchObject(gone);
+    await expect(projectClientService.unassignProjectClient(ctx, project.id)).rejects.toMatchObject({ status: 404 });
+
+    // None of it left a trace on the row.
+    expect(await stored(project.id)).toEqual({ ...before, deletedAt: expect.any(Date), deletedById: ctx.userId });
+    expect(files.size).toBe(kept);
+    expect(await db.select({ id: projectDocuments.id }).from(projectDocuments).where(eq(projectDocuments.id, documentId))).toHaveLength(1);
+  });
+
+  it("answers not_found the second time, and keeps who deleted it first", async () => {
+    const { tenant, ctx } = await setup();
+    const project = await createTestProject(tenant.id);
+    const second = await createTestUser(tenant.id, { role: "admin" });
+
+    await svc.deleteProject(ctx, project.id);
+    const first = await stored(project.id);
+
+    await expect(svc.deleteProject({ ...ctx, userId: second.id }, project.id)).rejects.toMatchObject({
+      code: "not_found",
+      status: 404,
     });
-
-    await expectKept(ctx, project.id);
-    expect(await db.select().from(purchaseOrders).where(eq(purchaseOrders.projectId, project.id))).toHaveLength(1);
+    expect(await stored(project.id)).toEqual(first);
   });
 
-  it("waits for an order being placed meanwhile, and then keeps the project", async () => {
-    const { tenant, ctx } = await setup();
-    const project = await createTestProject(tenant.id);
-    let orderId = "";
-    await contractThenDraft(ctx, project.id, async () => {
-      orderId = (await pendingOrders(ctx, project.id)).orderIds[0]!;
-    });
+  it("answers not_found for a project that doesn't exist", async () => {
+    const { ctx } = await setup();
 
-    // The order is placed in a transaction still open when the delete starts.
-    let commit = () => {};
-    const placed = new Promise<void>((resolve) => {
-      void db.transaction(async (tx) => {
-        await tx.update(purchaseOrders).set({ status: "ordered" }).where(eq(purchaseOrders.id, orderId));
-        await new Promise<void>((release) => {
-          commit = release;
-          resolve();
-        });
-      });
-    });
-    await placed;
-    const deleting = svc.deleteProject(ctx, project.id);
-    deleting.catch(() => {});
-    await new Promise((resolve) => setTimeout(resolve, 150));
-    commit();
-
-    await expect(deleting).rejects.toMatchObject(blocked);
-    expect(await svc.getProject(ctx, project.id)).not.toBeNull();
+    await expect(svc.deleteProject(ctx, "no-such-project")).rejects.toMatchObject({ code: "not_found", status: 404 });
   });
 
-  it("keeps a project with a supplier's invoice, whatever its order's status", async () => {
+  it("does not delete another tenant's project, with records or without", async () => {
     const { tenant, ctx } = await setup();
     const project = await createTestProject(tenant.id);
-    await contractThenDraft(ctx, project.id, async () => {
-      const { subcontractorId, orderIds } = await pendingOrders(ctx, project.id);
-      await db.insert(purchaseInvoices).values({
-        tenantId: ctx.tenantId,
-        orderId: orderIds[0]!,
-        subcontractorId,
-        number: "F-2026/118",
-        issuedOn: "2026-10-01",
-        baseCents: 40_000,
-        vatKind: "vat21",
-        vatCents: 8_400,
-      });
-    });
+    const withBudget = await createTestProject(tenant.id);
+    await acceptedBudget(ctx, withBudget.id);
+    const outsider = await otherTenantCtx();
 
-    await expectKept(ctx, project.id);
+    for (const { id } of [project, withBudget]) {
+      await expect(svc.deleteProject(outsider, id)).rejects.toMatchObject({ code: "not_found", status: 404 });
+      expect(await svc.getProject(ctx, id)).not.toBeNull();
+      expect(await stored(id)).toMatchObject({ deletedAt: null, deletedById: null });
+    }
   });
 
-  it("keeps a project with a hito's registered payment", async () => {
+  it("frees its ref for a new project, which then holds it alone", async () => {
     const { tenant, ctx } = await setup();
-    const project = await createTestProject(tenant.id);
-    await contractThenDraft(ctx, project.id, async () => {
-      const [h0] = await hitosService.listHitos(ctx, project.id);
-      await hitosService.registerPayment(ctx, project.id, h0!.id, { paidOn: "2026-02-03" });
-    });
+    const project = await createTestProject(tenant.id, { ref: "VTH-26-030" });
+    const input = { ref: "VTH-26-030", address: "Calle Nueva 2, Santander" };
+    await expect(svc.createProject(ctx, input)).rejects.toMatchObject({ code: "ref_exists" });
 
-    await expectKept(ctx, project.id);
-  });
+    await svc.deleteProject(ctx, project.id);
+    const { id } = await svc.createProject(ctx, input);
 
-  it("keeps a project whose hito payment was registered and then cancelled: its history stays", async () => {
-    const { tenant, ctx } = await setup();
-    const project = await createTestProject(tenant.id);
-    await contractThenDraft(ctx, project.id, async () => {
-      const [h0] = await hitosService.listHitos(ctx, project.id);
-      await hitosService.registerPayment(ctx, project.id, h0!.id, { paidOn: "2026-02-03" });
-      await hitosService.cancelPayment(ctx, project.id, h0!.id);
-    });
-
-    await expectKept(ctx, project.id);
-  });
-
-  it.each(["acta", "invoice"] as const)("keeps a project with a hito's %s", async (kind) => {
-    const { tenant, ctx } = await setup();
-    const project = await createTestProject(tenant.id);
-    await contractThenDraft(ctx, project.id, async () => {
-      const [h0] = await hitosService.listHitos(ctx, project.id);
-      const file = new File(["%PDF-1.7 hito"], "hito.pdf", { type: "application/pdf" });
-      await hitosService.uploadHitoFile(ctx, project.id, h0!.id, kind, { file, date: "2026-02-03" });
-    });
-
-    await expectKept(ctx, project.id);
-  });
-
-  it("keeps a project with a contract among its documents, but not for its other documents", async () => {
-    const { tenant, ctx } = await setup();
-    const withPlans = await createTestProject(tenant.id);
-    await createTestDocument(tenant.id, withPlans.id, { category: "plans" });
-    await svc.deleteProject(ctx, withPlans.id);
-
-    const project = await createTestProject(tenant.id);
-    await createTestDocument(tenant.id, project.id, { category: "contract" });
-    await expectKept(ctx, project.id);
-  });
-
-  it("keeps a project with an incident or change logged", async () => {
-    const { tenant, ctx } = await setup();
-    const project = await createTestProject(tenant.id);
-    await db.insert(obraIssues).values({
-      tenantId: tenant.id,
-      projectId: project.id,
-      kind: "change",
-      number: 1,
-      occurredOn: "2026-10-01",
-      chapterCode: "02",
-      description: "El cliente pide otra puerta",
-      party: "client",
-    });
-    await expectKept(ctx, project.id);
-  });
-
-  it("keeps a project with a subcontractor assigned to it", async () => {
-    const { tenant, ctx } = await setup();
-    const project = await createTestProject(tenant.id);
-    const [company] = await db
-      .insert(subcontractors)
-      .values({
-        tenantId: tenant.id,
-        kind: "company",
-        legalName: "Montajes Norte S.L.",
-        taxId: "B39654322",
-        address: "Calle Alta 1",
-        postalCode: "39001",
-        city: "Santander",
-        province: "Cantabria",
-        reaRegion: "cb",
-      })
-      .returning({ id: subcontractors.id });
-    await db.insert(subcontractorAssignments).values({ tenantId: tenant.id, subcontractorId: company!.id, projectId: project.id });
-    await expectKept(ctx, project.id);
-  });
-
-  it("keeps a project whose works have started", async () => {
-    const { tenant, ctx } = await setup();
-    const project = await createTestProject(tenant.id);
-    await contractThenDraft(ctx, project.id, () =>
-      constructionService.startChapter(ctx, project.id, "01", { date: "2026-02-03" }),
-    );
-
-    await expectKept(ctx, project.id);
+    expect(id).not.toBe(project.id);
+    expect(await svc.listProjects(ctx)).toMatchObject([{ id, ref: "VTH-26-030", address: "Calle Nueva 2, Santander" }]);
+    await expect(svc.createProject(ctx, input)).rejects.toMatchObject({ code: "ref_exists" });
+    // The deleted one keeps its ref, and the new one can be deleted in its turn.
+    await svc.deleteProject(ctx, id);
+    expect((await stored(project.id))!.ref).toBe("VTH-26-030");
+    expect((await stored(id))!.ref).toBe("VTH-26-030");
+    expect(await svc.listProjects(ctx)).toEqual([]);
   });
 });
 

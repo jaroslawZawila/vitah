@@ -7,6 +7,7 @@ import {
   db,
   eq,
   inArray,
+  isNull,
   obraHitoChapters,
   obraHitoChecks,
   obraHitoPhotos,
@@ -14,6 +15,7 @@ import {
   users,
   obraChapterProgress,
   obraInvoiceRequests,
+  projectPhotos,
   sql,
   type AnyColumn,
   type PgTable,
@@ -328,10 +330,12 @@ async function loadHitoRows(tenantId: string, projectId: string) {
       .innerJoin(obraHitos, eq(obraHitos.id, obraHitoChecks.hitoId))
       .where(inProject)
       .orderBy(asc(obraHitoChecks.position)),
+    // A deleted photo is out of the acta too.
     db
       .select({ hitoId: obraHitoPhotos.hitoId, photoId: obraHitoPhotos.photoId })
       .from(obraHitoPhotos)
       .innerJoin(obraHitos, eq(obraHitos.id, obraHitoPhotos.hitoId))
+      .innerJoin(projectPhotos, and(eq(projectPhotos.id, obraHitoPhotos.photoId), isNull(projectPhotos.deletedAt)))
       .where(inProject),
     db
       .select({ request: obraInvoiceRequests, by: users.name, byEmail: users.email })

@@ -1,4 +1,4 @@
-import { and, asc, budgetRevisions, db, eq, isNotNull, lt, projectDocuments, projects, sql } from "@repo/db";
+import { and, asc, budgetRevisions, db, eq, isNotNull, isNull, lt, projectDocuments, projects, sql } from "@repo/db";
 import { CONTINGENCY_CHAPTER, type StageEvidence } from "./contract";
 import { evidenceStage, stageEvidence, todayInSpain } from "./obra-calc";
 import { loadObra } from "./obra-data";
@@ -34,6 +34,7 @@ export async function loadFirstDays(tenantId: string, projectId: string) {
           eq(projectDocuments.tenantId, tenantId),
           eq(projectDocuments.projectId, projectId),
           isNotNull(projectDocuments.budgetInput),
+          isNull(projectDocuments.deletedAt),
         ),
       )
       .orderBy(asc(projectDocuments.createdAt))

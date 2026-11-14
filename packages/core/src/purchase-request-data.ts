@@ -1,21 +1,29 @@
-import { and, eq, purchaseRequestEvents, purchaseRequests, type SQL } from "@repo/db";
+import { and, eq, purchaseRequestEvents, purchaseRequests, sql, type SQL } from "@repo/db";
 import type { Ctx } from "./context";
 import type { PurchaseRequestStatus } from "./contract";
 import { fail } from "./obra-data";
-import type { Tx } from "./project-client";
+import { inLiveProject, type Tx } from "./project-client";
 
 // A purchase request's lifecycle writes, shared by ./purchase-requests and by
 // ./purchasing (an order made from a request): its lock and its history.
 
 /**
  * The tenant's request locked for this transaction (`where` narrows it, e.g.
- * to a project); `not_found`, or `invalid_state` unless it is one of `statuses`.
+ * to a project); `not_found` (also when its obra was deleted), or
+ * `invalid_state` unless it is one of `statuses`.
  */
 export async function lockRequest(tx: Tx, ctx: Ctx, requestId: string, statuses: readonly PurchaseRequestStatus[], where?: SQL) {
   const [locked] = await tx
     .select()
     .from(purchaseRequests)
-    .where(and(eq(purchaseRequests.id, requestId), eq(purchaseRequests.tenantId, ctx.tenantId), where))
+    .where(
+      and(
+        eq(purchaseRequests.id, requestId),
+        eq(purchaseRequests.tenantId, ctx.tenantId),
+        inLiveProject(purchaseRequests.projectId),
+        where,
+      ),
+    )
     .for("update");
   if (!locked) fail("not_found");
   if (!statuses.includes(locked.status)) fail("invalid_state");

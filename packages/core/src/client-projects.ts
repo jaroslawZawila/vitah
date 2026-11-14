@@ -4,6 +4,7 @@ import { EXECUTION_STAGE, HANDED_OVER_STAGE, type MobileProject, type ObraStage 
 import { CoreError } from "./errors";
 import { loadObra } from "./obra-data";
 import { clientDates } from "./planning-calc";
+import { projectsInTenant } from "./project-client";
 import { approvedPlanDates } from "./planning-data";
 
 // ─── A client's projects (mobile app) ────────────────────────────────────────
@@ -13,9 +14,9 @@ import { approvedPlanDates } from "./planning-data";
 // client's own identity (from their mobile token), not a staff `Ctx`.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Every project attached to a mobile-app client. */
+/** Every project attached to a mobile-app client; a deleted one is no longer theirs to see. */
 export function clientProjectsWhere(tenantId: string, clientUserId: string) {
-  return and(eq(projects.tenantId, tenantId), eq(projects.clientUserId, clientUserId));
+  return and(projectsInTenant(tenantId), eq(projects.clientUserId, clientUserId));
 }
 
 /** Open ones first, then handed over; the newest (by start, else creation) first in each. */

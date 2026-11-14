@@ -6,6 +6,7 @@
 // PDFs need a Blob store (BLOB_READ_WRITE_TOKEN); without one they're left out.
 
 import { and, budgetRevisions, db, eq, obraChapterProgress, projects, seedConfig, tenants, users } from "@repo/db";
+import { projectsInTenant } from "../project-client";
 import { seedControl, seedObra } from "./seed-obra";
 import { seedPlanning } from "./planning";
 import { seedPurchaseInvoices } from "./purchase-invoices";
@@ -29,7 +30,8 @@ async function run() {
   const project =
     tenant &&
     (await db.query.projects.findFirst({
-      where: and(eq(projects.tenantId, tenant.id), eq(projects.ref, projectRef)),
+      // The live one: a deleted project keeps its ref.
+      where: and(projectsInTenant(tenant.id), eq(projects.ref, projectRef)),
       columns: { id: true },
     }));
   if (!tenant || !admin || !project) throw new Error("Run @repo/db's seed first");

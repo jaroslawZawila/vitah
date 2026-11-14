@@ -190,11 +190,19 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
   `subcontractor_assignments`, `subcontractor_audit`, Compras' `purchase_orders`, `purchase_order_lines`,
   `purchase_order_events`, `purchase_order_documents`, `purchase_order_document_versions`, `purchase_order_milestones`, `purchase_invoices`, `purchase_invoice_lines`, `purchase_invoice_files`,
   `purchase_payments`, `purchase_requests`, `purchase_request_lines`, `purchase_request_events`, `purchase_order_amendments`, `purchase_document_checks`, and Planning's `planning_versions`, `planning_items`. A project is deliberately minimal — exactly what the mobile app shows: `ref`, `address`, `start_date`, `completion_date`, plus `client_user_id` linking it to its mobile app client (a client may have several)
-- A project can be deleted (admins) only while nothing has to be kept: `deleteProject` refuses with
-  `project_has_records` (409) once it has a budget revision that isn't a draft, a placed order or a supplier invoice, a
-  hito with an acta, invoice or payment (or the history of one since undone), a chapter recorded as started, a contract among its
-  documents, an incident or change logged, or a subcontractor assigned. A write in flight makes it answer the same. Nothing is
-  archived yet: such a project stays
+- **Deletes are soft.** What a user deletes is never erased: a project (admins; it leaves the portal and the client's
+  app, whatever it holds), a project document or photo, an incident's file, a subcontractor's assignment to an obra
+  (assigning again takes the same row back, and an obra's CAE document counts only while the company is assigned to
+  it), an order's document, a supplier's invoice or payment. Each keeps its row
+  and its files in the Blob store, with `deleted_at` and `deleted_by_id` (when and who), and **every read leaves it
+  out**, as if it were gone: lists, by-id lookups, joins, sums and counters. A new read of one of these 8 tables must
+  filter `deleted_at is null`, and a tenant-wide query must also leave out the rows of a deleted project
+  (`projectInTenant`, `projectsInTenant`, `projectIdsInTenant`, `projectNotDeleted` and, in raw SQL, `inLiveProject` /
+  `inLiveOrder` in `project-client.ts`; a child row read by its own id checks its project too, e.g. `requireOrder`,
+  `requireInvoice`, `documentInProject`). A delete writes `softDeleted(ctx)`. A project's
+  ref and a supplier's invoice number are unique among the rows not deleted. No restore screen yet: restoring is a
+  database change. Drafts (a budget's, a plan's) and rows rewritten while editing are still deleted for real.
+  Prod SQL: `packages/db/sql/2026-11-soft-delete.sql`
 - Prod migrations are additive SQL files in `packages/db/sql/`, applied by hand (no plain `db:push` on prod)
 
 ### Obra (construction process)
@@ -463,7 +471,7 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
 
 ### Project documents
 
-- PDFs (≤ 4 MB, `MAX_DOCUMENT_BYTES`) shared with a project's client. Admins/managers upload and delete on the project page; all staff can download. Service: `packages/core/src/documents.ts`
+- PDFs (≤ 4 MB, `MAX_DOCUMENT_BYTES`) shared with a project's client. Admins/managers upload and delete (soft: see Database) on the project page; all staff can download. Service: `packages/core/src/documents.ts`
 - `visible_to_client` decides whether the app shows a document (staff switch it on the Documents tab); budget inputs
   start staff-only. Budget documents (`budget_input`, `budget_pdf`) are grouped first; issued PDFs can't be deleted
 - Files live in a **private Vercel Blob store** (`packages/core/src/storage.ts`) and are only ever streamed through our API after an auth check — no public or presigned URLs. Uploads go through our functions, hence the 4 MB cap (Vercel's 4.5 MB body limit)

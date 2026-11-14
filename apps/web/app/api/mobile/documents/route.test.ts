@@ -45,7 +45,7 @@ async function setup() {
     role: "client",
     tenantId: tenant.id,
   });
-  return { client, documentId, token };
+  return { client, documentId, token, ctx, project };
 }
 
 beforeEach(async () => {
@@ -72,6 +72,18 @@ describe("GET /api/mobile/documents", () => {
         },
       ],
     });
+  });
+
+  it("no longer lists or serves a document staff deleted, though its file is kept", async () => {
+    const { documentId, token, ctx, project } = await setup();
+
+    await documentsService.deleteDocument(ctx, project.id, documentId);
+
+    expect(await (await list(request(token))).json()).toEqual({ documents: [] });
+    const res = await download(request(token), { params: Promise.resolve({ id: documentId }) });
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: "not_found" });
+    expect(files.size).toBe(1);
   });
 
   it("lists the budget's PDF as other for app builds that don't know the category", async () => {

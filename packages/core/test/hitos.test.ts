@@ -7,7 +7,7 @@ import {
   resetDatabase,
 } from "@repo/db/testing";
 import { asc, db, eq, obraHitoEvents, users } from "@repo/db";
-import { budgetService, hitosService as svc, MAX_DOCUMENT_BYTES, type Ctx, type Hito } from "../src";
+import { budgetService, hitosService as svc, MAX_DOCUMENT_BYTES, photosService, type Ctx, type Hito } from "../src";
 import { framerDraft } from "./budget-fixture";
 import { files } from "../src/testing";
 
@@ -364,6 +364,21 @@ describe("acta, invoice and payment", () => {
     await expect(svc.setActaPhotos(ctx, project.id, h3.id, { photoIds: [foreign.id] })).rejects.toMatchObject({ code: "not_found" });
     await svc.setActaPhotos(ctx, project.id, h3.id, { photoIds: [] });
     expect((await find(ctx, project.id, "H3")).photoIds).toEqual([]);
+  });
+
+  it("leaves a deleted photo out of the acta, and doesn't take one", async () => {
+    const { tenant, project, ctx, byCode } = await setup();
+    const a = await createTestPhoto(tenant.id, project.id);
+    const b = await createTestPhoto(tenant.id, project.id);
+    const h3 = byCode("H3");
+    await svc.setActaPhotos(ctx, project.id, h3.id, { photoIds: [a.id, b.id] });
+
+    await photosService.deletePhoto(ctx, project.id, a.id);
+
+    expect((await find(ctx, project.id, "H3")).photoIds).toEqual([b.id]);
+    expect((await svc.getHito(ctx, project.id, h3.id)).photoIds).toEqual([b.id]);
+    await expect(svc.setActaPhotos(ctx, project.id, h3.id, { photoIds: [a.id, b.id] })).rejects.toMatchObject({ code: "not_found" });
+    expect((await find(ctx, project.id, "H3")).photoIds).toEqual([b.id]);
   });
 });
 

@@ -1,5 +1,5 @@
 import { createElement } from "react";
-import { and, asc, budgetRevisions, db, eq, lte, obraHitos, projectDocuments, projects, tenants } from "@repo/db";
+import { and, asc, budgetRevisions, db, eq, isNull, lte, obraHitos, projectDocuments, projects, tenants } from "@repo/db";
 import { getBudget } from "./budget";
 import { revisionInProject } from "./budget-draft";
 import { money, monthLabel, type BudgetPdfData, type Letterhead } from "./budget-pdf/format";
@@ -9,7 +9,8 @@ import { CONTINGENCY_CHAPTER, promoterName, type BudgetPdfKind, type BudgetRevis
 import { newPdfDocument, openDocument } from "./documents";
 import { notifyProjectClient } from "./notifications";
 import { addDays, forClient, perM2Cents, todayInSpain } from "./obra-calc";
-import { calendarDate, fail, optionalText, workDate } from "./obra-data";
+import { calendarDate, fail, optionalText, requireProject, workDate } from "./obra-data";
+import { projectInTenant } from "./project-client";
 import { storeFiles, type StoredFile } from "./project-files";
 
 // ─── Issuing a budget ─────────────────────────────────────────────────────────
@@ -45,7 +46,7 @@ async function pdfData(
   const revision = forClient(atCost);
   const [letterhead, project, hitos, history] = await Promise.all([
     letterheadOf(ctx.tenantId),
-    db.query.projects.findFirst({ where: eq(projects.id, projectId), columns: { address: true } }),
+    db.query.projects.findFirst({ where: projectInTenant(ctx.tenantId, projectId), columns: { address: true } }),
     db
       .select({
         code: obraHitos.code,
@@ -134,17 +135,21 @@ export async function revisionPdf(
   kind: BudgetPdfKind,
 ): Promise<StoredFile> {
   // Once issued, the stored file, without building the revision.
-  const [stored] = await db
-    .select({ id: projectDocuments.id })
-    .from(projectDocuments)
-    .where(
-      and(
-        eq(projectDocuments.tenantId, ctx.tenantId),
-        eq(projectDocuments.projectId, projectId),
-        eq(projectDocuments.budgetRevisionId, revisionId),
-        eq(projectDocuments.budgetPdf, kind),
+  const [, [stored]] = await Promise.all([
+    requireProject(ctx.tenantId, projectId),
+    db
+      .select({ id: projectDocuments.id })
+      .from(projectDocuments)
+      .where(
+        and(
+          eq(projectDocuments.tenantId, ctx.tenantId),
+          eq(projectDocuments.projectId, projectId),
+          eq(projectDocuments.budgetRevisionId, revisionId),
+          eq(projectDocuments.budgetPdf, kind),
+          isNull(projectDocuments.deletedAt),
+        ),
       ),
-    );
+  ]);
   if (stored) return openDocument(ctx, projectId, stored.id);
   const budget = await getBudget(ctx, projectId, revisionId);
   const revision = budget.revision;

@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createTestProject, createTestTenant, createTestUser, resetDatabase } from "@repo/db/testing";
-import { db, eq, purchaseOrders, sql } from "@repo/db";
+import { db, eq, projects, purchaseOrderDocumentVersions, purchaseOrderDocuments, purchaseOrders, sql } from "@repo/db";
 import {
   budgetService,
   purchaseDocumentsService as svc,
@@ -82,16 +82,56 @@ describe("an order's documents", () => {
     expect(listed.orders[0]?.hasFile).toBe(true);
   });
 
-  it("removes a document with all its versions", async () => {
+  it("removes a document with all its versions: its row, versions and files stay, out of every read", async () => {
     const s = await setup();
     const { documentId } = await svc.addOrderDocument(s.ctx, s.orderId, { title: "Oferta", file: pdf() });
     await svc.addOrderDocumentVersion(s.ctx, s.orderId, documentId, { file: pdf("%PDF-1.7 v2") });
     await svc.deleteOrderDocument(s.ctx, s.orderId, documentId);
-    expect(files.size).toBe(0);
+    // A soft delete: the row says who and when, and nothing leaves the storage.
+    expect(await db.select().from(purchaseOrderDocuments)).toMatchObject([
+      { id: documentId, title: "Oferta", deletedAt: expect.any(Date), deletedById: s.ctx.userId },
+    ]);
+    const versions = await db.select().from(purchaseOrderDocumentVersions);
+    expect(versions).toHaveLength(2);
+    expect(files.size).toBe(2);
+    expect(versions.every((v) => files.has(v.pathname))).toBe(true);
+
     const order = await purchasingService.getPurchase(s.ctx, s.orderId);
     expect(order).toMatchObject({ documents: [], hasFile: false, file: null });
     expect(order.events[0]).toMatchObject({ action: "document_removed", detail: { title: "Oferta", versions: 2 } });
-    await expect(svc.openOrderDocument(s.ctx, s.orderId, documentId)).rejects.toMatchObject({ code: "not_found" });
+    expect((await purchasingService.getProjectPurchases(s.ctx, s.project.id)).orders[0]?.hasFile).toBe(false);
+    expect((await purchasingService.listPurchases(s.ctx)).orders[0]?.hasFile).toBe(false);
+    for (const attempt of [
+      () => svc.openOrderDocument(s.ctx, s.orderId, documentId),
+      () => svc.openOrderDocument(s.ctx, s.orderId, documentId, versions[0]!.id),
+      () => svc.addOrderDocumentVersion(s.ctx, s.orderId, documentId, { file: pdf("%PDF-1.7 v3") }),
+      () => svc.openPurchaseFile(s.ctx, s.orderId),
+      // Twice: it is gone already.
+      () => svc.deleteOrderDocument(s.ctx, s.orderId, documentId),
+      () => svc.deletePurchaseFile(s.ctx, s.orderId),
+    ]) {
+      await expect(attempt()).rejects.toMatchObject({ code: "not_found" });
+    }
+    expect(files.size).toBe(2);
+    expect((await purchasingService.getPurchase(s.ctx, s.orderId)).events.filter((e) => e.action === "document_removed")).toHaveLength(1);
+  });
+
+  it("is out of reach once its obra is deleted", async () => {
+    const s = await setup();
+    const { documentId } = await svc.addOrderDocument(s.ctx, s.orderId, { title: "Contrato", file: pdf() });
+    await db.update(projects).set({ deletedAt: new Date() }).where(eq(projects.id, s.project.id));
+    for (const attempt of [
+      () => svc.openOrderDocument(s.ctx, s.orderId, documentId),
+      () => svc.openPurchaseFile(s.ctx, s.orderId),
+      () => svc.addOrderDocument(s.ctx, s.orderId, { title: "Anexo", file: pdf() }),
+      () => svc.addOrderDocumentVersion(s.ctx, s.orderId, documentId, { file: pdf() }),
+      () => svc.uploadPurchaseFile(s.ctx, s.orderId, { file: pdf() }),
+      () => svc.deleteOrderDocument(s.ctx, s.orderId, documentId),
+    ]) {
+      await expect(attempt()).rejects.toMatchObject({ code: "not_found" });
+    }
+    expect(await db.select().from(purchaseOrderDocuments)).toMatchObject([{ id: documentId, deletedAt: null }]);
+    expect(files.size).toBe(1);
   });
 
   it("checks the title, the file and that the document is the order's", async () => {
@@ -127,10 +167,17 @@ describe("the single PDF older clients know", () => {
     ]);
     expect(await text(await svc.openPurchaseFile(s.ctx, s.orderId))).toBe("%PDF-1.7 v2");
 
+    // The first document not removed: a removed one is skipped, and its files stay.
     await svc.deletePurchaseFile(s.ctx, s.orderId);
     expect(await text(await svc.openPurchaseFile(s.ctx, s.orderId))).toBe("%PDF-1.7 anexo");
+    expect((await purchasingService.getPurchase(s.ctx, s.orderId)).file).toMatchObject({ name: "Contrato.pdf" });
+    // A new upload versions that one, not the removed one.
+    await svc.uploadPurchaseFile(s.ctx, s.orderId, { file: pdf("%PDF-1.7 anexo v2", "Anexo v2.pdf") });
+    expect((await purchasingService.getPurchase(s.ctx, s.orderId)).documents.map((d) => [d.title, d.versions.length])).toEqual([["Anexo", 2]]);
     await svc.deletePurchaseFile(s.ctx, s.orderId);
     await expect(svc.openPurchaseFile(s.ctx, s.orderId)).rejects.toMatchObject({ code: "not_found" });
+    await expect(svc.deletePurchaseFile(s.ctx, s.orderId)).rejects.toMatchObject({ code: "not_found" });
+    expect(files.size).toBe(4);
   });
 });
 
@@ -152,6 +199,8 @@ describe("the prod migration (2026-10-purchase-documents.sql)", () => {
     await svc.deleteOrderDocument(s.ctx, s.orderId, order.documents[0]!.id);
     await db.execute(sql.raw(migration));
     expect((await purchasingService.getPurchase(s.ctx, s.orderId)).documents).toEqual([]);
+    // Removed, not erased: the file is still stored.
+    expect(files.has(pathname)).toBe(true);
   });
 
   it("names a document after nothing 'pedido', and catches up with a PDF the old code replaced", async () => {
@@ -179,7 +228,9 @@ describe("access", () => {
     await expect(svc.addOrderDocument(s.ctx, s.orderId, { title: "X", file: pdf() })).rejects.toMatchObject({ code: "forbidden" });
     await expect(svc.addOrderDocumentVersion(s.ctx, s.orderId, documentId, { file: pdf() })).rejects.toMatchObject({ code: "forbidden" });
     await expect(svc.deleteOrderDocument(s.ctx, s.orderId, documentId)).rejects.toMatchObject({ code: "forbidden" });
+    await expect(svc.deletePurchaseFile(s.ctx, s.orderId)).rejects.toMatchObject({ code: "forbidden" });
     await expect(svc.uploadPurchaseFile(s.ctx, s.orderId, { file: pdf() })).rejects.toMatchObject({ code: "forbidden" });
+    expect(await db.select().from(purchaseOrderDocuments)).toMatchObject([{ deletedAt: null }]);
   });
 
   it("keeps tenants apart", async () => {
@@ -193,8 +244,10 @@ describe("access", () => {
       () => svc.addOrderDocumentVersion(stranger, s.orderId, documentId, { file: pdf() }),
       () => svc.deleteOrderDocument(stranger, s.orderId, documentId),
       () => svc.openPurchaseFile(stranger, s.orderId),
+      () => svc.deletePurchaseFile(stranger, s.orderId),
     ]) {
       await expect(attempt()).rejects.toMatchObject({ code: "not_found" });
     }
+    expect(await db.select().from(purchaseOrderDocuments)).toMatchObject([{ deletedAt: null }]);
   });
 });

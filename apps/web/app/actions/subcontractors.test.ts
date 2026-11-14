@@ -14,6 +14,7 @@ import {
   getWorkers,
   markNotApplicableAction,
   rejectSubcontractorDocumentAction,
+  removeSubcontractorAssignmentAction,
   requestSubcontractorDocumentsAction,
   updateSubcontractorAction,
   updateWorkerAction,
@@ -133,6 +134,30 @@ describe("subcontractor actions", () => {
     expect(await checkWorkerAccessAction({ query: "" })).toEqual({ error: "missing_fields" });
   });
 
+  it("removes a company from an obra once, and assigns it again", async () => {
+    const { tenant } = await setup();
+    const { id } = (await createSubcontractorAction(company))!;
+    const project = await createTestProject(tenant.id);
+    await assignSubcontractorAction(id!, project.id, { chapterCodes: ["05"], bookOrder: 3, bookDate: "2026-09-20" });
+    vi.mocked(revalidatePath).mockClear();
+
+    expect(await removeSubcontractorAssignmentAction(id!, project.id)).toEqual({ success: true });
+    expect(revalidatePath).toHaveBeenCalledWith("/dashboard", "layout");
+    expect((await getSubcontractor(id!))!.assignments).toEqual([]);
+    expect((await getSubcontractor(id!))!.history.map((h) => h.action)).toContain("unassigned");
+    expect((await getWorkers(project.id))!).toEqual([]);
+
+    // Already removed.
+    vi.mocked(revalidatePath).mockClear();
+    expect(await removeSubcontractorAssignmentAction(id!, project.id)).toEqual({ error: "not_found" });
+    expect(revalidatePath).not.toHaveBeenCalled();
+
+    expect(await assignSubcontractorAction(id!, project.id, { chapterCodes: ["13"] })).toEqual({ success: true });
+    expect((await getSubcontractor(id!))!.assignments).toEqual([
+      expect.objectContaining({ projectId: project.id, chapterCodes: ["13"], bookOrder: null, bookDate: null }),
+    ]);
+  });
+
   it("lets viewers read but not write", async () => {
     const { tenant } = await setup("manager");
     const { id } = (await createSubcontractorAction(company))!;
@@ -141,6 +166,7 @@ describe("subcontractor actions", () => {
 
     expect((await getSubcontractor(id!))!.canManage).toBe(false);
     expect(await updateSubcontractorAction(id!, { phone: "942 00 00 00" })).toEqual({ error: "forbidden" });
+    expect(await removeSubcontractorAssignmentAction(id!, "any-obra")).toEqual({ error: "forbidden" });
   });
 
   it("returns null for another tenant's company", async () => {

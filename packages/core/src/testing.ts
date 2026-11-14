@@ -21,12 +21,6 @@ export async function deleteFile(pathname: string) {
   files.delete(pathname);
 }
 
-export async function deleteFolder(prefix: string) {
-  for (const pathname of [...files.keys()]) {
-    if (pathname.startsWith(prefix)) files.delete(pathname);
-  }
-}
-
 /** A real image for upload tests, e.g. `await testImage("png", 1600, 1200)`. */
 export async function testImage(
   format: "jpeg" | "png" | "webp" = "jpeg",

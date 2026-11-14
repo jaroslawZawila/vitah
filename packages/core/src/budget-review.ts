@@ -70,7 +70,7 @@ export function computeChecks(input: {
 
 /**
  * The tenant's average €/m² built per chapter code (cents), over the issued
- * and accepted FRAMER budgets of its other projects. At price, margins in, so
+ * and accepted FRAMER budgets of its other projects (deleted ones aside). At price, margins in, so
  * budgets priced at cost and older ones (margins inside the unit prices, 0 %
  * on top) compare alike.
  */
@@ -90,6 +90,7 @@ export async function tenantRatiosByProject(tenantId: string): Promise<(projectI
       from budget_lines
       join budget_chapters on budget_chapters.id = budget_lines.chapter_id
       join budget_revisions on budget_revisions.id = budget_chapters.revision_id
+      join projects on projects.id = budget_revisions.project_id and projects.deleted_at is null
       where budget_revisions.tenant_id = ${tenantId}
         and budget_revisions.model = ${BUDGET_MODEL}
         and budget_revisions.status in ('issued', 'accepted')

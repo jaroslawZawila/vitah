@@ -2,7 +2,7 @@ import bcrypt from "bcryptjs";
 const { hash } = bcrypt;
 import postgres from "postgres";
 import { drizzle } from "drizzle-orm/postgres-js";
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import * as schema from "./schema";
 import { seedConfig, seedPassword } from "./seed-config";
 
@@ -98,7 +98,8 @@ async function seed() {
     await db
       .update(schema.projects)
       .set({ clientUserId: demoClient.id })
-      .where(and(eq(schema.projects.tenantId, tenantId), eq(schema.projects.ref, projectRef)));
+      // The live one: a deleted project keeps its ref.
+      .where(and(eq(schema.projects.tenantId, tenantId), eq(schema.projects.ref, projectRef), isNull(schema.projects.deletedAt)));
     console.log(`Mobile app client: ${clientEmail} (project ${projectRef})`);
   }
 

@@ -1,4 +1,4 @@
-import { db, eq, projects } from "@repo/db";
+import { db, projects } from "@repo/db";
 import { toCalendarDate } from "./calendar";
 import { markChanged } from "./changes";
 import { requireEditor, type Ctx } from "./context";
@@ -23,6 +23,7 @@ import { buildPhases, obraTerm, shareBp, todayInSpain } from "./obra-calc";
 import { evidenceOf, loadFirstDays } from "./obra-stage";
 import { clientDates } from "./planning-calc";
 import { listPhotos, photosByChapter } from "./photos";
+import { projectInTenant } from "./project-client";
 
 // ─── Obra ────────────────────────────────────────────────────────────────────
 // The construction process of a project as a whole: its stage (1–8), progress
@@ -99,7 +100,7 @@ export async function setStage(ctx: Ctx, projectId: string, input: Record<string
   await db
     .update(projects)
     .set({ obraStage: stage, updatedAt: new Date() })
-    .where(eq(projects.id, projectId));
+    .where(projectInTenant(ctx.tenantId, projectId));
   await markChanged(ctx.tenantId, projectId, ["obra"]);
   return { stage };
 }

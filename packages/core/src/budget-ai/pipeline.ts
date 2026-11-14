@@ -5,6 +5,7 @@ import {
   db,
   eq,
   inArray,
+  projects,
   sql,
 } from "@repo/db";
 import { insertFramerRevision } from "../budget";
@@ -15,6 +16,7 @@ import { raiseStage } from "../obra-stage";
 import { CoreError } from "../errors";
 import { ACTIVE_GENERATION_STATUSES, lineAmountCents, type BudgetGenerationLogEntry, type BudgetInput } from "../contract";
 import { budgetInputs, setClaudeFileId } from "../documents";
+import { inLiveProject } from "../project-client";
 import { readStoredBytes } from "../project-files";
 import { ClaudeError, MODELS, structuredCall, uploadFile, type CallContext, type ContentBlock } from "./claude";
 import { measurementText, parseBc3, parseXlsx } from "./measurements";
@@ -56,12 +58,20 @@ const INPUT_LABELS: Record<BudgetInput, string> = {
   measurements: "Mediciones",
 };
 
-/** The generation, unless it was cancelled; marks it running. */
+/**
+ * The generation, unless it was cancelled; marks it running. `not_found` too
+ * once its project is deleted: the run stops there, before its next step.
+ */
 async function load(generationId: string): Promise<GenerationRow & { state: PipelineState }> {
   const [row] = await db
     .update(budgetGenerations)
     .set({ status: sql`case when ${budgetGenerations.status} = 'queued' then 'running' else ${budgetGenerations.status} end` })
-    .where(eq(budgetGenerations.id, generationId))
+    .where(
+      and(
+        eq(budgetGenerations.id, generationId),
+        inLiveProject(budgetGenerations.projectId),
+      ),
+    )
     .returning();
   if (!row) throw new GenerationFailed("not_found");
   if (row.status === "cancelled") throw new GenerationStopped();

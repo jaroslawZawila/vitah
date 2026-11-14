@@ -239,7 +239,10 @@ describe("DocumentsScreen", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Eliminar Contrato de obra" }));
 
-    expect(confirm).toHaveBeenCalledWith(expect.stringContaining("«Contrato de obra»"));
+    // Says what happens: it stops being shown, and the file is kept.
+    expect(confirm).toHaveBeenCalledWith(
+      "¿Eliminar «Contrato de obra»? Dejará de verse en el portal y en la app del cliente; el archivo se conserva.",
+    );
     await waitFor(() =>
       expect(actions.deleteProjectDocumentAction).toHaveBeenCalledWith("project-1", "doc-1"),
     );

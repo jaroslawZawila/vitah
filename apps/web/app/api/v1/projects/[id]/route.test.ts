@@ -5,7 +5,7 @@ import {
   createTestUser,
   resetDatabase,
 } from "@repo/db/testing";
-import { budgetRevisions, db } from "@repo/db";
+import { budgetRevisions, db, eq, projects } from "@repo/db";
 import { createMobileToken } from "@repo/auth/mobile";
 import { DELETE, GET, PATCH } from "./route";
 
@@ -81,7 +81,31 @@ describe("/api/v1/projects/:id", () => {
     expect((await call(GET, project.id, token)).status).toBe(404);
   });
 
-  it("answers 409 for a project with records to keep, and keeps it", async () => {
+  it("answers 404 for a deleted project from then on, to every method", async () => {
+    const tenant = await createTestTenant();
+    const token = await staffToken(tenant.id);
+    const project = await createTestProject(tenant.id);
+    expect((await call(DELETE, project.id, token, { method: "DELETE" })).status).toBe(204);
+
+    for (const [handler, method] of [
+      [GET, "GET"],
+      [PATCH, "PATCH"],
+      [DELETE, "DELETE"],
+    ] as const) {
+      const res = await call(handler, project.id, token, {
+        method,
+        body: method === "PATCH" ? { address: "Otra" } : undefined,
+      });
+      expect(res.status).toBe(404);
+      expect(await res.json()).toEqual({ error: "not_found" });
+    }
+    // Archived, not erased: who deleted it, and nothing else changed.
+    const [row] = await db.select().from(projects).where(eq(projects.id, project.id));
+    expect(row).toMatchObject({ address: project.address, deletedAt: expect.any(Date) });
+    expect(row!.deletedById).not.toBeNull();
+  });
+
+  it("deletes a project with records too, and keeps them", async () => {
     const tenant = await createTestTenant();
     const token = await staffToken(tenant.id);
     const project = await createTestProject(tenant.id);
@@ -89,9 +113,9 @@ describe("/api/v1/projects/:id", () => {
 
     const res = await call(DELETE, project.id, token, { method: "DELETE" });
 
-    expect(res.status).toBe(409);
-    expect(await res.json()).toEqual({ error: "project_has_records" });
-    expect((await call(GET, project.id, token)).status).toBe(200);
+    expect(res.status).toBe(204);
+    expect((await call(GET, project.id, token)).status).toBe(404);
+    expect(await db.select().from(budgetRevisions).where(eq(budgetRevisions.projectId, project.id))).toHaveLength(1);
   });
 
   it("returns 404 for another tenant's project", async () => {

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { removeFiles, storeFiles } from "../src/project-files";
+import { storeFiles } from "../src/project-files";
 import * as storage from "../src/storage";
 import { files } from "../src/testing";
 
@@ -49,16 +49,5 @@ describe("storeFiles", () => {
     await expect(stored).rejects.toThrow("upload failed");
     expect(insertRow).not.toHaveBeenCalled();
     expect(files.size).toBe(0);
-  });
-});
-
-describe("removeFiles", () => {
-  it("deletes the files before the row", async () => {
-    await storeFiles(newFiles, async () => {});
-    const deleteRow = vi.fn(async () => expect(files.size).toBe(0));
-
-    await removeFiles(["a.jpg", "a.thumb.webp"], deleteRow);
-
-    expect(deleteRow).toHaveBeenCalled();
   });
 });

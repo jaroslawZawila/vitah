@@ -4,6 +4,7 @@ import {
   desc,
   eq,
   inArray,
+  isNull,
   projects,
   purchaseOrders,
   purchaseRequestEvents,
@@ -39,6 +40,7 @@ import {
   userName,
   userNamesById,
 } from "./obra-data";
+import { projectNotDeleted } from "./project-client";
 import { lockRequest, logRequestEvent } from "./purchase-request-data";
 import {
   MAX_DESCRIPTION,
@@ -66,7 +68,7 @@ import {
 
 const sumCents = (rows: { amountCents: number }[]) => rows.reduce((sum, r) => sum + r.amountCents, 0);
 
-/** Requests with their project, suggested supplier, order, lines and who asked and decided; newest first. */
+/** Requests with their project, suggested supplier, order, lines and who asked and decided; newest first. Those of a deleted obra aside. */
 async function loadRequests(tenantId: string, where?: SQL) {
   const rows = await db
     .select({
@@ -79,7 +81,7 @@ async function loadRequests(tenantId: string, where?: SQL) {
     .innerJoin(projects, eq(projects.id, purchaseRequests.projectId))
     .leftJoin(subcontractors, eq(subcontractors.id, purchaseRequests.subcontractorId))
     .leftJoin(purchaseOrders, eq(purchaseOrders.id, purchaseRequests.orderId))
-    .where(and(eq(purchaseRequests.tenantId, tenantId), where))
+    .where(and(eq(purchaseRequests.tenantId, tenantId), projectNotDeleted(), where))
     .orderBy(desc(purchaseRequests.createdAt), desc(purchaseRequests.number));
   const ids = rows.map((r) => r.request.id);
   const [lineRows, names] = await Promise.all([
@@ -279,7 +281,8 @@ export async function updateRequest(ctx: Ctx, requestId: string, input: Record<s
   const [request] = await db
     .select({ projectId: purchaseRequests.projectId, status: purchaseRequests.status })
     .from(purchaseRequests)
-    .where(and(eq(purchaseRequests.id, requestId), eq(purchaseRequests.tenantId, ctx.tenantId)));
+    .innerJoin(projects, eq(projects.id, purchaseRequests.projectId))
+    .where(and(eq(purchaseRequests.id, requestId), eq(purchaseRequests.tenantId, ctx.tenantId), projectNotDeleted()));
   if (!request) fail("not_found");
   if (request.status !== "pending") fail("invalid_state");
   // What was sent, checked before the lock; compared with the row as it is under it.

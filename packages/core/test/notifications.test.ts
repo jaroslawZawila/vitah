@@ -8,7 +8,7 @@ import {
   createTestUser,
   resetDatabase,
 } from "@repo/db/testing";
-import { clientAccountService, documentsService, photosService, type Ctx } from "../src";
+import { clientAccountService, documentsService, photosService, projectsService, type Ctx } from "../src";
 import { notifyProjectClient } from "../src/notifications";
 import { files, testImage } from "../src/testing";
 
@@ -110,6 +110,22 @@ describe("notifying the client", () => {
     ]);
   });
 
+  it("says nothing about a deleted home, and no longer counts it among the client's", async () => {
+    const { tenant, client, project, ctx } = await setup();
+    const older = await createTestProject(tenant.id, { clientUserId: client.id, ref: "VTH-24-007" });
+    await projectsService.deleteProject(ctx, older.id);
+
+    await notifyProjectClient(tenant.id, older.id, { kind: "delivery", date: "2027-01-15" });
+    expect(sendPush).not.toHaveBeenCalled();
+
+    // One home left: its notices don't name it.
+    await addDocument(ctx, project.id);
+    expect(sendPush).toHaveBeenCalledTimes(1);
+    expect(sendPush).toHaveBeenCalledWith([
+      expect.objectContaining({ title: "Nuevo documento", data: { screen: "documents", projectId: project.id } }),
+    ]);
+  });
+
   it("sends one push for a batch of photos, not one per photo", async () => {
     const { project, ctx } = await setup();
 
@@ -131,6 +147,29 @@ describe("notifying the client", () => {
     await addPhoto(ctx, project.id);
 
     expect(sendPush).toHaveBeenCalledTimes(1);
+  });
+
+  it("pushes for a new photo when the only one pushed lately has been deleted", async () => {
+    const { tenant, project, ctx } = await setup();
+    const told = await createTestPhoto(tenant.id, project.id);
+    await photosService.deletePhoto(ctx, project.id, told.id);
+
+    await addPhoto(ctx, project.id);
+
+    expect(sendPush).toHaveBeenCalledTimes(1);
+  });
+
+  it("pushes nothing for a deleted document or photo: it can't be shown", async () => {
+    const { tenant, project, ctx } = await setup();
+    const doc = await createTestDocument(tenant.id, project.id, { visibleToClient: false });
+    const photo = await createTestPhoto(tenant.id, project.id, { visibleToClient: false });
+    await documentsService.deleteDocument(ctx, project.id, doc.id);
+    await photosService.deletePhoto(ctx, project.id, photo.id);
+
+    await expect(documentsService.setDocumentVisibility(ctx, project.id, doc.id, { visibleToClient: true })).rejects.toMatchObject({ code: "not_found" });
+    await expect(photosService.setPhotoVisibility(ctx, project.id, photo.id, { visibleToClient: true })).rejects.toMatchObject({ code: "not_found" });
+
+    expect(sendPush).not.toHaveBeenCalled();
   });
 
   it("pushes a hidden document or photo when it is first shown", async () => {

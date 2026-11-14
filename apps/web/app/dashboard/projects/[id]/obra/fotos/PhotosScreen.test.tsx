@@ -105,9 +105,13 @@ describe("PhotosScreen", () => {
   });
 
   it("deletes a photo once confirmed", async () => {
-    vi.spyOn(window, "confirm").mockReturnValue(true);
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
     renderScreen();
     await userEvent.click(screen.getByRole("button", { name: "Eliminar Fachada norte" }));
+    // Says what happens: it stops being shown, and the file is kept.
+    expect(confirm).toHaveBeenCalledWith(
+      "¿Eliminar esta foto? Dejará de verse en el portal y en la app del cliente; el archivo se conserva.",
+    );
     expect(actions.deleteProjectPhotoAction).toHaveBeenCalledWith("p-1", "photo-1");
   });
 

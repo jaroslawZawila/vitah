@@ -10,6 +10,7 @@ import {
   eq,
   inArray,
   isNotNull,
+  isNull,
   ne,
   obraChapterProgress,
   obraHitoChapters,
@@ -69,8 +70,8 @@ import {
 import { todayInSpain } from "./obra-calc";
 import { listPhotos } from "./photos";
 import { contractingOf, loadProjectOrders } from "./purchasing";
-import { projectInTenant, type Tx } from "./project-client";
-import { isPdf, openStoredFile, projectFolder, removeFiles, storeFiles, type StoredFile } from "./project-files";
+import { inLiveProject, projectInTenant, softDeleted, type Tx } from "./project-client";
+import { isPdf, openStoredFile, projectFolder, storeFiles, type StoredFile } from "./project-files";
 import { listProjectAttention } from "./subcontractors";
 
 // ─── Construction control ────────────────────────────────────────────────────
@@ -301,7 +302,13 @@ async function issueRows(ctx: Ctx, projectId: string, where?: ReturnType<typeof 
     const fileRows = await db
       .select()
       .from(obraIssueFiles)
-      .where(and(eq(obraIssueFiles.tenantId, ctx.tenantId), inArray(obraIssueFiles.issueId, rows.map((r) => r.issue.id))))
+      .where(
+        and(
+          eq(obraIssueFiles.tenantId, ctx.tenantId),
+          inArray(obraIssueFiles.issueId, rows.map((r) => r.issue.id)),
+          isNull(obraIssueFiles.deletedAt),
+        ),
+      )
       .orderBy(asc(obraIssueFiles.createdAt));
     for (const { issueId, id, filename, contentType, sizeBytes } of fileRows) {
       files.set(issueId, [...(files.get(issueId) ?? []), { id, filename, contentType, sizeBytes }]);
@@ -365,7 +372,10 @@ export async function getControl(ctx: Ctx, projectId: string): Promise<Construct
     issueRows(ctx, projectId, isOpenIssue),
     eventRows(ctx, projectId, { limit: RECENT_EVENTS }),
     listPhotos(ctx, projectId, { limit: RECENT_PHOTOS }),
-    db.$count(projectPhotos, and(eq(projectPhotos.projectId, projectId), eq(projectPhotos.tenantId, ctx.tenantId))),
+    db.$count(
+      projectPhotos,
+      and(eq(projectPhotos.projectId, projectId), eq(projectPhotos.tenantId, ctx.tenantId), isNull(projectPhotos.deletedAt)),
+    ),
     listProjectAttention(ctx, projectId),
   ]);
   const { project, works, revision, items, hitos, previousCodes, dates } = control;
@@ -832,9 +842,10 @@ export async function createIssue(ctx: Ctx, projectId: string, input: Record<str
   throw new Error("Could not number the issue");
 }
 
+/** The project's issue, by its id; not found once its project is deleted. */
 async function requireIssue(ctx: Ctx, projectId: string, issueId: string) {
   const issue = await db.query.obraIssues.findFirst({
-    where: and(eq(obraIssues.id, issueId), issuesOf(ctx, projectId)),
+    where: and(eq(obraIssues.id, issueId), issuesOf(ctx, projectId), inLiveProject(obraIssues.projectId)),
     columns: { id: true },
   });
   if (!issue) fail("not_found");
@@ -881,17 +892,26 @@ export async function addIssueFile(ctx: Ctx, projectId: string, issueId: string,
   return { fileId: id };
 }
 
+/** An issue's file that hasn't been deleted: a deleted one keeps its row and its file, and no read finds it. */
 function fileInIssue(ctx: Ctx, issueId: string, fileId: string) {
-  return and(eq(obraIssueFiles.id, fileId), eq(obraIssueFiles.issueId, issueId), eq(obraIssueFiles.tenantId, ctx.tenantId));
+  return and(
+    eq(obraIssueFiles.id, fileId),
+    eq(obraIssueFiles.issueId, issueId),
+    eq(obraIssueFiles.tenantId, ctx.tenantId),
+    isNull(obraIssueFiles.deletedAt),
+  );
 }
 
+/** Takes a file off the issue. Its row and the stored file are kept: it is marked deleted, with who did it. */
 export async function deleteIssueFile(ctx: Ctx, projectId: string, issueId: string, fileId: string) {
   requireEditor(ctx);
   await requireIssue(ctx, projectId, issueId);
-  const where = fileInIssue(ctx, issueId, fileId);
-  const file = await db.query.obraIssueFiles.findFirst({ where, columns: { pathname: true } });
-  if (!file) fail("not_found");
-  await removeFiles([file.pathname], () => db.delete(obraIssueFiles).where(where));
+  const [deleted] = await db
+    .update(obraIssueFiles)
+    .set(softDeleted(ctx))
+    .where(fileInIssue(ctx, issueId, fileId))
+    .returning({ id: obraIssueFiles.id });
+  if (!deleted) fail("not_found");
   return { fileId };
 }
 

@@ -2,7 +2,7 @@ import { purchaseInvoicesService } from "@repo/core";
 import { withContext } from "../../../../../../lib/api";
 
 // DELETE /api/v1/purchases/payments/:paymentId → { paymentId }: a payment
-// recorded by mistake, with its proof.
+// recorded by mistake (a soft delete: the invoice owes it again, its proof stays).
 
 type Params = { params: Promise<{ paymentId: string }> };
 

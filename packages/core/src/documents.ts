@@ -34,16 +34,8 @@ import {
 import { clippedText } from "./input";
 import { notifyProjectClient } from "./notifications";
 import { raiseStage } from "./obra-stage";
-import {
-  claimFirstShown,
-  fail,
-  isPdf,
-  openStoredFile,
-  projectFolder,
-  removeFiles,
-  requireProject,
-  storeFiles,
-} from "./project-files";
+import { inLiveProject, softDeleted } from "./project-client";
+import { claimFirstShown, fail, isPdf, openStoredFile, projectFolder, requireProject, storeFiles } from "./project-files";
 import { fileInfo, readFile } from "./storage";
 
 // ─── Project documents ────────────────────────────────────────────────────────
@@ -52,13 +44,21 @@ import { fileInfo, readFile } from "./storage";
 // budget adds two kinds that can't simply be deleted here: the documents it
 // was generated from (staff-only, any of BUDGET_INPUT_TYPES, uploaded straight
 // to the store) and the PDFs of each issued revision.
+// A deleted document keeps its row (`deleted_at`) and its file; every read
+// here leaves it out, as if it were gone.
 // ─────────────────────────────────────────────────────────────────────────────
 
+/** Not deleted: what every read of documents asks for. */
+const notDeleted = isNull(projectDocuments.deletedAt);
+
+/** One document of the project, by its id: not deleted, nor its project. */
 function documentInProject(ctx: Ctx, projectId: string, documentId: string) {
   return and(
     eq(projectDocuments.id, documentId),
     eq(projectDocuments.projectId, projectId),
     eq(projectDocuments.tenantId, ctx.tenantId),
+    notDeleted,
+    inLiveProject(projectDocuments.projectId),
   );
 }
 
@@ -156,6 +156,7 @@ export async function listDocuments(ctx: Ctx, projectId: string): Promise<Projec
         and(
           eq(projectDocuments.projectId, projectId),
           eq(projectDocuments.tenantId, ctx.tenantId),
+          notDeleted,
         ),
       )
       .orderBy(desc(projectDocuments.createdAt)),
@@ -172,13 +173,17 @@ export async function listDocuments(ctx: Ctx, projectId: string): Promise<Projec
   }));
 }
 
+/**
+ * Deletes a document for everyone, the client's app included. Its row and its
+ * file are kept: it is marked deleted, with who did it.
+ */
 export async function deleteDocument(ctx: Ctx, projectId: string, documentId: string) {
   requireEditor(ctx);
 
   const where = documentInProject(ctx, projectId, documentId);
   const doc = await db.query.projectDocuments.findFirst({
     where,
-    columns: { pathname: true, budgetInput: true, budgetRevisionId: true },
+    columns: { budgetInput: true, budgetRevisionId: true },
   });
   if (!doc) fail("not_found");
   // A revision's PDFs are what was sent; a budget's inputs are what the AI
@@ -209,7 +214,13 @@ export async function deleteDocument(ctx: Ctx, projectId: string, documentId: st
     if (generation) fail("generation_running");
   }
 
-  await removeFiles([doc.pathname], () => db.delete(projectDocuments).where(where));
+  const [deleted] = await db
+    .update(projectDocuments)
+    .set(softDeleted(ctx))
+    .where(where)
+    .returning({ id: projectDocuments.id });
+  // Deleted meanwhile by someone else.
+  if (!deleted) fail("not_found");
   await markChanged(ctx.tenantId, projectId, ["documents"]);
 
   return { documentId };
@@ -367,6 +378,7 @@ export async function budgetInputs(tenantId: string, projectId: string, ids: str
         eq(projectDocuments.projectId, projectId),
         inArray(projectDocuments.id, ids),
         isNotNull(projectDocuments.budgetInput),
+        notDeleted,
       ),
     );
 }
@@ -411,6 +423,7 @@ function clientProject(tenantId: string, clientUserId: string) {
     eq(projects.id, projectDocuments.projectId),
     clientProjectsWhere(tenantId, clientUserId),
     eq(projectDocuments.visibleToClient, true),
+    notDeleted,
   );
 }
 
@@ -433,7 +446,7 @@ export async function listClientDocuments(
   const rows = await db
     .select(mobileColumns)
     .from(projectDocuments)
-    .where(and(eq(projectDocuments.projectId, project.id), eq(projectDocuments.visibleToClient, true)))
+    .where(and(eq(projectDocuments.projectId, project.id), eq(projectDocuments.visibleToClient, true), notDeleted))
     .orderBy(desc(projectDocuments.createdAt));
   return rows.map((row) => toMobileDocument(categories.includes(row.category) ? row : { ...row, category: "other" }));
 }

@@ -4,6 +4,7 @@ import {
   asc,
   db,
   eq,
+  isNull,
   lt,
   ne,
   or,
@@ -18,14 +19,16 @@ import {
   purchasePayments,
   sql,
   subcontractors,
+  type SQL,
 } from "@repo/db";
 import { aiLimitReached } from "./ai-limit";
 import { ClaudeError, MODELS, structuredCall, type ContentBlock } from "./budget-ai/claude";
 import { requireEditor, type Ctx } from "./context";
 import type { DocumentFinding } from "./contract";
 import { fail } from "./obra-data";
+import { inLiveOrder, projectNotDeleted } from "./project-client";
 import { invoiceAmounts } from "./purchase-calc";
-import type { CheckRow } from "./purchase-check-data";
+import { liveCheck, type CheckRow } from "./purchase-check-data";
 import { readStoredBytes } from "./project-files";
 
 // ─── The AI's review of purchase documents ───────────────────────────────────
@@ -84,7 +87,8 @@ async function factsOf(check: CheckRow): Promise<{ projectId: string; text: stri
     .from(purchaseOrders)
     .innerJoin(projects, eq(projects.id, purchaseOrders.projectId))
     .innerJoin(subcontractors, eq(subcontractors.id, purchaseOrders.subcontractorId))
-    .where(eq(purchaseOrders.id, check.orderId));
+    // Nothing of a deleted obra is sent to Claude.
+    .where(and(eq(purchaseOrders.id, check.orderId), projectNotDeleted()));
   if (!order) fail("not_found");
   // The order's amount is its last modificado's: the original contract and each modificado's PDF state their own.
   const amendments = await db
@@ -115,7 +119,7 @@ async function factsOf(check: CheckRow): Promise<{ projectId: string; text: stri
       })
       .from(purchaseOrderDocumentVersions)
       .innerJoin(purchaseOrderDocuments, eq(purchaseOrderDocuments.id, purchaseOrderDocumentVersions.documentId))
-      .where(eq(purchaseOrderDocumentVersions.id, check.documentVersionId));
+      .where(and(eq(purchaseOrderDocumentVersions.id, check.documentVersionId), isNull(purchaseOrderDocuments.deletedAt)));
     lines.push(`Documento del pedido: «${doc?.title ?? check.label}», versión ${doc?.version ?? 1}${doc?.note ? ` (${doc.note})` : ""}`);
     const amendment = amendments.find((a) => doc && a.documentId === doc.id);
     if (amendment) {
@@ -124,8 +128,10 @@ async function factsOf(check: CheckRow): Promise<{ projectId: string; text: stri
   } else {
     const invoiceId = check.invoiceFileId
       ? (await db.select({ id: purchaseInvoiceFiles.invoiceId }).from(purchaseInvoiceFiles).where(eq(purchaseInvoiceFiles.id, check.invoiceFileId)))[0]?.id
-      : (await db.select({ id: purchasePayments.invoiceId }).from(purchasePayments).where(eq(purchasePayments.id, check.paymentId!)))[0]?.id;
-    const invoice = invoiceId ? await db.query.purchaseInvoices.findFirst({ where: eq(purchaseInvoices.id, invoiceId) }) : undefined;
+      : (await db.select({ id: purchasePayments.invoiceId }).from(purchasePayments).where(and(eq(purchasePayments.id, check.paymentId!), isNull(purchasePayments.deletedAt))))[0]?.id;
+    const invoice = invoiceId
+      ? await db.query.purchaseInvoices.findFirst({ where: and(eq(purchaseInvoices.id, invoiceId), isNull(purchaseInvoices.deletedAt)) })
+      : undefined;
     if (invoice) {
       const amounts = invoiceAmounts(invoice);
       lines.push(
@@ -133,7 +139,7 @@ async function factsOf(check: CheckRow): Promise<{ projectId: string; text: stri
       );
     }
     if (check.paymentId) {
-      const [payment] = await db.select().from(purchasePayments).where(eq(purchasePayments.id, check.paymentId));
+      const [payment] = await db.select().from(purchasePayments).where(and(eq(purchasePayments.id, check.paymentId), isNull(purchasePayments.deletedAt)));
       if (payment) {
         lines.push(`Justificante de un pago de ${euros(payment.amountCents)} el ${payment.paidOn} (${payment.method}${payment.reference ? `, referencia ${payment.reference}` : ""}) de esa factura`);
       }
@@ -144,7 +150,7 @@ async function factsOf(check: CheckRow): Promise<{ projectId: string; text: stri
   return { projectId: order.projectId, text: lines.join("\n") };
 }
 
-/** Other files of the tenant with the same content: the same PDF uploaded twice. */
+/** Other files of the tenant with the same content: the same PDF uploaded twice (a deleted record's file is no other file). */
 async function duplicatesOf(check: CheckRow, sha256: string): Promise<DocumentFinding[]> {
   const rows = await db
     .select({
@@ -162,6 +168,7 @@ async function duplicatesOf(check: CheckRow, sha256: string): Promise<DocumentFi
         eq(purchaseDocumentChecks.tenantId, check.tenantId),
         eq(purchaseDocumentChecks.sha256, sha256),
         ne(purchaseDocumentChecks.id, check.id),
+        liveCheck,
       ),
     );
   return rows.map((r) => ({ kind: "duplicate", detail: null, duplicate: { label: r.label, orderId: r.orderId, projectId: r.projectId, invoiceId: r.invoiceId } }));
@@ -212,7 +219,8 @@ async function review(ctx: Ctx, check: CheckRow, withAi: boolean) {
 
 /**
  * Queues the files uploaded in the last day that have no check yet (an order
- * document's version, an invoice's PDF, a payment's proof). The portal calls
+ * document's version, an invoice's PDF, a payment's proof; not those of a
+ * deleted document, invoice, payment or obra). The portal calls
  * it as an upload answers (so the page shows the review coming), then
  * `runPendingChecks` after the response.
  */
@@ -223,6 +231,7 @@ export async function queueNewChecks(ctx: Ctx) {
     select gen_random_uuid()::text, v.tenant_id, d.order_id, v.id, v.pathname, d.title || ' · v' || v.version
     from purchase_order_document_versions v join purchase_order_documents d on d.id = v.document_id
     where v.tenant_id = ${tenantId} and v.created_at > now() - interval '1 day'
+      and d.deleted_at is null and ${inLiveOrder(sql`d.order_id`)}
       and not exists (select 1 from purchase_document_checks c where c.document_version_id = v.id)
     on conflict do nothing`);
   await db.execute(sql`
@@ -230,6 +239,7 @@ export async function queueNewChecks(ctx: Ctx) {
     select gen_random_uuid()::text, f.tenant_id, i.order_id, f.id, f.pathname, i.number || ' · v' || f.version
     from purchase_invoice_files f join purchase_invoices i on i.id = f.invoice_id
     where f.tenant_id = ${tenantId} and f.created_at > now() - interval '1 day'
+      and i.deleted_at is null and ${inLiveOrder(sql`i.order_id`)}
       and not exists (select 1 from purchase_document_checks c where c.invoice_file_id = f.id)
     on conflict do nothing`);
   await db.execute(sql`
@@ -237,17 +247,18 @@ export async function queueNewChecks(ctx: Ctx) {
     select gen_random_uuid()::text, p.tenant_id, i.order_id, p.id, p.file_pathname, coalesce(p.file_name, i.number)
     from purchase_payments p join purchase_invoices i on i.id = p.invoice_id
     where p.tenant_id = ${tenantId} and p.file_pathname is not null and p.created_at > now() - interval '1 day'
+      and p.deleted_at is null and i.deleted_at is null and ${inLiveOrder(sql`i.order_id`)}
       and not exists (select 1 from purchase_document_checks c where c.payment_id = p.id)
     on conflict do nothing`);
 }
 
-/** Takes the oldest pending check of the tenant, so two runs never review the same one. */
+/** Takes the oldest pending check of the tenant (of a record not deleted), so two runs never review the same one. */
 async function claim(tenantId: string): Promise<CheckRow | undefined> {
   const rows = await db.execute<{ id: string }>(sql`
     update purchase_document_checks set status = 'running', started_at = now()
     where id = (
       select id from purchase_document_checks
-      where tenant_id = ${tenantId} and status = 'pending'
+      where tenant_id = ${tenantId} and status = 'pending' and ${liveCheck}
       order by created_at limit 1 for update skip locked)
     returning id`);
   const id = rows[0]?.id;
@@ -293,10 +304,12 @@ export async function runPendingChecks(ctx: Ctx) {
   return ran;
 }
 
+/** The tenant's check of a record not deleted; `not_found` otherwise. */
 async function requireCheck(ctx: Ctx, checkId: string) {
-  const check = await db.query.purchaseDocumentChecks.findFirst({
-    where: and(eq(purchaseDocumentChecks.id, checkId), eq(purchaseDocumentChecks.tenantId, ctx.tenantId)),
-  });
+  const [check] = await db
+    .select()
+    .from(purchaseDocumentChecks)
+    .where(and(eq(purchaseDocumentChecks.id, checkId), eq(purchaseDocumentChecks.tenantId, ctx.tenantId), liveCheck));
   if (!check) fail("not_found");
   return check;
 }

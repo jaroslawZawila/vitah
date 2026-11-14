@@ -139,22 +139,32 @@ describe("project actions", () => {
     signInAs({ tenantId: tenant.id, userId: admin.id, role: "admin" });
     const project = await createTestProject(tenant.id);
 
+    const other = await createTestProject(tenant.id);
+
     expect(await deleteProject(project.id)).toEqual({ success: true });
 
-    expect(await reload(project.id)).toBeUndefined();
+    // Archived, not erased: the row stays, marked with who deleted it.
+    expect(await reload(project.id)).toMatchObject({ id: project.id, deletedAt: expect.any(Date), deletedById: admin.id });
     expect(revalidatePath).toHaveBeenCalledWith("/dashboard/projects");
+    // And it is gone from the portal.
+    expect(await getProject(project.id)).toBeNull();
+    expect((await getProjects()).map((p) => p.id)).toEqual([other.id]);
+    expect((await getProjectList()).map((p) => p.id)).toEqual([other.id]);
+    expect(await updateProject(project.id, { address: "Otra" })).toEqual({ error: "not_found" });
   });
 
-  it("keeps a project with records and returns the error as state", async () => {
+  it("deletes a project whatever it holds, keeping its records, and answers not_found the second time", async () => {
     const { tenant } = await setup();
     const admin = await createTestUser(tenant.id, { role: "admin" });
     signInAs({ tenantId: tenant.id, userId: admin.id, role: "admin" });
     const project = await createTestProject(tenant.id);
     await db.insert(budgetRevisions).values({ tenantId: tenant.id, projectId: project.id, number: 0, status: "accepted" });
 
-    expect(await deleteProject(project.id)).toEqual({ error: "project_has_records" });
+    expect(await deleteProject(project.id)).toEqual({ success: true });
 
-    expect(await reload(project.id)).toBeDefined();
+    expect(await db.select().from(budgetRevisions).where(eq(budgetRevisions.projectId, project.id))).toHaveLength(1);
+    vi.mocked(revalidatePath).mockClear();
+    expect(await deleteProject(project.id)).toEqual({ error: "not_found" });
     expect(revalidatePath).not.toHaveBeenCalled();
   });
 
@@ -163,14 +173,14 @@ describe("project actions", () => {
     const project = await createTestProject(tenant.id);
 
     expect(await deleteProject(project.id)).toEqual({ error: "forbidden" });
-    expect(await reload(project.id)).toBeDefined();
+    expect((await reload(project.id))?.deletedAt).toBeNull();
 
     const admin = await createTestUser(tenant.id, { role: "admin" });
     signInAs({ tenantId: tenant.id, userId: admin.id, role: "admin" });
     const foreign = await createTestProject((await createTestTenant()).id);
 
     expect(await deleteProject(foreign.id)).toEqual({ error: "not_found" });
-    expect(await reload(foreign.id)).toBeDefined();
+    expect((await reload(foreign.id))?.deletedAt).toBeNull();
     expect(revalidatePath).not.toHaveBeenCalled();
   });
 
@@ -187,7 +197,7 @@ describe("project actions", () => {
       error: "forbidden",
     });
     expect(await deleteProject(project.id)).toEqual({ error: "forbidden" });
-    expect((await reload(project.id))?.address).toBe("Calle 1");
+    expect(await reload(project.id)).toMatchObject({ address: "Calle 1", deletedAt: null });
     expect(revalidatePath).not.toHaveBeenCalled();
   });
 });

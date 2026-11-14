@@ -73,7 +73,7 @@ export async function updateProject(id: string, data: Record<string, unknown>) {
   });
 }
 
-/** `project_has_records` when the project holds records that must be kept. */
+/** Archives the project (nothing is erased): it leaves the portal and the client's app. Admins only. */
 export async function deleteProject(id: string) {
   const ctx = await requireAuth();
   return formResult(async () => {

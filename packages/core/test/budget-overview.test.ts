@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { budgetChapters, budgetGenerations, budgetRevisions, db, eq } from "@repo/db";
 import { createTestProject, createTestTenant, createTestUser, resetDatabase } from "@repo/db/testing";
-import { budgetOptionsService as options, budgetOverviewService as svc, budgetService, type Ctx } from "../src";
+import { budgetOptionsService as options, budgetOverviewService as svc, budgetService, projectsService, type Ctx } from "../src";
+import { tenantRatios } from "../src/budget-review";
 import { addDays, todayInSpain } from "../src/obra-calc";
 import { files } from "../src/testing";
 import { framerDraft } from "./budget-fixture";
@@ -180,6 +181,34 @@ describe("listBudgets", () => {
     expect(summary.expiring).toBe(1);
     expect(summary.averagePerM2Cents).toBeNull();
     expect(items[0]!.revision!.perM2DeltaBp).toBeNull();
+  });
+
+  it("leaves a deleted project out of the list, the totals and the averages", async () => {
+    const { tenant, ctx } = await setup("admin");
+    const today = todayInSpain();
+    const accept = (revisionId: string) =>
+      setRevision(revisionId, { status: "accepted", acceptedOn: today, acceptedAt: new Date(), builtAreaCm2: 100_00 });
+    const kept = await createTestProject(tenant.id, { ref: "VTH-1" });
+    await accept((await framerDraft(ctx, kept.id, ["01"], 100_000)).revisionId);
+    const deleted = await createTestProject(tenant.id, { ref: "VTH-2" });
+    await accept((await framerDraft(ctx, deleted.id, ["01"], 300_000)).revisionId);
+    const drafting = await createTestProject(tenant.id, { ref: "VTH-3" });
+    await generation(tenant.id, drafting.id, "running");
+    // Before: both contracts count, and VTH-2's prices are in the tenant's €/m² averages.
+    expect((await svc.listBudgets(ctx)).summary).toMatchObject({ accepted: 2, contractCents: 420_000, averagePerM2Cents: 2_100, generating: 1 });
+    expect(await tenantRatios(tenant.id, kept.id)).toEqual({ "01": 3_000, "20": 150 });
+
+    await projectsService.deleteProject(ctx, deleted.id);
+    await projectsService.deleteProject(ctx, drafting.id);
+
+    const { items, summary } = await svc.listBudgets(ctx);
+    expect(items.map((i) => i.ref)).toEqual(["VTH-1"]);
+    expect(items[0]!.revision).toMatchObject({ totalCents: 105_000, perM2Cents: 1_050, perM2DeltaBp: 0 });
+    expect(summary).toMatchObject({ accepted: 1, contractCents: 105_000, averagePerM2Cents: 1_050, generating: 0, aboveAverage: 0 });
+    expect((await svc.listProjectsWithBudget(ctx)).map((p) => p.ref)).toEqual(["VTH-1"]);
+    expect(await tenantRatios(tenant.id, kept.id)).toEqual({});
+    // Their budgets are still stored.
+    expect(await db.select().from(budgetRevisions).where(eq(budgetRevisions.projectId, deleted.id))).toHaveLength(1);
   });
 
   it("keeps to the caller's tenant", async () => {

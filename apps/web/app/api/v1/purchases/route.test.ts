@@ -97,7 +97,13 @@ describe("/api/v1 purchases", () => {
     const download = await getFile(apiRequest(token), routeParams({ orderId }));
     expect(download.headers.get("Content-Type")).toBe("application/pdf");
     expect(await download.text()).toBe("%PDF-1.7 pedido");
-    expect(await (await deleteFile(apiRequest(token, { method: "DELETE" }), routeParams({ orderId }))).json()).toEqual({ orderId });
+    // A soft delete: the same answer, once; the PDF is no longer served, and stays stored.
+    const stored = files.size;
+    const removed = await deleteFile(apiRequest(token, { method: "DELETE" }), routeParams({ orderId }));
+    expect([removed.status, await removed.json()]).toEqual([200, { orderId }]);
+    expect((await deleteFile(apiRequest(token, { method: "DELETE" }), routeParams({ orderId }))).status).toBe(404);
+    expect((await getFile(apiRequest(token), routeParams({ orderId }))).status).toBe(404);
+    expect(files.size).toBe(stored);
   });
 
   it("keeps several documents per order, each in versions", async () => {
@@ -128,8 +134,18 @@ describe("/api/v1 purchases", () => {
     // The single PDF older clients know is the first document.
     expect(await (await getFile(apiRequest(token), routeParams({ orderId }))).text()).toBe("%PDF-1.7 v2");
 
-    expect(await (await removeDocument(apiRequest(token, { method: "DELETE" }), routeParams({ orderId, documentId }))).json()).toEqual({ documentId });
+    // A soft delete: the same answer, once; it leaves the order and is no longer served, and its files stay.
+    const stored = files.size;
+    const removed = await removeDocument(apiRequest(token, { method: "DELETE" }), routeParams({ orderId, documentId }));
+    expect([removed.status, await removed.json()]).toEqual([200, { documentId }]);
+    expect((await removeDocument(apiRequest(token, { method: "DELETE" }), routeParams({ orderId, documentId }))).status).toBe(404);
     expect((await getDocument(apiRequest(token), routeParams({ orderId, documentId }))).status).toBe(404);
+    expect((await getDocument(apiRequest(token, { query: `?versionId=${older}` }), routeParams({ orderId, documentId }))).status).toBe(404);
+    expect((await getFile(apiRequest(token), routeParams({ orderId }))).status).toBe(404);
+    const after = await (await getOne(apiRequest(token), routeParams({ orderId }))).json();
+    expect(after).toMatchObject({ documents: [], hasFile: false, file: null });
+    expect((await (await listAll(apiRequest(token))).json()).orders[0]).toMatchObject({ id: orderId, hasFile: false });
+    expect(files.size).toBe(stored);
   });
 
   it("records a placed order's modificado, as JSON or with its signed PDF", async () => {

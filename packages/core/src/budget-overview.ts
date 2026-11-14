@@ -1,4 +1,4 @@
-import { budgetChapters, budgetGenerations, budgetLines, budgetRevisions, db, desc, eq, inArray } from "@repo/db";
+import { and, budgetChapters, budgetGenerations, budgetLines, budgetRevisions, db, desc, eq, inArray } from "@repo/db";
 import { revisionChecks, toSummary } from "./budget";
 import { tenantRatiosByProject } from "./budget-review";
 import type { Ctx } from "./context";
@@ -15,6 +15,7 @@ import {
 } from "./contract";
 import { perM2Cents, priceLines, shareBp, todayInSpain } from "./obra-calc";
 import type { RevisionRow } from "./obra-data";
+import { projectIdsInTenant } from "./project-client";
 import { listProjects } from "./projects";
 import { daysBetween } from "./subcontractor-rules";
 
@@ -28,12 +29,12 @@ import { daysBetween } from "./subcontractor-rules";
 
 const sum = (values: number[]) => values.reduce((total, value) => total + value, 0);
 
-/** Each project's newest revision. */
+/** Each project's newest revision (the deleted projects' aside: they count in no total or average). */
 function newestRevisions(tenantId: string) {
   return db
     .selectDistinctOn([budgetRevisions.projectId])
     .from(budgetRevisions)
-    .where(eq(budgetRevisions.tenantId, tenantId))
+    .where(and(eq(budgetRevisions.tenantId, tenantId), inArray(budgetRevisions.projectId, projectIdsInTenant(tenantId))))
     .orderBy(budgetRevisions.projectId, desc(budgetRevisions.number));
 }
 
@@ -47,7 +48,7 @@ function newestGenerations(tenantId: string) {
       updatedAt: budgetGenerations.updatedAt,
     })
     .from(budgetGenerations)
-    .where(eq(budgetGenerations.tenantId, tenantId))
+    .where(and(eq(budgetGenerations.tenantId, tenantId), inArray(budgetGenerations.projectId, projectIdsInTenant(tenantId))))
     .orderBy(budgetGenerations.projectId, desc(budgetGenerations.createdAt));
 }
 

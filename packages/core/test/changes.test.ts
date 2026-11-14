@@ -405,6 +405,12 @@ describe("writes the client sees", () => {
     "requirePdf",
     "newPdfDocument",
     "projectInTenant",
+    "projectsInTenant",
+    "projectIdsInTenant",
+    "projectNotDeleted",
+    "inLiveProject",
+    "inLiveOrder",
+    "softDeleted",
     "clientProjectsWhere",
     "resolveClientProject",
     "DEFAULT_FIRST",
@@ -478,6 +484,18 @@ describe("markChanged", () => {
     expect(await counters(project.id)).toEqual(before);
   });
 
+  it("leaves a deleted project's counters as they were, without failing", async () => {
+    const { tenant, project, ctx } = await setup();
+    await projectsService.deleteProject(ctx, project.id);
+    const before = await counters(project.id);
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    await expect(svc.markChanged(tenant.id, project.id, CHANGE_AREAS)).resolves.toBeUndefined();
+
+    expect(await counters(project.id)).toEqual(before);
+    expect(log).not.toHaveBeenCalled();
+  });
+
   it("never fails the caller", async () => {
     const { tenant, project } = await setup();
     vi.spyOn(db, "update").mockImplementationOnce(() => {
@@ -519,6 +537,16 @@ describe("getClientChanges", () => {
     await projectClientService.unassignProjectClient(ctx, project.id);
 
     expect((await svc.getClientChanges(tenant.id, client.id)).changes).toBeNull();
+  });
+
+  it("returns null, and no home, once the project is deleted", async () => {
+    const { tenant, client, project, ctx } = await setup();
+    expect((await svc.getClientChanges(tenant.id, client.id)).projects).toContain(project.id);
+
+    await projectsService.deleteProject(ctx, project.id);
+
+    expect(await svc.getClientChanges(tenant.id, client.id)).toEqual({ changes: null, projects: "" });
+    expect(await svc.getClientChanges(tenant.id, client.id, project.id)).toEqual({ changes: null, projects: "" });
   });
 
   it("never reaches across tenants", async () => {

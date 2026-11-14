@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createTestProject, createTestTenant, createTestUser, resetDatabase } from "@repo/db/testing";
-import { db, eq, purchaseDocumentChecks, purchaseOrderDocumentVersions, sql, tenants } from "@repo/db";
+import { db, eq, projects, purchaseDocumentChecks, purchaseOrderDocumentVersions, sql, tenants } from "@repo/db";
 import {
   budgetService,
   purchaseChecksService as svc,
@@ -198,6 +198,80 @@ describe("the AI's review of purchase documents", () => {
     expect(facts).toContain("importe actual 1200.00 € sin IVA");
     expect(facts).toContain("Importe original del contrato: 1000.00 € sin IVA. Modificados: nº 1 del 2026-10-05, de 1000.00 € a 1200.00 €");
     expect(facts).toContain("Este documento es el modificado nº 1");
+  });
+
+  it("never queues, reviews or shows the files of a deleted document, invoice or payment", async () => {
+    const s = await setup();
+    const labels = async () => (await db.select({ label: purchaseDocumentChecks.label, status: purchaseDocumentChecks.status }).from(purchaseDocumentChecks)).map((c) => [c.label, c.status]).sort();
+    const removed = await purchaseDocumentsService.addOrderDocument(s.ctx, s.orderId, { title: "Quitado", file: pdf("quitado") });
+    const { invoiceId } = await purchaseInvoicesService.createInvoice(s.admin, s.orderId, { number: "PL-0815", issuedOn: "2026-10-02", baseCents: 100_000, file: pdf("factura") });
+    const { paymentId } = await purchaseInvoicesService.createPayment(s.admin, invoiceId, { amountCents: 50_000, paidOn: "2026-10-10", file: pdf("transferencia", "Justificante.pdf") });
+    const gone = await purchaseInvoicesService.createInvoice(s.admin, s.orderId, { number: "PL-0816", issuedOn: "2026-10-03", baseCents: 1_000, file: pdf("otra") });
+
+    // Deleted before the queue ran: never queued.
+    await purchaseDocumentsService.deleteOrderDocument(s.ctx, s.orderId, removed.documentId);
+    await purchaseInvoicesService.deletePayment(s.admin, paymentId);
+    await purchaseInvoicesService.deleteInvoice(s.admin, gone.invoiceId);
+    await svc.queueNewChecks(s.ctx);
+    expect(await labels()).toEqual([["PL-0815 · v1", "pending"]]);
+
+    // Deleted while waiting: not reviewed, nothing sent to Claude, not shown, and not to be asked again.
+    const [queued] = await db.select().from(purchaseDocumentChecks);
+    await purchaseInvoicesService.deleteInvoice(s.admin, invoiceId);
+    expect(await svc.runPendingChecks(s.ctx)).toBe(0);
+    expect(claude).not.toHaveBeenCalled();
+    expect(await labels()).toEqual([["PL-0815 · v1", "pending"]]);
+    await expect(svc.recheckDocument(s.ctx, queued!.id)).rejects.toMatchObject({ code: "not_found" });
+    await expect(svc.dismissCheck(s.ctx, queued!.id)).rejects.toMatchObject({ code: "not_found" });
+  });
+
+  it("a deleted record's file is not the same file uploaded before, and its review leaves the page", async () => {
+    const s = await setup();
+    const first = await purchaseDocumentsService.addOrderDocument(s.ctx, s.orderId, { title: "Contrato", file: pdf("mismo") });
+    const { invoiceId } = await purchaseInvoicesService.createInvoice(s.admin, s.orderId, { number: "PL-1", issuedOn: "2026-10-02", baseCents: 100_000, file: pdf("mismo") });
+    const { paymentId } = await purchaseInvoicesService.createPayment(s.admin, invoiceId, { amountCents: 1_000, paidOn: "2026-10-10", file: pdf("mismo") });
+    await svc.queueNewChecks(s.ctx);
+    expect(await svc.runPendingChecks(s.ctx)).toBe(3);
+    expect((await purchasingService.getPurchase(s.ctx, s.orderId)).checks).toMatchObject([{ label: "Contrato · v1", status: "done" }]);
+    expect((await purchaseInvoicesService.getInvoice(s.ctx, invoiceId)).checks).toHaveLength(2);
+
+    // The payment's proof goes: the invoice shows its own PDF's review only.
+    await purchaseInvoicesService.deletePayment(s.admin, paymentId);
+    expect((await purchaseInvoicesService.getInvoice(s.ctx, invoiceId)).checks.map((c) => c.subject)).toEqual(["invoice_file"]);
+    await purchaseDocumentsService.deleteOrderDocument(s.ctx, s.orderId, first.documentId);
+    expect((await purchasingService.getPurchase(s.ctx, s.orderId)).checks).toEqual([]);
+    // The same PDF again: only the invoice's, still there, is the same file; not the removed document nor the deleted proof.
+    await purchaseDocumentsService.addOrderDocument(s.ctx, s.orderId, { title: "Contrato (bien)", file: pdf("mismo") });
+    await svc.queueNewChecks(s.ctx);
+    expect(await svc.runPendingChecks(s.ctx)).toBe(1);
+    const [again] = (await purchasingService.getPurchase(s.ctx, s.orderId)).checks;
+    expect(again).toMatchObject({ label: "Contrato (bien) · v1", status: "done" });
+    expect(again!.findings).toEqual([{ kind: "duplicate", detail: null, duplicate: { label: "PL-1 · v1", orderId: s.orderId, projectId: s.project.id, invoiceId } }]);
+    // The invoice deleted too: asked again, nothing is the same file any more.
+    await purchaseInvoicesService.deleteInvoice(s.admin, invoiceId);
+    await svc.recheckDocument(s.ctx, again!.id);
+    expect(await svc.runPendingChecks(s.ctx)).toBe(1);
+    expect((await purchasingService.getPurchase(s.ctx, s.orderId)).checks).toMatchObject([{ label: "Contrato (bien) · v1", status: "done", findings: [] }]);
+    // The checks are kept with their files.
+    expect(await db.select().from(purchaseDocumentChecks)).toHaveLength(4);
+  });
+
+  it("skips a deleted obra: its files are not queued, reviewed or sent to Claude", async () => {
+    const s = await setup();
+    await purchaseDocumentsService.addOrderDocument(s.ctx, s.orderId, { title: "En cola", file: pdf("a") });
+    await svc.queueNewChecks(s.ctx);
+    await purchaseDocumentsService.addOrderDocument(s.ctx, s.orderId, { title: "Sin cola", file: pdf("b") });
+    const { invoiceId } = await purchaseInvoicesService.createInvoice(s.admin, s.orderId, { number: "PL-1", issuedOn: "2026-10-02", baseCents: 1_000, file: pdf("c") });
+    await purchaseInvoicesService.createPayment(s.admin, invoiceId, { amountCents: 100, paidOn: "2026-10-10", file: pdf("d") });
+    const [queued] = await db.select().from(purchaseDocumentChecks);
+
+    await db.update(projects).set({ deletedAt: new Date() }).where(eq(projects.id, s.project.id));
+    await svc.queueNewChecks(s.ctx);
+    expect(await db.select().from(purchaseDocumentChecks)).toHaveLength(1);
+    expect(await svc.runPendingChecks(s.ctx)).toBe(0);
+    expect(claude).not.toHaveBeenCalled();
+    expect((await db.select().from(purchaseDocumentChecks))[0]).toMatchObject({ status: "pending", checkedAt: null });
+    await expect(svc.recheckDocument(s.ctx, queued!.id)).rejects.toMatchObject({ code: "not_found" });
   });
 
   it("leaves files from before the last day to be asked for", async () => {

@@ -1,4 +1,4 @@
-import { and, asc, db, eq, isClientUser, isNotNull, projects, users } from "@repo/db";
+import { and, asc, db, eq, isClientUser, isNotNull, isNull, projects, users, sql, type AnyColumn, type SQL } from "@repo/db";
 import { markChanged } from "./changes";
 import { requireAdmin, type Ctx } from "./context";
 import { CHANGE_AREAS, type ClientOption, type ProjectClientError } from "./contract";
@@ -28,8 +28,42 @@ function text(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
+/**
+ * A deleted project is only archived (`deleted_at`): its row and everything
+ * under it stay, and no read or write may reach it. Every query on `projects`
+ * carries this, here or through the helpers below and in ./client-projects.
+ */
+export const projectNotDeleted = () => isNull(projects.deletedAt);
+
+/** The tenant's projects, the deleted ones left out. */
+export function projectsInTenant(tenantId: string) {
+  return and(eq(projects.tenantId, tenantId), projectNotDeleted());
+}
+
+/** Their ids, as a subquery for rows that only hold a `project_id`: `inArray(row.projectId, projectIdsInTenant(t))`. */
+export function projectIdsInTenant(tenantId: string) {
+  return db.select({ id: projects.id }).from(projects).where(projectsInTenant(tenantId));
+}
+
+/**
+ * The same in raw SQL, for a row reached by its own id: `projectId` (the row's
+ * column) names a project not deleted. It also goes inside raw statements and
+ * `db.query` conditions, which rewrite every Drizzle column to the row's table:
+ * hence the project named by hand.
+ */
+export const inLiveProject = (projectId: AnyColumn | SQL) =>
+  sql`exists (select 1 from projects lp where lp.id = ${projectId} and lp.deleted_at is null)`;
+
+/** And through an order: `orderId` names an order of a project not deleted. */
+export const inLiveOrder = (orderId: AnyColumn | SQL) =>
+  sql`exists (select 1 from purchase_orders lo join projects lp on lp.id = lo.project_id where lo.id = ${orderId} and lp.deleted_at is null)`;
+
+/** What a soft delete sets on its row: when, and who. Nothing else of it changes, and no file goes. */
+export const softDeleted = (ctx: Ctx) => ({ deletedAt: new Date(), deletedById: ctx.userId });
+
+/** The project, if it is the tenant's and not deleted. */
 export function projectInTenant(tenantId: string, projectId: string) {
-  return and(eq(projects.id, projectId), eq(projects.tenantId, tenantId));
+  return and(eq(projects.id, projectId), projectsInTenant(tenantId));
 }
 
 export type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -84,7 +118,7 @@ export async function assignProjectClient(
     await tx
       .update(projects)
       .set({ clientUserId: clientId, updatedAt: new Date() })
-      .where(eq(projects.id, projectId));
+      .where(projectInTenant(ctx.tenantId, projectId));
   });
   // A client removed and attached again between two polls still reloads.
   await markChanged(ctx.tenantId, projectId, CHANGE_AREAS);

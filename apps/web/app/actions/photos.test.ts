@@ -96,6 +96,8 @@ describe("photo actions", () => {
 
     expect(await deleteProjectPhotoAction(project.id, photo.id)).toEqual({ success: true });
     expect((await getProjectPhotos(project.id)).photos).toEqual([]);
+    // Already deleted: gone for the next delete too.
+    expect(await deleteProjectPhotoAction(project.id, photo.id)).toEqual({ error: "not_found" });
   });
 
   it("hides a photo from the client's app and shows it again", async () => {

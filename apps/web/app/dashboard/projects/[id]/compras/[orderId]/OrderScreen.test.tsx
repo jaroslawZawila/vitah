@@ -160,7 +160,10 @@ describe("OrderScreen", () => {
     expect([documentId, version.get("file"), version.get("note")]).toEqual(["doc-1", v3, "Precio corregido"]);
 
     await userEvent.click(documents.getByRole("button", { name: "Quitar Pedido PED-049" }));
-    expect(window.confirm).toHaveBeenCalledWith("¿Quitar «Pedido PED-049» con todas sus versiones?");
+    // It says what happens: it leaves the order, and nothing is erased.
+    expect(window.confirm).toHaveBeenCalledWith(
+      "¿Quitar «Pedido PED-049» con todas sus versiones? Deja de verse en el pedido; el documento y sus archivos se conservan.",
+    );
     expect(actions.deleteOrderDocumentAction).toHaveBeenCalledWith("p-1", "order-49", "doc-1");
   });
 

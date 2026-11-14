@@ -187,16 +187,50 @@ describe("listDocuments", () => {
 });
 
 describe("deleteDocument", () => {
-  it("removes the row and the file", async () => {
-    const { project, ctx } = await setup();
+  const rowOf = (documentId: string) =>
+    db.query.projectDocuments.findFirst({ where: eq(projectDocuments.id, documentId) });
+
+  it("marks the row as deleted, with who did it, and keeps the file", async () => {
+    const { tenant, project, ctx } = await setup();
+    const manager = await createTestUser(tenant.id, { role: "manager" });
     const { documentId } = await upload(ctx, project.id);
 
     await expect(
-      svc.deleteDocument({ ...ctx, role: "manager" }, project.id, documentId),
+      svc.deleteDocument({ ...ctx, userId: manager.id, role: "manager" }, project.id, documentId),
     ).resolves.toEqual({ documentId });
 
-    expect(await svc.listDocuments(ctx, project.id)).toEqual([]);
-    expect(files.size).toBe(0);
+    const row = await rowOf(documentId);
+    expect(row).toMatchObject({ title: "Contrato", deletedAt: expect.any(Date), deletedById: manager.id });
+    expect([...files.keys()]).toEqual([row!.pathname]);
+  });
+
+  it("leaves it out of the staff list and download, and of the client's app", async () => {
+    const { tenant, client, project, ctx } = await setup();
+    const { documentId } = await upload(ctx, project.id);
+    const kept = await upload(ctx, project.id, { title: "Planos", category: "plans" });
+
+    await svc.deleteDocument(ctx, project.id, documentId);
+
+    expect((await svc.listDocuments(ctx, project.id)).map((d) => d.id)).toEqual([kept.documentId]);
+    await expect(svc.openDocument(ctx, project.id, documentId)).rejects.toMatchObject({ code: "not_found", status: 404 });
+    expect((await svc.listClientDocuments(tenant.id, client.id)).map((d) => d.id)).toEqual([kept.documentId]);
+    await expect(svc.openClientDocument(tenant.id, client.id, documentId)).rejects.toMatchObject({ code: "not_found", status: 404 });
+    // The one beside it is untouched.
+    expect(await text((await svc.openClientDocument(tenant.id, client.id, kept.documentId)).body)).toBe("%PDF-1.7\ncontenido");
+  });
+
+  it("is not found from then on: deleting again, showing it, using it as a budget input", async () => {
+    const { project, ctx } = await setup();
+    const { documentId } = await upload(ctx, project.id);
+    await svc.deleteDocument(ctx, project.id, documentId);
+    const { deletedAt } = (await rowOf(documentId))!;
+
+    await expect(svc.deleteDocument(ctx, project.id, documentId)).rejects.toMatchObject({ code: "not_found", status: 404 });
+    await expect(svc.setDocumentVisibility(ctx, project.id, documentId, { visibleToClient: false })).rejects.toMatchObject({ code: "not_found" });
+    await expect(svc.setDocumentVisibility(ctx, project.id, documentId, { visibleToClient: true })).rejects.toMatchObject({ code: "not_found" });
+    await expect(svc.markBudgetInput(ctx, project.id, documentId, { budgetInput: "plans" })).rejects.toMatchObject({ code: "not_found" });
+    // The first delete's mark stands.
+    expect(await rowOf(documentId)).toMatchObject({ deletedAt, visibleToClient: true, budgetInput: null });
   });
 
   it("is forbidden for viewers", async () => {
@@ -206,7 +240,8 @@ describe("deleteDocument", () => {
     await expect(
       svc.deleteDocument({ ...ctx, role: "viewer" }, project.id, documentId),
     ).rejects.toMatchObject({ code: "forbidden" });
-    expect(files.size).toBe(1);
+    expect(await rowOf(documentId)).toMatchObject({ deletedAt: null, deletedById: null });
+    expect((await svc.listDocuments(ctx, project.id)).map((d) => d.id)).toEqual([documentId]);
   });
 
   it("does not delete another tenant's document", async () => {
@@ -218,7 +253,30 @@ describe("deleteDocument", () => {
       code: "not_found",
       status: 404,
     });
-    expect(files.size).toBe(1);
+    // Nor through a project of their own.
+    await expect(svc.deleteDocument(other.ctx, other.project.id, documentId)).rejects.toMatchObject({ code: "not_found" });
+    expect(await rowOf(documentId)).toMatchObject({ deletedAt: null, deletedById: null });
+    expect((await svc.listDocuments(ctx, project.id)).map((d) => d.id)).toEqual([documentId]);
+  });
+});
+
+describe("a deleted project's documents", () => {
+  it("are not found by their own id: download, delete, visibility, budget input", async () => {
+    const { project, ctx } = await setup();
+    const { documentId } = await upload(ctx, project.id);
+    await db.update(projects).set({ deletedAt: new Date() }).where(eq(projects.id, project.id));
+
+    await expect(svc.openDocument(ctx, project.id, documentId)).rejects.toMatchObject({ code: "not_found", status: 404 });
+    await expect(svc.deleteDocument(ctx, project.id, documentId)).rejects.toMatchObject({ code: "not_found", status: 404 });
+    for (const visibleToClient of [false, true]) {
+      await expect(svc.setDocumentVisibility(ctx, project.id, documentId, { visibleToClient })).rejects.toMatchObject({ status: 404 });
+    }
+    await expect(svc.markBudgetInput(ctx, project.id, documentId, { budgetInput: "plans" })).rejects.toMatchObject({ status: 404 });
+
+    // Nothing was written, and the file is kept.
+    const row = await db.query.projectDocuments.findFirst({ where: eq(projectDocuments.id, documentId) });
+    expect(row).toMatchObject({ deletedAt: null, deletedById: null, visibleToClient: true, budgetInput: null });
+    expect(files.has(row!.pathname)).toBe(true);
   });
 });
 
@@ -418,7 +476,13 @@ describe("budget inputs", () => {
     const { project, ctx } = await setup();
     const first = await uploadInput(ctx, project.id, "planos.pdf", "%PDF-1.7 a");
     await svc.deleteDocument(ctx, project.id, first.documentId);
-    expect(files.has(first.pathname)).toBe(false);
+    // The swapped one's file is kept, but it is no input any more: the AI can't be given it.
+    expect(files.has(first.pathname)).toBe(true);
+    expect(await svc.listDocuments(ctx, project.id)).toEqual([]);
+    expect(await svc.budgetInputs(ctx.tenantId, project.id, [first.documentId])).toEqual([]);
+    await expect(
+      budgetGenerationsService.startGeneration(ctx, project.id, { documentIds: [first.documentId] }),
+    ).rejects.toMatchObject({ code: "not_found" });
 
     const second = await uploadInput(ctx, project.id, "planos.pdf", "%PDF-1.7 b");
     const { generationId } = await budgetGenerationsService.startGeneration(ctx, project.id, { documentIds: [second.documentId] });
@@ -427,19 +491,36 @@ describe("budget inputs", () => {
     await budgetGenerationsService.cancelGeneration(ctx, project.id, generationId);
     await budgetService.createBudget(ctx, project.id, {});
     await expect(svc.deleteDocument(ctx, project.id, second.documentId)).rejects.toMatchObject({ code: "budget_document", status: 409 });
+    // Refused: still there, not marked.
+    expect((await svc.listDocuments(ctx, project.id)).map((d) => d.id)).toEqual([second.documentId]);
+    const row = await db.query.projectDocuments.findFirst({ where: eq(projectDocuments.id, second.documentId) });
+    expect(row?.deletedAt).toBeNull();
   });
 });
 
 describe("deleteProject", () => {
-  it("also deletes the project's stored files", async () => {
-    const { project, ctx } = await setup();
-    // Not a contract: a project holding one can't be deleted.
-    await upload(ctx, project.id, { title: "Planos", category: "plans" });
+  it("keeps the project's documents and their stored files, out of reach", async () => {
+    const { project, ctx, tenant, client } = await setup();
+    const { documentId } = await upload(ctx, project.id);
     const other = await setup();
     await upload(other.ctx, other.project.id);
+    const stored = [...files.keys()];
 
     await projectsService.deleteProject(ctx, project.id);
 
-    expect([...files.keys()]).toEqual([expect.stringContaining(other.project.id)]);
+    // Nothing is erased: both projects' files, and the document's row.
+    expect([...files.keys()]).toEqual(stored);
+    expect(stored).toEqual([expect.stringContaining(project.id), expect.stringContaining(other.project.id)]);
+    expect(await db.select({ id: projectDocuments.id }).from(projectDocuments).where(eq(projectDocuments.projectId, project.id))).toEqual([
+      { id: documentId },
+    ]);
+    // But staff can't list or add to them, and the client no longer has them.
+    await expect(svc.listDocuments(ctx, project.id)).rejects.toMatchObject({ code: "project_not_found", status: 404 });
+    await expect(upload(ctx, project.id)).rejects.toMatchObject({ code: "project_not_found", status: 404 });
+    expect(await svc.listClientDocuments(tenant.id, client.id)).toEqual([]);
+    await expect(svc.openClientDocument(tenant.id, client.id, documentId)).rejects.toMatchObject({ code: "not_found", status: 404 });
+    expect([...files.keys()]).toEqual(stored);
+    // The other project's are untouched.
+    expect(await svc.listDocuments(other.ctx, other.project.id)).toHaveLength(1);
   });
 });

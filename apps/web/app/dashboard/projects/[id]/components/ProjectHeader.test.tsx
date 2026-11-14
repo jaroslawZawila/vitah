@@ -104,8 +104,8 @@ describe("ProjectHeader", () => {
     expect(router.refresh).not.toHaveBeenCalled();
   });
 
-  it("deletes the project after confirmation", async () => {
-    vi.spyOn(window, "confirm").mockReturnValue(true);
+  it("deletes the project after confirmation, saying what a delete really does", async () => {
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
     renderHeader();
 
     await userEvent.click(screen.getByRole("button", { name: "Editar" }));
@@ -113,6 +113,9 @@ describe("ProjectHeader", () => {
       screen.getByRole("button", { name: "Eliminar proyecto" }),
     );
 
+    expect(confirm).toHaveBeenCalledWith(
+      "¿Eliminar este proyecto? Dejará de verse en el portal y en la app del cliente. No se borra nada: sus datos y documentos se conservan.",
+    );
     await waitFor(() =>
       expect(deleteProject).toHaveBeenCalledWith("project-1"),
     );
@@ -122,10 +125,9 @@ describe("ProjectHeader", () => {
   });
 
   it.each([
-    [
-      "project_has_records",
-      "Este proyecto ya tiene registros que deben conservarse (presupuesto emitido, contrato, pedidos, facturas, actas, cobros, incidencias o subcontratas). No se puede eliminar.",
-    ],
+    ["forbidden", "No tienes permiso para cambiar este proyecto."],
+    // Deleted meanwhile by someone else.
+    ["not_found", "Proyecto no encontrado."],
     ["some_new_code", "No se ha podido completar la operación. Inténtalo de nuevo."],
   ])("stays on the project and explains when the delete answers %s", async (error, message) => {
     vi.spyOn(window, "confirm").mockReturnValue(true);

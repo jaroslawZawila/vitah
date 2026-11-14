@@ -1,4 +1,4 @@
-import { BlobNotFoundError, del, get, head, list, put } from "@vercel/blob";
+import { BlobNotFoundError, del, get, head, put } from "@vercel/blob";
 
 // File storage for project documents: a private Vercel Blob store. Files have
 // no public URL; they are only read back through our authenticated API.
@@ -28,14 +28,4 @@ export async function fileInfo(pathname: string): Promise<{ size: number; conten
 
 export async function deleteFile(pathname: string) {
   await del(pathname);
-}
-
-/** Deletes every file whose pathname starts with `prefix`. */
-export async function deleteFolder(prefix: string) {
-  let cursor: string | undefined;
-  do {
-    const page = await list({ prefix, cursor });
-    if (page.blobs.length > 0) await del(page.blobs.map((blob) => blob.url));
-    cursor = page.hasMore ? page.cursor : undefined;
-  } while (cursor);
 }

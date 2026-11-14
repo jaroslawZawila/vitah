@@ -92,6 +92,8 @@ describe("document actions", () => {
 
     expect(await deleteProjectDocumentAction(project.id, doc.id)).toEqual({ success: true });
     expect((await getProjectDocuments(project.id)).documents).toEqual([]);
+    // Already deleted: gone for the next delete too.
+    expect(await deleteProjectDocumentAction(project.id, doc.id)).toEqual({ error: "not_found" });
   });
 
   it("lists nothing for another tenant's project or when signed out", async () => {

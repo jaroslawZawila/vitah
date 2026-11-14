@@ -10,7 +10,9 @@ import {
   inArray,
   isNotNull,
   isNull,
+  or,
   projects,
+  sql,
   subcontractorAssignments,
   subcontractorAudit,
   subcontractorDocumentVersions,
@@ -42,6 +44,7 @@ import {
 import { CoreError } from "./errors";
 import { userNamesById } from "./obra-data";
 import { clippedText, MAX_TEXT, PHONE_PATTERN } from "./input";
+import { projectIdsInTenant, projectInTenant, projectsInTenant } from "./project-client";
 
 // ─── Subcontractor network ────────────────────────────────────────────────────
 // What the subcontractor services share: error codes, input parsing, the audit
@@ -171,6 +174,16 @@ export async function requireWorker(ctx: Ctx, workerId: string, subcontractorId?
   return row;
 }
 
+/** The tenant's obra, unless it was deleted. */
+export async function requireProjectRef(ctx: Ctx, projectId: string) {
+  const [project] = await db
+    .select({ id: projects.id, ref: projects.ref })
+    .from(projects)
+    .where(projectInTenant(ctx.tenantId, projectId));
+  if (!project) fail("project_not_found");
+  return project;
+}
+
 // ─── Audit ───────────────────────────────────────────────────────────────────
 
 type Executor = Pick<typeof db, "insert">;
@@ -210,7 +223,33 @@ export type DocRow = typeof subcontractorDocuments.$inferSelect;
 export type VersionRow = typeof subcontractorDocumentVersions.$inferSelect;
 export type AssignmentRow = typeof subcontractorAssignments.$inferSelect;
 
+// ─── What was removed ────────────────────────────────────────────────────────
+// Taking a company off an obra, or deleting an obra, only marks the row
+// (`deleted_at`). Every read goes through these, so neither shows anywhere.
 
+/** The tenant's assignments that count: not removed, on an obra that wasn't deleted. */
+export const liveAssignment = (tenantId: string) =>
+  and(
+    eq(subcontractorAssignments.tenantId, tenantId),
+    isNull(subcontractorAssignments.deletedAt),
+    inArray(subcontractorAssignments.projectId, projectIdsInTenant(tenantId)),
+  );
+
+/** A company's or a worker's document, or an obra's one while the company is assigned to it. */
+export const liveDocument = (tenantId: string) =>
+  or(
+    isNull(subcontractorDocuments.projectId),
+    sql<boolean>`exists (${db
+      .select({ id: subcontractorAssignments.id })
+      .from(subcontractorAssignments)
+      .where(
+        and(
+          liveAssignment(tenantId),
+          eq(subcontractorAssignments.subcontractorId, subcontractorDocuments.subcontractorId),
+          eq(subcontractorAssignments.projectId, subcontractorDocuments.projectId),
+        ),
+      )})`,
+  );
 
 /** Each document's latest version (or latest validated one), keyed by document id. */
 async function latestVersions(tenantId: string, documentIds: string[] | undefined, validatedOnly: boolean) {
@@ -250,15 +289,19 @@ export async function loadNetwork(tenantId: string, subcontractorId?: string | s
     db
       .select()
       .from(subcontractorDocuments)
-      .where(scoped(subcontractorDocuments.tenantId, subcontractorDocuments.subcontractorId)),
+      .where(
+        and(scoped(subcontractorDocuments.tenantId, subcontractorDocuments.subcontractorId), liveDocument(tenantId)),
+      ),
     db
       .select()
       .from(subcontractorAssignments)
-      .where(scoped(subcontractorAssignments.tenantId, subcontractorAssignments.subcontractorId)),
+      .where(
+        and(scoped(subcontractorAssignments.tenantId, subcontractorAssignments.subcontractorId), liveAssignment(tenantId)),
+      ),
     db
       .select({ id: projects.id, ref: projects.ref, address: projects.address, obraStage: projects.obraStage })
       .from(projects)
-      .where(eq(projects.tenantId, tenantId))
+      .where(projectsInTenant(tenantId))
       .orderBy(asc(projects.ref)),
   ]);
   const ids = only ? docs.map((d) => d.id) : undefined;

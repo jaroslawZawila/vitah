@@ -6,6 +6,7 @@ import {
   eq,
   gte,
   inArray,
+  isNull,
   or,
   projects,
   purchaseDocumentChecks,
@@ -58,7 +59,7 @@ import {
   userName,
   workDate,
 } from "./obra-data";
-import type { Tx } from "./project-client";
+import { inLiveOrder, projectNotDeleted, softDeleted, type Tx } from "./project-client";
 import { openStoredFile, projectFolder, storeFiles, uploadedName, type StoredFile } from "./project-files";
 import {
   defaultDueOn,
@@ -83,8 +84,7 @@ import {
   orderInvoicing,
   orderMilestones,
 } from "./purchase-invoice-data";
-import { contractLines, loadOrders, logEvent, projectList, requireOrder } from "./purchasing";
-import { deleteFile } from "./storage";
+import { contractLines, loadOrders, logEvent, projectList, releaseMilestones, requireOrder } from "./purchasing";
 
 // ─── Supplier invoices and payments (Compras) ────────────────────────────────
 // Administration registers each supplier invoice once, against a placed
@@ -96,6 +96,9 @@ import { deleteFile } from "./storage";
 // once released. The obra reads all of it by budget line (./purchasing).
 // Every change goes to the order's log. Staff only: admins and managers
 // write, viewers read; the client's app never sees it.
+// Deleting an invoice or a payment is a soft delete (`deleted_at`,
+// `deleted_by_id`): the row and its PDFs stay, and every read, sum and check
+// leaves it out as if it were gone (so do the rows of a deleted obra).
 // ─────────────────────────────────────────────────────────────────────────────
 
 const MAX_NUMBER = 60;
@@ -111,13 +114,23 @@ type NewInvoiceLine = { lineageId: string; chapterCode: string; amountCents: num
 
 // ─── Loading ─────────────────────────────────────────────────────────────────
 
-/** The tenant's invoice (or credit note); `not_found` otherwise. */
+/** The tenant's invoice (or credit note), not deleted nor of a deleted obra; `not_found` otherwise. */
 async function requireInvoice(ctx: Ctx, invoiceId: string) {
-  const invoice = await db.query.purchaseInvoices.findFirst({
-    where: and(eq(purchaseInvoices.id, invoiceId), eq(purchaseInvoices.tenantId, ctx.tenantId)),
-  });
-  if (!invoice) fail("not_found");
-  return invoice;
+  const [row] = await db
+    .select({ invoice: purchaseInvoices })
+    .from(purchaseInvoices)
+    .innerJoin(purchaseOrders, eq(purchaseOrders.id, purchaseInvoices.orderId))
+    .innerJoin(projects, eq(projects.id, purchaseOrders.projectId))
+    .where(
+      and(
+        eq(purchaseInvoices.id, invoiceId),
+        eq(purchaseInvoices.tenantId, ctx.tenantId),
+        isNull(purchaseInvoices.deletedAt),
+        projectNotDeleted(),
+      ),
+    );
+  if (!row) fail("not_found");
+  return row.invoice;
 }
 
 const owed = (i: PurchaseInvoiceListItem) => isOwed(i.state);
@@ -201,25 +214,30 @@ export async function listPayments(ctx: Ctx, filters: Filters = {}): Promise<Ten
   };
 }
 
-/** What an invoice owes: payable, net of its credit notes, less what was paid. Mirrors `settle`. */
+/** What an invoice owes: payable, net of its credit notes, less what was paid (deleted ones aside). Mirrors `settle`. */
 const outstandingSql = sql`(${purchaseInvoices.baseCents} + ${purchaseInvoices.vatCents} - ${purchaseInvoices.irpfCents} - ${purchaseInvoices.retentionCents})
-  + coalesce((select sum(c.base_cents + c.vat_cents - c.irpf_cents - c.retention_cents) from ${purchaseInvoices} c where c.rectifies_id = ${purchaseInvoices.id}), 0)
-  - coalesce((select sum(p.amount_cents) from ${purchasePayments} p where p.invoice_id = ${purchaseInvoices.id}), 0)`;
+  + coalesce((select sum(c.base_cents + c.vat_cents - c.irpf_cents - c.retention_cents) from ${purchaseInvoices} c where c.rectifies_id = ${purchaseInvoices.id} and c.deleted_at is null), 0)
+  - coalesce((select sum(p.amount_cents) from ${purchasePayments} p where p.invoice_id = ${purchaseInvoices.id} and p.deleted_at is null), 0)`;
 
 /** Compras' sections in the rail, and the invoices that need paying now (past due or due soon). */
 export async function getPurchasingCounts(ctx: Ctx): Promise<PurchasingCounts> {
   const horizon = addDays(todayInSpain(), DUE_SOON_DAYS);
   const tenant = ctx.tenantId;
-  // One round trip: the rail asks on every page.
+  // One round trip: the rail asks on every page. Deleted invoices and payments, and deleted obras' rows, don't count.
   const [row] = await db.execute<{ requests: number; orders: number; invoices: number; payments: number; suppliers: number; due: number }>(sql`
     select
       (select count(*) from ${subcontractors} where tenant_id = ${tenant})::int as suppliers,
-      (select count(*) from ${purchaseRequests} where tenant_id = ${tenant} and status = 'pending')::int as requests,
-      (select count(*) from ${purchaseOrders} where tenant_id = ${tenant})::int as orders,
-      (select count(*) from ${purchaseInvoices} where tenant_id = ${tenant})::int as invoices,
-      (select count(*) from ${purchasePayments} where tenant_id = ${tenant})::int as payments,
+      (select count(*) from ${purchaseRequests} r join ${projects} rp on rp.id = r.project_id
+        where r.tenant_id = ${tenant} and r.status = 'pending' and rp.deleted_at is null)::int as requests,
+      (select count(*) from ${purchaseOrders} o join ${projects} op on op.id = o.project_id
+        where o.tenant_id = ${tenant} and op.deleted_at is null)::int as orders,
+      (select count(*) from ${purchaseInvoices} i
+        where i.tenant_id = ${tenant} and i.deleted_at is null and ${inLiveOrder(sql`i.order_id`)})::int as invoices,
+      (select count(*) from ${purchasePayments} p join ${purchaseInvoices} i on i.id = p.invoice_id
+        where p.tenant_id = ${tenant} and p.deleted_at is null and i.deleted_at is null and ${inLiveOrder(sql`i.order_id`)})::int as payments,
       (select count(*) from ${purchaseInvoices}
         where ${purchaseInvoices.tenantId} = ${tenant} and ${purchaseInvoices.kind} = 'invoice'
+          and ${purchaseInvoices.deletedAt} is null and ${inLiveOrder(sql`${purchaseInvoices.orderId}`)}
           and ${purchaseInvoices.dueOn} <= ${horizon} and ${outstandingSql} > 0)::int as due`);
   return {
     requests: row?.requests ?? 0,
@@ -245,7 +263,7 @@ export async function getInvoice(ctx: Ctx, invoiceId: string): Promise<PurchaseI
     .innerJoin(projects, eq(projects.id, purchaseOrders.projectId))
     // An invoiced order keeps its supplier: the invoice's.
     .innerJoin(subcontractors, eq(subcontractors.id, purchaseOrders.subcontractorId))
-    .where(eq(purchaseOrders.id, invoice.orderId));
+    .where(and(eq(purchaseOrders.id, invoice.orderId), projectNotDeleted()));
   if (!order) fail("not_found");
   // A credit note's payments are its invoice's.
   const payer = payerOf(invoice);
@@ -278,7 +296,7 @@ export async function getInvoice(ctx: Ctx, invoiceId: string): Promise<PurchaseI
       ctx.tenantId,
       or(
         inArray(purchaseDocumentChecks.invoiceFileId, db.select({ id: purchaseInvoiceFiles.id }).from(purchaseInvoiceFiles).where(eq(purchaseInvoiceFiles.invoiceId, invoiceId))),
-        inArray(purchaseDocumentChecks.paymentId, db.select({ id: purchasePayments.id }).from(purchasePayments).where(eq(purchasePayments.invoiceId, payer))),
+        inArray(purchaseDocumentChecks.paymentId, db.select({ id: purchasePayments.id }).from(purchasePayments).where(and(eq(purchasePayments.invoiceId, payer), isNull(purchasePayments.deletedAt)))),
       )!,
     ),
   ]);
@@ -622,14 +640,27 @@ export async function createInvoice(ctx: Ctx, orderId: string, input: Record<str
   return { invoiceId };
 }
 
-/** A credit note never takes off more than its invoice and the invoice's other credit notes leave. */
+/** Locks the invoice for this transaction; `not_found` if it was deleted meanwhile. */
+async function lockInvoice(tx: Tx, invoiceId: string) {
+  const [locked] = await tx
+    .select({ id: purchaseInvoices.id })
+    .from(purchaseInvoices)
+    .where(and(eq(purchaseInvoices.id, invoiceId), isNull(purchaseInvoices.deletedAt)))
+    .for("update");
+  if (!locked) fail("not_found");
+}
+
+/** An invoice and its credit notes. */
+const inGroup = (invoiceId: string) => sql`(${purchaseInvoices.id} = ${invoiceId} or ${purchaseInvoices.rectifiesId} = ${invoiceId})`;
+
+/** A credit note never takes off more than its invoice and the invoice's other credit notes (deleted ones aside) leave. */
 async function checkCreditRoom(tx: Tx, invoiceId: string, addedCents: number) {
   // Locked: two credit notes at once can't both fit in what is left.
-  await tx.select({ id: purchaseInvoices.id }).from(purchaseInvoices).where(eq(purchaseInvoices.id, invoiceId)).for("update");
+  await lockInvoice(tx, invoiceId);
   const [left] = await tx
     .select({ base: sql<string>`sum(${purchaseInvoices.baseCents})` })
     .from(purchaseInvoices)
-    .where(sql`${purchaseInvoices.id} = ${invoiceId} or ${purchaseInvoices.rectifiesId} = ${invoiceId}`);
+    .where(and(inGroup(invoiceId), isNull(purchaseInvoices.deletedAt)));
   if (Number(left?.base ?? 0) + addedCents < 0) fail("exceeds_amount");
 }
 
@@ -640,12 +671,12 @@ const rectifiedLines = (ctx: Ctx, invoiceId: string) =>
     .from(purchaseInvoiceLines)
     .where(and(eq(purchaseInvoiceLines.invoiceId, invoiceId), eq(purchaseInvoiceLines.tenantId, ctx.tenantId)));
 
-/** What was paid on the invoice an invoice or credit note settles against. */
+/** What was paid on the invoice an invoice or credit note settles against (deleted payments aside). */
 async function paidAgainst(run: Tx | typeof db, invoice: InvoiceRow) {
   const [row] = await run
     .select({ paid: sql<string>`coalesce(sum(${purchasePayments.amountCents}), 0)` })
     .from(purchasePayments)
-    .where(eq(purchasePayments.invoiceId, payerOf(invoice)));
+    .where(and(eq(purchasePayments.invoiceId, payerOf(invoice)), isNull(purchasePayments.deletedAt)));
   return Number(row?.paid ?? 0);
 }
 
@@ -694,7 +725,7 @@ export async function updateInvoice(ctx: Ctx, invoiceId: string, input: Record<s
 
   try {
     await db.transaction(async (tx) => {
-      await tx.select({ id: purchaseInvoices.id }).from(purchaseInvoices).where(eq(purchaseInvoices.id, invoiceId)).for("update");
+      await lockInvoice(tx, invoiceId);
       if (money && (await paidAgainst(tx, invoice)) > 0) fail("has_payments");
       // Never below what its credit notes take off (an invoice), nor more off than its invoice leaves (a credit note).
       if (amounts.baseCents !== invoice.baseCents) {
@@ -705,7 +736,7 @@ export async function updateInvoice(ctx: Ctx, invoiceId: string, input: Record<s
         const [first] = await tx
           .select({ paidOn: sql<string | null>`min(${purchasePayments.paidOn})` })
           .from(purchasePayments)
-          .where(eq(purchasePayments.invoiceId, invoiceId));
+          .where(and(eq(purchasePayments.invoiceId, invoiceId), isNull(purchasePayments.deletedAt)));
         if (first?.paidOn && first.paidOn < parsed.issuedOn) fail("invalid_date");
       }
       if (Object.keys(changed).length === 0 && !split) return;
@@ -731,25 +762,27 @@ export async function updateInvoice(ctx: Ctx, invoiceId: string, input: Record<s
   return { invoiceId };
 }
 
-/** Removes an invoice nothing was paid on and no credit note rectifies, with its PDFs. */
+/**
+ * Deletes an invoice nothing was paid on and no credit note rectifies: it
+ * leaves every list and total, its row and PDFs stay (a soft delete), and
+ * its number is free again. Deleted already: `not_found`.
+ */
 export async function deleteInvoice(ctx: Ctx, invoiceId: string) {
   requireEditor(ctx);
   const invoice = await requireInvoice(ctx, invoiceId);
-  const files = await db
-    .select({ pathname: purchaseInvoiceFiles.pathname })
-    .from(purchaseInvoiceFiles)
-    .where(eq(purchaseInvoiceFiles.invoiceId, invoiceId));
   await db.transaction(async (tx) => {
     // Under the lock: a payment or credit note can't land between the check and the delete.
-    await tx.select({ id: purchaseInvoices.id }).from(purchaseInvoices).where(eq(purchaseInvoices.id, invoiceId)).for("update");
+    await lockInvoice(tx, invoiceId);
     if (invoice.kind === "invoice" && (await paidAgainst(tx, invoice)) > 0) fail("has_payments");
-    const [credit] = await tx.select({ id: purchaseInvoices.id }).from(purchaseInvoices).where(eq(purchaseInvoices.rectifiesId, invoiceId)).limit(1);
+    const [credit] = await tx
+      .select({ id: purchaseInvoices.id })
+      .from(purchaseInvoices)
+      .where(and(eq(purchaseInvoices.rectifiesId, invoiceId), isNull(purchaseInvoices.deletedAt)))
+      .limit(1);
     if (credit) fail("has_invoices");
-    await tx.delete(purchaseInvoices).where(eq(purchaseInvoices.id, invoiceId));
+    await tx.update(purchaseInvoices).set(softDeleted(ctx)).where(eq(purchaseInvoices.id, invoiceId));
     await logEvent(tx, ctx, invoice.orderId, "invoice_deleted", { invoiceId, number: invoice.number, kind: invoice.kind });
   });
-  // The PDFs go once the invoice is gone, so a refused delete never loses one.
-  await Promise.all(files.map((f) => deleteFile(f.pathname).catch(() => {})));
   return { invoiceId };
 }
 
@@ -793,13 +826,25 @@ export async function addInvoiceFile(ctx: Ctx, invoiceId: string, input: Record<
 
 // ─── Writes: payments ────────────────────────────────────────────────────────
 
-/** The tenant's payment; `not_found` otherwise. */
+/** The tenant's payment, not deleted, of an invoice and an obra not deleted; `not_found` otherwise. */
 async function requirePayment(ctx: Ctx, paymentId: string) {
-  const payment = await db.query.purchasePayments.findFirst({
-    where: and(eq(purchasePayments.id, paymentId), eq(purchasePayments.tenantId, ctx.tenantId)),
-  });
-  if (!payment) fail("not_found");
-  return payment;
+  const [row] = await db
+    .select({ payment: purchasePayments })
+    .from(purchasePayments)
+    .innerJoin(purchaseInvoices, eq(purchaseInvoices.id, purchasePayments.invoiceId))
+    .innerJoin(purchaseOrders, eq(purchaseOrders.id, purchaseInvoices.orderId))
+    .innerJoin(projects, eq(projects.id, purchaseOrders.projectId))
+    .where(
+      and(
+        eq(purchasePayments.id, paymentId),
+        eq(purchasePayments.tenantId, ctx.tenantId),
+        isNull(purchasePayments.deletedAt),
+        isNull(purchaseInvoices.deletedAt),
+        projectNotDeleted(),
+      ),
+    );
+  if (!row) fail("not_found");
+  return row.payment;
 }
 
 /**
@@ -826,8 +871,8 @@ export async function createPayment(ctx: Ctx, invoiceId: string, input: Record<s
   await storeFiles(file ? [{ pathname, body: file, contentType: "application/pdf" }] : [], () =>
     db.transaction(async (tx) => {
       // Locked: two payments at once can't both fit in what is left.
-      await tx.select({ id: purchaseInvoices.id }).from(purchaseInvoices).where(eq(purchaseInvoices.id, invoiceId)).for("update");
-      const group = await tx.select().from(purchaseInvoices).where(sql`${purchaseInvoices.id} = ${invoiceId} or ${purchaseInvoices.rectifiesId} = ${invoiceId}`);
+      await lockInvoice(tx, invoiceId);
+      const group = await tx.select().from(purchaseInvoices).where(and(inGroup(invoiceId), isNull(purchaseInvoices.deletedAt)));
       const own = group.find((g) => g.id === invoiceId)!;
       const settlement = settle(
         withTotals(own),
@@ -859,13 +904,21 @@ export async function createPayment(ctx: Ctx, invoiceId: string, input: Record<s
   return { paymentId };
 }
 
-/** Removes a payment recorded by mistake, with its proof. */
+/**
+ * Deletes a payment recorded by mistake: the invoice owes it again, its row
+ * and proof stay (a soft delete). Deleted already: `not_found`.
+ */
 export async function deletePayment(ctx: Ctx, paymentId: string) {
   requireEditor(ctx);
   const payment = await requirePayment(ctx, paymentId);
   const invoice = await requireInvoice(ctx, payment.invoiceId);
   await db.transaction(async (tx) => {
-    await tx.delete(purchasePayments).where(eq(purchasePayments.id, paymentId));
+    const [deleted] = await tx
+      .update(purchasePayments)
+      .set(softDeleted(ctx))
+      .where(and(eq(purchasePayments.id, paymentId), isNull(purchasePayments.deletedAt)))
+      .returning({ id: purchasePayments.id });
+    if (!deleted) fail("not_found");
     await logEvent(tx, ctx, invoice.orderId, "payment_deleted", {
       invoiceId: invoice.id,
       number: invoice.number,
@@ -874,7 +927,6 @@ export async function deletePayment(ctx: Ctx, paymentId: string) {
       paidOn: payment.paidOn,
     });
   });
-  if (payment.filePathname) await deleteFile(payment.filePathname).catch(() => {});
   return { paymentId };
 }
 
@@ -911,7 +963,8 @@ export async function setOrderMilestones(ctx: Ctx, orderId: string, input: Recor
       tx
         .selectDistinct({ milestoneId: purchaseInvoices.milestoneId })
         .from(purchaseInvoices)
-        .where(eq(purchaseInvoices.orderId, orderId)),
+        // A deleted invoice locks no milestone.
+        .where(and(eq(purchaseInvoices.orderId, orderId), isNull(purchaseInvoices.deletedAt))),
     ]);
     const amount = lines.reduce((sum, l) => sum + l.amountCents, 0);
     if (wanted.length > 0 && wanted.reduce((sum, m) => sum + m.amountCents, 0) !== amount) fail("milestones_mismatch");
@@ -925,7 +978,10 @@ export async function setOrderMilestones(ctx: Ctx, orderId: string, input: Recor
     }
     const keep = new Set(wanted.flatMap((m) => (m.id ? [m.id] : [])));
     const dropped = existing.filter((m) => !keep.has(m.id)).map((m) => m.id);
-    if (dropped.length > 0) await tx.delete(purchaseOrderMilestones).where(inArray(purchaseOrderMilestones.id, dropped));
+    if (dropped.length > 0) {
+      await releaseMilestones(tx, dropped);
+      await tx.delete(purchaseOrderMilestones).where(inArray(purchaseOrderMilestones.id, dropped));
+    }
     for (const [position, m] of wanted.entries()) {
       if (m.id) {
         await tx

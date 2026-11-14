@@ -14,7 +14,7 @@ import { BUDGET_MODEL, CONTINGENCY_CHAPTER, CONTINGENCY_LINE } from "./contract"
 import { contingencyDescription } from "./budget-template";
 import { ofBp } from "./obra-calc";
 import { fail, linesTotalSql, requireProject, type RevisionRow } from "./obra-data";
-import type { Tx } from "./project-client";
+import { projectNotDeleted, type Tx } from "./project-client";
 
 // ─── Budget: finding what a call acts on, and writing to drafts ───────────────
 // Shared by the budget services (budget.ts, budget-options.ts, budget-issue.ts).
@@ -101,9 +101,17 @@ export async function draftLine(ctx: Ctx, projectId: string, lineId: string) {
   return row!;
 }
 
-/** Serialises revision creation within a project (the checks read, then insert). */
+/**
+ * Serialises revision creation within a project (the checks read, then
+ * insert). `project_not_found` if it was deleted since the caller looked.
+ */
 export async function lockProject(tx: Tx, projectId: string) {
-  await tx.select({ id: projects.id }).from(projects).where(eq(projects.id, projectId)).for("update");
+  const [project] = await tx
+    .select({ id: projects.id })
+    .from(projects)
+    .where(and(eq(projects.id, projectId), projectNotDeleted()))
+    .for("update");
+  if (!project) fail("project_not_found");
 }
 
 /** Locks the project for its first budget: `budget_exists` if it has one. */

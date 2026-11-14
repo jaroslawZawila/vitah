@@ -3,6 +3,7 @@ import { createTestProject, createTestTenant, createTestUser, resetDatabase } fr
 import {
   budgetService,
   purchaseAmendmentsService as svc,
+  purchaseDocumentsService,
   purchaseInvoicesService,
   purchasingService,
   subcontractorsService,
@@ -120,6 +121,11 @@ describe("an order's modificados", () => {
     const order = await purchasingService.getPurchase(s.ctx, s.orderId);
     expect(order.documents.map((d) => d.title)).toEqual(["Modificado nº 1 firmado", "Modificado"]);
     expect(order.amendments[1]).toMatchObject({ id: amendmentId, document: { id: order.documents[0]!.id, title: "Modificado nº 1 firmado" } });
+    // Its PDF removed: the modificado stands without it.
+    await purchaseDocumentsService.deleteOrderDocument(s.ctx, s.orderId, order.documents[0]!.id);
+    const without = await purchasingService.getPurchase(s.ctx, s.orderId);
+    expect(without.documents.map((d) => d.title)).toEqual(["Modificado"]);
+    expect(without.amendments.map((a) => a.document?.title ?? null)).toEqual(["Modificado", null]);
     // A bad file stops it before anything changes.
     await expect(svc.amendPurchase(s.ctx, s.orderId, { ...amendment(s, { concept: "Otro" }), file: new File(["no"], "x.pdf") })).rejects.toMatchObject({
       code: "invalid_file_type",

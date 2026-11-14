@@ -115,7 +115,7 @@
       "save": "Guardar",
       "cancel": "Cancelar",
       "delete": "Eliminar proyecto",
-      "confirmDelete": "¿Seguro que deseas eliminar este proyecto?",
+      "confirmDelete": "¿Eliminar este proyecto? Dejará de verse en el portal y en la app del cliente. No se borra nada: sus datos y documentos se conservan.",
       "address": "Dirección",
       "startDate": "Fecha de inicio",
       "completionDate": "Fecha de finalización",
@@ -127,7 +127,6 @@
         "forbidden": "No tienes permiso para cambiar este proyecto.",
         "dates_out_of_order": "La fecha de finalización no puede ser anterior a la de inicio.",
         "too_long": "El texto es demasiado largo.",
-        "project_has_records": "Este proyecto ya tiene registros que deben conservarse (presupuesto emitido, contrato, pedidos, facturas, actas, cobros, incidencias o subcontratas). No se puede eliminar.",
         "generic": "No se ha podido completar la operación. Inténtalo de nuevo."
       }
     },
@@ -158,7 +157,7 @@
       "emptyText": "Aquí solo vive una araña. Sube el primer PDF y el cliente lo verá en la app.",
       "delete": "Eliminar",
       "deleteLabel": "Eliminar {title}",
-      "confirmDelete": "¿Eliminar «{title}»? El cliente dejará de verlo en la app.",
+      "confirmDelete": "¿Eliminar «{title}»? Dejará de verse en el portal y en la app del cliente; el archivo se conserva.",
       "upload": "Subir documento",
       "file": "Archivo PDF",
       "fileHint": "Solo PDF, hasta 4 MB.",
@@ -1039,7 +1038,7 @@
       "files": "Adjuntos: fotos, correos o documentos",
       "currentFiles": "Adjuntos actuales",
       "deleteFile": "Quitar {name}",
-      "confirmDeleteFile": "¿Quitar el adjunto {name}?",
+      "confirmDeleteFile": "¿Quitar el adjunto {name}? Dejará de verse en el portal; el archivo se conserva.",
       "filesHint": "PDF, imagen, correo (EML, MSG), TXT, DOCX o XLSX, hasta 4 MB cada uno.",
       "note": "Es historia: no mueve fechas ni importes. Los costes extra solo cuentan cuando se formalizan en Compras, Ventas o Presupuesto.",
       "uploading": "Subiendo adjuntos: {done} de {total}…",
@@ -1076,7 +1075,7 @@
       "visible": "En la app",
       "hidden": "Solo equipo",
       "visibleLabel": "Visible en la app del cliente: {name}",
-      "confirmDelete": "¿Eliminar esta foto? El cliente dejará de verla en la app.",
+      "confirmDelete": "¿Eliminar esta foto? Dejará de verse en el portal y en la app del cliente; el archivo se conserva.",
       "emptyTitle": "Todavía no hay fotos",
       "emptyText": "La cámara se ha echado la siesta. Sube la primera foto de la obra y el cliente la verá en la app.",
       "uploadTitle": "Subir fotos",
@@ -2427,7 +2426,7 @@
         "workersLabel": "Trabajadores",
         "edit": "Editar",
         "remove": "Quitar de la obra",
-        "confirmRemove": "¿Quitar a la empresa de {ref}?",
+        "confirmRemove": "¿Quitar a la empresa de {ref}? Dejará de aparecer en esa obra; el registro de su asignación se conserva.",
         "save": "Guardar",
         "saving": "Guardando…",
         "cancel": "Cancelar"
@@ -2903,7 +2902,7 @@
         "versionOf": "Nueva versión de {title}",
         "remove": "Quitar",
         "removeOf": "Quitar {title}",
-        "confirmRemove": "¿Quitar «{title}» con todas sus versiones?",
+        "confirmRemove": "¿Quitar «{title}» con todas sus versiones? Deja de verse en el pedido; el documento y sus archivos se conservan.",
         "hint": "Cada documento guarda sus versiones; las facturas y sus justificantes están en cada factura."
       },
       "fromRequest": "desde <link>{number}</link>"
@@ -3351,7 +3350,7 @@
       "credit": "Registrar abono",
       "edit": "Editar",
       "delete": "Eliminar",
-      "confirmDelete": "¿Eliminar {number}? Se quitan también sus PDF.",
+      "confirmDelete": "¿Eliminar {number}? Sale de las listas y de los totales; sus datos y sus PDF se conservan.",
       "banner": {
         "dueIn": "Vence el {date}, {in}.",
         "overdue": "Vencida el {date}, {ago}.",
@@ -3394,7 +3393,7 @@
         "none": "Ningún pago todavía.",
         "remove": "Quitar",
         "removeOf": "Quitar el pago del {date}",
-        "confirmRemove": "¿Quitar el pago de {amount}?"
+        "confirmRemove": "¿Quitar el pago de {amount}? Sale de las listas y de los totales; sus datos y su justificante se conservan."
       },
       "payForm": {
         "title": "Registrar pago",

@@ -112,8 +112,17 @@ describe("/api/v1/projects/:id/obra/control", () => {
     expect(changes).toMatchObject([{ id: issueId, status: "review", files: [{ id: fileId }] }]);
     expect(await (await listIssues(apiRequest(token, { query: "?kind=issue" }), routeParams({ id }))).json()).toEqual([]);
 
+    const stored = files.size;
     const removed = await deleteFile(apiRequest(token, { method: "DELETE" }), routeParams({ id, issueId, fileId }));
     expect(await removed.json()).toEqual({ fileId });
+    // The stored file is kept; the attachment is gone for every request.
+    expect(files.size).toBe(stored);
+    const after = await (await listIssues(apiRequest(token, { query: "?kind=change" }), routeParams({ id }))).json();
+    expect(after).toMatchObject([{ id: issueId, files: [] }]);
+    expect((await getFile(apiRequest(token), routeParams({ id, issueId, fileId }))).status).toBe(404);
+    const again = await deleteFile(apiRequest(token, { method: "DELETE" }), routeParams({ id, issueId, fileId }));
+    expect(again.status).toBe(404);
+    expect(await again.json()).toEqual({ error: "not_found" });
   });
 
   it("needs a token, lets viewers only read, and keeps tenants apart", async () => {

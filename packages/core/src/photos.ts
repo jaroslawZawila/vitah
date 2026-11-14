@@ -1,4 +1,4 @@
-import { and, db, desc, eq, gt, isNotNull, ne, projectPhotos, projects, sql, users } from "@repo/db";
+import { and, db, desc, eq, gt, isNotNull, isNull, ne, projectPhotos, projects, sql, users } from "@repo/db";
 import { markChanged } from "./changes";
 import { clientProjectsWhere, resolveClientProject } from "./client-projects";
 import { requireEditor, type Ctx } from "./context";
@@ -16,20 +16,15 @@ import { clippedText } from "./input";
 import { workDate } from "./obra-data";
 import { notifyProjectClient } from "./notifications";
 import type { PhotosByChapter } from "./obra-calc";
-import {
-  claimFirstShown,
-  fail,
-  openStoredFile,
-  projectFolder,
-  removeFiles,
-  requireProject,
-  storeFiles,
-} from "./project-files";
+import { inLiveProject, softDeleted } from "./project-client";
+import { claimFirstShown, fail, openStoredFile, projectFolder, requireProject, storeFiles } from "./project-files";
 
 // ─── Project photos ───────────────────────────────────────────────────────────
 // Site photos staff share with a project's client (see ./project-files for who
 // may do what). The client sees their own project's photos in the mobile app,
-// except those staff hide, as with documents.
+// except those staff hide, as with documents. A deleted photo keeps its row
+// (`deleted_at`), its image and its thumbnail; every read leaves it out, as if
+// it were gone.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const EXTENSIONS: Record<PhotoType, string> = {
@@ -85,11 +80,17 @@ const photoDay = sql<string>`coalesce(${projectPhotos.takenOn}, (${projectPhotos
 /** Far more than a project has: the list is never cut short. */
 const MAX_PHOTOS = 100_000;
 
+/** Not deleted: what every read of photos asks for. */
+const notDeleted = isNull(projectPhotos.deletedAt);
+
+/** One photo of the project, by its id: not deleted, nor its project. */
 function photoInProject(ctx: Ctx, projectId: string, photoId: string) {
   return and(
     eq(projectPhotos.id, photoId),
     eq(projectPhotos.projectId, projectId),
     eq(projectPhotos.tenantId, ctx.tenantId),
+    notDeleted,
+    inLiveProject(projectPhotos.projectId),
   );
 }
 
@@ -165,6 +166,8 @@ async function pushPhoto(ctx: Ctx, projectId: string, photoId: string) {
       eq(projectPhotos.projectId, projectId),
       ne(projectPhotos.id, photoId),
       gt(projectPhotos.clientNotifiedAt, new Date(Date.now() - PHOTO_PUSH_QUIET_MS)),
+      // A photo deleted since doesn't count: the client was told of something they can no longer see.
+      notDeleted,
     ),
     columns: { id: true },
   });
@@ -221,6 +224,7 @@ export async function listPhotos(
         and(
           eq(projectPhotos.projectId, projectId),
           eq(projectPhotos.tenantId, ctx.tenantId),
+          notDeleted,
           chapterCode === undefined ? undefined : eq(projectPhotos.chapterCode, chapterCode),
         ),
       )
@@ -238,19 +242,19 @@ export async function listPhotos(
   }));
 }
 
+/**
+ * Deletes a photo for everyone, the client's app included. Its row, its image
+ * and its thumbnail are kept: it is marked deleted, with who did it.
+ */
 export async function deletePhoto(ctx: Ctx, projectId: string, photoId: string) {
   requireEditor(ctx);
 
-  const where = photoInProject(ctx, projectId, photoId);
-  const photo = await db.query.projectPhotos.findFirst({
-    where,
-    columns: { pathname: true, thumbSizeBytes: true },
-  });
-  if (!photo) fail("not_found");
-
-  const { pathname, thumbSizeBytes } = photo;
-  const pathnames = thumbSizeBytes === null ? [pathname] : [pathname, thumbPath(pathname)];
-  await removeFiles(pathnames, () => db.delete(projectPhotos).where(where));
+  const [deleted] = await db
+    .update(projectPhotos)
+    .set(softDeleted(ctx))
+    .where(photoInProject(ctx, projectId, photoId))
+    .returning({ id: projectPhotos.id });
+  if (!deleted) fail("not_found");
   await markChanged(ctx.tenantId, projectId, ["photos"]);
 
   return { photoId };
@@ -311,6 +315,7 @@ function clientProject(tenantId: string, clientUserId: string) {
     eq(projects.id, projectPhotos.projectId),
     clientProjectsWhere(tenantId, clientUserId),
     eq(projectPhotos.visibleToClient, true),
+    notDeleted,
   );
 }
 
@@ -325,7 +330,7 @@ export async function listClientPhotos(
   const rows = await db
     .select(mobileColumns)
     .from(projectPhotos)
-    .where(and(eq(projectPhotos.projectId, project.id), eq(projectPhotos.visibleToClient, true)))
+    .where(and(eq(projectPhotos.projectId, project.id), eq(projectPhotos.visibleToClient, true), notDeleted))
     .orderBy(desc(projectPhotos.createdAt));
   return rows.map(toMobilePhoto);
 }
@@ -362,6 +367,7 @@ export async function photosByChapter(
         eq(projectPhotos.tenantId, tenantId),
         eq(projectPhotos.visibleToClient, true),
         isNotNull(projectPhotos.chapterCode),
+        notDeleted,
       ),
     );
   const byChapter: PhotosByChapter = new Map();

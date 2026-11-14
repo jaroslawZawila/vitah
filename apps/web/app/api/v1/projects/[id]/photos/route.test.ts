@@ -84,7 +84,14 @@ describe("/api/v1/projects/:id/photos", () => {
 
     const deleted = await DELETE(request(token, { method: "DELETE" }), params(project.id, photoId));
     expect(deleted.status).toBe(204);
-    expect(files.size).toBe(0);
+    // The image and its thumbnail are kept; the photo itself is gone for every request.
+    expect(files.size).toBe(2);
+    expect(await (await list(request(token), projectParams(project.id))).json()).toEqual([]);
+    expect((await download(request(token), params(project.id, photoId))).status).toBe(404);
+    expect((await download(request(token, { query: "?size=thumb" }), params(project.id, photoId))).status).toBe(404);
+    const again = await DELETE(request(token, { method: "DELETE" }), params(project.id, photoId));
+    expect(again.status).toBe(404);
+    expect(await again.json()).toEqual({ error: "not_found" });
   });
 
   it("hides a photo from the client's app and shows it again", async () => {

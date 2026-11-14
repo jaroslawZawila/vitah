@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { budgetChapters, budgetLines, budgetRevisions, db, eq } from "@repo/db";
+import { budgetChapters, budgetLines, budgetRevisions, db, eq, projects } from "@repo/db";
 import {
   createTestProject,
   createTestTenant,
@@ -16,6 +16,7 @@ import {
   BUDGET_CHAPTER_CODES,
   type Ctx,
 } from "../src";
+import { lockProject } from "../src/budget-draft";
 import { CHAPTER_NAMES } from "../src/budget-template";
 import * as storage from "../src/storage";
 import { files } from "../src/testing";
@@ -419,6 +420,19 @@ describe("margins", () => {
       svc.updateRevision({ tenantId: tenant.id, userId: viewer.id, role: "viewer" }, project.id, revisionId, { profitPct: 50 }),
     ).rejects.toMatchObject({ code: "forbidden" });
     expect((await revisionOf(ctx, project.id)).profitBp).toBe(600);
+  });
+});
+
+describe("a project deleted meanwhile", () => {
+  it("is not found by the lock a new revision takes, so none lands on it", async () => {
+    const { project, ctx } = await setup();
+    await db.update(projects).set({ deletedAt: new Date() }).where(eq(projects.id, project.id));
+
+    const locked = db.transaction((tx) => lockProject(tx, project.id));
+    await expect(locked).rejects.toMatchObject({ code: "project_not_found" });
+    // Through the service it is refused earlier, by the project lookup.
+    await expect(svc.createBudget(ctx, project.id, {})).rejects.toMatchObject({ code: "project_not_found" });
+    expect(await db.select().from(budgetRevisions).where(eq(budgetRevisions.projectId, project.id))).toEqual([]);
   });
 });
 

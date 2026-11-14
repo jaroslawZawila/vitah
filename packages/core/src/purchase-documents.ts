@@ -1,17 +1,19 @@
-import { and, asc, db, desc, eq, purchaseOrderDocumentVersions, purchaseOrderDocuments, purchaseOrders, sql } from "@repo/db";
+import { and, asc, db, desc, eq, isNull, purchaseOrderDocumentVersions, purchaseOrderDocuments, sql } from "@repo/db";
 import { requireEditor, type Ctx } from "./context";
 import { requirePdf } from "./documents";
 import { fail, optionalText, requiredText } from "./obra-data";
+import { softDeleted } from "./project-client";
 import { openStoredFile, projectFolder, storeFiles, uploadedName, type StoredFile } from "./project-files";
 import { logEvent, requireOrder } from "./purchasing";
-import { deleteFile } from "./storage";
 
 // ─── An order's documents (Compras) ──────────────────────────────────────────
 // The order, its signed contract, annexes, the supplier's offer…: each a PDF
 // in versions. A new upload adds a version (with why it replaced the last);
 // the newest is current and none is overwritten. A document can be removed
-// with all its versions. Invoices keep their own PDFs (./purchase-invoices).
-// Admins and managers upload and remove; every staff member downloads.
+// with all its versions: a soft delete (`deleted_at`), so its row, versions
+// and files stay and every read leaves it out. Invoices keep their own PDFs
+// (./purchase-invoices). Admins and managers upload and remove; every staff
+// member downloads.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const MAX_TITLE = 200;
@@ -19,23 +21,28 @@ const MAX_NOTE = 300;
 
 type OrderRow = Awaited<ReturnType<typeof requireOrder>>;
 
-/** The order's document; `not_found` otherwise. */
+/** The order's document, unless removed; `not_found` otherwise. */
 async function requireDocument(ctx: Ctx, order: OrderRow, documentId: string) {
   const document = await db.query.purchaseOrderDocuments.findFirst({
     where: and(
       eq(purchaseOrderDocuments.id, documentId),
       eq(purchaseOrderDocuments.orderId, order.id),
       eq(purchaseOrderDocuments.tenantId, ctx.tenantId),
+      isNull(purchaseOrderDocuments.deletedAt),
     ),
   });
   if (!document) fail("not_found");
   return document;
 }
 
-/** The order's first document, if any (what its single PDF used to be). */
+/** The order's first document not removed, if any (what its single PDF used to be). */
 const firstDocument = (ctx: Ctx, orderId: string) =>
   db.query.purchaseOrderDocuments.findFirst({
-    where: and(eq(purchaseOrderDocuments.orderId, orderId), eq(purchaseOrderDocuments.tenantId, ctx.tenantId)),
+    where: and(
+      eq(purchaseOrderDocuments.orderId, orderId),
+      eq(purchaseOrderDocuments.tenantId, ctx.tenantId),
+      isNull(purchaseOrderDocuments.deletedAt),
+    ),
     orderBy: [asc(purchaseOrderDocuments.createdAt), asc(purchaseOrderDocuments.id)],
   });
 
@@ -60,7 +67,7 @@ async function addVersion(ctx: Ctx, order: OrderRow, document: { id: string; tit
           const [still] = await tx
             .select({ id: purchaseOrderDocuments.id })
             .from(purchaseOrderDocuments)
-            .where(eq(purchaseOrderDocuments.id, document.id))
+            .where(and(eq(purchaseOrderDocuments.id, document.id), isNull(purchaseOrderDocuments.deletedAt)))
             .for("share");
           if (!still) fail("not_found");
         }
@@ -118,34 +125,28 @@ export async function addOrderDocumentVersion(ctx: Ctx, orderId: string, documen
   return { documentId, version };
 }
 
-/** Removes a document with all its versions. */
+/**
+ * Removes a document with all its versions: it leaves the order's page, its
+ * row, versions and files stay (a soft delete). Removed already: `not_found`.
+ */
 export async function deleteOrderDocument(ctx: Ctx, orderId: string, documentId: string) {
   requireEditor(ctx);
   const order = await requireOrder(ctx, orderId);
   const document = await requireDocument(ctx, order, documentId);
-  const pathnames = await db.transaction(async (tx) => {
-    // Locked first: no version can land between reading its files and the delete.
-    const [locked] = await tx
-      .select({ id: purchaseOrderDocuments.id })
-      .from(purchaseOrderDocuments)
-      .where(eq(purchaseOrderDocuments.id, documentId))
-      .for("update");
-    if (!locked) fail("not_found");
+  await db.transaction(async (tx) => {
+    // The row is locked by the update: a version landing at the same time waits, then finds it removed.
+    const [removed] = await tx
+      .update(purchaseOrderDocuments)
+      .set(softDeleted(ctx))
+      .where(and(eq(purchaseOrderDocuments.id, documentId), isNull(purchaseOrderDocuments.deletedAt)))
+      .returning({ id: purchaseOrderDocuments.id });
+    if (!removed) fail("not_found");
     const versions = await tx
-      .select({ pathname: purchaseOrderDocumentVersions.pathname })
+      .select({ id: purchaseOrderDocumentVersions.id })
       .from(purchaseOrderDocumentVersions)
       .where(eq(purchaseOrderDocumentVersions.documentId, documentId));
-    const pathnames = versions.map((v) => v.pathname);
-    await tx.delete(purchaseOrderDocuments).where(eq(purchaseOrderDocuments.id, documentId));
-    // The legacy single PDF it came from goes too, so a re-run of the migration can't bring it back.
-    if (order.filePathname && pathnames.includes(order.filePathname)) {
-      await tx.update(purchaseOrders).set({ fileName: null, filePathname: null, fileSizeBytes: null }).where(eq(purchaseOrders.id, order.id));
-    }
-    await logEvent(tx, ctx, order.id, "document_removed", { documentId, title: document.title, versions: pathnames.length });
-    return pathnames;
+    await logEvent(tx, ctx, order.id, "document_removed", { documentId, title: document.title, versions: versions.length });
   });
-  // The files go once the rows are gone, so a refused delete never loses one.
-  await Promise.all(pathnames.map((p) => deleteFile(p).catch(() => {})));
   return { documentId };
 }
 

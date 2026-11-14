@@ -7,6 +7,7 @@ import {
   desc,
   eq,
   inArray,
+  isNull,
   ne,
   obraHitoChapters,
   obraHitos,
@@ -250,7 +251,7 @@ async function revisionPdfs(revisionId: string): Promise<Record<BudgetPdfKind, s
   const rows = await db
     .select({ id: projectDocuments.id, kind: projectDocuments.budgetPdf })
     .from(projectDocuments)
-    .where(eq(projectDocuments.budgetRevisionId, revisionId));
+    .where(and(eq(projectDocuments.budgetRevisionId, revisionId), isNull(projectDocuments.deletedAt)));
   const of = (kind: BudgetPdfKind) => rows.find((r) => r.kind === kind)?.id ?? null;
   return { general: of("general"), detailed: of("detailed") };
 }

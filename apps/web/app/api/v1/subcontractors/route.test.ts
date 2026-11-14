@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { unzipSync } from "fflate";
+import { db, eq, projects } from "@repo/db";
 import { createTestProject, createTestTenant, resetDatabase } from "@repo/db/testing";
 import { files } from "@repo/core/testing";
 import { apiRequest, routeParams, staffToken } from "../../../../test/api";
@@ -139,7 +140,61 @@ describe("/api/v1/subcontractors", () => {
     expect(zip.headers.get("content-disposition")).toMatch(/^attachment; filename\*=UTF-8''dossier-cae-VTH-26-001-/);
     expect(Object.keys(unzipSync(new Uint8Array(await zip.arrayBuffer())))).toEqual(["indice.csv"]);
 
-    expect((await unassign(apiRequest(token, { method: "DELETE" }), routeParams({ id, projectId: project.id }))).status).toBe(204);
+    const remove = () => unassign(apiRequest(token, { method: "DELETE" }), routeParams({ id, projectId: project.id }));
+    expect((await remove()).status).toBe(204);
+    expect(((await (await detail(apiRequest(token), routeParams({ id }))).json()) as { assignments: unknown[] }).assignments).toEqual([]);
+    // Already removed: nothing to remove.
+    const again = await remove();
+    expect(again.status).toBe(404);
+    expect(await again.json()).toEqual({ error: "not_found" });
+
+    // Assigned again: the same call as the first time, as a new assignment.
+    const back = await assign(
+      apiRequest(token, { method: "PUT", body: { chapterCodes: ["05"] } }),
+      routeParams({ id, projectId: project.id }),
+    );
+    expect(back.status).toBe(200);
+    expect(await back.json()).toEqual({ subcontractorId: id, projectId: project.id });
+    expect(await (await detail(apiRequest(token), routeParams({ id }))).json()).toMatchObject({
+      assignments: [{ projectId: project.id, chapterCodes: ["05"], bookOrder: null, bookDate: null }],
+    });
+  });
+
+  it("keeps removing a company from an obra from viewers and other tenants", async () => {
+    const { tenant, token } = await setup();
+    const id = await createCompany(token);
+    const project = await createTestProject(tenant.id);
+    await assign(apiRequest(token, { method: "PUT", body: {} }), routeParams({ id, projectId: project.id }));
+    const { token: viewer } = await staffToken(tenant.id, "viewer");
+    const { token: stranger } = await setup();
+
+    const params = () => routeParams({ id, projectId: project.id });
+    expect((await unassign(apiRequest(viewer, { method: "DELETE" }), params())).status).toBe(403);
+    expect((await unassign(apiRequest(stranger, { method: "DELETE" }), params())).status).toBe(404);
+    expect(await (await detail(apiRequest(token), routeParams({ id }))).json()).toMatchObject({
+      assignments: [{ projectId: project.id }],
+    });
+  });
+
+  it("leaves a deleted obra out: not offered, not assignable, no access check", async () => {
+    const { tenant, token } = await setup();
+    const id = await createCompany(token);
+    const gone = await createTestProject(tenant.id, { ref: "VTH-26-001" });
+    const kept = await createTestProject(tenant.id, { ref: "VTH-26-002" });
+    await assign(apiRequest(token, { method: "PUT", body: {} }), routeParams({ id, projectId: gone.id }));
+    await db.update(projects).set({ deletedAt: new Date() }).where(eq(projects.id, gone.id));
+
+    expect(await (await projectsRoute(apiRequest(token))).json()).toEqual([expect.objectContaining({ id: kept.id })]);
+    expect(await (await detail(apiRequest(token), routeParams({ id }))).json()).toMatchObject({ assignments: [] });
+    const notFound = async (res: Response, error: string) => {
+      expect(res.status).toBe(404);
+      expect(await res.json()).toEqual({ error });
+    };
+    const params = routeParams({ id, projectId: gone.id });
+    await notFound(await assign(apiRequest(token, { method: "PUT", body: {} }), params), "project_not_found");
+    await notFound(await unassign(apiRequest(token, { method: "DELETE" }), params), "not_found");
+    await notFound(await dossier(apiRequest(token, { query: `?projectId=${gone.id}` })), "project_not_found");
+    await notFound(await check(apiRequest(token, { query: `?query=72145836B&projectId=${gone.id}` })), "project_not_found");
   });
 
   it("creates workers and checks their access", async () => {

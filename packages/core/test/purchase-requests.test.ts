@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createTestProject, createTestTenant, createTestUser, resetDatabase } from "@repo/db/testing";
-import { db, eq, purchaseOrders } from "@repo/db";
+import { db, eq, projects, purchaseOrders, purchaseRequests } from "@repo/db";
 import {
   budgetService,
   purchaseInvoicesService,
@@ -253,6 +253,36 @@ describe("purchase requests", () => {
     expect((await svc.getRequest(s.ctx, requestId)).lateDays).toBe(3);
     await svc.cancelRequest(s.ctx, requestId);
     expect((await svc.getRequest(s.ctx, requestId)).lateDays).toBeNull();
+  });
+
+  it("is left out of the lists and the counter, and out of reach by its id, once its obra is deleted", async () => {
+    const s = await setup();
+    const { requestId } = await svc.createRequest(s.ctx, s.project.id, request(s));
+    const approved = await svc.createRequest(s.ctx, s.project.id, request(s, { description: "Otra" }));
+    await svc.decideRequest(s.admin, approved.requestId, { decision: "approve" });
+    expect((await purchaseInvoicesService.getPurchasingCounts(s.ctx)).requests).toBe(1);
+
+    await db.update(projects).set({ deletedAt: new Date() }).where(eq(projects.id, s.project.id));
+
+    const list = await svc.listRequests(s.ctx);
+    expect(list).toMatchObject({ requests: [], projects: [], summary: { pending: 0, pendingCents: 0, approved: 0, approvedCents: 0 } });
+    expect((await svc.listRequests(s.ctx, { projectId: s.project.id })).requests).toEqual([]);
+    expect((await purchaseInvoicesService.getPurchasingCounts(s.ctx)).requests).toBe(0);
+    for (const attempt of [
+      () => svc.getRequest(s.ctx, requestId),
+      () => svc.updateRequest(s.ctx, requestId, { description: "x" }),
+      () => svc.decideRequest(s.admin, requestId, { decision: "approve" }),
+      () => svc.cancelRequest(s.ctx, requestId),
+      () => svc.cancelRequest(s.ctx, approved.requestId),
+    ]) {
+      await expect(attempt()).rejects.toMatchObject({ code: "not_found" });
+    }
+    // Nothing was written on them.
+    const rows = await db.select({ status: purchaseRequests.status, description: purchaseRequests.description }).from(purchaseRequests);
+    expect(rows.map((r) => [r.description, r.status]).sort()).toEqual([
+      ["Otra", "approved"],
+      ["Piedra para la fachada", "pending"],
+    ]);
   });
 
   it("stays within its tenant and project", async () => {

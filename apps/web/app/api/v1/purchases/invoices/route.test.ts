@@ -107,8 +107,32 @@ describe("/api/v1 supplier invoices", () => {
     const byLine = await (await lines(apiRequest(token), routeParams({ id: project.id }))).json();
     expect(byLine.summary).toMatchObject({ invoicedCents: 300_000, invoices: 1 });
 
-    expect((await remove(apiRequest(token, { method: "DELETE" }), routeParams({ invoiceId }))).status).toBe(409);
-    expect(await (await deletePayment(apiRequest(token, { method: "DELETE" }), routeParams({ paymentId }))).json()).toEqual({ paymentId });
+    // Deleting is a soft delete: the same answers, once; then it is gone from every read, and its files stay.
+    const stored = files.size;
+    const del = { method: "DELETE" };
+    expect((await remove(apiRequest(token, del), routeParams({ invoiceId }))).status).toBe(409);
+    const unpaid = await deletePayment(apiRequest(token, del), routeParams({ paymentId }));
+    expect([unpaid.status, await unpaid.json()]).toEqual([200, { paymentId }]);
+    expect((await deletePayment(apiRequest(token, del), routeParams({ paymentId }))).status).toBe(404);
+    expect((await paymentFile(apiRequest(token), routeParams({ paymentId }))).status).toBe(404);
+    const left = await (await listPayments(apiRequest(token))).json();
+    expect(left.payments.map((p: { amountCents: number }) => p.amountCents)).toEqual([100_000]);
+    expect((await (await getOne(apiRequest(token), routeParams({ invoiceId }))).json()).paidCents).toBe(100_000);
+    await deletePayment(apiRequest(token, del), routeParams({ paymentId: left.payments[0].id }));
+
+    const removed = await remove(apiRequest(token, del), routeParams({ invoiceId }));
+    expect([removed.status, await removed.json()]).toEqual([200, { invoiceId }]);
+    expect((await remove(apiRequest(token, del), routeParams({ invoiceId }))).status).toBe(404);
+    expect((await getOne(apiRequest(token), routeParams({ invoiceId }))).status).toBe(404);
+    expect((await getFile(apiRequest(token), routeParams({ invoiceId }))).status).toBe(404);
+    expect((await (await list(apiRequest(token))).json()).invoices).toEqual([]);
+    expect((await (await listPayments(apiRequest(token))).json()).payments).toEqual([]);
+    expect(await (await counts(apiRequest(token))).json()).toEqual({ requests: 0, orders: 1, invoices: 0, payments: 0, suppliers: 1, dueAttention: 0 });
+    expect((await (await lines(apiRequest(token), routeParams({ id: project.id }))).json()).summary).toMatchObject({ invoicedCents: 0, invoices: 0 });
+    expect(files.size).toBe(stored);
+    // Its number is free again.
+    const again = await createOn(apiRequest(token, json({ number: "PL-1", issuedOn: "2026-10-01", baseCents: 1 })), routeParams({ orderId }));
+    expect(again.status).toBe(201);
   });
 
   it("sets an order's payment schedule", async () => {

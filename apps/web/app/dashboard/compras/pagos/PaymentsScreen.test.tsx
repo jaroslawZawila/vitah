@@ -43,7 +43,9 @@ describe("PaymentsScreen", () => {
   it("takes back a payment recorded by mistake", async () => {
     renderScreen();
     await userEvent.click(screen.getByRole("button", { name: "Quitar el pago del 15 oct" }));
-    expect(window.confirm).toHaveBeenCalledWith(expect.stringMatching(/^¿Quitar el pago de 15\.000,00\s€\?$/));
+    expect(window.confirm).toHaveBeenCalledWith(
+      expect.stringMatching(/^¿Quitar el pago de 15\.000,00\s€\? Sale de las listas y de los totales; sus datos y su justificante se conservan\.$/),
+    );
     expect(actions.deletePaymentAction).toHaveBeenCalledWith("pay-1");
   });
 

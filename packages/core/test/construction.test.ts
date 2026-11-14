@@ -1,11 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createTestProject, createTestTenant, createTestUser, resetDatabase } from "@repo/db/testing";
-import { db, eq, obraInvoiceRequests, obraProgressEvents } from "@repo/db";
+import { createTestPhoto, createTestProject, createTestTenant, createTestUser, resetDatabase } from "@repo/db/testing";
+import { db, eq, obraInvoiceRequests, obraIssueFiles, obraIssues, obraProgressEvents, projects } from "@repo/db";
 import {
   budgetService,
   constructionService as svc,
   hitosService,
   obraService,
+  photosService,
   purchasingService,
   subcontractorsService,
   type Ctx,
@@ -473,7 +474,62 @@ describe("issues and changes", () => {
     ).rejects.toMatchObject({ code: "invalid_file_type" });
 
     await svc.deleteIssueFile(ctx, project.id, issueId, fileId);
-    expect((await svc.listIssues(ctx, project.id))[0]!.files).toHaveLength(1);
+    expect((await svc.listIssues(ctx, project.id))[0]!.files.map((f) => f.filename)).toEqual(["aviso.eml"]);
+  });
+
+  it("keeps a removed file's row and stored file, and shows it nowhere", async () => {
+    const { tenant, ctx, project } = await setup();
+    const { issueId } = await svc.createIssue(ctx, project.id, issue());
+    const { fileId } = await svc.addIssueFile(ctx, project.id, issueId, {
+      file: new File(["%PDF-1.7 albarán"], "Albarán.pdf", { type: "application/pdf" }),
+    });
+    const kept = await svc.addIssueFile(ctx, project.id, issueId, { file: new File(["From: obra@example.com"], "aviso.eml") });
+    const rowOf = () => db.query.obraIssueFiles.findFirst({ where: eq(obraIssueFiles.id, fileId) });
+
+    // Viewers and other tenants can't.
+    const viewer: Ctx = { tenantId: tenant.id, userId: (await createTestUser(tenant.id, { role: "viewer" })).id, role: "viewer" };
+    await expect(svc.deleteIssueFile(viewer, project.id, issueId, fileId)).rejects.toMatchObject({ code: "forbidden" });
+    const other = await createTestTenant();
+    const stranger: Ctx = { tenantId: other.id, userId: (await createTestUser(other.id)).id, role: "admin" };
+    const theirs = await createTestProject(other.id);
+    await expect(svc.deleteIssueFile(stranger, project.id, issueId, fileId)).rejects.toMatchObject({ code: "not_found" });
+    await expect(svc.deleteIssueFile(stranger, theirs.id, issueId, fileId)).rejects.toMatchObject({ code: "not_found" });
+    expect(await rowOf()).toMatchObject({ deletedAt: null, deletedById: null });
+
+    await expect(svc.deleteIssueFile(ctx, project.id, issueId, fileId)).resolves.toEqual({ fileId });
+
+    // The row is marked, with who did it; both stored files are still there.
+    const row = await rowOf();
+    expect(row).toMatchObject({ filename: "Albarán.pdf", deletedAt: expect.any(Date), deletedById: ctx.userId });
+    expect(files.size).toBe(2);
+    expect(files.has(row!.pathname)).toBe(true);
+    // Gone from the issue wherever it is read, and from the download.
+    expect((await svc.listIssues(ctx, project.id))[0]!.files.map((f) => f.id)).toEqual([kept.fileId]);
+    expect((await svc.getControl(ctx, project.id)).issues[0]!.files.map((f) => f.id)).toEqual([kept.fileId]);
+    expect((await svc.getControlChapter(ctx, project.id, "02")).issues[0]!.files.map((f) => f.id)).toEqual([kept.fileId]);
+    await expect(svc.openIssueFile(ctx, project.id, issueId, fileId)).rejects.toMatchObject({ code: "not_found", status: 404 });
+    expect(await svc.openIssueFile(ctx, project.id, issueId, kept.fileId)).toMatchObject({ filename: "aviso.eml" });
+    // Removing it twice: not found, and the first mark stands.
+    await expect(svc.deleteIssueFile(ctx, project.id, issueId, fileId)).rejects.toMatchObject({ code: "not_found", status: 404 });
+    expect((await rowOf())!.deletedAt).toEqual(row!.deletedAt);
+  });
+
+  it("finds no issue of a deleted project: it can't be updated, nor its files added, removed or opened", async () => {
+    const { ctx, project } = await setup();
+    const { issueId } = await svc.createIssue(ctx, project.id, issue());
+    const file = () => new File(["%PDF-1.7 albarán"], "Albarán.pdf", { type: "application/pdf" });
+    const { fileId } = await svc.addIssueFile(ctx, project.id, issueId, { file: file() });
+    await db.update(projects).set({ deletedAt: new Date() }).where(eq(projects.id, project.id));
+
+    const notFound = { code: "not_found", status: 404 };
+    await expect(svc.updateIssue(ctx, project.id, issueId, { status: "resolved" })).rejects.toMatchObject(notFound);
+    await expect(svc.addIssueFile(ctx, project.id, issueId, { file: file() })).rejects.toMatchObject(notFound);
+    await expect(svc.deleteIssueFile(ctx, project.id, issueId, fileId)).rejects.toMatchObject(notFound);
+    await expect(svc.openIssueFile(ctx, project.id, issueId, fileId)).rejects.toMatchObject(notFound);
+
+    // Nothing was written, and the one file is kept.
+    expect(await db.query.obraIssues.findFirst({ where: eq(obraIssues.id, issueId) })).toMatchObject({ status: "pending" });
+    expect(await db.query.obraIssueFiles.findFirst({ where: eq(obraIssueFiles.id, fileId) })).toMatchObject({ deletedAt: null });
     expect(files.size).toBe(1);
   });
 
@@ -489,6 +545,22 @@ describe("issues and changes", () => {
     const theirs = await createTestProject(other.id);
     await expect(svc.updateIssue(stranger, theirs.id, issueId, { status: "resolved" })).rejects.toMatchObject({ code: "not_found" });
     await expect(svc.openIssueFile(stranger, theirs.id, issueId, "x")).rejects.toMatchObject({ code: "not_found" });
+  });
+});
+
+describe("photos", () => {
+  it("shows and counts the obra's photos without a deleted one", async () => {
+    const { tenant, ctx, project } = await setup();
+    const kept = await createTestPhoto(tenant.id, project.id, { chapterCode: "02" });
+    const deleted = await createTestPhoto(tenant.id, project.id, { chapterCode: "02" });
+    expect((await svc.getControl(ctx, project.id)).photoCount).toBe(2);
+
+    await photosService.deletePhoto(ctx, project.id, deleted.id);
+
+    const control = await svc.getControl(ctx, project.id);
+    expect(control.photos.map((p) => p.id)).toEqual([kept.id]);
+    expect(control.photoCount).toBe(1);
+    expect((await svc.getControlChapter(ctx, project.id, "02")).photos.map((p) => p.id)).toEqual([kept.id]);
   });
 });
 

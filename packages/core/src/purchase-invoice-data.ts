@@ -5,6 +5,7 @@ import {
   desc,
   eq,
   inArray,
+  isNull,
   projects,
   purchaseInvoiceFiles,
   purchaseInvoiceLines,
@@ -25,6 +26,7 @@ import type {
   PurchasePayment,
 } from "./contract";
 import { groupBy, userName } from "./obra-data";
+import { projectNotDeleted } from "./project-client";
 import {
   addInvoicing,
   invoiceState,
@@ -41,6 +43,9 @@ import {
 // credit note travels with its invoice), settling each invoice with its
 // credit notes and payments, and summing that up by order, milestone and
 // budget line.
+// Soft delete: an invoice or a payment a user deleted stays in its table
+// (`deleted_at`), and so does an obra; every read here leaves them out, as if
+// the row were gone.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export type MilestoneRow = typeof purchaseOrderMilestones.$inferSelect;
@@ -67,7 +72,7 @@ export async function loadInvoices(tenantId: string, where?: SQL, { lines: withL
     .innerJoin(projects, eq(projects.id, purchaseOrders.projectId))
     .innerJoin(subcontractors, eq(subcontractors.id, purchaseInvoices.subcontractorId))
     .leftJoin(purchaseOrderMilestones, eq(purchaseOrderMilestones.id, purchaseInvoices.milestoneId))
-    .where(and(eq(purchaseInvoices.tenantId, tenantId), where))
+    .where(and(eq(purchaseInvoices.tenantId, tenantId), isNull(purchaseInvoices.deletedAt), projectNotDeleted(), where))
     .orderBy(desc(purchaseInvoices.issuedOn), desc(purchaseInvoices.createdAt));
   const ids = rows.map((r) => r.invoice.id);
   const [lineRows, paidRows, fileRows] =
@@ -83,7 +88,7 @@ export async function loadInvoices(tenantId: string, where?: SQL, { lines: withL
           db
             .select({ invoiceId: purchasePayments.invoiceId, paid: sql<string>`sum(${purchasePayments.amountCents})` })
             .from(purchasePayments)
-            .where(and(eq(purchasePayments.tenantId, tenantId), inArray(purchasePayments.invoiceId, ids)))
+            .where(and(eq(purchasePayments.tenantId, tenantId), isNull(purchasePayments.deletedAt), inArray(purchasePayments.invoiceId, ids)))
             .groupBy(purchasePayments.invoiceId),
           db
             .selectDistinct({ invoiceId: purchaseInvoiceFiles.invoiceId })
@@ -277,7 +282,7 @@ export async function invoicedByOrder(tenantId: string, orderIds: string[]) {
   const rows = await db
     .select({ orderId: purchaseInvoices.orderId, base: sql<string>`sum(${purchaseInvoices.baseCents})` })
     .from(purchaseInvoices)
-    .where(and(eq(purchaseInvoices.tenantId, tenantId), inArray(purchaseInvoices.orderId, orderIds)))
+    .where(and(eq(purchaseInvoices.tenantId, tenantId), isNull(purchaseInvoices.deletedAt), inArray(purchaseInvoices.orderId, orderIds)))
     .groupBy(purchaseInvoices.orderId);
   return new Map(rows.map((r) => [r.orderId, Number(r.base)]));
 }
@@ -300,7 +305,15 @@ export async function loadPayments(tenantId: string, where?: SQL): Promise<Purch
     .innerJoin(projects, eq(projects.id, purchaseOrders.projectId))
     .innerJoin(subcontractors, eq(subcontractors.id, purchaseInvoices.subcontractorId))
     .leftJoin(users, eq(users.id, purchasePayments.createdById))
-    .where(and(eq(purchasePayments.tenantId, tenantId), where))
+    .where(
+      and(
+        eq(purchasePayments.tenantId, tenantId),
+        isNull(purchasePayments.deletedAt),
+        isNull(purchaseInvoices.deletedAt),
+        projectNotDeleted(),
+        where,
+      ),
+    )
     .orderBy(desc(purchasePayments.paidOn), desc(purchasePayments.createdAt));
   return rows.map(({ payment, ...row }) => ({
     id: payment.id,

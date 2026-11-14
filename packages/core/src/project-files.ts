@@ -1,4 +1,4 @@
-import { and, db, eq, isNull, projectDocuments, projectPhotos, type SQL } from "@repo/db";
+import { and, db, eq, isNull, projectDocuments, projectPhotos, projects, sql, type AnyColumn, type SQL } from "@repo/db";
 import type { Ctx } from "./context";
 import type { DocumentError, PhotoError } from "./contract";
 import { CoreError } from "./errors";
@@ -9,6 +9,7 @@ import { deleteFile, putFile, readFile } from "./storage";
 // What documents and photos share: files staff share with a project's client,
 // kept in the private Blob store under the project's folder. Admins and
 // managers upload and delete them; every staff member can list and view them.
+// Deleting one only marks its row (`deleted_at`): the stored files stay.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const STATUS: Record<DocumentError | PhotoError, number> = {
@@ -38,7 +39,7 @@ export async function claimFirstShown(table: typeof projectDocuments | typeof pr
   const claimed = await db
     .update(table)
     .set({ clientNotifiedAt: new Date() })
-    .where(and(where, eq(table.visibleToClient, true), isNull(table.clientNotifiedAt)))
+    .where(and(where, eq(table.visibleToClient, true), isNull(table.clientNotifiedAt), isNull(table.deletedAt)))
     .returning({ id: table.id });
   return claimed.length > 0;
 }
@@ -84,12 +85,6 @@ export async function storeFiles(files: NewFile[], insertRow: () => Promise<unkn
     await Promise.all(files.map((f) => deleteFile(f.pathname).catch(() => {})));
     throw error;
   }
-}
-
-/** Files first: if that fails the row stays and the delete can be retried. */
-export async function removeFiles(pathnames: string[], deleteRow: () => Promise<unknown>) {
-  await Promise.all(pathnames.map(deleteFile));
-  await deleteRow();
 }
 
 /** A stored file, ready to stream to the caller. */

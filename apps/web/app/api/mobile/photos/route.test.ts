@@ -48,7 +48,7 @@ async function setup() {
     role: "client",
     tenantId: tenant.id,
   });
-  return { client, photoId, token };
+  return { client, photoId, token, ctx, project };
 }
 
 beforeEach(async () => {
@@ -74,6 +74,20 @@ describe("GET /api/mobile/photos", () => {
         },
       ],
     });
+  });
+
+  it("no longer lists or serves a photo staff deleted, though its files are kept", async () => {
+    const { photoId, token, ctx, project } = await setup();
+
+    await photosService.deletePhoto(ctx, project.id, photoId);
+
+    expect(await (await list(request(token))).json()).toEqual({ photos: [] });
+    for (const query of ["", "?size=thumb"]) {
+      const res = await download(request(token, query), { params: Promise.resolve({ id: photoId }) });
+      expect(res.status).toBe(404);
+      expect(await res.json()).toEqual({ error: "not_found" });
+    }
+    expect(files.size).toBe(2); // the photo and its thumbnail
   });
 
   it("lists the photos of the client's project asked for", async () => {

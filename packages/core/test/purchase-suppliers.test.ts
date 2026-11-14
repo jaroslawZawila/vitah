@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createTestProject, createTestTenant, createTestUser, resetDatabase } from "@repo/db/testing";
+import { db, eq, projects } from "@repo/db";
 import {
   budgetService,
   purchaseInvoicesService,
@@ -165,6 +166,35 @@ describe("Compras › Proveedores", () => {
     expect(view.invoices.map((i) => [i.number, i.state])).toEqual([["PL-0815", "overdue"]]);
     expect(view.payments.map((p) => [p.invoiceNumber, p.amountCents])).toEqual([["PL-0815", 50_000]]);
     expect(view.today).toBe("2026-10-19");
+  });
+
+  it("counts neither a deleted invoice or payment, nor a deleted obra's orders", async () => {
+    const s = await setup();
+    const before = await svc.listSuppliers(s.ctx);
+    const { invoiceId } = await purchaseInvoicesService.createInvoice(s.admin, s.materialId, { number: "PL-0815", issuedOn: "2026-08-01", baseCents: 145_000 });
+    const owed = await svc.listSuppliers(s.ctx);
+    expect(owed.suppliers[0]).toMatchObject({ id: s.supplierId, invoicedCents: 145_000, paidCents: 0, outstandingCents: 175_450, overdueCents: 175_450 });
+    const { paymentId } = await purchaseInvoicesService.createPayment(s.admin, invoiceId, { amountCents: 50_000, paidOn: "2026-09-01" });
+    expect((await svc.listSuppliers(s.ctx)).suppliers[0]).toMatchObject({ paidCents: 41_322, outstandingCents: 125_450 });
+
+    // The payment deleted: all of it is owed again. The invoice deleted: as before it existed.
+    await purchaseInvoicesService.deletePayment(s.admin, paymentId);
+    expect(await svc.listSuppliers(s.ctx)).toEqual(owed);
+    expect((await svc.getSupplierPurchasing(s.ctx, s.supplierId)).payments).toEqual([]);
+    await purchaseInvoicesService.deleteInvoice(s.admin, invoiceId);
+    expect(await svc.listSuppliers(s.ctx)).toEqual(before);
+    expect(await svc.getSupplierPurchasing(s.ctx, s.supplierId)).toMatchObject({ supplier: { invoicedCents: 0, outstandingCents: 0 }, invoices: [], payments: [] });
+
+    // The obra deleted: its orders are nobody's any more.
+    await withInvoices(s);
+    await db.update(projects).set({ deletedAt: new Date() }).where(eq(projects.id, s.project.id));
+    const { suppliers, summary } = await svc.listSuppliers(s.ctx);
+    expect(suppliers).toHaveLength(3);
+    for (const supplier of suppliers) {
+      expect(supplier).toMatchObject({ orders: 0, projects: 0, contractedCents: 0, invoicedCents: 0, paidCents: 0, outstandingCents: 0, overdueCents: 0, retainedCents: 0, lastOrderOn: null });
+    }
+    expect(summary).toEqual({ active: 0, contractedCents: 0, outstandingCents: 0, overdueCents: 0, overdueSuppliers: 0, retainedCents: 0 });
+    expect(await svc.getSupplierPurchasing(s.ctx, s.supplierId)).toMatchObject({ orders: [], invoices: [], payments: [] });
   });
 
   it("stays within its tenant", async () => {

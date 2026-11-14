@@ -94,6 +94,10 @@ describe("InvoiceScreen", () => {
   it("takes a payment back, adds a version of the PDF and deletes the invoice", async () => {
     renderScreen();
     await userEvent.click(screen.getByRole("button", { name: "Quitar el pago del 15 oct" }));
+    // Each confirmation says what happens: it leaves the lists and totals, and nothing is erased.
+    expect(window.confirm).toHaveBeenLastCalledWith(
+      expect.stringMatching(/^¿Quitar el pago de 15\.000,00\s€\? Sale de las listas y de los totales; sus datos y su justificante se conservan\.$/),
+    );
     expect(actions.deletePaymentAction).toHaveBeenCalledWith("pay-1");
 
     await userEvent.click(screen.getByRole("button", { name: "+ Nueva versión" }));
@@ -106,6 +110,7 @@ describe("InvoiceScreen", () => {
     expect([form.get("file"), form.get("note")]).toEqual([pdf, "Importe corregido"]);
 
     await userEvent.click(screen.getByRole("button", { name: "Eliminar" }));
+    expect(window.confirm).toHaveBeenLastCalledWith("¿Eliminar MSN-2026/148? Sale de las listas y de los totales; sus datos y sus PDF se conservan.");
     expect(actions.deleteInvoiceAction).toHaveBeenCalledWith("inv-148");
     expect(router.push).toHaveBeenCalledWith("/dashboard/compras/facturas");
   });

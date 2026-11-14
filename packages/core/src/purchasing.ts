@@ -15,6 +15,7 @@ import {
   purchaseRequests,
   purchaseDocumentChecks,
   isNotNull,
+  isNull,
   sql,
   subcontractors,
   users,
@@ -89,7 +90,7 @@ import {
   userName,
   workDate,
 } from "./obra-data";
-import { projectInTenant, type Tx } from "./project-client";
+import { projectInTenant, projectNotDeleted, projectsInTenant, type Tx } from "./project-client";
 import { loadNetwork, requireCompany, type Network } from "./subcontractor-network";
 
 // ─── Purchasing (Compras) ────────────────────────────────────────────────────
@@ -104,7 +105,9 @@ import { loadNetwork, requireCompany, type Network } from "./subcontractor-netwo
 // managers write, viewers read; the client's app never sees it. Suppliers'
 // invoices and payments are ./purchase-invoices; once an order has invoices
 // it keeps its supplier, its invoiced lines and its place (never back to
-// pending, never cancelled).
+// pending, never cancelled). Soft delete: an invoice a user deleted stays in
+// its table and counts for none of that; a deleted obra's orders are left out
+// of every read.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const MAX_DESCRIPTION = 500;
@@ -124,7 +127,7 @@ type NewLine = Pick<LineRow, "lineageId" | "chapterCode" | "amountCents" | "clos
 
 const inTenant = (ctx: Ctx) => eq(purchaseOrders.tenantId, ctx.tenantId);
 
-/** Orders with their supplier, project and lines, newest first. */
+/** Orders with their supplier, project and lines, newest first; those of a deleted obra aside. */
 /** `documents`: whether each has documents (the lists' `hasFile`); else false. */
 export async function loadOrders(tenantId: string, where?: SQL, { documents = false } = {}) {
   const rows = await db
@@ -137,7 +140,7 @@ export async function loadOrders(tenantId: string, where?: SQL, { documents = fa
     .from(purchaseOrders)
     .innerJoin(subcontractors, eq(subcontractors.id, purchaseOrders.subcontractorId))
     .innerJoin(projects, eq(projects.id, purchaseOrders.projectId))
-    .where(and(eq(purchaseOrders.tenantId, tenantId), where))
+    .where(and(eq(purchaseOrders.tenantId, tenantId), projectNotDeleted(), where))
     .orderBy(desc(purchaseOrders.createdAt), desc(purchaseOrders.number));
   const ids = rows.map((r) => r.order.id);
   const [lineRows, invoiced, documented] = await Promise.all([
@@ -286,7 +289,7 @@ export const projectList = (tenantId: string) =>
   db
     .select({ id: projects.id, ref: projects.ref, address: projects.address })
     .from(projects)
-    .where(eq(projects.tenantId, tenantId))
+    .where(projectsInTenant(tenantId))
     .orderBy(asc(projects.ref));
 
 /** Every order of the tenant, with the totals Administration watches. */
@@ -592,11 +595,15 @@ export async function getPurchaseForm(ctx: Ctx, projectId: string, orderId?: str
   };
 }
 
-/** The tenant's order; `not_found` otherwise. */
+/** The tenant's order, of an obra not deleted; `not_found` otherwise. */
 export async function requireOrder(ctx: Ctx, orderId: string) {
-  const order = await db.query.purchaseOrders.findFirst({ where: and(eq(purchaseOrders.id, orderId), inTenant(ctx)) });
-  if (!order) fail("not_found");
-  return order;
+  const [row] = await db
+    .select({ order: purchaseOrders })
+    .from(purchaseOrders)
+    .innerJoin(projects, eq(projects.id, purchaseOrders.projectId))
+    .where(and(eq(purchaseOrders.id, orderId), inTenant(ctx), projectNotDeleted()));
+  if (!row) fail("not_found");
+  return row.order;
 }
 
 /** The first document's current version: the single PDF older clients know. */
@@ -774,23 +781,23 @@ const FIELD_PARSERS = {
   vatKind: orNull(pick(PURCHASE_VAT_KINDS)),
 };
 
-/** Whether the order has invoices (credit notes too); in `run`, after locking the order. */
+/** Whether the order has invoices (credit notes too; deleted ones aside); in `run`, after locking the order. */
 async function hasInvoices(run: Tx | typeof db, tenantId: string, orderId: string) {
   const [row] = await run
     .select({ id: purchaseInvoices.id })
     .from(purchaseInvoices)
-    .where(and(eq(purchaseInvoices.tenantId, tenantId), eq(purchaseInvoices.orderId, orderId)))
+    .where(and(eq(purchaseInvoices.tenantId, tenantId), eq(purchaseInvoices.orderId, orderId), isNull(purchaseInvoices.deletedAt)))
     .limit(1);
   return row !== undefined;
 }
 
-/** What the order's invoices (credit notes net) put on each budget line, by lineage. */
+/** What the order's invoices (credit notes net; deleted ones aside) put on each budget line, by lineage. */
 async function invoicedByLineage(run: Tx, tenantId: string, orderId: string) {
   const rows = await run
     .select({ lineageId: purchaseInvoiceLines.lineageId, cents: sql<number>`sum(${purchaseInvoiceLines.amountCents})::int` })
     .from(purchaseInvoiceLines)
     .innerJoin(purchaseInvoices, eq(purchaseInvoices.id, purchaseInvoiceLines.invoiceId))
-    .where(and(eq(purchaseInvoiceLines.tenantId, tenantId), eq(purchaseInvoices.orderId, orderId)))
+    .where(and(eq(purchaseInvoiceLines.tenantId, tenantId), eq(purchaseInvoices.orderId, orderId), isNull(purchaseInvoices.deletedAt)))
     .groupBy(purchaseInvoiceLines.lineageId);
   return new Map(rows.map((r) => [r.lineageId, r.cents]));
 }
@@ -825,6 +832,19 @@ export async function replaceOrderLines(
 }
 
 /**
+ * In `tx`, before milestones are removed: the deleted invoices that were
+ * theirs let go of them (the column is a foreign key; an invoice not deleted
+ * locks its milestone, so only deleted ones can be left).
+ */
+export async function releaseMilestones(tx: Tx, milestoneIds: string[]) {
+  if (milestoneIds.length === 0) return;
+  await tx
+    .update(purchaseInvoices)
+    .set({ milestoneId: null })
+    .where(and(inArray(purchaseInvoices.milestoneId, milestoneIds), isNotNull(purchaseInvoices.deletedAt)));
+}
+
+/**
  * In `tx`, with the order locked: its payment schedule, if any, follows a
  * change of `deltaCents` (an edit or a modificado): a rise is a milestone of
  * its own (`concept`), a cut comes off the last milestones with no invoice;
@@ -846,7 +866,15 @@ export async function followSchedule(tx: Tx, ctx: Ctx, orderId: string, deltaCen
   const invoiced = await tx
     .selectDistinct({ milestoneId: purchaseInvoices.milestoneId })
     .from(purchaseInvoices)
-    .where(and(eq(purchaseInvoices.orderId, orderId), isNotNull(purchaseInvoices.milestoneId), inArray(purchaseInvoices.milestoneId, milestones.map((m) => m.id))));
+    .where(
+      and(
+        eq(purchaseInvoices.orderId, orderId),
+        // A deleted invoice locks no milestone.
+        isNull(purchaseInvoices.deletedAt),
+        isNotNull(purchaseInvoices.milestoneId),
+        inArray(purchaseInvoices.milestoneId, milestones.map((m) => m.id)),
+      ),
+    );
   const locked = new Set(invoiced.map((i) => i.milestoneId));
   let left = -deltaCents;
   for (const milestone of [...milestones].reverse()) {
@@ -854,8 +882,10 @@ export async function followSchedule(tx: Tx, ctx: Ctx, orderId: string, deltaCen
     if (locked.has(milestone.id)) continue;
     const taken = Math.min(left, milestone.amountCents);
     left -= taken;
-    if (taken === milestone.amountCents) await tx.delete(purchaseOrderMilestones).where(eq(purchaseOrderMilestones.id, milestone.id));
-    else await tx.update(purchaseOrderMilestones).set({ amountCents: milestone.amountCents - taken }).where(eq(purchaseOrderMilestones.id, milestone.id));
+    if (taken === milestone.amountCents) {
+      await releaseMilestones(tx, [milestone.id]);
+      await tx.delete(purchaseOrderMilestones).where(eq(purchaseOrderMilestones.id, milestone.id));
+    } else await tx.update(purchaseOrderMilestones).set({ amountCents: milestone.amountCents - taken }).where(eq(purchaseOrderMilestones.id, milestone.id));
   }
   if (left > 0) fail("milestones_cut");
   return true;

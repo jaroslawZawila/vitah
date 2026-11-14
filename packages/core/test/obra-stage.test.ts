@@ -8,6 +8,7 @@ import {
   documentsService,
   hitosService,
   obraService,
+  projectsService,
   type Ctx,
 } from "../src";
 import { evidenceStage } from "../src/obra-calc";
@@ -115,6 +116,17 @@ describe("the stage on its own", () => {
 
     await documentsService.markBudgetInput(ctx, project.id, doc.id, { budgetInput: "basic" });
 
+    expect(await stageOf(project.id)).toBe(2);
+  });
+
+  it("no longer counts a budget input once it is deleted (the stage stays where it was)", async () => {
+    const { ctx, project, tenant } = await setup();
+    const { documentId } = await registerInput(ctx, project.id);
+    expect((await loadFirstDays(tenant.id, project.id)).firstInputOn).not.toBeNull();
+
+    await documentsService.deleteDocument(ctx, project.id, documentId);
+
+    expect((await loadFirstDays(tenant.id, project.id)).firstInputOn).toBeNull();
     expect(await stageOf(project.id)).toBe(2);
   });
 
@@ -253,6 +265,17 @@ describe("raiseStage", () => {
 
     expect(await raiseStage(other.id, project.id)).toBeNull();
     expect(await stageOf(project.id)).toBe(1);
+  });
+
+  it("leaves a deleted project's stage where it was", async () => {
+    const { ctx, tenant, project } = await accepted();
+    await obraService.setStage(ctx, project.id, { stage: 1 });
+    const admin = await createTestUser(tenant.id, { role: "admin" });
+    await projectsService.deleteProject({ ...ctx, userId: admin.id, role: "admin" }, project.id);
+    const before = await projectRow(project.id);
+
+    expect(await raiseStage(ctx.tenantId, project.id)).toBeNull();
+    expect(await projectRow(project.id)).toEqual(before);
   });
 
   it("never fails the caller", async () => {

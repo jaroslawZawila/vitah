@@ -42,6 +42,7 @@ import {
   type Recorded,
 } from "./planning-calc";
 import { approvedPlanDates } from "./planning-data";
+import { projectInTenant, projectNotDeleted } from "./project-client";
 
 // ─── Planning ────────────────────────────────────────────────────────────────
 // The works schedule (the Obra tab's Planificación): per version, each contract
@@ -218,7 +219,7 @@ export async function getPlanning(ctx: Ctx, projectId: string): Promise<ProjectP
   };
 }
 
-/** The tenant's other projects with a baseline, to copy one from. */
+/** The tenant's other projects (not deleted) with a baseline, to copy one from. */
 function otherBaselines(tenantId: string, projectId: string) {
   return db
     .select({ projectId: projects.id, ref: projects.ref })
@@ -229,6 +230,7 @@ function otherBaselines(tenantId: string, projectId: string) {
         eq(planningVersions.tenantId, tenantId),
         eq(planningVersions.status, "approved"),
         ne(planningVersions.projectId, projectId),
+        projectNotDeleted(),
       ),
     )
     .orderBy(asc(projects.ref));
@@ -384,9 +386,12 @@ export async function createPlanningDraft(
     if (input.from === "template") rules = templateItems(codes);
     else {
       if (typeof input.projectId !== "string" || input.projectId === projectId) fail("invalid_input");
-      // Another project of the tenant, with a baseline.
-      const source = (await loadVersions(ctx.tenantId, input.projectId)).approved;
-      if (!source) fail("not_found");
+      // Another project of the tenant (not a deleted one), with a baseline.
+      const [other, { approved: source }] = await Promise.all([
+        db.query.projects.findFirst({ where: projectInTenant(ctx.tenantId, input.projectId), columns: { id: true } }),
+        loadVersions(ctx.tenantId, input.projectId),
+      ]);
+      if (!other || !source) fail("not_found");
       // Its fixed days belong to its own calendar: here those chapters start with the works.
       const copied = ((await loadItems([source])).get(source.id) ?? []).map((row) => ({ ...toInput(row), fixedStart: null }));
       rules = fitToContract(copied, codes);
@@ -523,7 +528,7 @@ export async function approvePlanningDraft(ctx: Ctx, projectId: string, input: u
 /** Throws the draft away; the baseline stays as it is. */
 export async function discardPlanningDraft(ctx: Ctx, projectId: string) {
   requireEditor(ctx);
-  const { draft } = await loadVersions(ctx.tenantId, projectId);
+  const [, { draft }] = await Promise.all([requireProject(ctx.tenantId, projectId), loadVersions(ctx.tenantId, projectId)]);
   if (!draft) fail("not_found");
   await db.delete(planningVersions).where(eq(planningVersions.id, draft.id));
 }

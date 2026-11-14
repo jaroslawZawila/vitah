@@ -1,9 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createTestProject, createTestTenant, createTestUser, resetDatabase } from "@repo/db/testing";
+import { db, eq, planningVersions } from "@repo/db";
 import {
   budgetService,
   constructionService,
   planningService as svc,
+  projectsService,
   purchasingService,
   type Ctx,
 } from "../src";
@@ -278,6 +280,41 @@ describe("who and what", () => {
     await expect(
       svc.createPlanningDraft(stranger, mine.id, { ...PLAIN, from: "project", projectId: project.id }),
     ).rejects.toMatchObject({ code: "not_found" });
+  });
+
+  it("leaves a deleted project out: no plan to copy from it, none of its own to read or change", async () => {
+    const { ctx, admin, project, tenant } = await setup();
+    await svc.createPlanningDraft(ctx, project.id, PLAIN);
+    await svc.approvePlanningDraft(ctx, project.id, {});
+    await svc.createPlanningDraft(ctx, project.id, { from: "baseline" });
+    const other = await createTestProject(tenant.id, { startDate: new Date("2026-06-01T00:00:00Z") });
+    const { revisionId } = await framerDraft(admin, other.id, ["01"]);
+    await budgetService.acceptRevision(admin, other.id, revisionId, {}, { unissued: true });
+    expect((await svc.getPlanning(ctx, other.id)).copyFrom).toEqual([{ projectId: project.id, ref: project.ref }]);
+
+    await projectsService.deleteProject(admin, project.id);
+    vi.mocked(notifyProjectClient).mockClear();
+
+    expect((await svc.getPlanning(ctx, other.id)).copyFrom).toEqual([]);
+    await expect(
+      svc.createPlanningDraft(ctx, other.id, { ...PLAIN, from: "project", projectId: project.id }),
+    ).rejects.toMatchObject({ code: "not_found", status: 404 });
+    expect((await svc.getPlanning(ctx, other.id)).draft).toBeNull();
+
+    const gone = { code: "project_not_found", status: 404 };
+    await expect(svc.getPlanning(ctx, project.id)).rejects.toMatchObject(gone);
+    await expect(svc.getPlanningDraft(ctx, project.id)).rejects.toMatchObject(gone);
+    await expect(svc.getPlanningVersions(ctx, project.id)).rejects.toMatchObject(gone);
+    await expect(svc.updatePlanningDraft(ctx, project.id, { items: [] })).rejects.toMatchObject(gone);
+    await expect(svc.approvePlanningDraft(ctx, project.id, { reason: "Lluvias" })).rejects.toMatchObject(gone);
+    await expect(svc.discardPlanningDraft(ctx, project.id)).rejects.toMatchObject(gone);
+    // Its baseline and its open draft are kept as they were.
+    expect(
+      (await db.select({ status: planningVersions.status }).from(planningVersions).where(eq(planningVersions.projectId, project.id)))
+        .map((v) => v.status)
+        .sort(),
+    ).toEqual(["approved", "draft"]);
+    expect(notifyProjectClient).not.toHaveBeenCalled();
   });
 
   it("needs an accepted budget, a start date and a known way to start", async () => {

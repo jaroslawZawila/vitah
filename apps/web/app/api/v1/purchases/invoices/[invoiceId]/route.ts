@@ -6,7 +6,7 @@ import { readJson, withContext } from "../../../../../../lib/api";
 // PATCH any of { number, issuedOn, dueOn, notes } and, until something is
 //   paid, { baseCents, vatKind, irpfBp, retentionBp, milestoneId, lines }
 //   → { invoiceId }
-// DELETE (nothing paid, no credit note on it) → { invoiceId }
+// DELETE (nothing paid, no credit note on it) → { invoiceId }: a soft delete, its PDFs stay
 // ─────────────────────────────────────────────────────────────────────────────
 
 type Params = { params: Promise<{ invoiceId: string }> };

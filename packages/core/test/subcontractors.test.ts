@@ -1,6 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { unzipSync, strFromU8 } from "fflate";
-import { db, eq, projects, subcontractorAudit, subcontractorDocumentVersions } from "@repo/db";
+import {
+  db,
+  eq,
+  projects,
+  sql,
+  subcontractorAssignments,
+  subcontractorAudit,
+  subcontractorDocumentVersions,
+} from "@repo/db";
 import { createTestProject, createTestTenant, createTestUser, resetDatabase } from "@repo/db/testing";
 import {
   MANDATORY_COMPANY_REQUIREMENTS,
@@ -504,6 +512,288 @@ describe("assignments", () => {
     const other = await createTestTenant();
     const project = await createTestProject(other.id);
     await expect(svc.assignToProject(ctx, id, project.id, {})).rejects.toMatchObject({ code: "project_not_found" });
+  });
+});
+
+/** The company's assignment rows as stored, removed ones too. */
+const storedAssignments = (subcontractorId: string) =>
+  db.select().from(subcontractorAssignments).where(eq(subcontractorAssignments.subcontractorId, subcontractorId));
+
+const auditActions = async (subcontractorId: string) =>
+  (await db.select().from(subcontractorAudit).where(eq(subcontractorAudit.subcontractorId, subcontractorId)))
+    .map((r) => r.action)
+    .sort();
+
+/**
+ * An apta company with a worker ready to enter, on an obra in execution, its
+ * PSS adhesion there validated and about to expire (so it counts everywhere).
+ */
+async function onObra() {
+  const base = await setup();
+  const { ctx, id, tenant } = base;
+  await makeApta(ctx, id);
+  const workerId = await readyWorker(ctx, id);
+  const project = await createTestProject(tenant.id, { ref: "VTH-26-001" });
+  await db.update(projects).set({ obraStage: 6 }).where(eq(projects.id, project.id));
+  await svc.assignToProject(ctx, id, project.id, { chapterCodes: ["13"], bookOrder: 7, bookDate: today });
+  await validDoc(ctx, id, "adhesion_pss", { projectId: project.id, expiresAt: inDays(5) });
+  return { ...base, project, workerId };
+}
+
+/** Everything the portal reads about the company on that obra. */
+async function seenOnObra(ctx: Ctx, id: string, projectId: string, workerId: string) {
+  const overview = await svc.getOverview(ctx);
+  return {
+    assignments: (await svc.getSubcontractor(ctx, id)).assignments.map((a) => a.projectId),
+    listed: (await svc.listSubcontractors(ctx)).find((c) => c.id === id)!.projectIds,
+    onSiteToday: overview.onSiteToday,
+    expiring: overview.expiring,
+    expiries: (await svc.getCounts(ctx)).expiries,
+    attention: overview.attention.filter((a) => a.projectId === projectId).length,
+    projectAttention: (await svc.listProjectAttention(ctx, projectId)).length,
+    workersOnObra: (await workers.listWorkers(ctx, { projectId })).length,
+    workerObras: (await workers.getWorker(ctx, workerId)).obras.length,
+    accessOnObra: await workers.checkAccess(ctx, { query: "72145836B", projectId }).then(
+      (check) => check.access!.status,
+      (error: { code: string }) => error.code,
+    ),
+    accessAnywhere: (await workers.checkAccess(ctx, { query: "72145836B" })).access!.status,
+  };
+}
+
+/** The obra's PSS adhesion can't be reviewed or opened by its id either. */
+async function expectAdhesionGone(ctx: Ctx, id: string, documentId: string, versionId: string) {
+  const notFound = { code: "not_found", status: 404 };
+  await expect(svc.validateDocument(ctx, id, documentId)).rejects.toMatchObject(notFound);
+  await expect(svc.rejectDocument(ctx, id, documentId, { reason: "x" })).rejects.toMatchObject(notFound);
+  await expect(svc.openDocumentVersion(ctx, id, versionId)).rejects.toMatchObject(notFound);
+}
+
+const GONE = {
+  assignments: [],
+  listed: [],
+  onSiteToday: { projectRefs: [], companies: 0, workers: 0, blocked: [] },
+  expiring: 0,
+  expiries: 0,
+  attention: 0,
+  projectAttention: 0,
+  workersOnObra: 0,
+  workerObras: 0,
+  // The obra's own checks fail, as on any obra the company isn't on.
+  accessOnObra: "pending",
+  accessAnywhere: "ok",
+};
+
+describe("removing a company from an obra", () => {
+  it("keeps the assignment, marked with who removed it and when, and logs it", async () => {
+    const { ctx, id, admin, project } = await onObra();
+    const [before] = await storedAssignments(id);
+
+    await svc.removeAssignment(ctx, id, project.id);
+
+    const rows = await storedAssignments(id);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      id: before!.id,
+      deletedAt: expect.any(Date),
+      deletedById: admin.id,
+      // The Libro de Subcontratación entry stays as it was.
+      chapterCodes: ["13"],
+      bookOrder: 7,
+      bookDate: today,
+    });
+    const log = await db.select().from(subcontractorAudit).where(eq(subcontractorAudit.subcontractorId, id));
+    expect(log.filter((r) => r.action === "unassigned")).toEqual([
+      expect.objectContaining({ userId: admin.id, detail: { projectId: project.id } }),
+    ]);
+
+    // Already removed: there is nothing to remove, and nothing more is logged.
+    await expect(svc.removeAssignment(ctx, id, project.id)).rejects.toMatchObject({ code: "not_found", status: 404 });
+    expect((await auditActions(id)).filter((a) => a === "unassigned")).toHaveLength(1);
+    expect((await storedAssignments(id))[0]!.deletedAt).toEqual(rows[0]!.deletedAt);
+  });
+
+  it("removes and logs in one transaction: neither stays if the log fails", async () => {
+    const { ctx, id, project } = await onObra();
+    await db.execute(
+      sql`alter table subcontractor_audit add constraint test_no_unassigned check (action <> 'unassigned') not valid`,
+    );
+    try {
+      await expect(svc.removeAssignment(ctx, id, project.id)).rejects.toThrow();
+    } finally {
+      await db.execute(sql`alter table subcontractor_audit drop constraint test_no_unassigned`);
+    }
+
+    expect((await storedAssignments(id))[0]).toMatchObject({ deletedAt: null, deletedById: null });
+    expect(await auditActions(id)).not.toContain("unassigned");
+    expect((await svc.getSubcontractor(ctx, id)).assignments).toHaveLength(1);
+  });
+
+  it("takes no obra document for a company that is no longer on that obra", async () => {
+    const { ctx, id, project } = await onObra();
+    await svc.removeAssignment(ctx, id, project.id);
+
+    // No read would show it: better refused than stored and hidden.
+    const upload = svc.uploadDocument(ctx, id, { requirementId: "adhesion_pss", projectId: project.id, file: pdf() });
+    await expect(upload).rejects.toMatchObject({ code: "project_not_found" });
+
+    await svc.assignToProject(ctx, id, project.id, { chapterCodes: ["05"] });
+    await svc.uploadDocument(ctx, id, { requirementId: "adhesion_pss", projectId: project.id, file: pdf() });
+  });
+
+  it("leaves it out of every read, as if it had never been there", async () => {
+    const { ctx, id, project, workerId } = await onObra();
+    expect(await seenOnObra(ctx, id, project.id, workerId)).toEqual({
+      assignments: [project.id],
+      listed: [project.id],
+      onSiteToday: { projectRefs: ["VTH-26-001"], companies: 1, workers: 1, blocked: [] },
+      expiring: 1,
+      expiries: 1,
+      attention: 1,
+      projectAttention: 1,
+      workersOnObra: 1,
+      workerObras: 1,
+      accessOnObra: "ok",
+      accessAnywhere: "ok",
+    });
+
+    const adhesion = await findDoc(ctx, id, "adhesion_pss", { projectId: project.id });
+
+    await svc.removeAssignment(ctx, id, project.id);
+
+    expect(await seenOnObra(ctx, id, project.id, workerId)).toEqual(GONE);
+    await expectAdhesionGone(ctx, id, adhesion.id!, adhesion.current!.id);
+    // The obra is still there to assign to; its dossier no longer has the company.
+    expect((await svc.listProjectOptions(ctx)).map((p) => p.id)).toEqual([project.id]);
+    const dossier = await svc.exportDossier(ctx, { projectId: project.id });
+    const zip = unzipSync(new Uint8Array(await new Response(dossier.body).arrayBuffer()));
+    expect(Object.keys(zip)).toEqual(["indice.csv"]);
+    expect(strFromU8(zip["indice.csv"]!)).not.toContain("Electricidad Saja");
+    // With no obra left, the company may become a material supplier.
+    const { id: bare } = await svc.createSubcontractor(ctx, company({ taxId: "B39654322" }));
+    await svc.assignToProject(ctx, bare, project.id, {});
+    await expect(svc.updateSubcontractor(ctx, bare, { suppliesOnly: true })).rejects.toMatchObject({ code: "supplies_only" });
+    await svc.removeAssignment(ctx, bare, project.id);
+    await expect(svc.updateSubcontractor(ctx, bare, { suppliesOnly: true })).resolves.toEqual({ id: bare });
+  });
+
+  it("is not for viewers, nor for another tenant", async () => {
+    const { ctx, id, tenant, project } = await onObra();
+    const viewer = await createTestUser(tenant.id, { role: "viewer" });
+    const other = await createTestTenant();
+    const stranger = await createTestUser(other.id, { role: "admin" });
+
+    await expect(
+      svc.removeAssignment({ tenantId: tenant.id, userId: viewer.id, role: "viewer" }, id, project.id),
+    ).rejects.toMatchObject({ code: "forbidden" });
+    await expect(
+      svc.removeAssignment({ tenantId: other.id, userId: stranger.id, role: "admin" }, id, project.id),
+    ).rejects.toMatchObject({ code: "not_found" });
+
+    expect((await storedAssignments(id))[0]).toMatchObject({ deletedAt: null, deletedById: null });
+    expect(await auditActions(id)).not.toContain("unassigned");
+    expect((await svc.getSubcontractor(ctx, id)).assignments).toHaveLength(1);
+  });
+
+  it("takes the removed row back when the company is assigned again, as a new assignment", async () => {
+    const { ctx, id, project } = await onObra();
+    await svc.assignToProject(ctx, id, project.id, {
+      chapterCodes: ["13"],
+      plannedStart: "2026-10-05",
+      plannedEnd: "2026-11-20",
+      bookOrder: 7,
+      bookDate: today,
+      cssInformed: true,
+    });
+    const [before] = await storedAssignments(id);
+    const adhesion = await findDoc(ctx, id, "adhesion_pss", { projectId: project.id });
+    await svc.removeAssignment(ctx, id, project.id);
+
+    await expect(svc.assignToProject(ctx, id, project.id, { chapterCodes: ["05"] })).resolves.toEqual({
+      subcontractorId: id,
+      projectId: project.id,
+    });
+
+    // The same row (one per company and obra), with only what was sent now.
+    const rows = await storedAssignments(id);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      id: before!.id,
+      deletedAt: null,
+      deletedById: null,
+      chapterCodes: ["05"],
+      plannedStart: null,
+      plannedEnd: null,
+      bookOrder: null,
+      bookDate: null,
+      cssInformed: false,
+    });
+    const [assignment] = (await svc.getSubcontractor(ctx, id)).assignments;
+    // The obra's documents are the company's there: the adhesion it had shows again.
+    expect(assignment).toMatchObject({
+      projectId: project.id,
+      chapterCodes: ["05"],
+      bookOrder: null,
+      pssAdhesion: { id: adhesion.id, state: "expiring" },
+    });
+    await expect(svc.openDocumentVersion(ctx, id, adhesion.current!.id)).resolves.toMatchObject({ filename: "certificado.pdf" });
+    expect((await auditActions(id)).filter((a) => a.endsWith("assigned"))).toEqual([
+      "assigned",
+      "assigned",
+      "assigned",
+      "unassigned",
+    ]);
+
+    // Removed and assigned twice at once: still one row, never a unique violation.
+    await svc.removeAssignment(ctx, id, project.id);
+    await Promise.all([
+      svc.assignToProject(ctx, id, project.id, { chapterCodes: ["14"] }),
+      svc.assignToProject(ctx, id, project.id, { chapterCodes: ["14"] }),
+    ]);
+    expect(await storedAssignments(id)).toEqual([
+      expect.objectContaining({ id: before!.id, deletedAt: null, chapterCodes: ["14"] }),
+    ]);
+  });
+});
+
+describe("a deleted obra", () => {
+  it("takes its assignments out of every read and can't be assigned to", async () => {
+    const { ctx, id, admin, project, workerId, tenant } = await onObra();
+    const kept = await createTestProject(tenant.id, { ref: "VTH-26-002" });
+    const adhesion = await findDoc(ctx, id, "adhesion_pss", { projectId: project.id });
+
+    await db.update(projects).set({ deletedAt: new Date(), deletedById: admin.id }).where(eq(projects.id, project.id));
+
+    // A check at the gate of an obra that is gone says so, whoever the worker.
+    expect(await seenOnObra(ctx, id, project.id, workerId)).toEqual({ ...GONE, accessOnObra: "project_not_found" });
+    await expect(workers.checkAccess(ctx, { query: "00000000T", projectId: project.id })).rejects.toMatchObject({
+      code: "project_not_found",
+    });
+    await expectAdhesionGone(ctx, id, adhesion.id!, adhesion.current!.id);
+    // The assignment itself was never removed.
+    expect((await storedAssignments(id))[0]).toMatchObject({ projectId: project.id, deletedAt: null });
+
+    // Not an obra to choose any more: in the lists, the dossier or a new assignment.
+    expect((await svc.listProjectOptions(ctx)).map((p) => p.ref)).toEqual(["VTH-26-002"]);
+    expect((await svc.getOverview(ctx)).projects.map((p) => p.ref)).toEqual(["VTH-26-002"]);
+    const notFound = { code: "project_not_found", status: 404 };
+    await expect(svc.exportDossier(ctx, { projectId: project.id })).rejects.toMatchObject(notFound);
+    await expect(svc.assignToProject(ctx, id, project.id, { chapterCodes: ["05"] })).rejects.toMatchObject(notFound);
+    await expect(
+      svc.createSubcontractor(ctx, company({ taxId: "B39654322", assignment: { projectId: project.id } })),
+    ).rejects.toMatchObject(notFound);
+    await expect(
+      svc.uploadDocument(ctx, id, { requirementId: "adhesion_pss", projectId: project.id, file: pdf() }),
+    ).rejects.toMatchObject(notFound);
+    await expect(
+      svc.requestDocuments(ctx, id, { requirementIds: ["adhesion_pss"], projectId: project.id }),
+    ).rejects.toMatchObject(notFound);
+    await expect(svc.removeAssignment(ctx, id, project.id)).rejects.toMatchObject({ code: "not_found" });
+    expect((await storedAssignments(id))[0]).toMatchObject({ chapterCodes: ["13"], deletedAt: null });
+
+    // The other obra works as ever.
+    await svc.assignToProject(ctx, id, kept.id, {});
+    expect((await svc.getSubcontractor(ctx, id)).assignments.map((a) => a.projectRef)).toEqual(["VTH-26-002"]);
   });
 });
 

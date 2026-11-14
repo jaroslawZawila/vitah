@@ -60,7 +60,7 @@ import {
 } from "./contract";
 import { requirePdf } from "./documents";
 import { addDays, todayInSpain } from "./obra-calc";
-import { projectInTenant } from "./project-client";
+import { projectsInTenant, softDeleted } from "./project-client";
 import { openStoredFile, storeFiles, type StoredFile } from "./project-files";
 import { readFile } from "./storage";
 import {
@@ -72,6 +72,8 @@ import {
   count,
   fail,
   listOf,
+  liveAssignment,
+  liveDocument,
   loadNetwork,
   merged,
   oneOf,
@@ -80,6 +82,7 @@ import {
   projectOptions,
   requireCaeCompany,
   requireCompany,
+  requireProjectRef,
   requireWorker,
   str,
   toDoc,
@@ -430,7 +433,7 @@ export async function listProjectAttention(ctx: Ctx, projectId: string): Promise
   const rows = await db
     .select({ id: subcontractorAssignments.subcontractorId })
     .from(subcontractorAssignments)
-    .where(and(eq(subcontractorAssignments.projectId, projectId), eq(subcontractorAssignments.tenantId, ctx.tenantId)));
+    .where(and(eq(subcontractorAssignments.projectId, projectId), liveAssignment(ctx.tenantId)));
   if (rows.length === 0) return [];
   const assigned = new Set(rows.map((r) => r.id));
   const net = await loadNetwork(ctx.tenantId, [...assigned]);
@@ -481,6 +484,7 @@ export async function getCounts(ctx: Ctx): Promise<SubcontractorCounts> {
       .where(
         and(
           eq(subcontractorDocuments.tenantId, ctx.tenantId),
+          liveDocument(ctx.tenantId),
           inArray(subcontractorDocuments.status, ["uploaded", "validated"]),
           lte(latest.expiresAt, addDays(today, 30)),
         ),
@@ -609,17 +613,23 @@ async function owner(ctx: Ctx, subcontractorId: string, input: Record<string, un
   const projectId = req.scope === "obra" ? str(input.projectId) : "";
   if ((req.scope === "worker" && !workerId) || (req.scope === "obra" && !projectId)) fail("missing_fields");
   if (workerId) await requireWorker(ctx, workerId, subcontractorId);
-  if (projectId) await requireProjectRef(ctx, projectId);
+  if (projectId) {
+    await requireProjectRef(ctx, projectId);
+    // An obra's document goes with the company's assignment there: without one, no read would show it.
+    const [assigned] = await db
+      .select({ id: subcontractorAssignments.id })
+      .from(subcontractorAssignments)
+      .where(
+        and(
+          eq(subcontractorAssignments.subcontractorId, subcontractorId),
+          eq(subcontractorAssignments.projectId, projectId),
+          liveAssignment(ctx.tenantId),
+        ),
+      )
+      .limit(1);
+    if (!assigned) fail("project_not_found");
+  }
   return { req, workerId: workerId || null, projectId: projectId || null };
-}
-
-async function requireProjectRef(ctx: Ctx, projectId: string) {
-  const [project] = await db
-    .select({ id: projects.id, ref: projects.ref })
-    .from(projects)
-    .where(projectInTenant(ctx.tenantId, projectId));
-  if (!project) fail("project_not_found");
-  return project;
 }
 
 type Owner = { workerId: string | null; projectId: string | null; req: { id: string } };
@@ -717,13 +727,17 @@ export async function uploadDocument(ctx: Ctx, subcontractorId: string, input: R
 
 /** The document and its current version, if the version still waits for review. */
 async function reviewable(ctx: Ctx, subcontractorId: string, documentId: string) {
-  const doc = await db.query.subcontractorDocuments.findFirst({
-    where: and(
-      eq(subcontractorDocuments.id, documentId),
-      eq(subcontractorDocuments.subcontractorId, subcontractorId),
-      eq(subcontractorDocuments.tenantId, ctx.tenantId),
-    ),
-  });
+  const [doc] = await db
+    .select()
+    .from(subcontractorDocuments)
+    .where(
+      and(
+        eq(subcontractorDocuments.id, documentId),
+        eq(subcontractorDocuments.subcontractorId, subcontractorId),
+        eq(subcontractorDocuments.tenantId, ctx.tenantId),
+        liveDocument(ctx.tenantId),
+      ),
+    );
   if (!doc) fail("not_found");
   const [version] = await db
     .select()
@@ -887,6 +901,7 @@ export async function openDocumentVersion(ctx: Ctx, subcontractorId: string, ver
         eq(subcontractorDocumentVersions.id, versionId),
         eq(subcontractorDocuments.subcontractorId, subcontractorId),
         eq(subcontractorDocumentVersions.tenantId, ctx.tenantId),
+        liveDocument(ctx.tenantId),
       ),
     );
   if (!row) fail("not_found");
@@ -898,6 +913,7 @@ export async function openDocumentVersion(ctx: Ctx, subcontractorId: string, ver
 /**
  * Puts a company on an obra, or changes what it does there. Body: {
  * chapterCodes, plannedStart?, plannedEnd?, bookOrder?, bookDate?, cssInformed? }.
+ * A company put back on an obra it was taken off starts again from this body.
  */
 export async function assignToProject(
   ctx: Ctx,
@@ -941,7 +957,8 @@ async function saveAssignment(
     .values({ tenantId: ctx.tenantId, subcontractorId, projectId: project.id, ...values })
     .onConflictDoUpdate({
       target: [subcontractorAssignments.subcontractorId, subcontractorAssignments.projectId],
-      set: values,
+      // One row per company and obra, a removed one too: assigning again takes that row back.
+      set: { ...values, deletedAt: null, deletedById: null },
     });
   await audit(tx, ctx, subcontractorId, "assigned", { projectId: project.id, projectRef: project.ref, ...values });
 }
@@ -951,28 +968,32 @@ const isObject = (value: unknown): value is Record<string, unknown> =>
 
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
+/** Takes a company off an obra. Its assignment is kept, marked as removed: no read shows it again. */
 export async function removeAssignment(ctx: Ctx, subcontractorId: string, projectId: string) {
   requireEditor(ctx);
   await requireCompany(ctx, subcontractorId);
-  const removed = await db
-    .delete(subcontractorAssignments)
-    .where(
-      and(
-        eq(subcontractorAssignments.subcontractorId, subcontractorId),
-        eq(subcontractorAssignments.projectId, projectId),
-        eq(subcontractorAssignments.tenantId, ctx.tenantId),
-      ),
-    )
-    .returning({ id: subcontractorAssignments.id });
-  if (removed.length === 0) fail("not_found");
-  await audit(db, ctx, subcontractorId, "unassigned", { projectId });
+  await db.transaction(async (tx) => {
+    const removed = await tx
+      .update(subcontractorAssignments)
+      .set(softDeleted(ctx))
+      .where(
+        and(
+          eq(subcontractorAssignments.subcontractorId, subcontractorId),
+          eq(subcontractorAssignments.projectId, projectId),
+          liveAssignment(ctx.tenantId),
+        ),
+      )
+      .returning({ id: subcontractorAssignments.id });
+    if (removed.length === 0) fail("not_found");
+    await audit(tx, ctx, subcontractorId, "unassigned", { projectId });
+  });
 }
 
 export async function listProjectOptions(ctx: Ctx) {
   const rows = await db
     .select({ id: projects.id, ref: projects.ref, address: projects.address, obraStage: projects.obraStage })
     .from(projects)
-    .where(eq(projects.tenantId, ctx.tenantId))
+    .where(projectsInTenant(ctx.tenantId))
     .orderBy(asc(projects.ref));
   return projectOptions(ctx.tenantId, rows);
 }

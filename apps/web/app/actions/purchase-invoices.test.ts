@@ -98,9 +98,19 @@ describe("invoice actions", () => {
     expect(invoice).toMatchObject({ number: "PL-1", state: "partial", paidCents: 100_000, notes: "Por correo", files: [{ version: 2 }, { version: 1 }] });
     expect(invoice.payments[0]).toMatchObject({ method: "confirming", file: { name: "factura.pdf" } });
 
+    // Deleting is a soft delete: the same answers, once; then it is gone from the reads, and its files stay.
+    const stored = files.size;
     expect(await deleteInvoiceAction(invoiceId)).toEqual({ error: "has_payments" });
     expect(await deletePaymentAction(invoice.payments[0]!.id)).toEqual({ success: true });
+    expect(await deletePaymentAction(invoice.payments[0]!.id)).toEqual({ error: "not_found" });
+    expect((await getPayments())!.payments.payments).toEqual([]);
+    expect((await getInvoice(invoiceId))!.invoice).toMatchObject({ state: "pending", paidCents: 0, payments: [] });
     expect(await deleteInvoiceAction(invoiceId)).toEqual({ success: true });
+    expect(await deleteInvoiceAction(invoiceId)).toEqual({ error: "not_found" });
+    expect(await getInvoice(invoiceId)).toBeNull();
+    expect((await getInvoices())!.invoices.invoices).toEqual([]);
+    expect(await getPurchasingCounts()).toEqual({ requests: 0, orders: 1, invoices: 0, payments: 0, suppliers: 1, dueAttention: 0 });
+    expect(files.size).toBe(stored);
   });
 
   it("set an order's schedule and read the lists, the form, the counts and the obra by line", async () => {
