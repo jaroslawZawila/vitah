@@ -18,7 +18,7 @@
     "@repo/db": "workspace:*",
     "bcryptjs": "^2.4.3",
     "jose": "^5.0.0",
-    "next-auth": "5.0.0-beta.31"
+    "next-auth": "5.0.0-beta.32"
   },
   "devDependencies": {
     "@repo/typescript-config": "workspace:*",

@@ -35,7 +35,9 @@
   "pnpm": {
     "overrides": {
       "react": "19.2.3",
-      "react-dom": "19.2.3"
+      "react-dom": "19.2.3",
+      "@vercel/cli-auth>zod": "^4.6.6",
+      "@vercel/cli-config>zod": "^4.6.6"
     }
   }
 }
