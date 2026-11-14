@@ -7,7 +7,7 @@ import { codeRange, promoterName, type BudgetRevision } from "@repo/core/contrac
 import { ofBp, todayInSpain } from "@repo/core/obra-calc";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Field, FormActions } from "@/components/ui/field";
+import { Field, FieldDescription, FormActions } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
@@ -20,8 +20,9 @@ export type AcceptInput = { acceptedOn: string; acceptedBy: string; chosenOption
 
 /**
  * Presentational: recording the client's acceptance (shown in a modal): the
- * date, who, the options they chose (the contract price follows live) and,
- * optionally, the signed budget.
+ * date (between the day it was issued and today, as core checks), who, the
+ * options they chose (the contract price follows live) and, optionally, the
+ * signed budget.
  */
 export default function AcceptDialog({
   revision,
@@ -44,6 +45,8 @@ export default function AcceptDialog({
   const id = useId();
   const [chosen, setChosen] = useState<Set<string>>(new Set());
   const [signed, setSigned] = useState<File | null>(null);
+  const today = todayInSpain();
+  const { issuedOn } = revision;
   const delta = revision.options.filter((o) => chosen.has(o.id)).reduce((sum, o) => sum + o.priceCents, 0);
   const contract = revision.totalCents + delta;
   const toggle = (optionId: string) =>
@@ -71,7 +74,17 @@ export default function AcceptDialog({
       <div className="grid gap-3 sm:grid-cols-2">
         <Field>
           <Label htmlFor={`${id}-on`}>{t("acceptedOn")}</Label>
-          <Input id={`${id}-on`} name="acceptedOn" type="date" required defaultValue={todayInSpain()} />
+          <Input
+            id={`${id}-on`}
+            name="acceptedOn"
+            type="date"
+            required
+            defaultValue={today}
+            min={issuedOn ?? undefined}
+            max={today}
+            aria-describedby={issuedOn ? `${id}-on-hint` : undefined}
+          />
+          {issuedOn && <FieldDescription id={`${id}-on-hint`}>{t("acceptedOnHint", { issued: f.date(issuedOn) })}</FieldDescription>}
         </Field>
         <Field>
           <Label htmlFor={`${id}-by`}>{t("acceptedBy")}</Label>

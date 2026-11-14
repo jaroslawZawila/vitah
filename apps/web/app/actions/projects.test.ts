@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { db, eq, projects } from "@repo/db";
+import { budgetRevisions, db, eq, projects } from "@repo/db";
 import {
   createTestProject,
   createTestTenant,
@@ -139,18 +139,39 @@ describe("project actions", () => {
     signInAs({ tenantId: tenant.id, userId: admin.id, role: "admin" });
     const project = await createTestProject(tenant.id);
 
-    await deleteProject(project.id);
+    expect(await deleteProject(project.id)).toEqual({ success: true });
 
     expect(await reload(project.id)).toBeUndefined();
     expect(revalidatePath).toHaveBeenCalledWith("/dashboard/projects");
   });
 
-  it("refuses to delete for a manager", async () => {
+  it("keeps a project with records and returns the error as state", async () => {
+    const { tenant } = await setup();
+    const admin = await createTestUser(tenant.id, { role: "admin" });
+    signInAs({ tenantId: tenant.id, userId: admin.id, role: "admin" });
+    const project = await createTestProject(tenant.id);
+    await db.insert(budgetRevisions).values({ tenantId: tenant.id, projectId: project.id, number: 0, status: "accepted" });
+
+    expect(await deleteProject(project.id)).toEqual({ error: "project_has_records" });
+
+    expect(await reload(project.id)).toBeDefined();
+    expect(revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it("refuses to delete for a manager, or another tenant's project", async () => {
     const { tenant } = await setup();
     const project = await createTestProject(tenant.id);
 
-    await expect(deleteProject(project.id)).rejects.toMatchObject({ code: "forbidden" });
+    expect(await deleteProject(project.id)).toEqual({ error: "forbidden" });
     expect(await reload(project.id)).toBeDefined();
+
+    const admin = await createTestUser(tenant.id, { role: "admin" });
+    signInAs({ tenantId: tenant.id, userId: admin.id, role: "admin" });
+    const foreign = await createTestProject((await createTestTenant()).id);
+
+    expect(await deleteProject(foreign.id)).toEqual({ error: "not_found" });
+    expect(await reload(foreign.id)).toBeDefined();
+    expect(revalidatePath).not.toHaveBeenCalled();
   });
 
   it("refuses changes from a viewer", async () => {
@@ -165,7 +186,7 @@ describe("project actions", () => {
     expect(await updateProject(project.id, { address: "Hacked" })).toEqual({
       error: "forbidden",
     });
-    await expect(deleteProject(project.id)).rejects.toMatchObject({ code: "forbidden" });
+    expect(await deleteProject(project.id)).toEqual({ error: "forbidden" });
     expect((await reload(project.id))?.address).toBe("Calle 1");
     expect(revalidatePath).not.toHaveBeenCalled();
   });

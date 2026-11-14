@@ -53,8 +53,8 @@ async function setup(role: "manager" | "viewer" = "manager") {
 }
 
 describe("/api/v1/projects/:id/budget", () => {
-  it("keeps the v1 flow: create, edit lines, accept without a body, record progress, revise", async () => {
-    const { id, token, read, post, patch, del } = await setup();
+  it("keeps the v1 flow: create, edit lines, issue, accept without a body, record progress, revise", async () => {
+    const { ctx, id, token, read, post, patch, del } = await setup();
 
     const created = await POST(post({ reference: "036/2026" }), routeParams({ id }));
     expect(created.status).toBe(201);
@@ -85,7 +85,29 @@ describe("/api/v1/projects/:id/budget", () => {
     expect(edited).toMatchObject({ costCents: 35_000 + 1_750, overheadCents: 3_650, profitCents: 2_126, totalCents: 42_526 });
     expect(edited.chapters[0]).toMatchObject({ name: "Actuaciones previas", totalCents: 35_000, priceCents: 40_500 });
 
+    // A draft was never sent to the client: it can't become the contract, whatever the body says.
+    for (const body of [undefined, { unissued: true }]) {
+      const refused = await accept(post(body), routeParams({ id, revisionId }));
+      expect(refused.status).toBe(409);
+      expect(await refused.json()).toEqual({ error: "not_issued" });
+    }
+    expect((await read()).revision).toMatchObject({ status: "draft", acceptedAt: null, acceptedByUser: null });
+
+    expect((await issue(post({ issuedOn: "2026-10-01", shareWithClient: false }), routeParams({ id, revisionId }))).status).toBe(200);
+    // The day the client accepted: not before it was sent, not after today.
+    for (const acceptedOn of ["2026-09-30", "2999-01-01"]) {
+      const refused = await accept(post({ acceptedOn }), routeParams({ id, revisionId }));
+      expect(refused.status).toBe(400);
+      expect(await refused.json()).toEqual({ error: "invalid_date" });
+    }
     expect((await accept(post(), routeParams({ id, revisionId }))).status).toBe(200);
+    // Registered by the caller; no signed copy came with it.
+    expect((await read()).revision).toMatchObject({
+      status: "accepted",
+      acceptedAt: expect.any(String),
+      acceptedByUser: { id: ctx.userId, name: expect.any(String) },
+      signedDocumentId: null,
+    });
     const saved = await progress(apiRequest(token, { method: "PUT", body: { lines: [{ id: lineId, executedPct: 40 }] } }), routeParams({ id }));
     expect(await saved.json()).toEqual({ updated: 1 });
 
@@ -97,7 +119,7 @@ describe("/api/v1/projects/:id/budget", () => {
     expect((await deleteLine(del(), routeParams({ id, lineId: copy.chapters[0].lines[0].id }))).status).toBe(200);
     expect((await deleteRevision(del(), routeParams({ id, revisionId: rev1 }))).status).toBe(200);
     expect((await read()).revisions).toHaveLength(1);
-  });
+  }, 60_000);
 
   it("refuses to add a chapter to the fixed 20", async () => {
     const { id, post } = await setup();

@@ -419,6 +419,13 @@ export function EventText({ event }: { event: PurchaseOrderEvent }) {
               </span>
             );
           })}
+          {/* An edit that moved the amount took the payment schedule with it. */}
+          {typeof d.scheduleDeltaCents === "number" && d.scheduleDeltaCents !== 0 && (
+            <span>
+              {changes.length > 0 && " · "}
+              {t(d.scheduleDeltaCents > 0 ? "scheduleRaised" : "scheduleCut", { amount: f.amount(Math.abs(d.scheduleDeltaCents)) })}
+            </span>
+          )}
         </>
       );
     }

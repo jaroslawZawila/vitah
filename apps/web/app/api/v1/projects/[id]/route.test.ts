@@ -5,6 +5,7 @@ import {
   createTestUser,
   resetDatabase,
 } from "@repo/db/testing";
+import { budgetRevisions, db } from "@repo/db";
 import { createMobileToken } from "@repo/auth/mobile";
 import { DELETE, GET, PATCH } from "./route";
 
@@ -78,6 +79,19 @@ describe("/api/v1/projects/:id", () => {
     const deleted = await call(DELETE, project.id, token, { method: "DELETE" });
     expect(deleted.status).toBe(204);
     expect((await call(GET, project.id, token)).status).toBe(404);
+  });
+
+  it("answers 409 for a project with records to keep, and keeps it", async () => {
+    const tenant = await createTestTenant();
+    const token = await staffToken(tenant.id);
+    const project = await createTestProject(tenant.id);
+    await db.insert(budgetRevisions).values({ tenantId: tenant.id, projectId: project.id, number: 0, status: "accepted" });
+
+    const res = await call(DELETE, project.id, token, { method: "DELETE" });
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: "project_has_records" });
+    expect((await call(GET, project.id, token)).status).toBe(200);
   });
 
   it("returns 404 for another tenant's project", async () => {

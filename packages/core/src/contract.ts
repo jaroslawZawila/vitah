@@ -478,8 +478,13 @@ export type BudgetRevision = BudgetRevisionSummary & {
   conditions: BudgetConditions;
   changeReason: string | null;
   validUntil: string | null;
+  /** The day the client accepted it, and who they are (as staff typed it). */
   acceptedOn: string | null;
   acceptedBy: string | null;
+  /** The staff user who registered the acceptance (at `acceptedAt`); null when unknown (registered before it was kept). */
+  acceptedByUser: { id: string; name: string } | null;
+  /** The client's signed copy among the project's documents, if one was filed. */
+  signedDocumentId: string | null;
   rejectedOn: string | null;
   /** The PDFs stored when it was issued (document ids). */
   pdfs: Record<BudgetPdfKind, string | null>;
@@ -644,6 +649,33 @@ export type Hito = {
   invoiceRequestedAt: string | null;
 };
 
+/** What the history keeps of an acta or invoice PDF (never where it is stored). */
+export type HitoFileFacts = { date: string | null; sizeBytes: number | null };
+/** What the history keeps of a payment. */
+export type HitoPaymentFacts = { paidOn: string; amountCents: number | null };
+
+/**
+ * One entry of a hito's history: its acta or invoice uploaded (`previous`: the
+ * one it replaced) or removed, its payment registered (`previous`: the one it
+ * corrected) or cancelled. Staff-only, web-only: the client never sees it.
+ */
+export type HitoEvent = {
+  id: string;
+  /** When it was recorded (ISO). */
+  at: string;
+  /** Who did it; null once that user is deleted. */
+  userName: string | null;
+} & (
+  | { action: "acta_uploaded" | "invoice_uploaded"; detail: HitoFileFacts & { previous: HitoFileFacts | null } }
+  | { action: "acta_removed" | "invoice_removed"; detail: HitoFileFacts }
+  | { action: "payment_registered"; detail: HitoPaymentFacts & { previous: HitoPaymentFacts | null } }
+  | { action: "payment_cancelled"; detail: HitoPaymentFacts }
+);
+export type HitoEventAction = HitoEvent["action"];
+
+/** GET /api/v1/projects/:id/hitos/:hitoId: the hito with its history, newest first. */
+export type HitoDetail = Hito & { events: HitoEvent[] };
+
 /** The works' calendar: from the project's start date to its completion date. */
 export type ObraTerm = {
   startDate: string;
@@ -745,6 +777,7 @@ export type ObraError =
   | "has_payments"
   | "duplicate_number"
   | "milestones_mismatch"
+  | "milestones_cut"
   | "exceeds_amount"
   | "request_not_approved"
   | "no_changes"

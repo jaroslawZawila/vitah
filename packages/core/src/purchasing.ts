@@ -10,6 +10,7 @@ import {
   purchaseInvoices,
   purchaseOrderEvents,
   purchaseOrderLines,
+  purchaseOrderMilestones,
   purchaseOrders,
   purchaseRequests,
   purchaseDocumentChecks,
@@ -111,6 +112,9 @@ export const MAX_NOTES = 2000;
 export const MAX_NOTE = 500;
 export const MAX_AMOUNT_CENTS = 2_000_000_000;
 export const MAX_EVENTS = 500;
+const MAX_MILESTONE_CONCEPT = 200;
+/** The milestone a rise by an edit adds to the payment schedule; staff rename it on the order's page. */
+const EDIT_MILESTONE_CONCEPT = "Ajuste por corrección del pedido";
 
 type OrderRow = typeof purchaseOrders.$inferSelect;
 type LineRow = typeof purchaseOrderLines.$inferSelect;
@@ -275,7 +279,7 @@ export async function contractLines(tenantId: string, projectId: string) {
 
 // ─── Reads ───────────────────────────────────────────────────────────────────
 
-const sumOf = (list: PurchaseOrderListItem[]) => list.reduce((total, o) => total + o.amountCents, 0);
+const sumOf = (list: { amountCents: number }[]) => list.reduce((total, o) => total + o.amountCents, 0);
 
 /** The tenant's projects, for the lists' filter. */
 export const projectList = (tenantId: string) =>
@@ -820,6 +824,43 @@ export async function replaceOrderLines(
   return { before, changes };
 }
 
+/**
+ * In `tx`, with the order locked: its payment schedule, if any, follows a
+ * change of `deltaCents` (an edit or a modificado): a rise is a milestone of
+ * its own (`concept`), a cut comes off the last milestones with no invoice;
+ * `milestones_cut` if those can't take it. → whether the schedule moved.
+ */
+export async function followSchedule(tx: Tx, ctx: Ctx, orderId: string, deltaCents: number, concept: string) {
+  if (deltaCents === 0) return false;
+  const milestones = await tx
+    .select()
+    .from(purchaseOrderMilestones)
+    .where(eq(purchaseOrderMilestones.orderId, orderId))
+    .orderBy(asc(purchaseOrderMilestones.position));
+  if (milestones.length === 0) return false;
+  if (deltaCents > 0) {
+    const position = Math.max(...milestones.map((m) => m.position)) + 1;
+    await tx.insert(purchaseOrderMilestones).values({ tenantId: ctx.tenantId, orderId, position, concept: concept.slice(0, MAX_MILESTONE_CONCEPT), amountCents: deltaCents });
+    return true;
+  }
+  const invoiced = await tx
+    .selectDistinct({ milestoneId: purchaseInvoices.milestoneId })
+    .from(purchaseInvoices)
+    .where(and(eq(purchaseInvoices.orderId, orderId), isNotNull(purchaseInvoices.milestoneId), inArray(purchaseInvoices.milestoneId, milestones.map((m) => m.id))));
+  const locked = new Set(invoiced.map((i) => i.milestoneId));
+  let left = -deltaCents;
+  for (const milestone of [...milestones].reverse()) {
+    if (left === 0) break;
+    if (locked.has(milestone.id)) continue;
+    const taken = Math.min(left, milestone.amountCents);
+    left -= taken;
+    if (taken === milestone.amountCents) await tx.delete(purchaseOrderMilestones).where(eq(purchaseOrderMilestones.id, milestone.id));
+    else await tx.update(purchaseOrderMilestones).set({ amountCents: milestone.amountCents - taken }).where(eq(purchaseOrderMilestones.id, milestone.id));
+  }
+  if (left > 0) fail("milestones_cut");
+  return true;
+}
+
 /** A kind's own dates only: a delivery for material, a works period for a subcontract. */
 function checkDates(fields: OrderFields): OrderFields {
   const own =
@@ -906,8 +947,11 @@ export async function createPurchase(ctx: Ctx, projectId: string, input: Record<
  * Body: any of { description, subcontractorId, orderedOn, expectedOn,
  * workStart, workEnd, notes, paymentDays, retentionBp, vatKind, kind (only
  * while pending), lines }. An invoiced order keeps its supplier and the lines
- * its invoices are split across. Each change is logged with its previous
- * value. → { orderId }
+ * its invoices are split across. When the lines change its amount, its
+ * payment schedule follows as with a modificado (`followSchedule`: a rise is a
+ * new milestone, a cut comes off the last ones not invoiced, or
+ * `milestones_cut` and nothing changes). Each change is logged with its
+ * previous value. → { orderId }
  */
 export async function updatePurchase(ctx: Ctx, orderId: string, input: Record<string, unknown>) {
   requireEditor(ctx);
@@ -960,8 +1004,13 @@ export async function updatePurchase(ctx: Ctx, orderId: string, input: Record<st
       await logEvent(tx, ctx, orderId, "updated", { fields: changed });
     }
     if (lines && contract) {
-      const { changes } = await replaceOrderLines(tx, ctx, orderId, lines, contract);
-      if (changes.length > 0) await logEvent(tx, ctx, orderId, "lines", { changes });
+      const { before, changes } = await replaceOrderLines(tx, ctx, orderId, lines, contract);
+      if (changes.length > 0) {
+        const deltaCents = sumOf(lines) - sumOf(before);
+        const followed = await followSchedule(tx, ctx, orderId, deltaCents, EDIT_MILESTONE_CONCEPT);
+        // `scheduleDeltaCents`: what the payment schedule took with it.
+        await logEvent(tx, ctx, orderId, "lines", { changes, ...(followed ? { scheduleDeltaCents: deltaCents } : {}) });
+      }
     }
   });
   return { orderId };

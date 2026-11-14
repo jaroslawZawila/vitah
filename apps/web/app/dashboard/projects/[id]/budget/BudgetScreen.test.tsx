@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { BudgetRevision, ProjectBudget } from "@repo/core/contract";
+import { todayInSpain } from "@repo/core/obra-calc";
 import messages from "../../../../../messages/es.json";
 import { budget, hitos } from "../../../../../test/obra-fixture";
 import BudgetScreen from "./BudgetScreen";
@@ -37,6 +38,21 @@ const issued: Budget = {
   revisions: budget.revisions.slice(1),
   revision: { ...draft.revision, id: "rev-0", number: 0, status: "issued", issuedOn: "2026-10-14", validUntil: "2027-01-12", changeReason: null, previous: null },
 };
+
+/** Rev.0 as the contract: accepted by the client, registered by staff a day later. */
+const accepted = (changes: Partial<BudgetRevision> = {}): Budget => ({
+  ...issued,
+  revision: {
+    ...issued.revision,
+    status: "accepted",
+    acceptedOn: "2026-10-21",
+    acceptedBy: "D. Roberto Guzmán",
+    acceptedAt: "2026-10-22T22:30:00.000Z",
+    acceptedByUser: { id: "u-1", name: "Marta Ruiz" },
+    signedDocumentId: "doc-9",
+    ...changes,
+  },
+});
 
 function renderScreen(props: Partial<Parameters<typeof BudgetScreen>[0]> = {}) {
   return render(screenWith(props));
@@ -264,6 +280,12 @@ describe("BudgetScreen", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Registrar aceptación" }));
     const dialog = await openedDialog("Registrar la aceptación de la Rev.0");
+    // The day the client accepted: from the day it was issued to today, as core checks.
+    const on = dialog.getByLabelText("Fecha de aceptación");
+    expect(on).toHaveValue(todayInSpain());
+    expect(on).toHaveAttribute("min", "2026-10-14");
+    expect(on).toHaveAttribute("max", todayInSpain());
+    expect(on).toHaveAccessibleDescription("Entre el día de emisión (14 oct 2026) y hoy.");
     const by = dialog.getByLabelText("Aceptado por");
     // The promoter, from the cover, by default.
     expect(by).toHaveValue("D. Roberto Guzmán Mesa");
@@ -286,6 +308,49 @@ describe("BudgetScreen", () => {
     expect(form.getAll("chosenOptionIds")).toEqual(["option-1"]);
     expect((form.get("signed") as File).name).toBe("firmado.pdf");
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  });
+
+  it.each([
+    ["invalid_date", "Introduce una fecha válida."],
+    ["not_issued", "Esa revisión no está emitida."],
+  ] as const)("keeps the acceptance dialog open with core's refusal (%s)", async (error, message) => {
+    vi.mocked(actions.acceptRevisionAction).mockResolvedValue({ error });
+    renderScreen({ budget: issued });
+
+    await userEvent.click(screen.getByRole("button", { name: "Registrar aceptación" }));
+    const dialog = await openedDialog("Registrar la aceptación de la Rev.0");
+    await userEvent.click(dialog.getByRole("button", { name: "Aceptar como contrato" }));
+
+    expect(await dialog.findByText(message)).toBeInTheDocument();
+  });
+
+  it("shows what proves the contract: who accepted, who registered it and the signed copy", () => {
+    renderScreen({ budget: accepted() });
+
+    expect(screen.getByText("Aceptada el 21 oct 2026: es el contrato.")).toBeInTheDocument();
+    expect(screen.getByText(/Aceptada por D\. Roberto Guzmán\./)).toBeInTheDocument();
+    // When it was registered, in Spain: 22:30 UTC is already the 23rd there.
+    expect(screen.getByText("Registrado por Marta Ruiz el 23 oct 2026, 0:30.")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Copia firmada" })).toHaveAttribute("href", "/api/v1/projects/p-1/documents/doc-9");
+    expect(screen.queryByText("Sin copia firmada")).not.toBeInTheDocument();
+  });
+
+  it("says so when the contract was registered without a signed copy", () => {
+    renderScreen({ budget: accepted({ signedDocumentId: null }) });
+
+    expect(screen.getByText("Registrado por Marta Ruiz el 23 oct 2026, 0:30.")).toBeInTheDocument();
+    expect(screen.getByText("Sin copia firmada")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Copia firmada" })).not.toBeInTheDocument();
+  });
+
+  it("shows only the acceptance on a contract registered before the registrar was kept", () => {
+    renderScreen({ budget: accepted({ acceptedByUser: null, signedDocumentId: null }) });
+
+    expect(screen.getByText("Aceptada el 21 oct 2026: es el contrato.")).toBeInTheDocument();
+    expect(screen.queryByText(/Registrado por/)).not.toBeInTheDocument();
+    // Its signed copy may be among the documents, not linked: nothing is claimed.
+    expect(screen.queryByText("Sin copia firmada")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Copia firmada" })).not.toBeInTheDocument();
   });
 
   it("rejects an issued revision or starts the next one with changes", async () => {

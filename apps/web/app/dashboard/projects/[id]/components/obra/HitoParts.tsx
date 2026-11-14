@@ -10,7 +10,10 @@ import {
   HITO_STATUSES,
   MAX_DOCUMENT_BYTES,
   type Hito,
+  type HitoEvent,
+  type HitoFileFacts,
   type HitoFileKind,
+  type HitoPaymentFacts,
   type ProjectPhoto,
 } from "@repo/core/contract";
 import { Button } from "@/components/ui/button";
@@ -321,11 +324,14 @@ export function PhotoPicker({
 /** Record the payment, or show it with an undo. */
 export function PaymentCard({
   hito,
+  today,
   onPay,
   onCancel,
   pending,
 }: {
   hito: Hito;
+  /** Today in Spain: a payment is never dated after it. */
+  today: string;
   /** Omitted for read-only users. */
   onPay?: (paidOn: string, amount: string) => void;
   onCancel?: () => void;
@@ -358,7 +364,7 @@ export function PaymentCard({
         >
           <Field>
             <Label htmlFor="paid-on">{t("paidOn")}</Label>
-            <Input id="paid-on" name="paidOn" type="date" required />
+            <Input id="paid-on" name="paidOn" type="date" required max={today} />
           </Field>
           <Field>
             <Label htmlFor="paid-amount">{t("paidAmount")}</Label>
@@ -369,6 +375,81 @@ export function PaymentCard({
           </Button>
         </form>
       ) : null}
+    </section>
+  );
+}
+
+/** One entry of the history in words, with its figures. */
+function HitoEventText({ event }: { event: HitoEvent }) {
+  const t = useTranslations("obra.hito.history");
+  const f = useObraFormat();
+  const file = (facts: HitoFileFacts) => ({
+    date: facts.date ? f.date(facts.date) : "—",
+    size: facts.sizeBytes === null ? "—" : f.fileSize(facts.sizeBytes),
+  });
+  const payment = (facts: HitoPaymentFacts) => ({
+    date: f.date(facts.paidOn),
+    amount: facts.amountCents === null ? "—" : f.money(facts.amountCents),
+  });
+
+  switch (event.action) {
+    case "acta_uploaded":
+    case "invoice_uploaded": {
+      const kind = event.action === "acta_uploaded" ? "acta" : "invoice";
+      const { previous } = event.detail;
+      if (!previous) return t(`${kind}Uploaded`, file(event.detail));
+      const was = file(previous);
+      return t(`${kind}Replaced`, { ...file(event.detail), previousDate: was.date, previousSize: was.size });
+    }
+    case "acta_removed":
+      return t("actaRemoved", file(event.detail));
+    case "invoice_removed":
+      return t("invoiceRemoved", file(event.detail));
+    case "payment_registered": {
+      const { previous } = event.detail;
+      if (!previous) return t("paymentRegistered", payment(event.detail));
+      const was = payment(previous);
+      return t("paymentCorrected", { ...payment(event.detail), previousDate: was.date, previousAmount: was.amount });
+    }
+    case "payment_cancelled":
+      return t("paymentCancelled", payment(event.detail));
+  }
+}
+
+/**
+ * Every acta, invoice and payment registered, corrected or cancelled on the
+ * hito, newest first, with who did it. Staff only: the client's app has no
+ * such history.
+ */
+export function HitoHistory({ events }: { events: HitoEvent[] }) {
+  const t = useTranslations("obra.hito.history");
+  const f = useObraFormat();
+  return (
+    <section className={cardVariants()} aria-labelledby="hito-history-title">
+      <div className={cardHead}>
+        <h2 id="hito-history-title">{t("title")}</h2>
+        <span className={muted}>{t("hint")}</span>
+      </div>
+      {events.length === 0 ? (
+        <p className="text-[13px] text-muted-foreground">{t("empty")}</p>
+      ) : (
+        <ul className="m-0 list-none p-0" aria-labelledby="hito-history-title">
+          {events.map((event) => (
+            <li
+              key={event.id}
+              className="grid gap-x-4 gap-y-0.5 border-b py-2.5 text-[13.5px] last:border-b-0 sm:grid-cols-[150px_minmax(0,1fr)]"
+            >
+              <time dateTime={event.at} className="num text-[12.5px] text-muted-foreground">
+                {f.dateTime(event.at)}
+              </time>
+              <div className="min-w-0 [overflow-wrap:anywhere]">
+                <HitoEventText event={event} />
+                {event.userName && <span className="text-muted-foreground"> · {event.userName}</span>}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
   );
 }

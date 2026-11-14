@@ -72,7 +72,7 @@ describe("reading the obra", () => {
 
     const h4 = await hitoOf(project.id, "H4");
     const hito = await getProjectHito(project.id, h4.id);
-    expect(hito).toMatchObject({ hito: { code: "H4" }, photos: [{ id: photo.id }], canManage: true });
+    expect(hito).toMatchObject({ hito: { code: "H4", events: [] }, photos: [{ id: photo.id }], canManage: true });
   });
 
   it("returns null for another tenant's project or when signed out", async () => {
@@ -146,6 +146,7 @@ describe("hito mutations", () => {
     const form = new FormData();
     form.set("file", new File(["%PDF-1.7"], "acta.pdf", { type: "application/pdf" }));
     form.set("date", "2026-10-20");
+    const stored = files.size;
 
     expect(await uploadHitoFileAction(project.id, h4.id, "acta", null, form)).toEqual({ success: true });
     expect(await setActaPhotosAction(project.id, h4.id, [photo.id])).toEqual({ success: true });
@@ -159,6 +160,23 @@ describe("hito mutations", () => {
     expect(await cancelPaymentAction(project.id, h4.id)).toEqual({ success: true });
     expect(await removeHitoFileAction(project.id, h4.id, "acta")).toEqual({ success: true });
     expect(await hitoOf(project.id, "H4")).toMatchObject({ status: "active", actaSignedOn: null });
+
+    // Each of them is in the hito page's history, newest first, without where the PDF is stored.
+    const { events } = (await getProjectHito(project.id, h4.id))!.hito;
+    expect(events.map((e) => e.action)).toEqual(["acta_removed", "payment_cancelled", "payment_registered", "acta_uploaded"]);
+    expect(events[2]).toMatchObject({ userName: expect.any(String), detail: { paidOn: "2026-10-27", previous: null } });
+    expect(JSON.stringify(events)).not.toContain("pathname");
+    // The acta taken off the hito is kept.
+    expect(files.size).toBe(stored + 1);
+  });
+
+  it("refuses a payment dated after today or of nothing", async () => {
+    const { project } = await setup();
+    const h4 = await hitoOf(project.id, "H4");
+
+    expect(await registerPaymentAction(project.id, h4.id, { paidOn: "2999-01-01" })).toEqual({ error: "invalid_date" });
+    expect(await registerPaymentAction(project.id, h4.id, { paidOn: "2026-10-27", amountCents: 0 })).toEqual({ error: "invalid_input" });
+    expect((await getProjectHito(project.id, h4.id))!.hito).toMatchObject({ paidOn: null, events: [] });
   });
 
   it("reports a bad upload", async () => {

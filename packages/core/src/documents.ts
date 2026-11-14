@@ -184,6 +184,12 @@ export async function deleteDocument(ctx: Ctx, projectId: string, documentId: st
   // A revision's PDFs are what was sent; a budget's inputs are what the AI
   // read. Inputs can still be swapped while there is no budget and no AI run.
   if (doc.budgetRevisionId) fail("budget_document");
+  // The client's signed copy is the proof a revision was accepted.
+  const signedCopyOf = await db.query.budgetRevisions.findFirst({
+    where: eq(budgetRevisions.acceptedDocumentId, documentId),
+    columns: { id: true },
+  });
+  if (signedCopyOf) fail("budget_document");
   if (doc.budgetInput) {
     const [budget, generation] = await Promise.all([
       db.query.budgetRevisions.findFirst({

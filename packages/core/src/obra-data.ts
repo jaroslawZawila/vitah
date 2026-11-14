@@ -63,6 +63,7 @@ const STATUS: Record<ObraError, number> = {
   has_payments: 409,
   duplicate_number: 409,
   milestones_mismatch: 400,
+  milestones_cut: 409,
   exceeds_amount: 409,
   request_not_approved: 409,
   no_changes: 400,

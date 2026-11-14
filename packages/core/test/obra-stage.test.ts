@@ -37,7 +37,7 @@ async function accepted() {
   const s = await setup();
   await registerInput(s.ctx, s.project.id);
   const { revisionId } = await framerDraft(s.ctx, s.project.id, ["01", "02"]);
-  await budgetService.acceptRevision(s.ctx, s.project.id, revisionId);
+  await budgetService.acceptRevision(s.ctx, s.project.id, revisionId, {}, { unissued: true });
   const hitos = await hitosService.listHitos(s.ctx, s.project.id);
   const hito = (code: string) => hitos.find((h) => h.code === code)!.id;
   const pay = (code: string, paidOn = "2026-06-20") =>
@@ -68,7 +68,7 @@ describe("the stage on its own", () => {
     const { revisionId } = await framerDraft(ctx, id, ["01", "02"]);
     expect(await stageOf(id)).toBe(3);
 
-    await budgetService.acceptRevision(ctx, id, revisionId, { acceptedOn: "2026-06-12" });
+    await budgetService.acceptRevision(ctx, id, revisionId, { acceptedOn: "2026-06-12" }, { unissued: true });
     expect(await stageOf(id)).toBe(4);
 
     const hitos = await hitosService.listHitos(ctx, id);
@@ -132,9 +132,9 @@ describe("the stage on its own", () => {
   it("keeps the day the first revision was accepted once a change order is accepted", async () => {
     const { ctx, project } = await setup();
     const { revisionId } = await framerDraft(ctx, project.id, ["01"]);
-    await budgetService.acceptRevision(ctx, project.id, revisionId, { acceptedOn: "2026-06-12" });
+    await budgetService.acceptRevision(ctx, project.id, revisionId, { acceptedOn: "2026-06-12" }, { unissued: true });
     const { revisionId: change } = await budgetService.createRevision(ctx, project.id);
-    await budgetService.acceptRevision(ctx, project.id, change, { acceptedOn: "2026-09-01" });
+    await budgetService.acceptRevision(ctx, project.id, change, { acceptedOn: "2026-09-01" }, { unissued: true });
 
     expect((await obraService.getObra(ctx, project.id)).stageEvidence[4]).toBe("2026-06-12");
   });
@@ -142,7 +142,7 @@ describe("the stage on its own", () => {
   it("skips stages the evidence passes over", async () => {
     const { ctx, project } = await setup();
     const { revisionId } = await framerDraft(ctx, project.id, ["01"]);
-    await budgetService.acceptRevision(ctx, project.id, revisionId);
+    await budgetService.acceptRevision(ctx, project.id, revisionId, {}, { unissued: true });
     const h0 = (await hitosService.listHitos(ctx, project.id)).find((h) => h.code === "H0")!;
 
     await hitosService.registerPayment(ctx, project.id, h0.id, { paidOn: "2026-06-20" });

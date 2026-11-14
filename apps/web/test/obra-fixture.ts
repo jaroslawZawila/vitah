@@ -206,6 +206,8 @@ export const budget: ProjectBudget = {
     validUntil: null,
     acceptedOn: null,
     acceptedBy: null,
+    acceptedByUser: null,
+    signedDocumentId: null,
     rejectedOn: null,
     pdfs: { general: null, detailed: null },
     checks: [

@@ -9,7 +9,7 @@ import { CONTINGENCY_CHAPTER, promoterName, type BudgetPdfKind, type BudgetRevis
 import { newPdfDocument, openDocument } from "./documents";
 import { notifyProjectClient } from "./notifications";
 import { addDays, forClient, perM2Cents, todayInSpain } from "./obra-calc";
-import { calendarDate, fail, optionalText } from "./obra-data";
+import { calendarDate, fail, optionalText, workDate } from "./obra-data";
 import { storeFiles, type StoredFile } from "./project-files";
 
 // ─── Issuing a budget ─────────────────────────────────────────────────────────
@@ -168,7 +168,8 @@ export async function issueRevision(ctx: Ctx, projectId: string, revisionId: str
   const row = await revisionInProject(ctx, projectId, revisionId);
   const changeReason = input.changeReason === undefined ? row.changeReason : optionalText(input.changeReason, MAX_NOTE);
   if (row.number > 0 && !changeReason) fail("change_reason_required");
-  const issuedOn = input.issuedOn === undefined ? todayInSpain() : calendarDate(input.issuedOn);
+  // Up to today: accepting needs a day from the issue on, and never after today.
+  const issuedOn = input.issuedOn === undefined ? todayInSpain() : workDate(input.issuedOn);
   const shareWithClient = input.shareWithClient !== false;
 
   // All under the revision's row lock, which every draft edit takes (inDraft):

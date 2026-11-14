@@ -185,11 +185,16 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
 
 - **Driver:** `postgres` (postgres.js) — works with any PostgreSQL (local Docker, Vercel Postgres, AWS RDS, etc.)
 - Schema in `packages/db/src/schema.ts` — tables: `tenants`, `users`, `client_profiles`, `client_settings`, `push_tokens`, `accounts`, `sessions`, `verification_tokens`, `projects`, `project_documents`, `project_photos`, the construction control's `obra_chapter_progress`, `obra_progress_events`,
-  `obra_invoice_requests`, `obra_issues`, `obra_issue_files`, and the obra's `budget_revisions`, `budget_chapters`, `budget_lines`, `obra_hitos`, `obra_hito_chapters`, `obra_hito_checks`, `obra_hito_photos`, plus `budget_generations` (AI runs) and `ai_usage` (one row per Claude call, with its cost), and the
+  `obra_invoice_requests`, `obra_issues`, `obra_issue_files`, and the obra's `budget_revisions`, `budget_chapters`, `budget_lines`, `obra_hitos`, `obra_hito_chapters`, `obra_hito_checks`, `obra_hito_photos`, `obra_hito_events`, plus `budget_generations` (AI runs) and `ai_usage` (one row per Claude call, with its cost), and the
   Subcontratas tables `subcontractors`, `subcontractor_workers`, `subcontractor_documents`, `subcontractor_document_versions`,
   `subcontractor_assignments`, `subcontractor_audit`, Compras' `purchase_orders`, `purchase_order_lines`,
   `purchase_order_events`, `purchase_order_documents`, `purchase_order_document_versions`, `purchase_order_milestones`, `purchase_invoices`, `purchase_invoice_lines`, `purchase_invoice_files`,
   `purchase_payments`, `purchase_requests`, `purchase_request_lines`, `purchase_request_events`, `purchase_order_amendments`, `purchase_document_checks`, and Planning's `planning_versions`, `planning_items`. A project is deliberately minimal — exactly what the mobile app shows: `ref`, `address`, `start_date`, `completion_date`, plus `client_user_id` linking it to its mobile app client (a client may have several)
+- A project can be deleted (admins) only while nothing has to be kept: `deleteProject` refuses with
+  `project_has_records` (409) once it has a budget revision that isn't a draft, a placed order or a supplier invoice, a
+  hito with an acta, invoice or payment (or the history of one since undone), a chapter recorded as started, a contract among its
+  documents, an incident or change logged, or a subcontractor assigned. A write in flight makes it answer the same. Nothing is
+  archived yet: such a project stays
 - Prod migrations are additive SQL files in `packages/db/sql/`, applied by hand (no plain `db:push` on prod)
 
 ### Obra (construction process)
@@ -208,6 +213,10 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
   previous). Only the accepted revision drives prices and progress. The budget itself is under "Budget" below
 - Hitos (`hitos.ts`): every project starts with the standard plan (`obra-template.ts`); staff set each hito's % and the
   chapter codes it closes. The acta is signed on paper; staff upload it and the invoice (PDFs), then record the payment
+  (a day up to today, at least 1 cent). Every acta, invoice and payment registered, corrected or cancelled is logged in
+  `obra_hito_events` (append-only: who, when, what was there before) and no PDF is deleted: a replaced or removed one
+  stays in the Blob store, its pathname in the event. `getHito` returns the history (`events`) for the portal's hito
+  page (Historial); staff-only, never in the hito list nor in `/api/mobile`. Prod SQL: `packages/db/sql/2026-11-hito-events.sql`
 - `obra.ts` builds the portal's Obra page and the app's phases (pre-construction + one per hito); the arithmetic
   (progress, due dates, penalty, phases) is pure in `obra-calc.ts`, also used by the portal for live figures
 - Portal tabs Obra (construction control, below), Presupuesto and Pagos (`payments/[hitoId]`); the stage stepper is on
@@ -282,7 +291,9 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
   order's documents). It rewrites the order's lines like an edit (`replaceOrderLines`: invoiced lines stay, never below what
   they invoiced, `below_invoiced`; `no_changes` if nothing moves) and keeps a payment schedule adding up (a rise is a
   milestone of its own, a cut comes off the last ones not invoiced). The order keeps its `amendments` and
-  `originalAmountCents` (its amount less what they changed; edits are corrections). Signed between the order's date and today. A pending order is just edited. Portal: the order page's
+  `originalAmountCents` (its amount less what they changed; edits are corrections). Signed between the order's date and today. A pending order is just edited. An edit
+  that changes the amount (`updatePurchase`) moves the schedule the same way (`followSchedule` in `purchasing.ts`; the
+  new milestone is "Ajuste por corrección del pedido"), or fails with `milestones_cut` and changes nothing (as a modificado does). Portal: the order page's
   Modificados card and `compras/[orderId]/modificado`; API `POST /api/v1/purchases/:orderId/amendments` (JSON or
   multipart with `data` + `file`)
 - AI review of purchase documents (`packages/core/src/purchase-document-checks.ts`, `purchaseChecksService`; loader
@@ -378,7 +389,11 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
 - Status: draft → issued (frozen; both PDFs stored as project documents) → accepted or rejected; an older revision is
   superseded when a later one is accepted. One draft at a time; from Rev.1 issuing needs a `changeReason`.
   Accepting records the options the client chose: contract price = PEC + chosen options (at price), and that is what the obra,
-  hitos H0–H9 and the app use (`inContract` in `obra-data.ts`). Accepting a draft directly still works (v1)
+  hitos H0–H9 and the app use (`inContract` in `obra-data.ts`). Accepting keeps its proof: the day the client accepted
+  (from the issue day to today), the staff user who registered it (`accepted_by_user_id`) and the client's signed copy
+  linked to the revision (`accepted_document_id`). A draft is refused (`not_issued`) from the portal and `/api/v1`;
+  `acceptRevision`'s `options.unissued` is only for a contract signed outside the platform (the seed) and test
+  fixtures. Prod SQL: `packages/db/sql/2026-11-budget-acceptance.sql`
 - PDFs (`budget-pdf/`, `@react-pdf/renderer`, DejaVu Sans embedded): general and detailed, rendered by
   `budget-issue.ts`; a draft's are rendered on the fly with a "BORRADOR" watermark. The general one is shared with the
   client by default; the detailed one stays staff-only. Issued PDFs can't be deleted

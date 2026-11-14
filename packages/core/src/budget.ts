@@ -73,6 +73,8 @@ import {
   requireProject,
   requiredText,
   scaled,
+  userNamesById,
+  workDate,
   type LoadedChapter,
   type RevisionRow,
 } from "./obra-data";
@@ -265,13 +267,15 @@ export async function revisionView(
   previous: RevisionRow | undefined,
   totals: Map<string, number>,
 ): Promise<BudgetRevision> {
-  const [loaded, before, hitoOf, pdfs, ratios] = await Promise.all([
+  const [loaded, before, hitoOf, pdfs, ratios, names] = await Promise.all([
     loadChapters(row.id),
     previous ? loadChapters(previous.id) : null,
     hitoByChapter(row.projectId),
     revisionPdfs(row.id),
     row.model === BUDGET_MODEL ? tenantRatios(row.tenantId, row.projectId) : {},
+    userNamesById(row.tenantId, [row.acceptedByUserId]),
   ]);
+  const registrar = row.acceptedByUserId === null ? undefined : names.get(row.acceptedByUserId);
   const priced = withPrices(loaded, row);
   const chapters = priced.filter((c) => c.kind === "chapter");
   const options = priced.filter((c) => c.kind === "option");
@@ -317,6 +321,8 @@ export async function revisionView(
     validUntil: row.validUntil,
     acceptedOn: row.acceptedOn,
     acceptedBy: row.acceptedBy,
+    acceptedByUser: registrar === undefined ? null : { id: row.acceptedByUserId!, name: registrar },
+    signedDocumentId: row.acceptedDocumentId,
     rejectedOn: row.rejectedOn,
     pdfs,
     checks: framer
@@ -653,23 +659,36 @@ async function chosenOptions(revisionId: string, value: unknown): Promise<Set<st
 }
 
 /**
- * Makes an issued revision the contract (a draft too, for /api/v1 callers
- * that predate issuing). The options the client chose join the contract; the
- * revision it replaces, and older issued ones, are superseded; progress
- * recorded on the old contract carries over to the same lines (by lineage).
+ * Makes an issued revision the contract, and keeps the proof of it: the day
+ * the client accepted (`acceptedOn`: today unless given, never after today nor
+ * before the day it was issued), who they are (`acceptedBy`, as typed), the
+ * staff user registering it and when, and the client's signed copy if given.
+ * The options the client chose join the contract; the revision it replaces,
+ * and older issued ones, are superseded; progress recorded on the old contract
+ * carries over to the same lines (by lineage).
  * Body (all optional): { acceptedOn, acceptedBy, chosenOptionIds, signed }
  * — `signed`, the client's signed copy (a PDF), is checked first and stored
- * with the project's contracts once accepted.
+ * with the project's contracts once accepted, linked to the revision.
+ *
+ * A draft was never sent to the client, so it is refused (`not_issued`).
+ * `options.unissued` is the one way round it, for a contract signed outside
+ * the platform (the seed's, an import) and for test fixtures: the portal's
+ * action and the /api/v1 route never pass it.
  */
 export async function acceptRevision(
   ctx: Ctx,
   projectId: string,
   revisionId: string,
   input: Record<string, unknown> = {},
+  options: { unissued?: boolean } = {},
 ) {
   const revision = await revisionInProject(ctx, projectId, revisionId, { draft: false });
-  if (revision.status !== "draft" && revision.status !== "issued") fail("not_issued");
-  const acceptedOn = input.acceptedOn === undefined ? todayInSpain() : calendarDate(input.acceptedOn);
+  const acceptable = (status: RevisionRow["status"]) => status === "issued" || (status === "draft" && options.unissued === true);
+  if (!acceptable(revision.status)) fail("not_issued");
+  const acceptedOn = input.acceptedOn === undefined ? todayInSpain() : workDate(input.acceptedOn);
+  // Nobody accepts what they haven't been sent yet.
+  const afterIssue = (issuedOn: string | null) => issuedOn === null || acceptedOn >= issuedOn;
+  if (!afterIssue(revision.issuedOn)) fail("invalid_date");
   const acceptedBy = optionalText(input.acceptedBy, MAX_NAME);
   const chosen = await chosenOptions(revisionId, input.chosenOptionIds);
   // The signed copy is filed with the contracts, in the same step: if storing
@@ -684,11 +703,12 @@ export async function acceptRevision(
 
   const accept = () => db.transaction(async (tx) => {
     const [locked] = await tx
-      .select({ status: budgetRevisions.status })
+      .select({ status: budgetRevisions.status, issuedOn: budgetRevisions.issuedOn })
       .from(budgetRevisions)
       .where(eq(budgetRevisions.id, revisionId))
       .for("update");
-    if (!locked || (locked.status !== "draft" && locked.status !== "issued")) fail("not_issued");
+    if (!locked || !acceptable(locked.status)) fail("not_issued");
+    if (!afterIssue(locked.issuedOn)) fail("invalid_date");
     const [previous] = await tx
       .update(budgetRevisions)
       .set({ status: "superseded" })
@@ -717,19 +737,27 @@ export async function acceptRevision(
           and target.lineage_id = source.lineage_id
       `);
     }
-    const options = and(eq(budgetChapters.revisionId, revisionId), eq(budgetChapters.kind, "option"));
-    await tx.update(budgetChapters).set({ chosen: false }).where(options);
+    const ofRevision = and(eq(budgetChapters.revisionId, revisionId), eq(budgetChapters.kind, "option"));
+    await tx.update(budgetChapters).set({ chosen: false }).where(ofRevision);
     if (chosen.size > 0) {
       await tx
         .update(budgetChapters)
         .set({ chosen: true })
-        .where(and(options, inArray(budgetChapters.id, [...chosen])));
+        .where(and(ofRevision, inArray(budgetChapters.id, [...chosen])));
     }
+    // The document first: the revision points at it.
+    if (signed) await tx.insert(projectDocuments).values(signed.row);
     await tx
       .update(budgetRevisions)
-      .set({ status: "accepted", acceptedAt: new Date(), acceptedOn, acceptedBy })
+      .set({
+        status: "accepted",
+        acceptedAt: new Date(),
+        acceptedOn,
+        acceptedBy,
+        acceptedByUserId: ctx.userId,
+        acceptedDocumentId: signed?.row.id ?? null,
+      })
       .where(eq(budgetRevisions.id, revisionId));
-    if (signed) await tx.insert(projectDocuments).values(signed.row);
   });
   if (signed) {
     await storeFiles([signed.file], accept);

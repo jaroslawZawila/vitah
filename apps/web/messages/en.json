@@ -126,7 +126,9 @@
         "not_found": "Project not found.",
         "forbidden": "You don't have permission to change this project.",
         "dates_out_of_order": "The completion date can't be before the start date.",
-        "too_long": "The text is too long."
+        "too_long": "The text is too long.",
+        "project_has_records": "This project already has records that must be kept (an issued budget, a contract, orders, invoices, signed actas, payments, incidents or subcontractors). It can't be deleted.",
+        "generic": "Something went wrong. Please try again."
       }
     },
     "clientAccess": {
@@ -506,7 +508,21 @@
       "moment": "Invoiced when",
       "save": "Save",
       "saving": "Saving…",
-      "stepsLabel": "Milestone status"
+      "stepsLabel": "Milestone status",
+      "history": {
+        "title": "History",
+        "hint": "Every record, correction and cancellation is kept: what was there before, who and when.",
+        "empty": "Nothing recorded yet.",
+        "actaUploaded": "Signed acta uploaded: signed on {date} ({size})",
+        "actaReplaced": "Signed acta replaced: signed on {date} ({size}). Before: signed on {previousDate} ({previousSize})",
+        "actaRemoved": "Signed acta removed: signed on {date} ({size})",
+        "invoiceUploaded": "Invoice uploaded: issued {date} ({size})",
+        "invoiceReplaced": "Invoice replaced: issued {date} ({size}). Before: issued {previousDate} ({previousSize})",
+        "invoiceRemoved": "Invoice removed: issued {date} ({size})",
+        "paymentRegistered": "Payment recorded: {amount}, paid {date}",
+        "paymentCorrected": "Payment corrected: {amount}, paid {date}. Before: {previousAmount}, paid {previousDate}",
+        "paymentCancelled": "Payment undone: {amount}, paid {date}"
+      }
     },
     "errors": {
       "missing_fields": "Fill in the required fields.",
@@ -1367,6 +1383,9 @@
     "acceptButton": "Record acceptance",
     "acceptedBanner": "Accepted on {date}: it is the contract.",
     "acceptedBy": "Accepted by {by}.",
+    "acceptedRegistered": "Registered by {user} on {date}.",
+    "acceptedSigned": "Signed copy",
+    "acceptedUnsigned": "No signed copy",
     "rejectedBanner": "The client rejected it on {date}. Create a new revision with their changes.",
     "form": {
       "name": "Name",
@@ -1669,6 +1688,7 @@
     "accept": {
       "title": "Record the acceptance of Rev.{number}",
       "acceptedOn": "Acceptance date",
+      "acceptedOnHint": "Between the day it was issued ({issued}) and today.",
       "acceptedBy": "Accepted by",
       "options": "Which options has the client chosen?",
       "kinds": {
@@ -2921,6 +2941,8 @@
       "lineAmount": "Amount of {code}: {from} → {to}",
       "lineCloses": "{code} now closes the line",
       "lineReopens": "{code} no longer closes the line",
+      "scheduleRaised": "Payment schedule: new milestone of {amount} €",
+      "scheduleCut": "Payment schedule: {amount} € off the last milestones not invoiced",
       "fileAdded": "Document added: {name}",
       "fileRemoved": "Document removed: {name}",
       "invoiceCreated": "Invoice {number} recorded, {amount} €",
@@ -3111,6 +3133,7 @@
       "has_payments": "The invoice has payments: its amounts can't change and it can't be deleted.",
       "duplicate_number": "That supplier already has an invoice with that number.",
       "milestones_mismatch": "The milestones must add up to the order's amount.",
+      "milestones_cut": "The payment schedule can't take the cut: the milestones already invoiced add up to more than the new amount.",
       "exceeds_amount": "The amount is more than what is left to pay or to credit.",
       "request_not_approved": "The request is no longer approved (it was ordered or cancelled meanwhile). Go back to it to see what happened.",
       "no_changes": "The change order changes no line: change an amount, add or remove a line, or whether it closes it.",

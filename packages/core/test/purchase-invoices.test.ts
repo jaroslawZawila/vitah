@@ -41,7 +41,7 @@ async function setup(role: Ctx["role"] = "manager") {
     completionDate: new Date("2027-03-31T00:00:00Z"),
   });
   const { revisionId } = await framerDraft(admin, project.id, ["01", "02", "03"]);
-  await budgetService.acceptRevision(admin, project.id, revisionId);
+  await budgetService.acceptRevision(admin, project.id, revisionId, {}, { unissued: true });
   const { id: subcontractorId } = await subcontractorsService.createSubcontractor(admin, company());
   const { id: supplierId } = await subcontractorsService.createSubcontractor(
     admin,
@@ -389,13 +389,114 @@ describe("setOrderMilestones", () => {
     ]);
     expect(order.events[0]).toMatchObject({ action: "milestones" });
   });
+});
 
-  it("warns when the order's amount moves away from its schedule", async () => {
+describe("an edit and the payment schedule", () => {
+  const edit = (s: Setup, amountCents: number, ctx = s.admin) =>
+    purchasingService.updatePurchase(ctx, s.subId, { lines: [{ lineageId: s.lineage("03"), amountCents }] });
+  const schedule = async (s: Setup) => {
+    const order = await purchasingService.getPurchase(s.admin, s.subId);
+    expect(order.milestones.length === 0 || order.milestones.reduce((sum, m) => sum + m.amountCents, 0) === order.amountCents).toBe(true);
+    return { order, shown: order.milestones.map((m) => [m.concept, m.amountCents]) };
+  };
+
+  it("a rise becomes a milestone of its own, logged with the edit", async () => {
     const s = await setup();
     await withMilestones(s);
-    await purchasingService.updatePurchase(s.admin, s.subId, { lines: [{ lineageId: s.lineage("03"), amountCents: 100_000 }] });
-    const order = await purchasingService.getPurchase(s.ctx, s.subId);
-    expect(order.milestones.reduce((sum, m) => sum + m.amountCents, 0) - order.amountCents).toBe(-2_000);
+    await edit(s, 100_000);
+    const { order, shown } = await schedule(s);
+    expect(order.amountCents).toBe(100_000);
+    expect(shown).toEqual([
+      ["Inicio de fabricación", 49_000],
+      ["Fin de montaje", 49_000],
+      ["Ajuste por corrección del pedido", 2_000],
+    ]);
+    expect(order.milestones.map((m) => m.position)).toEqual([0, 1, 2]);
+    expect(order.events[0]).toMatchObject({
+      action: "lines",
+      detail: { changes: [{ from: { amountCents: 98_000 }, to: { amountCents: 100_000 } }], scheduleDeltaCents: 2_000 },
+    });
+  });
+
+  it("a cut comes off the last milestones not invoiced, which go when nothing is left of them", async () => {
+    const s = await setup();
+    const [first] = await withMilestones(s);
+    await svc.createInvoice(s.admin, s.subId, invoice({ baseCents: 10_000, milestoneId: first!.id }));
+    await edit(s, 100_000);
+    // 400 € off: the 20 € of the rise go, and 380 € come off Fin de montaje.
+    await edit(s, 60_000);
+    let { order, shown } = await schedule(s);
+    expect(shown).toEqual([
+      ["Inicio de fabricación", 49_000],
+      ["Fin de montaje", 11_000],
+    ]);
+    expect(order.events[0]).toMatchObject({ action: "lines", detail: { scheduleDeltaCents: -40_000 } });
+    // Down to the invoiced milestone: the other one goes.
+    await edit(s, 49_000);
+    ({ order, shown } = await schedule(s));
+    expect(order.amountCents).toBe(49_000);
+    expect(shown).toEqual([["Inicio de fabricación", 49_000]]);
+  });
+
+  it("a cut the milestones not invoiced can't take fails, and nothing changes", async () => {
+    const s = await setup();
+    const [first] = await withMilestones(s);
+    await svc.createInvoice(s.admin, s.subId, invoice({ baseCents: 10_000, milestoneId: first!.id }));
+    const before = await purchasingService.getPurchase(s.admin, s.subId);
+    // 580 € off, and only Fin de montaje (490 €) is free; the line itself stays above its 100 € invoiced.
+    await expect(
+      purchasingService.updatePurchase(s.admin, s.subId, { notes: "Recorte", lines: [{ lineageId: s.lineage("03"), amountCents: 40_000 }] }),
+    ).rejects.toMatchObject({ code: "milestones_cut" });
+    const after = await purchasingService.getPurchase(s.admin, s.subId);
+    expect(after.amountCents).toBe(98_000);
+    expect(after.notes).toBe(before.notes);
+    expect(after.lines.map((l) => [l.lineageId, l.amountCents])).toEqual([[s.lineage("03"), 98_000]]);
+    expect(after.milestones.map((m) => [m.id, m.position, m.concept, m.amountCents])).toEqual(
+      before.milestones.map((m) => [m.id, m.position, m.concept, m.amountCents]),
+    );
+    expect(after.events.map((e) => e.id)).toEqual(before.events.map((e) => e.id));
+  });
+
+  it("an edit that keeps the amount leaves the schedule alone", async () => {
+    const s = await setup();
+    const milestones = await withMilestones(s);
+    // Split again between two lines, a line that no longer closes, and other fields: 980 € all the same.
+    await purchasingService.updatePurchase(s.admin, s.subId, {
+      notes: "Portes incluidos",
+      workStart: "2026-07-01",
+      lines: [
+        { lineageId: s.lineage("03"), amountCents: 90_000, closesLine: false },
+        { lineageId: s.lineage("02"), amountCents: 8_000 },
+      ],
+    });
+    const { order } = await schedule(s);
+    expect(order.amountCents).toBe(98_000);
+    expect(order.milestones.map((m) => [m.id, m.concept, m.amountCents])).toEqual(milestones.map((m) => [m.id, m.concept, m.amountCents]));
+    const lines = order.events.find((e) => e.action === "lines")!;
+    expect(lines.detail.changes).toHaveLength(2);
+    expect(lines.detail).not.toHaveProperty("scheduleDeltaCents");
+  });
+
+  it("an order without a schedule gets none", async () => {
+    const s = await setup();
+    await edit(s, 100_000);
+    await edit(s, 60_000);
+    const { order } = await schedule(s);
+    expect(order.amountCents).toBe(60_000);
+    expect(order.milestones).toEqual([]);
+    expect(order.events.filter((e) => e.action === "lines").map((e) => "scheduleDeltaCents" in e.detail)).toEqual([false, false]);
+  });
+
+  it("is for the tenant's admins and managers only", async () => {
+    const s = await setup("viewer");
+    const milestones = await withMilestones({ ...s, ctx: s.admin });
+    await expect(edit(s, 100_000, s.ctx)).rejects.toMatchObject({ code: "forbidden" });
+    const other = await createTestTenant();
+    const intruder: Ctx = { tenantId: other.id, userId: (await createTestUser(other.id, { role: "admin" })).id, role: "admin" };
+    await expect(edit(s, 100_000, intruder)).rejects.toMatchObject({ code: "not_found" });
+    const { order } = await schedule(s);
+    expect(order.amountCents).toBe(98_000);
+    expect(order.milestones.map((m) => [m.id, m.amountCents])).toEqual(milestones.map((m) => [m.id, m.amountCents]));
   });
 });
 

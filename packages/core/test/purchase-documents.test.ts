@@ -25,7 +25,7 @@ async function setup(role: Ctx["role"] = "manager") {
   const ctx: Ctx = { tenantId: tenant.id, userId: user.id, role };
   const project = await createTestProject(tenant.id);
   const { revisionId } = await framerDraft(admin, project.id, ["01"]);
-  await budgetService.acceptRevision(admin, project.id, revisionId);
+  await budgetService.acceptRevision(admin, project.id, revisionId, {}, { unissued: true });
   const { id: supplierId } = await subcontractorsService.createSubcontractor(admin, {
     kind: "company",
     legalName: "Piedra de Liébana S.L.",

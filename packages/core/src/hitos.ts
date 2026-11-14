@@ -3,21 +3,32 @@ import {
   budgetChapters,
   budgetRevisions,
   db,
+  desc,
   eq,
   inArray,
   obraHitoChapters,
   obraHitoChecks,
+  obraHitoEvents,
   obraHitoPhotos,
   obraHitos,
   or,
   projectPhotos,
   projects,
+  users,
 } from "@repo/db";
 import { markChanged } from "./changes";
 import { clientProjectsWhere } from "./client-projects";
 import { raiseStage } from "./obra-stage";
 import { requireEditor, type Ctx } from "./context";
-import { MAX_CHAPTER_CODE, MAX_DOCUMENT_BYTES, type Hito, type HitoFileKind } from "./contract";
+import {
+  MAX_CHAPTER_CODE,
+  MAX_DOCUMENT_BYTES,
+  type Hito,
+  type HitoDetail,
+  type HitoEvent,
+  type HitoEventAction,
+  type HitoFileKind,
+} from "./contract";
 import {
   calendarDate,
   fail,
@@ -28,25 +39,23 @@ import {
   pickChanges,
   requireProject,
   requiredText,
+  userName,
+  workDate,
   type HitoRow,
 } from "./obra-data";
 import { todayInSpain } from "./obra-calc";
 import { HITO_TEMPLATE } from "./obra-template";
-import {
-  isPdf,
-  openStoredFile,
-  projectFolder,
-  removeFiles,
-  storeFiles,
-} from "./project-files";
+import { isPdf, openStoredFile, projectFolder, storeFiles } from "./project-files";
 import type { Tx } from "./project-client";
-import { deleteFile } from "./storage";
 
 // ─── Payment hitos (H0–H9) ───────────────────────────────────────────────────
 // The project's payment plan. Each hito closes some budget chapters; once they
 // are built and its checks are done, the acta fotográfica de conformidad is
 // signed on paper and staff upload it, then the invoice, then record the
-// payment (PROCESS.md §3.6, §8.4).
+// payment (PROCESS.md §3.6, §8.4). What is collected from a client leaves a
+// trace: every acta, invoice and payment registered, corrected or cancelled is
+// logged in `obra_hito_events` with what was there before, and no PDF is
+// deleted. Nothing here updates or deletes that table's rows.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const MAX_NAME = 120;
@@ -96,12 +105,51 @@ export async function listHitos(ctx: Ctx, projectId: string): Promise<Hito[]> {
   return hitos;
 }
 
-/** One hito of the project, priced and with its progress. */
-export async function getHito(ctx: Ctx, projectId: string, hitoId: string): Promise<Hito> {
-  const hito = (await listHitos(ctx, projectId)).find((h) => h.id === hitoId);
+/** One hito of the project, priced and with its progress, and its history. */
+export async function getHito(ctx: Ctx, projectId: string, hitoId: string): Promise<HitoDetail> {
+  const [hitos, events] = await Promise.all([
+    listHitos(ctx, projectId),
+    hitoEvents(ctx, projectId, hitoId),
+  ]);
+  const hito = hitos.find((h) => h.id === hitoId);
   if (!hito) fail("not_found");
-  return hito;
+  return { ...hito, events };
 }
+
+/**
+ * A hito's history, newest first. Staff-only, web-only: it is part of the
+ * portal's hito page alone, never of the hito list nor of `/api/mobile/*` (the
+ * client doesn't see who registered or corrected what). The storage pathnames
+ * kept in each `detail` stay on the server.
+ */
+async function hitoEvents(ctx: Ctx, projectId: string, hitoId: string): Promise<HitoEvent[]> {
+  const rows = await db
+    .select({
+      id: obraHitoEvents.id,
+      action: obraHitoEvents.action,
+      detail: obraHitoEvents.detail,
+      at: obraHitoEvents.createdAt,
+      userName,
+    })
+    .from(obraHitoEvents)
+    .leftJoin(users, eq(users.id, obraHitoEvents.userId))
+    .where(
+      and(
+        eq(obraHitoEvents.hitoId, hitoId),
+        eq(obraHitoEvents.projectId, projectId),
+        eq(obraHitoEvents.tenantId, ctx.tenantId),
+      ),
+    )
+    .orderBy(desc(obraHitoEvents.createdAt));
+  return rows.map(
+    ({ at, detail, ...row }) =>
+      ({ ...row, at: at.toISOString(), detail: withoutPathnames(detail) }) as HitoEvent,
+  );
+}
+
+/** A `detail` without any `pathname`, at whatever depth (`previous` has one too). */
+const withoutPathnames = (detail: Record<string, unknown>): Record<string, unknown> =>
+  JSON.parse(JSON.stringify(detail, (key, value: unknown) => (key === "pathname" ? undefined : value)));
 
 /** The hito, if it is the project's (checking the project too, in parallel). */
 async function findHito(ctx: Ctx, projectId: string, hitoId: string) {
@@ -125,8 +173,40 @@ async function hitoInProject(ctx: Ctx, projectId: string, hitoId: string): Promi
   return hito;
 }
 
-const touch = (hitoId: string, changes: Partial<typeof obraHitos.$inferInsert>) =>
-  db.update(obraHitos).set(changes).where(eq(obraHitos.id, hitoId));
+type Recorded = {
+  changes: Partial<typeof obraHitos.$inferInsert>;
+  action: HitoEventAction;
+  detail: Record<string, unknown>;
+};
+
+/**
+ * Changes a hito's acta, invoice or payment and logs it, in one transaction:
+ * neither happens without the other. `change` gets the row as it is, locked,
+ * so what it logs as replaced is what really was there; null from it changes
+ * and logs nothing. True if something was recorded.
+ */
+function record(ctx: Ctx, hitoId: string, change: (hito: HitoRow) => Recorded | null) {
+  return db.transaction(async (tx) => {
+    const [hito] = await tx
+      .select()
+      .from(obraHitos)
+      .where(and(eq(obraHitos.id, hitoId), eq(obraHitos.tenantId, ctx.tenantId)))
+      .for("update");
+    if (!hito) fail("not_found");
+    const recorded = change(hito);
+    if (!recorded) return false;
+    await tx.update(obraHitos).set(recorded.changes).where(eq(obraHitos.id, hitoId));
+    await tx.insert(obraHitoEvents).values({
+      tenantId: ctx.tenantId,
+      projectId: hito.projectId,
+      hitoId,
+      userId: ctx.userId,
+      action: recorded.action,
+      detail: recorded.detail,
+    });
+    return true;
+  });
+}
 
 /** Every hito change shows in the app's obra (its phases and payments). */
 const obraChanged = (ctx: Ctx, projectId: string) =>
@@ -377,10 +457,17 @@ const FILE_NAMES: Record<HitoFileKind, string> = {
   invoice: "Factura",
 };
 
+/** The hito's acta or invoice as the history keeps it; null without one. */
+function currentFile(hito: HitoRow, kind: HitoFileKind) {
+  const columns = FILE_COLUMNS[kind];
+  const pathname = hito[columns.pathname];
+  return pathname ? { date: hito[columns.date], sizeBytes: hito[columns.size], pathname } : null;
+}
+
 /**
  * Body (multipart form): { file (PDF, ≤ 4 MB), date } — the date the acta was
- * signed (required), or the invoice's date (default: today). Replaces any
- * earlier file of that kind.
+ * signed (required), or the invoice's date (default: today). Takes the place
+ * of any earlier file of that kind, which stays in storage (see the history).
  */
 export async function uploadHitoFile(
   ctx: Ctx,
@@ -389,7 +476,7 @@ export async function uploadHitoFile(
   kind: HitoFileKind,
   input: Record<string, unknown>,
 ) {
-  const hito = await hitoInProject(ctx, projectId, hitoId);
+  await hitoInProject(ctx, projectId, hitoId);
   const { file } = input;
   if (!(file instanceof Blob) || file.size === 0) fail("missing_file");
   if (file.size > MAX_DOCUMENT_BYTES) fail("file_too_large");
@@ -400,30 +487,38 @@ export async function uploadHitoFile(
       : calendarDate(input.date);
 
   const columns = FILE_COLUMNS[kind];
-  const previous = hito[columns.pathname];
   const pathname = `${projectFolder(ctx.tenantId, projectId)}hitos/${hitoId}/${kind}-${crypto.randomUUID()}.pdf`;
   await storeFiles([{ pathname, body: file, contentType: "application/pdf" }], () =>
-    touch(hitoId, { [columns.pathname]: pathname, [columns.size]: file.size, [columns.date]: date }),
+    record(ctx, hitoId, (hito) => ({
+      changes: { [columns.pathname]: pathname, [columns.size]: file.size, [columns.date]: date },
+      action: `${kind}_uploaded`,
+      detail: { date, sizeBytes: file.size, pathname, previous: currentFile(hito, kind) },
+    })),
   );
   await obraChanged(ctx, projectId);
-  if (previous) await deleteFile(previous).catch(() => {});
   return { hitoId };
 }
 
+/** Takes the acta or invoice off the hito. Its PDF stays in storage (see the history). */
 export async function removeHitoFile(
   ctx: Ctx,
   projectId: string,
   hitoId: string,
   kind: HitoFileKind,
 ) {
-  const hito = await hitoInProject(ctx, projectId, hitoId);
+  await hitoInProject(ctx, projectId, hitoId);
   const columns = FILE_COLUMNS[kind];
-  const pathname = hito[columns.pathname];
-  if (!pathname) return { hitoId };
-  await removeFiles([pathname], () =>
-    touch(hitoId, { [columns.pathname]: null, [columns.size]: null, [columns.date]: null }),
-  );
-  await obraChanged(ctx, projectId);
+  const removed = await record(ctx, hitoId, (hito) => {
+    const file = currentFile(hito, kind);
+    return (
+      file && {
+        changes: { [columns.pathname]: null, [columns.size]: null, [columns.date]: null },
+        action: `${kind}_removed`,
+        detail: file,
+      }
+    );
+  });
+  if (removed) await obraChanged(ctx, projectId);
   return { hitoId };
 }
 
@@ -470,7 +565,15 @@ export async function openClientHitoFile(
 
 // ─── Payment ─────────────────────────────────────────────────────────────────
 
-/** Body: { paidOn, amountCents? } — the amount defaults to the hito's price with VAT. */
+/** The payment registered on the hito, as the history keeps it; null without one. */
+const currentPayment = (hito: HitoRow) =>
+  hito.paidOn ? { paidOn: hito.paidOn, amountCents: hito.paidAmountCents } : null;
+
+/**
+ * Body: { paidOn, amountCents? } — the day it was collected (not after today
+ * in Spain) and the amount (default: the hito's price with VAT), at least a
+ * cent. Registering again corrects the payment: one per hito.
+ */
 export async function registerPayment(
   ctx: Ctx,
   projectId: string,
@@ -478,24 +581,38 @@ export async function registerPayment(
   input: Record<string, unknown>,
 ) {
   await hitoInProject(ctx, projectId, hitoId);
-  const paidOn = calendarDate(input.paidOn);
-  let amountCents: number;
-  if (input.amountCents === undefined || input.amountCents === null) {
-    const hito = (await loadObra(ctx.tenantId, projectId)).hitos.find((h) => h.id === hitoId)!;
-    amountCents = hito.totalCents;
-  } else {
-    amountCents = integer(input.amountCents, 0, 2_000_000_000);
-  }
-  await touch(hitoId, { paidOn, paidAmountCents: amountCents });
+  const paidOn = workDate(input.paidOn);
+  // Never a payment of nothing: a hito without a price yet needs its amount given.
+  const amountCents = integer(
+    input.amountCents ??
+      (await loadObra(ctx.tenantId, projectId)).hitos.find((h) => h.id === hitoId)!.totalCents,
+    1,
+    2_000_000_000,
+  );
+  await record(ctx, hitoId, (hito) => ({
+    changes: { paidOn, paidAmountCents: amountCents },
+    action: "payment_registered",
+    detail: { paidOn, amountCents, previous: currentPayment(hito) },
+  }));
   await obraChanged(ctx, projectId);
   // H0 paid opens stage 5, H9 paid stage 8.
   await raiseStage(ctx.tenantId, projectId);
   return { hitoId };
 }
 
+/** Undoes the registered payment; without one there is nothing to do. */
 export async function cancelPayment(ctx: Ctx, projectId: string, hitoId: string) {
   await hitoInProject(ctx, projectId, hitoId);
-  await touch(hitoId, { paidOn: null, paidAmountCents: null });
-  await obraChanged(ctx, projectId);
+  const cancelled = await record(ctx, hitoId, (hito) => {
+    const payment = currentPayment(hito);
+    return (
+      payment && {
+        changes: { paidOn: null, paidAmountCents: null },
+        action: "payment_cancelled",
+        detail: payment,
+      }
+    );
+  });
+  if (cancelled) await obraChanged(ctx, projectId);
   return { hitoId };
 }

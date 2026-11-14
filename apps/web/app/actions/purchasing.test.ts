@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createTestProject, createTestTenant, createTestUser, resetDatabase } from "@repo/db/testing";
-import { purchasingService, subcontractorsService } from "@repo/core";
+import { purchaseInvoicesService, purchasingService, subcontractorsService } from "@repo/core";
 import { files } from "@repo/core/testing";
 import { seedObra } from "@repo/core/seed";
 import { signInAs } from "../../test/session";
@@ -46,7 +46,7 @@ async function setup(role: "admin" | "manager" | "viewer" = "manager") {
   const lineageId = form.chapters.find((c) => c.code === "06")!.lines[0]!.lineageId;
   signInAs({ tenantId: tenant.id, userId: user.id, role });
   const order = { kind: "material", subcontractorId: supplierId, description: "Piedra", lines: [{ lineageId, amountCents: 300_000 }] };
-  return { tenant, project, order };
+  return { tenant, project, order, admin };
 }
 
 beforeEach(async () => {
@@ -89,6 +89,33 @@ describe("purchasing actions", () => {
     });
     expect(await deleteOrderDocumentAction(project.id, orderId, documentId)).toEqual({ success: true });
     expect(await deleteOrderDocumentAction(project.id, orderId, documentId)).toEqual({ error: "not_found" });
+  });
+
+  it("edit an order's amount with its payment schedule following, or the error when it can't", async () => {
+    const { project, order, admin } = await setup();
+    const { orderId } = (await createPurchaseAction(project.id, { ...order, status: "ordered" }))!;
+    await purchaseInvoicesService.setOrderMilestones(admin, orderId!, {
+      milestones: [
+        { concept: "Pedido", amountCents: 100_000 },
+        { concept: "Entrega", amountCents: 200_000 },
+      ],
+    });
+    const schedule = async () => (await getPurchase(orderId!))!.order.milestones.map((m) => [m.concept, m.amountCents]);
+    const [first] = (await getPurchase(orderId!))!.order.milestones;
+    await purchaseInvoicesService.createInvoice(admin, orderId!, { number: "PL-1", issuedOn: "2026-10-17", baseCents: 20_000, milestoneId: first!.id });
+
+    expect(await updatePurchaseAction(project.id, orderId!, { lines: [{ ...order.lines[0]!, amountCents: 320_000 }] })).toEqual({ success: true });
+    expect(await schedule()).toEqual([
+      ["Pedido", 100_000],
+      ["Entrega", 200_000],
+      ["Ajuste por corrección del pedido", 20_000],
+    ]);
+    // Below the invoiced milestone: the others can't take the cut, and nothing moves.
+    expect(await updatePurchaseAction(project.id, orderId!, { lines: [{ ...order.lines[0]!, amountCents: 90_000 }] })).toEqual({
+      error: "milestones_cut",
+    });
+    expect((await getPurchase(orderId!))!.order.amountCents).toBe(320_000);
+    expect(await schedule()).toHaveLength(3);
   });
 
   it("record a modificado on a placed order, refreshing the dashboard", async () => {

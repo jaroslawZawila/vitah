@@ -24,6 +24,9 @@ export function useObraFormat() {
     /** YYYY-MM-DD → "24 sept 2026". */
     date: (day: string) =>
       format.dateTime(new Date(`${day}T00:00:00Z`), { dateStyle: "medium", timeZone: "UTC" }),
+    /** A timestamp in Spain's time: "24 sept 2026, 12:05". */
+    dateTime: (iso: string) =>
+      format.dateTime(new Date(iso), { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Madrid" }),
     /** A quantity with up to 3 decimals. */
     quantity,
     /** Basis points as a % to type in: 1300 → "13", 1250 → "12,5". */

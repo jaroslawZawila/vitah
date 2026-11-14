@@ -370,7 +370,7 @@ describe("margins", () => {
     ]);
     expect(revision.optionTotals).toEqual({ adding: { count: 1, cents: 1_202_128 }, subtracting: { count: 1, cents: -120_213 } });
 
-    await issue.issueRevision(ctx, project.id, revisionId, { shareWithClient: false });
+    await issue.issueRevision(ctx, project.id, revisionId, { issuedOn: "2026-10-14", shareWithClient: false });
     await svc.acceptRevision(ctx, project.id, revisionId, { acceptedOn: "2026-10-21", chosenOptionIds: [pool] });
 
     revision = await revisionOf(ctx, project.id);
@@ -482,12 +482,14 @@ describe("issuing and accepting", () => {
     const { optionId: kitchen } = await options.addOption(ctx, project.id, revisionId, { name: "Cocina" });
     await svc.addLine(ctx, project.id, pool, { description: "Vaso", unit: "ud", quantity: 1, unitPriceCents: 1_000_000 });
     await svc.addLine(ctx, project.id, kitchen, { description: "Cocina", unit: "pa", quantity: 1, unitPriceCents: 500_000 });
-    await issue.issueRevision(ctx, project.id, revisionId);
+    await issue.issueRevision(ctx, project.id, revisionId, { issuedOn: "2026-10-14" });
 
     await svc.acceptRevision(ctx, project.id, revisionId, { acceptedOn: "2026-10-21", acceptedBy: "D. Roberto Guzmán", chosenOptionIds: [pool] });
 
     const revision = await revisionOf(ctx, project.id);
     expect(revision).toMatchObject({ status: "accepted", acceptedOn: "2026-10-21", acceptedBy: "D. Roberto Guzmán", totalCents: 278_513, contractTotalCents: 1_278_513 });
+    // No signed copy was handed in.
+    expect(revision.signedDocumentId).toBeNull();
     expect(revision.options.map((o) => [o.name, o.chosen])).toEqual([["Piscina", true], ["Cocina", false]]);
     // H0 is 5 % of the contract: PEC plus the pool.
     expect((await hitosService.listHitos(ctx, project.id))[0]).toMatchObject({ amountCents: 63_926 });
@@ -505,9 +507,72 @@ describe("issuing and accepting", () => {
 
     await svc.acceptRevision(ctx, project.id, revisionId, { signed: new Blob(["%PDF-1.7 firmado"]) });
 
-    expect((await revisionOf(ctx, project.id)).status).toBe("accepted");
+    const accepted = await revisionOf(ctx, project.id);
+    expect(accepted.status).toBe("accepted");
     const docs = await documentsService.listDocuments(ctx, project.id);
-    expect(docs.find((d) => d.category === "contract")).toMatchObject({ title: "Presupuesto 036/2026 · Rev.0 · firmado" });
+    const contract = docs.find((d) => d.category === "contract")!;
+    expect(contract).toMatchObject({ title: "Presupuesto 036/2026 · Rev.0 · firmado" });
+    // The revision points at its signed copy, which is its proof: it can't be deleted.
+    expect(accepted.signedDocumentId).toBe(contract.id);
+    await expect(documentsService.deleteDocument(ctx, project.id, contract.id)).rejects.toMatchObject({ code: "budget_document" });
+    expect(await revisionOf(ctx, project.id)).toMatchObject({ status: "accepted", signedDocumentId: contract.id });
+  });
+
+  it("can't be issued on a day still to come", async () => {
+    const { project, ctx } = await setup();
+    const { revisionId } = await draftBudget(ctx, project.id);
+    vi.useFakeTimers({ toFake: ["Date"], now: new Date("2026-10-20T10:00:00Z") });
+    await expect(issue.issueRevision(ctx, project.id, revisionId, { issuedOn: "2026-10-21" })).rejects.toMatchObject({ code: "invalid_date" });
+    expect(await revisionOf(ctx, project.id)).toMatchObject({ status: "draft" });
+  });
+
+  it("records who registered the acceptance: the staff user, not the name typed for the client", async () => {
+    const { tenant, project, ctx } = await setup();
+    const { revisionId } = await draftBudget(ctx, project.id);
+    await issue.issueRevision(ctx, project.id, revisionId, { shareWithClient: false });
+    const admin = await createTestUser(tenant.id, { role: "admin", name: "Marta Ruiz" });
+
+    await svc.acceptRevision({ tenantId: tenant.id, userId: admin.id, role: "admin" }, project.id, revisionId, { acceptedBy: "D. Roberto Guzmán" });
+
+    const [row] = await db.select().from(budgetRevisions).where(eq(budgetRevisions.id, revisionId));
+    expect(row).toMatchObject({ acceptedByUserId: admin.id, acceptedBy: "D. Roberto Guzmán", acceptedDocumentId: null });
+    expect(await revisionOf(ctx, project.id)).toMatchObject({
+      acceptedBy: "D. Roberto Guzmán",
+      acceptedByUser: { id: admin.id, name: "Marta Ruiz" },
+      acceptedAt: expect.any(String),
+    });
+  });
+
+  it("shows no registrar on a revision accepted before it was kept", async () => {
+    const { project, ctx } = await setup();
+    const { revisionId } = await draftBudget(ctx, project.id);
+    await svc.acceptRevision(ctx, project.id, revisionId, {}, { unissued: true });
+    await db.update(budgetRevisions).set({ acceptedByUserId: null }).where(eq(budgetRevisions.id, revisionId));
+
+    expect(await revisionOf(ctx, project.id)).toMatchObject({ status: "accepted", acceptedByUser: null, signedDocumentId: null });
+  });
+
+  it("takes the day the client accepted between the issue and today", async () => {
+    const { project, ctx } = await setup();
+    const { revisionId } = await draftBudget(ctx, project.id);
+    vi.useFakeTimers({ toFake: ["Date"], now: new Date("2026-10-20T10:00:00Z") });
+    await issue.issueRevision(ctx, project.id, revisionId, { issuedOn: "2026-10-14", shareWithClient: false });
+
+    // Tomorrow, the day before it was sent, and no date at all.
+    for (const acceptedOn of ["2026-10-21", "2026-10-13", "2026-02-30", null]) {
+      await expect(svc.acceptRevision(ctx, project.id, revisionId, { acceptedOn })).rejects.toMatchObject({ code: "invalid_date", status: 400 });
+    }
+    expect(await revisionOf(ctx, project.id)).toMatchObject({ status: "issued", acceptedOn: null, acceptedByUser: null });
+
+    // The day it was sent is fine; without a date it is today.
+    await svc.acceptRevision(ctx, project.id, revisionId, { acceptedOn: "2026-10-14" });
+    expect(await revisionOf(ctx, project.id)).toMatchObject({ status: "accepted", acceptedOn: "2026-10-14" });
+
+    const { revisionId: rev1 } = await svc.createRevision(ctx, project.id);
+    await svc.updateRevision(ctx, project.id, rev1, { changeReason: "Cambio de carpintería" });
+    await issue.issueRevision(ctx, project.id, rev1, { shareWithClient: false });
+    await svc.acceptRevision(ctx, project.id, rev1);
+    expect(await revisionOf(ctx, project.id, rev1)).toMatchObject({ status: "accepted", acceptedOn: "2026-10-20" });
   });
 
   it("stays issued when the signed copy can't be stored, so the acceptance can be sent again", async () => {
@@ -528,6 +593,7 @@ describe("issuing and accepting", () => {
   it("refuses options from another revision", async () => {
     const { project, ctx } = await setup();
     const { revisionId } = await draftBudget(ctx, project.id);
+    await issue.issueRevision(ctx, project.id, revisionId, { shareWithClient: false });
     await expect(svc.acceptRevision(ctx, project.id, revisionId, { chosenOptionIds: ["nope"] })).rejects.toMatchObject({ code: "not_found" });
     await expect(svc.acceptRevision(ctx, project.id, revisionId, { chosenOptionIds: "x" })).rejects.toMatchObject({ code: "invalid_input" });
   });
@@ -543,22 +609,37 @@ describe("issuing and accepting", () => {
     await expect(svc.acceptRevision(ctx, project.id, revisionId)).rejects.toMatchObject({ code: "not_issued" });
 
     const { revisionId: rev1 } = await svc.createRevision(ctx, project.id);
-    await svc.acceptRevision(ctx, project.id, rev1);
+    await svc.acceptRevision(ctx, project.id, rev1, {}, { unissued: true });
     const budget = await svc.getBudget(ctx, project.id);
     expect(budget.revisions.map((r) => [r.number, r.status])).toEqual([[1, "accepted"], [0, "superseded"]]);
   });
 
-  it("accepts a draft directly, for /api/v1 callers that predate issuing", async () => {
+  it("refuses a draft: what the client was never sent can't be the contract", async () => {
     const { project, ctx } = await setup();
     const { revisionId, c1 } = await draftBudget(ctx, project.id);
-    await svc.acceptRevision(ctx, project.id, revisionId);
+
+    await expect(svc.acceptRevision(ctx, project.id, revisionId)).rejects.toMatchObject({ code: "not_issued", status: 409 });
+    await expect(svc.acceptRevision(ctx, project.id, revisionId, { acceptedBy: "Ana" }, { unissued: false })).rejects.toMatchObject({ code: "not_issued" });
+    // Nothing a caller sends opens the way round: only core's own option does.
+    await expect(svc.acceptRevision(ctx, project.id, revisionId, { unissued: true })).rejects.toMatchObject({ code: "not_issued" });
+
+    expect(await revisionOf(ctx, project.id)).toMatchObject({ status: "draft", acceptedAt: null, acceptedOn: null, acceptedBy: null, acceptedByUser: null });
+    // Still a draft in every way: it can be edited, and the obra has no contract.
+    await svc.addLine(ctx, project.id, c1, line("01.03", 1, 1));
+    expect((await obraService.getObra(ctx, project.id)).budget).toBeNull();
+  });
+
+  it("accepts a draft only as a contract signed outside the platform (`unissued`)", async () => {
+    const { project, ctx } = await setup();
+    const { revisionId, c1 } = await draftBudget(ctx, project.id);
+    await svc.acceptRevision(ctx, project.id, revisionId, { acceptedOn: "2026-01-15" }, { unissued: true });
 
     await expect(svc.addLine(ctx, project.id, c1, line("01.03", 1, 1))).rejects.toMatchObject({ code: "not_draft", status: 409 });
     const [l1, l2] = (await revisionOf(ctx, project.id)).chapters[0]!.lines;
     await svc.setProgress(ctx, project.id, { lines: [{ id: l1!.id, executedPct: 100 }, { id: l2!.id, executedPct: 50 }] });
 
     const revision = await revisionOf(ctx, project.id);
-    expect(revision).toMatchObject({ status: "accepted", acceptedAt: expect.any(String) });
+    expect(revision).toMatchObject({ status: "accepted", acceptedAt: expect.any(String), acceptedOn: "2026-01-15", issuedOn: null, acceptedByUser: { id: ctx.userId } });
     expect(revision.chapters[0]).toMatchObject({ executedCents: 92_750 + 36_250, progressPct: 78, status: "active" });
   });
 
@@ -568,7 +649,7 @@ describe("issuing and accepting", () => {
     const lineId = (await revisionOf(ctx, project.id)).chapters[0]!.lines[0]!.id;
 
     await expect(svc.setProgress(ctx, project.id, { lines: [{ id: lineId, executedPct: 10 }] })).rejects.toMatchObject({ code: "not_accepted" });
-    await svc.acceptRevision(ctx, project.id, (await revisionOf(ctx, project.id)).id);
+    await svc.acceptRevision(ctx, project.id, (await revisionOf(ctx, project.id)).id, {}, { unissued: true });
     await expect(svc.setProgress(ctx, project.id, { lines: [{ id: lineId, executedPct: 101 }] })).rejects.toMatchObject({ code: "invalid_input" });
   });
 });
@@ -632,13 +713,13 @@ describe("revisions", () => {
   it("supersedes the accepted revision and keeps the progress recorded on it", async () => {
     const { project, ctx } = await setup();
     const { revisionId } = await draftBudget(ctx, project.id);
-    await svc.acceptRevision(ctx, project.id, revisionId);
+    await svc.acceptRevision(ctx, project.id, revisionId, {}, { unissued: true });
     const { revisionId: rev1 } = await svc.createRevision(ctx, project.id);
     // Progress recorded after the draft was copied still carries over.
     const accepted = await revisionOf(ctx, project.id, revisionId);
     await svc.setProgress(ctx, project.id, { lines: [{ id: accepted.chapters[0]!.lines[0]!.id, executedPct: 80 }] });
 
-    await svc.acceptRevision(ctx, project.id, rev1);
+    await svc.acceptRevision(ctx, project.id, rev1, {}, { unissued: true });
 
     const budget = await svc.getBudget(ctx, project.id);
     expect(budget.revisions.map((r) => [r.number, r.status])).toEqual([[1, "accepted"], [0, "superseded"]]);
@@ -674,7 +755,7 @@ describe("revisions", () => {
   it("deletes a draft revision only", async () => {
     const { project, ctx } = await setup();
     const { revisionId } = await draftBudget(ctx, project.id);
-    await svc.acceptRevision(ctx, project.id, revisionId);
+    await svc.acceptRevision(ctx, project.id, revisionId, {}, { unissued: true });
     await expect(svc.deleteRevision(ctx, project.id, revisionId)).rejects.toMatchObject({ code: "not_draft" });
 
     const { revisionId: rev1 } = await svc.createRevision(ctx, project.id);
@@ -833,6 +914,11 @@ describe("access", () => {
     await expect(options.addOption(vctx, project.id, revisionId, { name: "X" })).rejects.toMatchObject({ code: "forbidden" });
     await expect(issue.issueRevision(vctx, project.id, revisionId)).rejects.toMatchObject({ code: "forbidden" });
     await expect(svc.acceptRevision(vctx, project.id, revisionId)).rejects.toMatchObject({ code: "forbidden" });
+    // Issued or not, and whatever they pass.
+    await issue.issueRevision(ctx, project.id, revisionId, { shareWithClient: false });
+    await expect(svc.acceptRevision(vctx, project.id, revisionId)).rejects.toMatchObject({ code: "forbidden", status: 403 });
+    await expect(svc.acceptRevision(vctx, project.id, revisionId, {}, { unissued: true })).rejects.toMatchObject({ code: "forbidden" });
+    expect((await revisionOf(ctx, project.id)).status).toBe("issued");
   });
 
   it("keeps tenants apart", async () => {
@@ -851,6 +937,11 @@ describe("access", () => {
     await expect(issue.revisionPdf(other.ctx, other.project.id, revisionId, "general")).rejects.toMatchObject({ code: "not_found" });
     await expect(svc.acceptRevision(other.ctx, other.project.id, revisionId)).rejects.toMatchObject({ code: "not_found" });
     await expect(svc.rejectRevision(other.ctx, other.project.id, revisionId)).rejects.toMatchObject({ code: "not_found" });
+    // The same once it is issued, by its own project too.
+    await issue.issueRevision(ctx, project.id, revisionId, { shareWithClient: false });
+    await expect(svc.acceptRevision(other.ctx, other.project.id, revisionId)).rejects.toMatchObject({ code: "not_found" });
+    await expect(svc.acceptRevision(other.ctx, project.id, revisionId)).rejects.toMatchObject({ code: "project_not_found" });
+    expect((await revisionOf(ctx, project.id)).status).toBe("issued");
   });
 
   it("returns an empty budget before one exists", async () => {

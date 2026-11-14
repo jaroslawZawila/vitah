@@ -30,7 +30,7 @@ async function setup(role: Ctx["role"] = "manager") {
     completionDate: new Date("2027-03-31T00:00:00Z"),
   });
   const { revisionId } = await framerDraft(admin, project.id, ["01", "02", "03"]);
-  await budgetService.acceptRevision(admin, project.id, revisionId);
+  await budgetService.acceptRevision(admin, project.id, revisionId, {}, { unissued: true });
   const ctx: Ctx = { tenantId: tenant.id, userId: (await createTestUser(tenant.id, { role, name: "Jorge Ruiz" })).id, role };
   return { tenant, project, ctx, admin };
 }
@@ -114,7 +114,7 @@ describe("a first plan", () => {
 
     const other = await createTestProject(tenant.id, { startDate: new Date("2026-06-01T00:00:00Z") });
     const { revisionId } = await framerDraft(ctx, other.id, ["01", "02"]);
-    await budgetService.acceptRevision(ctx, other.id, revisionId);
+    await budgetService.acceptRevision(ctx, other.id, revisionId, {}, { unissued: true });
     expect((await svc.getPlanning(ctx, other.id)).copyFrom).toEqual([{ projectId: project.id, ref: project.ref }]);
     await svc.createPlanningDraft(ctx, other.id, { ...PLAIN, from: "project", projectId: project.id });
     expect(datesOf((await svc.getPlanningDraft(ctx, other.id)).rows)).toEqual({
@@ -133,7 +133,7 @@ describe("a first plan", () => {
 
     const other = await createTestProject(tenant.id, { startDate: new Date("2027-02-01T00:00:00Z") });
     const { revisionId } = await framerDraft(ctx, other.id, ["01"]);
-    await budgetService.acceptRevision(ctx, other.id, revisionId);
+    await budgetService.acceptRevision(ctx, other.id, revisionId, {}, { unissued: true });
     await svc.createPlanningDraft(ctx, other.id, { ...PLAIN, from: "project", projectId: project.id });
     expect((await svc.getPlanningDraft(ctx, other.id)).rows[0]).toMatchObject({ fixedStart: null, plannedStart: "2027-02-01" });
   });
@@ -273,7 +273,7 @@ describe("who and what", () => {
     // Nor can a plan be copied from another tenant's project.
     const mine = await createTestProject(other.id, { startDate: new Date("2026-06-01T00:00:00Z") });
     const { revisionId } = await framerDraft(stranger, mine.id, ["01"]);
-    await budgetService.acceptRevision(stranger, mine.id, revisionId);
+    await budgetService.acceptRevision(stranger, mine.id, revisionId, {}, { unissued: true });
     await svc.approvePlanningDraft(ctx, project.id, {});
     await expect(
       svc.createPlanningDraft(stranger, mine.id, { ...PLAIN, from: "project", projectId: project.id }),
@@ -287,7 +287,7 @@ describe("who and what", () => {
     await expect(svc.createPlanningDraft(ctx, bare.id, PLAIN)).rejects.toMatchObject({ code: "no_budget" });
 
     const { revisionId } = await framerDraft(ctx, bare.id, ["01"]);
-    await budgetService.acceptRevision(ctx, bare.id, revisionId);
+    await budgetService.acceptRevision(ctx, bare.id, revisionId, {}, { unissued: true });
     await expect(svc.createPlanningDraft(ctx, bare.id, PLAIN)).rejects.toMatchObject({ code: "missing_fields" });
     await expect(svc.createPlanningDraft(ctx, bare.id, { ...PLAIN, startDate: "2026-02-31" })).rejects.toMatchObject({ code: "invalid_date" });
     await expect(svc.createPlanningDraft(ctx, bare.id, { ...PLAIN, startDate: "2026-06-01", region: "xx" })).rejects.toMatchObject({

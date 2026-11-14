@@ -61,7 +61,8 @@ export async function issueRevisionAction(projectId: string, revisionId: string,
 
 /**
  * The acceptance dialog's form: acceptedOn, acceptedBy, chosenOptionIds
- * (repeated) and, optionally, the signed copy (`signed`, a PDF).
+ * (repeated) and, optionally, the signed copy (`signed`, a PDF). Issued
+ * revisions only: core refuses a draft (`not_issued`).
  */
 export async function acceptRevisionAction(projectId: string, revisionId: string, form: FormData): Promise<ObraState> {
   const signed = form.get("signed");

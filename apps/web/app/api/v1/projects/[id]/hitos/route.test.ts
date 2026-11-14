@@ -65,6 +65,7 @@ describe("/api/v1/projects/:id/hitos", () => {
     const body = new FormData();
     body.set("file", new File(["%PDF-acta"], "acta.pdf"));
     body.set("date", "2026-10-20");
+    const stored = files.size;
 
     expect((await putFile(apiRequest(token, { method: "PUT", body }), routeParams({ id, hitoId, kind: "acta" }))).status).toBe(200);
     const file = await getFile(apiRequest(token), routeParams({ id, hitoId, kind: "acta" }));
@@ -79,6 +80,41 @@ describe("/api/v1/projects/:id/hitos", () => {
     expect((await cancelPayment(apiRequest(token, { method: "DELETE" }), routeParams({ id, hitoId }))).status).toBe(200);
     expect((await deleteFile(apiRequest(token, { method: "DELETE" }), routeParams({ id, hitoId, kind: "acta" }))).status).toBe(200);
     expect((await getFile(apiRequest(token), routeParams({ id, hitoId, kind: "acta" }))).status).toBe(404);
+    // Off the hito, still in storage.
+    expect(files.size).toBe(stored + 1);
+  });
+
+  it("gives one hito's history, newest first, and only there", async () => {
+    const { id, token, hitos, hitoId } = await setup();
+    const body = new FormData();
+    body.set("file", new File(["%PDF-acta"], "acta.pdf"));
+    body.set("date", "2026-10-20");
+    await putFile(apiRequest(token, { method: "PUT", body }), routeParams({ id, hitoId, kind: "acta" }));
+    await pay(apiRequest(token, { method: "PUT", body: { paidOn: "2026-10-27", amountCents: 100_000 } }), routeParams({ id, hitoId }));
+    await pay(apiRequest(token, { method: "PUT", body: { paidOn: "2026-10-28", amountCents: 120_000 } }), routeParams({ id, hitoId }));
+    await cancelPayment(apiRequest(token, { method: "DELETE" }), routeParams({ id, hitoId }));
+
+    const one = await (await getOne(apiRequest(token), routeParams({ id, hitoId }))).json();
+    expect(one).toMatchObject({ code: "H4", paidOn: null, actaSignedOn: "2026-10-20" });
+    expect(one.events).toEqual([
+      { id: expect.any(String), at: expect.any(String), userName: expect.any(String), action: "payment_cancelled", detail: { paidOn: "2026-10-28", amountCents: 120_000 } },
+      { id: expect.any(String), at: expect.any(String), userName: expect.any(String), action: "payment_registered", detail: { paidOn: "2026-10-28", amountCents: 120_000, previous: { paidOn: "2026-10-27", amountCents: 100_000 } } },
+      { id: expect.any(String), at: expect.any(String), userName: expect.any(String), action: "payment_registered", detail: { paidOn: "2026-10-27", amountCents: 100_000, previous: null } },
+      { id: expect.any(String), at: expect.any(String), userName: expect.any(String), action: "acta_uploaded", detail: { date: "2026-10-20", sizeBytes: 9, previous: null } },
+    ]);
+    // The list stays as installed clients know it.
+    expect((await hitos()).find((h) => h.id === hitoId)).not.toHaveProperty("events");
+  });
+
+  it("refuses a payment dated after today or of nothing", async () => {
+    const { id, token, hitoId } = await setup();
+    const future = await pay(apiRequest(token, { method: "PUT", body: { paidOn: "2999-01-01" } }), routeParams({ id, hitoId }));
+    expect(future.status).toBe(400);
+    expect(await future.json()).toEqual({ error: "invalid_date" });
+    const nothing = await pay(apiRequest(token, { method: "PUT", body: { paidOn: "2026-10-27", amountCents: 0 } }), routeParams({ id, hitoId }));
+    expect(nothing.status).toBe(400);
+    expect(await nothing.json()).toEqual({ error: "invalid_input" });
+    expect((await (await getOne(apiRequest(token), routeParams({ id, hitoId }))).json()).events).toEqual([]);
   });
 
   it("keeps tenants apart", async () => {
@@ -86,6 +122,8 @@ describe("/api/v1/projects/:id/hitos", () => {
     const other = await createTestTenant();
     const { token } = await staffToken(other.id);
     expect((await GET(apiRequest(token), routeParams({ id }))).status).toBe(404);
+    expect((await getOne(apiRequest(token), routeParams({ id, hitoId }))).status).toBe(404);
+    expect((await pay(apiRequest(token, { method: "PUT", body: { paidOn: "2026-10-27" } }), routeParams({ id, hitoId }))).status).toBe(404);
     expect((await getFile(apiRequest(token), routeParams({ id, hitoId, kind: "invoice" }))).status).toBe(404);
   });
 });

@@ -40,6 +40,7 @@ import {
 import { savePlanAction } from "../../../../actions/obra";
 import FormError from "../../../components/FormError";
 import AcceptDialog, { type AcceptInput } from "../components/budget/AcceptDialog";
+import AcceptedBanner from "../components/budget/AcceptedBanner";
 import BudgetFrame from "../components/budget/BudgetFrame";
 import { budgetHref, type BudgetTab } from "../components/budget/links";
 import ChapterSummary from "../components/budget/ChapterSummary";
@@ -156,10 +157,10 @@ export default function BudgetScreen({ projectId, projectRef, site, clientName, 
   }
   if (revision.status === "accepted") {
     banner = (
-      <p className="rounded-[14px] border border-good/30 bg-good-soft px-4 py-3 text-sm">
-        <b>{t("acceptedBanner", { date: revision.acceptedOn ? f.date(revision.acceptedOn) : "—" })}</b>
-        {revision.acceptedBy && ` ${t("acceptedBy", { by: revision.acceptedBy })}`}
-      </p>
+      <AcceptedBanner
+        revision={revision}
+        signedHref={revision.signedDocumentId && `/api/v1/projects/${projectId}/documents/${revision.signedDocumentId}`}
+      />
     );
   } else if (revision.status === "rejected") {
     banner = (

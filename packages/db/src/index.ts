@@ -29,6 +29,7 @@ export {
   obraChapterProgress,
   obraProgressEvents,
   obraInvoiceRequests,
+  obraHitoEvents,
   obraIssues,
   obraIssueFiles,
   budgetGenerations,

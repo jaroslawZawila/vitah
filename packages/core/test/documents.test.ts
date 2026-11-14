@@ -433,7 +433,8 @@ describe("budget inputs", () => {
 describe("deleteProject", () => {
   it("also deletes the project's stored files", async () => {
     const { project, ctx } = await setup();
-    await upload(ctx, project.id);
+    // Not a contract: a project holding one can't be deleted.
+    await upload(ctx, project.id, { title: "Planos", category: "plans" });
     const other = await setup();
     await upload(other.ctx, other.project.id);
 

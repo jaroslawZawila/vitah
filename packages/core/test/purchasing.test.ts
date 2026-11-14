@@ -38,7 +38,7 @@ async function setup(role: Ctx["role"] = "manager") {
     completionDate: new Date("2027-03-31T00:00:00Z"),
   });
   const { revisionId } = await framerDraft(admin, project.id, ["01", "02", "03"]);
-  await budgetService.acceptRevision(admin, project.id, revisionId);
+  await budgetService.acceptRevision(admin, project.id, revisionId, {}, { unissued: true });
   const { id: subcontractorId } = await subcontractorsService.createSubcontractor(admin, company());
   const { id: supplierId } = await subcontractorsService.createSubcontractor(
     admin,
@@ -339,7 +339,7 @@ describe("listPurchases", () => {
     const s = await setup();
     const other = await createTestProject(s.tenant.id);
     const { revisionId } = await framerDraft(s.admin, other.id, ["01"]);
-    await budgetService.acceptRevision(s.admin, other.id, revisionId);
+    await budgetService.acceptRevision(s.admin, other.id, revisionId, {}, { unissued: true });
     const otherLine = (await svc.getPurchaseForm(s.ctx, other.id)).chapters[0]!.lines[0]!.lineageId;
 
     await svc.createPurchase(s.ctx, s.project.id, material(s, { status: "ordered", expectedOn: "2026-10-10" }));

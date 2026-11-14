@@ -126,7 +126,9 @@
         "not_found": "Proyecto no encontrado.",
         "forbidden": "No tienes permiso para cambiar este proyecto.",
         "dates_out_of_order": "La fecha de finalización no puede ser anterior a la de inicio.",
-        "too_long": "El texto es demasiado largo."
+        "too_long": "El texto es demasiado largo.",
+        "project_has_records": "Este proyecto ya tiene registros que deben conservarse (presupuesto emitido, contrato, pedidos, facturas, actas, cobros, incidencias o subcontratas). No se puede eliminar.",
+        "generic": "No se ha podido completar la operación. Inténtalo de nuevo."
       }
     },
     "clientAccess": {
@@ -506,7 +508,21 @@
       "moment": "Momento de facturación",
       "save": "Guardar",
       "saving": "Guardando…",
-      "stepsLabel": "Estado del hito"
+      "stepsLabel": "Estado del hito",
+      "history": {
+        "title": "Historial",
+        "hint": "Cada registro, corrección y anulación queda guardado: qué había antes, quién y cuándo.",
+        "empty": "Todavía no hay nada registrado.",
+        "actaUploaded": "Acta firmada subida: firmada el {date} ({size})",
+        "actaReplaced": "Acta firmada sustituida: firmada el {date} ({size}). Antes: firmada el {previousDate} ({previousSize})",
+        "actaRemoved": "Acta firmada quitada: firmada el {date} ({size})",
+        "invoiceUploaded": "Factura subida: emitida el {date} ({size})",
+        "invoiceReplaced": "Factura sustituida: emitida el {date} ({size}). Antes: emitida el {previousDate} ({previousSize})",
+        "invoiceRemoved": "Factura quitada: emitida el {date} ({size})",
+        "paymentRegistered": "Pago registrado: {amount}, cobrado el {date}",
+        "paymentCorrected": "Pago corregido: {amount}, cobrado el {date}. Antes: {previousAmount}, cobrado el {previousDate}",
+        "paymentCancelled": "Pago anulado: {amount}, cobrado el {date}"
+      }
     },
     "errors": {
       "missing_fields": "Rellena los campos obligatorios.",
@@ -1367,6 +1383,9 @@
     "acceptButton": "Registrar aceptación",
     "acceptedBanner": "Aceptada el {date}: es el contrato.",
     "acceptedBy": "Aceptada por {by}.",
+    "acceptedRegistered": "Registrado por {user} el {date}.",
+    "acceptedSigned": "Copia firmada",
+    "acceptedUnsigned": "Sin copia firmada",
     "rejectedBanner": "El cliente la rechazó el {date}. Crea una revisión nueva con sus cambios.",
     "form": {
       "name": "Nombre",
@@ -1669,6 +1688,7 @@
     "accept": {
       "title": "Registrar la aceptación de la Rev.{number}",
       "acceptedOn": "Fecha de aceptación",
+      "acceptedOnHint": "Entre el día de emisión ({issued}) y hoy.",
       "acceptedBy": "Aceptado por",
       "options": "¿Qué opciones ha elegido el cliente?",
       "kinds": {
@@ -2921,6 +2941,8 @@
       "lineAmount": "Importe de {code}: {from} → {to}",
       "lineCloses": "{code} ahora cierra la partida",
       "lineReopens": "{code} ya no cierra la partida",
+      "scheduleRaised": "Calendario de pagos: nuevo hito de {amount} €",
+      "scheduleCut": "Calendario de pagos: {amount} € menos en los últimos hitos sin facturar",
       "fileAdded": "Documento añadido: {name}",
       "fileRemoved": "Documento quitado: {name}",
       "invoiceCreated": "Factura {number} registrada, {amount} €",
@@ -3111,6 +3133,7 @@
       "has_payments": "La factura ya tiene pagos: no se pueden cambiar sus importes ni eliminarla.",
       "duplicate_number": "Ese proveedor ya tiene una factura con ese número.",
       "milestones_mismatch": "Los hitos deben sumar el importe del pedido.",
+      "milestones_cut": "El calendario de pagos no puede absorber la bajada: los hitos ya facturados suman más que el nuevo importe.",
       "exceeds_amount": "El importe supera lo que queda por pagar o por abonar.",
       "request_not_approved": "La solicitud ya no está aprobada (se ha pedido o cancelado mientras tanto). Vuelve a ella para ver qué ha pasado.",
       "no_changes": "El modificado no cambia ninguna partida: cambia un importe, añade o quita una partida, o cambia si la cierra.",

@@ -103,6 +103,10 @@ describe("budget actions", () => {
     expect(await updateOptionAction(project.id, garage!.id, { name: "Puerta de garaje" })).toEqual({ success: true });
     expect(revalidatePath).toHaveBeenCalledWith(`/dashboard/projects/${project.id}`, "layout");
 
+    // Still a draft, never sent to the client: it can't be accepted from the portal.
+    expect(await acceptRevisionAction(project.id, draft.id, new FormData())).toEqual({ error: "not_issued" });
+    expect((await revision(project.id)).status).toBe("draft");
+
     expect(await issueRevisionAction(project.id, draft.id, { issuedOn: "2026-10-01", validUntil: "2026-10-31" })).toEqual({ success: true });
     current = await revision(project.id);
     expect(current).toMatchObject({ status: "issued", issuedOn: "2026-10-01", validUntil: "2026-10-31" });
@@ -115,15 +119,23 @@ describe("budget actions", () => {
     );
 
     const form = new FormData();
-    form.set("acceptedOn", "2026-10-05");
     form.set("acceptedBy", "Ana");
     form.append("chosenOptionIds", garage!.id);
     form.set("signed", new File(["%PDF-1.7 firmado"], "firmado.pdf", { type: "application/pdf" }));
+    // Accepted between the day it was issued and today.
+    for (const acceptedOn of ["2026-09-30", "2999-01-01"]) {
+      form.set("acceptedOn", acceptedOn);
+      expect(await acceptRevisionAction(project.id, draft.id, form)).toEqual({ error: "invalid_date" });
+    }
+    form.set("acceptedOn", "2026-10-05");
     expect(await acceptRevisionAction(project.id, draft.id, form)).toEqual({ success: true });
     current = await revision(project.id);
-    expect(current).toMatchObject({ status: "accepted", acceptedBy: "Ana", contractTotalCents: current.totalCents + 320_651 });
-    // The signed copy is filed with the contracts.
-    expect((await getProjectDocuments(project.id)).documents.find((d) => d.category === "contract")).toMatchObject({ title: "Presupuesto 041/2026 · Rev.0 · firmado" });
+    expect(current).toMatchObject({ status: "accepted", acceptedOn: "2026-10-05", acceptedBy: "Ana", contractTotalCents: current.totalCents + 320_651 });
+    // Registered by the signed-in user, with the signed copy filed with the contracts.
+    expect(current.acceptedByUser).toMatchObject({ id: ctx.userId });
+    const contract = (await getProjectDocuments(project.id)).documents.find((d) => d.category === "contract")!;
+    expect(contract).toMatchObject({ title: "Presupuesto 041/2026 · Rev.0 · firmado" });
+    expect(current.signedDocumentId).toBe(contract.id);
 
     expect(await createRevisionAction(project.id)).toEqual({ success: true });
     const budget = (await getProjectBudget(project.id))!.budget;

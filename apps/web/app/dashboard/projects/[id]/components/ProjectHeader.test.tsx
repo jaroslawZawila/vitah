@@ -121,6 +121,24 @@ describe("ProjectHeader", () => {
     );
   });
 
+  it.each([
+    [
+      "project_has_records",
+      "Este proyecto ya tiene registros que deben conservarse (presupuesto emitido, contrato, pedidos, facturas, actas, cobros, incidencias o subcontratas). No se puede eliminar.",
+    ],
+    ["some_new_code", "No se ha podido completar la operación. Inténtalo de nuevo."],
+  ])("stays on the project and explains when the delete answers %s", async (error, message) => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    vi.mocked(deleteProject).mockResolvedValue({ error });
+    renderHeader();
+
+    await userEvent.click(screen.getByRole("button", { name: "Editar" }));
+    await userEvent.click(screen.getByRole("button", { name: "Eliminar proyecto" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(message);
+    expect(router.push).not.toHaveBeenCalled();
+  });
+
   it("does not delete when the confirmation is cancelled", async () => {
     vi.spyOn(window, "confirm").mockReturnValue(false);
     renderHeader();

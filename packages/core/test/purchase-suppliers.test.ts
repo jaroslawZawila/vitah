@@ -38,7 +38,7 @@ async function setup(role: Ctx["role"] = "manager") {
     completionDate: new Date("2027-03-31T00:00:00Z"),
   });
   const { revisionId } = await framerDraft(admin, project.id, ["01", "02", "03"]);
-  await budgetService.acceptRevision(admin, project.id, revisionId);
+  await budgetService.acceptRevision(admin, project.id, revisionId, {}, { unissued: true });
   const { id: subcontractorId } = await subcontractorsService.createSubcontractor(admin, company());
   const { id: supplierId } = await subcontractorsService.createSubcontractor(
     admin,

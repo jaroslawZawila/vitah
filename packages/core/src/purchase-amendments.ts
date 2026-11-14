@@ -1,12 +1,11 @@
-import { and, asc, db, eq, inArray, isNotNull, max, purchaseInvoices, purchaseOrderAmendments, purchaseOrderMilestones, purchaseOrders } from "@repo/db";
+import { db, eq, max, purchaseOrderAmendments, purchaseOrders } from "@repo/db";
 import { requireEditor, type Ctx } from "./context";
 import { canAmend } from "./contract";
 import { requirePdf } from "./documents";
 import { fail, optionalText, requiredText, workDate } from "./obra-data";
 import { todayInSpain } from "./obra-calc";
 import { addOrderDocument } from "./purchase-documents";
-import { MAX_DESCRIPTION, contractLines, logEvent, parseLines, replaceOrderLines, requireOrder } from "./purchasing";
-import type { Tx } from "./project-client";
+import { MAX_DESCRIPTION, contractLines, followSchedule, logEvent, parseLines, replaceOrderLines, requireOrder } from "./purchasing";
 
 // ─── An order's modificados (formal amendments) ──────────────────────────────
 // A placed order changes formally by a modificado: numbered per order, signed
@@ -19,44 +18,8 @@ import type { Tx } from "./project-client";
 // ─────────────────────────────────────────────────────────────────────────────
 
 const MAX_TITLE = 200;
-const MAX_CONCEPT = 200;
 
 const sum = (lines: { amountCents: number }[]) => lines.reduce((total, l) => total + l.amountCents, 0);
-
-/**
- * The order's payment schedule, if any, follows a change of `deltaCents`: a
- * rise is a milestone of its own (`concept`), a cut comes off the last
- * milestones with no invoice; `milestones_mismatch` if those can't take it.
- */
-async function followSchedule(tx: Tx, ctx: Ctx, orderId: string, deltaCents: number, concept: string) {
-  if (deltaCents === 0) return;
-  const milestones = await tx
-    .select()
-    .from(purchaseOrderMilestones)
-    .where(eq(purchaseOrderMilestones.orderId, orderId))
-    .orderBy(asc(purchaseOrderMilestones.position));
-  if (milestones.length === 0) return;
-  if (deltaCents > 0) {
-    const position = Math.max(...milestones.map((m) => m.position)) + 1;
-    await tx.insert(purchaseOrderMilestones).values({ tenantId: ctx.tenantId, orderId, position, concept: concept.slice(0, MAX_CONCEPT), amountCents: deltaCents });
-    return;
-  }
-  const invoiced = await tx
-    .selectDistinct({ milestoneId: purchaseInvoices.milestoneId })
-    .from(purchaseInvoices)
-    .where(and(eq(purchaseInvoices.orderId, orderId), isNotNull(purchaseInvoices.milestoneId), inArray(purchaseInvoices.milestoneId, milestones.map((m) => m.id))));
-  const locked = new Set(invoiced.map((i) => i.milestoneId));
-  let left = -deltaCents;
-  for (const milestone of [...milestones].reverse()) {
-    if (left === 0) break;
-    if (locked.has(milestone.id)) continue;
-    const taken = Math.min(left, milestone.amountCents);
-    left -= taken;
-    if (taken === milestone.amountCents) await tx.delete(purchaseOrderMilestones).where(eq(purchaseOrderMilestones.id, milestone.id));
-    else await tx.update(purchaseOrderMilestones).set({ amountCents: milestone.amountCents - taken }).where(eq(purchaseOrderMilestones.id, milestone.id));
-  }
-  if (left > 0) fail("milestones_mismatch");
-}
 
 /**
  * Body: { concept, lines: [{ lineageId, amountCents, closesLine? }] (all of

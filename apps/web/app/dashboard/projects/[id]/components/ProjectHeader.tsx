@@ -58,7 +58,11 @@ export default function ProjectHeader({
   function handleDelete() {
     if (!confirm(t("confirmDelete"))) return;
     startTransition(async () => {
-      await deleteProject(project.id);
+      const result = await deleteProject(project.id);
+      if (result?.error) {
+        setError(result.error);
+        return;
+      }
       router.push("/dashboard/projects");
     });
   }
@@ -94,7 +98,7 @@ export default function ProjectHeader({
         </Field>
         {error && (
           <FormMessage role="alert" className="sm:col-span-2">
-            {t(`errors.${error}`)}
+            {t.has(`errors.${error}`) ? t(`errors.${error}`) : t("errors.generic")}
           </FormMessage>
         )}
         <div className="flex flex-wrap items-center justify-end gap-2 sm:col-span-2">

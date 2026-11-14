@@ -42,7 +42,7 @@ async function setup() {
   const project = await createTestProject(tenant.id, { clientUserId: client.id });
   const ctx: Ctx = { tenantId: tenant.id, userId: user.id, role: "admin" };
   const { revisionId } = await framerDraft(ctx, project.id, ["01", "02"]);
-  await budgetService.acceptRevision(ctx, project.id, revisionId);
+  await budgetService.acceptRevision(ctx, project.id, revisionId, {}, { unissued: true });
   const hitos = await hitosService.listHitos(ctx, project.id);
   const hito = hitos.find((h) => h.code === "H2")!;
   return { tenant, client, project, ctx, hito };
@@ -192,7 +192,7 @@ const cases: Case[] = [
     ["obra"],
     async ({ ctx, project }) => {
       const { revisionId } = await budgetService.createRevision(ctx, project.id);
-      return () => budgetService.acceptRevision(ctx, project.id, revisionId);
+      return () => budgetService.acceptRevision(ctx, project.id, revisionId, {}, { unissued: true });
     },
   ],
   [

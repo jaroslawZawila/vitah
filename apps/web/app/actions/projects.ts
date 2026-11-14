@@ -73,8 +73,12 @@ export async function updateProject(id: string, data: Record<string, unknown>) {
   });
 }
 
+/** `project_has_records` when the project holds records that must be kept. */
 export async function deleteProject(id: string) {
   const ctx = await requireAuth();
-  await svc.deleteProject(ctx, id);
-  revalidatePath("/dashboard/projects");
+  return formResult(async () => {
+    await svc.deleteProject(ctx, id);
+    revalidatePath("/dashboard/projects");
+    return { success: true };
+  });
 }

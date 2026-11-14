@@ -1,10 +1,27 @@
-import { db, projects, eq, and, desc } from "@repo/db";
+import {
+  and,
+  budgetRevisions,
+  db,
+  desc,
+  eq,
+  inArray,
+  obraChapterProgress,
+  obraHitoEvents,
+  obraHitos,
+  obraIssues,
+  projectDocuments,
+  projects,
+  purchaseInvoices,
+  purchaseOrders,
+  sql,
+  subcontractorAssignments,
+} from "@repo/db";
 import { fromCalendarDate, isCalendarDate } from "./calendar";
 import { markChanged } from "./changes";
 import { requireAdmin, requireEditor, type Ctx } from "./context";
-import { invalid, notFound } from "./errors";
+import { CoreError, invalid, notFound } from "./errors";
 import { MAX_TEXT, text } from "./input";
-import { projectInTenant, requireAssignableClient } from "./project-client";
+import { projectInTenant, requireAssignableClient, type Tx } from "./project-client";
 import { projectFolder } from "./project-files";
 import { deleteFolder } from "./storage";
 
@@ -153,14 +170,122 @@ export async function updateProject(ctx: Ctx, id: string, input: Record<string, 
   return { projectId: id };
 }
 
-/** Deletes the project, its rows (cascade) and its stored files. Admin only. */
+/**
+ * Whether the project holds records the company must keep: a budget that left
+ * draft, a placed order or a supplier's invoice, a hito's acta, invoice or
+ * payment (or the history of one since undone), works recorded as started, a
+ * contract among its documents, an incident or change logged, or a
+ * subcontractor assigned to it (its entry in the Libro de Subcontratación). The rows are locked as they are read
+ * (and compared here, not in SQL), so a budget being issued, an order being
+ * placed or a payment being recorded waits for the delete and then finds nothing.
+ */
+async function hasRecordsToKeep(tx: Tx, projectId: string): Promise<boolean> {
+  const revisions = await tx
+    .select({ status: budgetRevisions.status })
+    .from(budgetRevisions)
+    .where(eq(budgetRevisions.projectId, projectId))
+    .for("update");
+  if (revisions.some((r) => r.status !== "draft")) return true;
+
+  const orders = await tx
+    .select({ id: purchaseOrders.id, status: purchaseOrders.status })
+    .from(purchaseOrders)
+    .where(eq(purchaseOrders.projectId, projectId))
+    .for("update");
+  if (orders.some((o) => o.status !== "pending" && o.status !== "cancelled")) return true;
+  if (orders.length > 0) {
+    const [invoice] = await tx
+      .select({ id: purchaseInvoices.id })
+      .from(purchaseInvoices)
+      .where(inArray(purchaseInvoices.orderId, orders.map((o) => o.id)))
+      .limit(1);
+    if (invoice) return true;
+  }
+
+  const hitos = await tx
+    .select({
+      id: obraHitos.id,
+      actaPathname: obraHitos.actaPathname,
+      invoicePathname: obraHitos.invoicePathname,
+      paidOn: obraHitos.paidOn,
+    })
+    .from(obraHitos)
+    .where(eq(obraHitos.projectId, projectId))
+    .for("update");
+  if (hitos.some((h) => h.actaPathname || h.invoicePathname || h.paidOn)) return true;
+  // Their history too: a payment registered and then cancelled is only there.
+  if (hitos.length > 0) {
+    const [event] = await tx
+      .select({ id: obraHitoEvents.id })
+      .from(obraHitoEvents)
+      .where(inArray(obraHitoEvents.hitoId, hitos.map((h) => h.id)))
+      .limit(1);
+    if (event) return true;
+  }
+
+  // Nothing to lock below: each is there or it isn't, and a new one needs the
+  // project's row, which the delete holds.
+  const [[progress], [contract], [issue], [assignment]] = await Promise.all([
+    tx
+      .select({ id: obraChapterProgress.id })
+      .from(obraChapterProgress)
+      .where(eq(obraChapterProgress.projectId, projectId))
+      .limit(1),
+    tx
+      .select({ id: projectDocuments.id })
+      .from(projectDocuments)
+      .where(and(eq(projectDocuments.projectId, projectId), eq(projectDocuments.category, "contract")))
+      .limit(1),
+    tx.select({ id: obraIssues.id }).from(obraIssues).where(eq(obraIssues.projectId, projectId)).limit(1),
+    tx
+      .select({ id: subcontractorAssignments.id })
+      .from(subcontractorAssignments)
+      .where(eq(subcontractorAssignments.projectId, projectId))
+      .limit(1),
+  ]);
+  return Boolean(progress || contract || issue || assignment);
+}
+
+/** Postgres gave up on a lock: it wasn't free in time (55P03), or waiting for it would deadlock (40P01). */
+function isLockFailure(error: unknown): boolean {
+  // Drizzle wraps driver errors, keeping the original as `cause`.
+  return [error, (error as { cause?: unknown } | null)?.cause].some(
+    (e) => typeof e === "object" && e !== null && ["55P03", "40P01"].includes((e as { code?: string }).code ?? ""),
+  );
+}
+
+/**
+ * Deletes the project, its rows (cascade) and its stored files. Admin only,
+ * and only while nothing has been issued, contracted, invoiced or collected:
+ * `project_has_records` otherwise.
+ */
 export async function deleteProject(ctx: Ctx, id: string) {
   requireAdmin(ctx);
-  const deleted = await db
-    .delete(projects)
-    .where(and(eq(projects.id, id), eq(projects.tenantId, ctx.tenantId)))
-    .returning({ id: projects.id });
-  if (deleted.length === 0) throw notFound();
+  const attempt = () =>
+    db.transaction(async (tx) => {
+      // A write to the project in flight locks its own row first and then, through
+      // its foreign key, the project's: this goes the other way round, so it gives
+      // up soon rather than deadlock with it.
+      await tx.execute(sql`set local lock_timeout = '500ms'`);
+      // Locked, so nothing new can be attached to the project meanwhile.
+      const [project] = await tx
+        .select({ id: projects.id })
+        .from(projects)
+        .where(projectInTenant(ctx.tenantId, id))
+        .for("update");
+      if (!project) throw notFound();
+      if (await hasRecordsToKeep(tx, id)) throw new CoreError("project_has_records", 409);
+      await tx.delete(projects).where(eq(projects.id, id));
+    });
+  try {
+    await attempt();
+  } catch (error) {
+    if (!isLockFailure(error)) throw error;
+    // Once more: that write is in by now, and what it wrote is usually a record to keep.
+    await attempt().catch((again: unknown) => {
+      throw isLockFailure(again) ? new CoreError("project_has_records", 409) : again;
+    });
+  }
 
   // The project is gone either way; a failure here only leaves orphaned files.
   await deleteFolder(projectFolder(ctx.tenantId, id)).catch((error: unknown) => {

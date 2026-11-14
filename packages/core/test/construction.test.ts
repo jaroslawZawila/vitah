@@ -30,7 +30,7 @@ async function setup(role: Ctx["role"] = "manager") {
   });
   const admin: Ctx = { tenantId: tenant.id, userId: (await createTestUser(tenant.id, { role: "admin" })).id, role: "admin" };
   const { revisionId } = await framerDraft(admin, project.id, ["01", "02", "03"]);
-  await budgetService.acceptRevision(admin, project.id, revisionId);
+  await budgetService.acceptRevision(admin, project.id, revisionId, {}, { unissued: true });
   const ctx: Ctx = { tenantId: tenant.id, userId: user.id, role };
   return { tenant, project, ctx, admin, revisionId };
 }
@@ -328,7 +328,7 @@ describe("budget revisions", () => {
     const ch = (code: string) => revision!.chapters.find((c) => c.code === code)!;
     await budgetService.deleteLine(admin, project.id, ch("03").lines[0]!.id);
     await budgetService.addLine(admin, project.id, ch("04").id, { code: "04.01", description: "Tabiquería", unit: "m²", quantity: 1, unitPriceCents: 100_000 });
-    await budgetService.acceptRevision(admin, project.id, revisionId);
+    await budgetService.acceptRevision(admin, project.id, revisionId, {}, { unissued: true });
 
     const control = await svc.getControl(ctx, project.id);
     expect(control.chapters.map((c) => [c.code, c.added])).toEqual([

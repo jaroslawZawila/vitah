@@ -5,7 +5,7 @@
 
 import { useActionState, useState } from "react";
 import { useTranslations } from "next-intl";
-import type { Hito, HitoFileKind, ProjectPhoto } from "@repo/core/contract";
+import type { Hito, HitoEvent, HitoFileKind, ProjectPhoto } from "@repo/core/contract";
 import {
   addCheckAction,
   cancelPaymentAction,
@@ -28,6 +28,7 @@ import {
   HitoConditions,
   HitoFileCard,
   HitoFileForm,
+  HitoHistory,
   HitoNotes,
   HitoSteps,
   PaymentCard,
@@ -41,17 +42,23 @@ import BackLink from "../../../../components/BackLink";
 
 type Dialog = "photos" | "edit" | HitoFileKind;
 
-/** A payment hito: its conditions, the signed acta, the invoice and the payment. */
+/** A payment hito: its conditions, the signed acta, the invoice, the payment and their history. */
 export default function HitoScreen({
   projectId,
   projectRef,
   hito,
+  events,
+  today,
   photos,
   canManage,
 }: {
   projectId: string;
   projectRef: string;
   hito: Hito;
+  /** What was registered, corrected and cancelled on the hito, newest first. */
+  events: HitoEvent[];
+  /** Today in Spain. */
+  today: string;
   /** The project's photos, to pick the acta's from. */
   photos: ProjectPhoto[];
   canManage: boolean;
@@ -145,11 +152,13 @@ export default function HitoScreen({
           >
             {hito.dueOn && <span className={muted}>{t("dueNote", { date: f.date(hito.dueOn) })}</span>}
           </HitoFileCard>
+          <HitoHistory events={events} />
         </div>
 
         <aside className="flex min-w-0 flex-col gap-5">
           <PaymentCard
             hito={hito}
+            today={today}
             pending={pending}
             onPay={editor((paidOn: string, amount: string) =>
               run(() =>

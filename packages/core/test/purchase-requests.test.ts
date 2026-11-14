@@ -35,7 +35,7 @@ async function setup(role: Ctx["role"] = "manager") {
   const ctx: Ctx = { tenantId: tenant.id, userId: user.id, role };
   const project = await createTestProject(tenant.id);
   const { revisionId } = await framerDraft(admin, project.id, ["01", "02", "03"]);
-  await budgetService.acceptRevision(admin, project.id, revisionId);
+  await budgetService.acceptRevision(admin, project.id, revisionId, {}, { unissued: true });
   const { id: subcontractorId } = await subcontractorsService.createSubcontractor(admin, company());
   const { id: supplierId } = await subcontractorsService.createSubcontractor(
     admin,
@@ -272,7 +272,7 @@ describe("purchase requests", () => {
     // Another project's request doesn't become this project's order.
     const second = await createTestProject(s.tenant.id);
     const { revisionId } = await framerDraft(s.admin, second.id, ["01"]);
-    await budgetService.acceptRevision(s.admin, second.id, revisionId);
+    await budgetService.acceptRevision(s.admin, second.id, revisionId, {}, { unissued: true });
     const form = await purchasingService.getPurchaseForm(s.admin, second.id);
     await expect(
       purchasingService.createPurchase(s.ctx, second.id, orderOf(s, requestId, { lines: [{ lineageId: form.chapters[0]!.lines[0]!.lineageId, amountCents: 1_000 }] })),

@@ -3,6 +3,7 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import english from "../../../../../../messages/en.json";
 import messages from "../../../../../../messages/es.json";
 import type { PurchaseDocumentCheck } from "@repo/core/contract";
 import { orderDetail } from "../../../../../../test/purchasing-fixture";
@@ -80,6 +81,17 @@ describe("OrderScreen", () => {
     expect(history.getByText("Importe de 06.05: 3050,00 → 3120,00")).toBeInTheDocument();
     expect(history.getByText(/Portes incluidos/)).toBeInTheDocument();
     expect(history.getByText("Creado con 1 partida, 3050,00 €")).toBeInTheDocument();
+  });
+
+  it("tells in the history when an edit took the payment schedule with it", () => {
+    const [, lines] = orderDetail.events;
+    const edited = (id: string, scheduleDeltaCents: number) => ({ ...lines!, id, detail: { ...lines!.detail, scheduleDeltaCents } });
+    renderScreen({ order: { ...orderDetail, events: [edited("ev-8", -4_000), edited("ev-7", 7_000)] } });
+    const history = within(screen.getByRole("region", { name: "Historial" }));
+    expect(history.getAllByText("Importe de 06.05: 3050,00 → 3120,00")).toHaveLength(2);
+    expect(history.getByText(/Calendario de pagos: nuevo hito de 70,00 €/)).toBeInTheDocument();
+    expect(history.getByText(/Calendario de pagos: 40,00 € menos en los últimos hitos sin facturar/)).toBeInTheDocument();
+    expect(english.purchasing.history).toMatchObject({ scheduleRaised: expect.any(String), scheduleCut: expect.any(String) });
   });
 
   it("records the delivery with its day and a note", async () => {

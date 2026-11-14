@@ -2,7 +2,9 @@ import { budgetService } from "@repo/core";
 import { readOptionalJson, withContext } from "../../../../../../../../../lib/api";
 
 // POST { acceptedOn?, acceptedBy?, chosenOptionIds? } (all optional): the
-// issued revision (or a draft, as before issuing existed) becomes the contract.
+// issued revision becomes the contract, registered by the caller. `acceptedOn`
+// is between the day it was issued and today (`invalid_date`); a draft, never
+// sent to the client, is refused (`not_issued`).
 
 type Params = { params: Promise<{ id: string; revisionId: string }> };
 

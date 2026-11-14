@@ -3,6 +3,7 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import english from "../../../../../messages/en.json";
 import messages from "../../../../../messages/es.json";
 import { editForm, purchaseForm } from "../../../../../test/purchasing-fixture";
 import OrderFormScreen from "./OrderFormScreen";
@@ -221,6 +222,17 @@ describe("OrderFormScreen", () => {
       }),
     );
     expect(router.push).toHaveBeenCalledWith("/dashboard/projects/p-1/compras/order-49");
+  });
+
+  it("says so when the payment schedule can't take an edit's cut", async () => {
+    vi.mocked(actions.updatePurchaseAction).mockResolvedValue({ error: "milestones_cut" });
+    renderScreen({ form: editForm, chapter: undefined });
+    await userEvent.click(screen.getByRole("button", { name: "Guardar cambios" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "El calendario de pagos no puede absorber la bajada: los hitos ya facturados suman más que el nuevo importe.",
+    );
+    expect(router.push).not.toHaveBeenCalled();
+    expect(english.purchasing.errors.milestones_cut).toMatch(/payment schedule can't take the cut/);
   });
 });
 

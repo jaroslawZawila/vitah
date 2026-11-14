@@ -413,6 +413,16 @@ export const budgetRevisions = pgTable(
     validUntil: date("valid_until", { mode: "string" }),
     acceptedOn: date("accepted_on", { mode: "string" }),
     acceptedBy: text("accepted_by"),
+    // The staff user who registered the acceptance (`acceptedBy` is the client's
+    // name as typed), and the client's signed copy filed with the documents.
+    // Both null on revisions accepted before they were kept.
+    acceptedByUserId: text("accepted_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    acceptedDocumentId: text("accepted_document_id").references(
+      (): AnyPgColumn => projectDocuments.id,
+      { onDelete: "set null" },
+    ),
     rejectedOn: date("rejected_on", { mode: "string" }),
     // The AI run that drafted it (Rev.0).
     generationId: text("generation_id"),
@@ -710,6 +720,45 @@ export const obraInvoiceRequests = pgTable("obra_invoice_requests", {
   requestedById: text("requested_by_id").references(() => users.id, { onDelete: "set null" }),
   requestedAt: timestamp("requested_at", { mode: "date" }).defaultNow().notNull(),
 });
+
+// Every change to a hito's collection from the client: its acta and invoice
+// uploaded, replaced or removed, its payment registered, corrected or
+// cancelled, with what was there before. Append-only: rows are never updated
+// or deleted (a replaced or removed PDF stays in storage, its pathname here).
+export const obraHitoEvents = pgTable(
+  "obra_hito_events",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    hitoId: text("hito_id")
+      .notNull()
+      .references(() => obraHitos.id, { onDelete: "cascade" }),
+    userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
+    action: text("action")
+      .$type<
+        | "acta_uploaded"
+        | "acta_removed"
+        | "invoice_uploaded"
+        | "invoice_removed"
+        | "payment_registered"
+        | "payment_cancelled"
+      >()
+      .notNull(),
+    detail: jsonb("detail").$type<Record<string, unknown>>().default({}).notNull(),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => ({
+    hitoIdx: index("obra_hito_events_hito_idx").on(table.hitoId),
+    tenantIdx: index("obra_hito_events_tenant_idx").on(table.tenantId),
+  }),
+);
 
 // A problem during the works (issue) or a difference from what was planned (change).
 export const obraIssues = pgTable(

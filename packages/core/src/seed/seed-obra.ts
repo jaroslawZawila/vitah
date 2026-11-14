@@ -89,7 +89,10 @@ export async function seedBudget(ctx: Ctx, projectId: string, { accept = true } 
   await hitos.updatePlan(ctx, projectId, {
     hitos: CAVIEDES_BUDGET.hitos.map(({ code, ...values }) => ({ id: plan.find((h) => h.code === code)!.id, ...values })),
   });
-  if (accept) await budget.acceptRevision(ctx, projectId, revisionId, { acceptedOn: "2026-01-15", acceptedBy: "D. Fernando Barcenilla" });
+  // The contract was signed on paper before the platform: it was never issued from here.
+  if (accept) {
+    await budget.acceptRevision(ctx, projectId, revisionId, { acceptedOn: "2026-01-15", acceptedBy: "D. Fernando Barcenilla" }, { unissued: true });
+  }
   return { revisionId };
 }
 
