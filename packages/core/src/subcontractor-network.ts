@@ -10,6 +10,7 @@ import {
   inArray,
   isNotNull,
   isNull,
+  ne,
   or,
   projects,
   sql,
@@ -251,7 +252,12 @@ export const liveDocument = (tenantId: string) =>
       )})`,
   );
 
-/** Each document's latest version (or latest validated one), keyed by document id. */
+/**
+ * Each document's latest version, keyed by document id. With `validatedOnly`,
+ * the latest validated one of the documents whose current version isn't: the
+ * only ones the rules look behind (a renewal uploaded early, or rejected),
+ * and a handful among thousands.
+ */
 async function latestVersions(tenantId: string, documentIds: string[] | undefined, validatedOnly: boolean) {
   if (documentIds?.length === 0) return new Map<string, VersionRow>();
   const v = subcontractorDocumentVersions;
@@ -262,7 +268,19 @@ async function latestVersions(tenantId: string, documentIds: string[] | undefine
       and(
         eq(v.tenantId, tenantId),
         documentIds ? inArray(v.documentId, documentIds) : undefined,
-        validatedOnly ? and(isNotNull(v.reviewedAt), isNull(v.rejectReason)) : undefined,
+        validatedOnly
+          ? and(
+              isNotNull(v.reviewedAt),
+              isNull(v.rejectReason),
+              inArray(
+                v.documentId,
+                db
+                  .select({ id: subcontractorDocuments.id })
+                  .from(subcontractorDocuments)
+                  .where(and(eq(subcontractorDocuments.tenantId, tenantId), ne(subcontractorDocuments.status, "validated"))),
+              ),
+            )
+          : undefined,
       ),
     )
     .orderBy(v.documentId, desc(v.version));
@@ -310,6 +328,40 @@ export async function loadNetwork(tenantId: string, subcontractorId?: string | s
     latestVersions(tenantId, ids, true),
   ]);
   return new Network(companies, workers, docs, versions, validated, assignments, projectRows, todayInSpain());
+}
+
+/**
+ * The companies (all, or a few) with only what their CAE status takes: their
+ * own documents, not their workers' nor their obras'. For Compras, which
+ * shows a supplier's status and nothing else of the network: a tenth of the
+ * rows `loadNetwork` reads.
+ */
+export async function loadCompanyStatuses(tenantId: string, subcontractorIds?: string[]): Promise<Pick<Network, "companies" | "status">> {
+  const only = (column: AnyColumn) => (subcontractorIds ? inArray(column, subcontractorIds) : undefined);
+  const [companies, docs] =
+    subcontractorIds?.length === 0
+      ? [[], []]
+      : await Promise.all([
+          db
+            .select()
+            .from(subcontractors)
+            .where(and(eq(subcontractors.tenantId, tenantId), only(subcontractors.id)))
+            .orderBy(asc(subcontractors.legalName)),
+          db
+            .select()
+            .from(subcontractorDocuments)
+            .where(
+              and(
+                eq(subcontractorDocuments.tenantId, tenantId),
+                only(subcontractorDocuments.subcontractorId),
+                isNull(subcontractorDocuments.workerId),
+                isNull(subcontractorDocuments.projectId),
+              ),
+            ),
+        ]);
+  const ids = docs.map((d) => d.id);
+  const [versions, validated] = await Promise.all([latestVersions(tenantId, ids, false), latestVersions(tenantId, ids, true)]);
+  return new Network(companies, [], docs, versions, validated, [], [], todayInSpain());
 }
 
 export type ProjectRow = { id: string; ref: string; address: string; obraStage: number };

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createTestTenant, createTestUser, resetDatabase } from "@repo/db/testing";
-import { purchasingService, subcontractorsService } from "@repo/core";
+import { purchaseInvoicesService, purchasingService, subcontractorsService } from "@repo/core";
 import { files } from "@repo/core/testing";
 import { apiRequest, routeParams, seededObraProject, staffToken } from "../../../../../test/api";
 import { GET as list } from "./route";
@@ -63,6 +63,70 @@ async function setup() {
   });
   return { tenant, project, orderId };
 }
+
+describe("/api/v1 supplier invoices, a page at a time", () => {
+  it("pages and filters invoices and payments, and without parameters answers as it always did", async () => {
+    const { tenant, project, orderId } = await setup();
+    const ctx = { tenantId: tenant.id, userId: (await createTestUser(tenant.id, { role: "admin" })).id, role: "admin" as const };
+    // Past due, due soon and paid: the order the list gives them.
+    const overdue = await purchaseInvoicesService.createInvoice(ctx, orderId, { number: "PL-1", issuedOn: "2026-09-01", baseCents: 100_000 });
+    const soon = await purchaseInvoicesService.createInvoice(ctx, orderId, { number: "PL-2", issuedOn: "2026-09-22", baseCents: 100_000 });
+    const paid = await purchaseInvoicesService.createInvoice(ctx, orderId, { number: "PL-3", issuedOn: "2026-10-01", baseCents: 10_000 });
+    await purchaseInvoicesService.createPayment(ctx, paid.invoiceId, { amountCents: 12_100, paidOn: "2026-10-05" });
+    await purchaseInvoicesService.createPayment(ctx, soon.invoiceId, { amountCents: 1_000, paidOn: "2026-10-10" });
+    const ids = [overdue.invoiceId, soon.invoiceId, paid.invoiceId];
+    const { token } = await staffToken(tenant.id, "viewer");
+    const get = async (route: typeof list, query = "") => {
+      const response = await route(apiRequest(token, { query }));
+      return { status: response.status, body: await response.json() };
+    };
+    const idsOf = (body: { invoices: { id: string }[] }) => body.invoices.map((i) => i.id);
+
+    // No parameters: every invoice, with the fields older clients read (and the new ones beside them).
+    const all = await get(list);
+    expect(idsOf(all.body)).toEqual(ids);
+    expect(Object.keys(all.body)).toEqual(expect.arrayContaining(["invoices", "projects", "summary", "today"]));
+    expect(all.body.summary).toMatchObject({ outstandingInvoices: 2, overdueInvoices: 1, paymentsThisMonth: 2 });
+    expect(all.body.paging).toEqual({ page: 1, limit: 5000, total: 3, pages: 1 });
+    expect(idsOf((await get(list, `?projectId=${project.id}`)).body)).toEqual(ids);
+    expect(idsOf((await get(list, "?projectId=nope")).body)).toEqual([]);
+
+    // A page at a time; the summary stays the whole list's.
+    const first = await get(list, "?page=1&limit=2");
+    expect(idsOf(first.body)).toEqual(ids.slice(0, 2));
+    expect(first.body.paging).toEqual({ page: 1, limit: 2, total: 3, pages: 2 });
+    expect(first.body.groupCounts).toEqual({ all: 3, open: 2, overdue: 1, paid: 1, credit: 0 });
+    expect(first.body.summary).toEqual(all.body.summary);
+    expect(idsOf((await get(list, "?page=2&limit=2")).body)).toEqual(ids.slice(2));
+    expect((await get(list, "?page=9")).body).toMatchObject({ invoices: [], paging: { page: 9, total: 3, pages: 1 } });
+    expect((await get(list, "?limit=1000000")).body.paging).toMatchObject({ limit: 200 });
+    expect(idsOf((await get(list, "?page=1&group=paid")).body)).toEqual([paid.invoiceId]);
+    expect(idsOf((await get(list, "?page=1&q=pl-2")).body)).toEqual([soon.invoiceId]);
+
+    const payments = await get(listPayments);
+    expect(payments.body.payments.map((p: { amountCents: number }) => p.amountCents)).toEqual([1_000, 12_100]);
+    expect(Object.keys(payments.body)).toEqual(expect.arrayContaining(["forecast", "payments", "summary", "today"]));
+    const second = await get(listPayments, "?page=2&limit=1");
+    expect(second.body.payments.map((p: { amountCents: number }) => p.amountCents)).toEqual([12_100]);
+    expect(second.body.paging).toEqual({ page: 2, limit: 1, total: 2, pages: 2 });
+    expect(second.body.summary).toEqual(payments.body.summary);
+    expect(second.body.forecast).toEqual(payments.body.forecast);
+
+    for (const route of [list, listPayments]) {
+      for (const query of ["?page=0", "?page=abc", "?limit=-2"]) {
+        expect(await get(route, query), query).toEqual({ status: 400, body: { error: "invalid_page" } });
+      }
+    }
+    expect(await get(list, "?group=nope")).toEqual({ status: 400, body: { error: "invalid_input" } });
+
+    // Another tenant pages through nothing.
+    const other = await createTestTenant();
+    const stranger = await staffToken(other.id);
+    expect(await (await list(apiRequest(stranger.token, { query: `?page=1&projectId=${project.id}` }))).json()).toMatchObject({ invoices: [], paging: { total: 0 } });
+    expect(await (await listPayments(apiRequest(stranger.token, { query: "?page=1" }))).json()).toMatchObject({ payments: [], paging: { total: 0 } });
+    expect((await list(apiRequest(null, { query: "?page=1" }))).status).toBe(401);
+  });
+});
 
 describe("/api/v1 supplier invoices", () => {
   it("registers an invoice with its PDF, pays it, versions it and lists it", async () => {

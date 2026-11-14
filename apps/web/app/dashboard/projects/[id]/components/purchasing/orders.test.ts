@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { orderItem, orders } from "../../../../../../test/purchasing-fixture";
-import { NO_ORDER_FILTER, bySupplier, contractedCents, filterOrders, groupCounts, orderGroup, toCsv } from "./orders";
+import { orders } from "../../../../../../test/purchasing-fixture";
+import { NO_ORDER_FILTER, contractedCents, filterOrders, groupCounts, orderGroup, toCsv } from "./orders";
 
 describe("Compras list rules", () => {
   it("groups orders as open, not sent, closed or cancelled", () => {
@@ -22,17 +22,6 @@ describe("Compras list rules", () => {
   it("filters by the pending order's creation day when it has no order date", () => {
     const filter = { ...NO_ORDER_FILTER, from: "2026-10-10" };
     expect(filterOrders(orders, filter).map((o) => o.number)).toEqual([56]);
-  });
-
-  it("groups by supplier, the most contracted first", () => {
-    const groups = bySupplier([...orders, orderItem({ id: "order-60", number: 60, projectRef: "VTH-26-003", amountCents: 100_000 })]);
-    expect(groups[0]).toMatchObject({ name: "Cubiertas Besaya", contractedCents: 1_986_000, openCents: 0 });
-    expect(groups.find((g) => g.name === "Piedra de Liébana")).toMatchObject({
-      orders: 2,
-      projectRefs: ["VTH-26-001", "VTH-26-003"],
-      contractedCents: 412_000,
-      openCents: 412_000,
-    });
   });
 
   it("writes CSV cells quoted only when they need it", () => {

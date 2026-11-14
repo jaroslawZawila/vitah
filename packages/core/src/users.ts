@@ -1,4 +1,4 @@
-import { db, users, and, eq, isStaffUser, STAFF_ROLES } from "@repo/db";
+import { db, users, userMfa, and, asc, eq, isStaffUser, sql, STAFF_ROLES } from "@repo/db";
 import {
   changeOwnPassword,
   EMAIL_PATTERN,
@@ -11,6 +11,7 @@ import { requireAdmin, type Ctx, type UserRole } from "./context";
 import { isAppLanguage } from "./contract";
 import { invalid, notFound } from "./errors";
 import { MAX_TEXT, text } from "./input";
+import { mfaTableMissing } from "./mfa";
 
 // Staff management within the caller's tenant. Admin only. Clients (mobile
 // app users) are managed from their project (./project-client.ts). Except
@@ -22,18 +23,21 @@ function role(value: unknown): UserRole | undefined {
 
 export async function listUsers(ctx: Ctx) {
   requireAdmin(ctx);
-  const staff = await db.query.users.findMany({
-    where: and(eq(users.tenantId, ctx.tenantId), isStaffUser),
-    columns: {
-      id: true,
-      name: true,
-      email: true,
-      role: true,
-      active: true,
-      createdAt: true,
-    },
-    orderBy: (users, { asc }) => [asc(users.createdAt)],
-  });
+  const columns = { id: users.id, name: users.name, email: users.email, role: users.role, active: users.active, createdAt: users.createdAt };
+  const ofTenant = and(eq(users.tenantId, ctx.tenantId), isStaffUser);
+  const staff = await db
+    // Whether signing in asks them for a code too (./mfa.ts): on or off, nothing else of it.
+    .select({ ...columns, mfaEnabled: sql<boolean>`${userMfa.confirmedAt} is not null` })
+    .from(users)
+    .leftJoin(userMfa, eq(userMfa.userId, users.id))
+    .where(ofTenant)
+    .orderBy(asc(users.createdAt))
+    .catch(async (error: unknown) => {
+      // Before two-step verification's table is there (./mfa.ts), nobody has it on.
+      if (!mfaTableMissing(error)) throw error;
+      const rows = await db.select(columns).from(users).where(ofTenant).orderBy(asc(users.createdAt));
+      return rows.map((user) => ({ ...user, mfaEnabled: false }));
+    });
   // Narrows the role type; the query already excludes clients.
   return staff.filter((u): u is typeof u & { role: UserRole } => u.role !== "client");
 }

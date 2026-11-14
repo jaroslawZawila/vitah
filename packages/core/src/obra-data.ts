@@ -77,6 +77,7 @@ const STATUS: Record<ObraError, number> = {
   no_budget: 404,
   project_not_found: 404,
   dependency_cycle: 400,
+  idempotency_key_reused: 409,
   not_found: 404,
   forbidden: 403,
 };

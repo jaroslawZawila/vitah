@@ -4,8 +4,8 @@ import Link from "next/link";
 import { useState, useTransition } from "react";
 import { useParams, usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Contact, FolderKanban, HardHat, KeyRound, Settings, ShoppingCart, UserCog } from "lucide-react";
-import { APP_LANGUAGES, type AppLanguage, type PurchasingCounts, type SubcontractorCounts } from "@repo/core/contract";
+import { ArchiveRestore, Contact, FolderKanban, HardHat, KeyRound, LogOut, Settings, ShieldCheck, ShoppingCart, UserCog } from "lucide-react";
+import { APP_LANGUAGES, type AppLanguage, type MfaStatus, type PurchasingCounts, type SubcontractorCounts } from "@repo/core/contract";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import ChangePasswordDialog, { type PasswordChangeResult } from "./ChangePasswordDialog";
+import TwoStepDialog, { type TwoStepActions } from "./TwoStepDialog";
 import {
   COMPANY_PURCHASES_HREF,
   INVOICES_HREF,
@@ -44,6 +45,9 @@ const PROJECT_TABS = [
 ] as const;
 
 const SUBCONTRACTORS_HREF = "/dashboard/subcontratas";
+
+/** What users deleted, for an admin to restore: reached from the settings menu, not a rail section. */
+const DELETED_HREF = "/dashboard/eliminados";
 
 /** The Subcontratas section's pages, nested under it in the rail's "Red" group. */
 const SUBCONTRACTOR_TABS = [
@@ -81,6 +85,8 @@ export default function Sidebar({
   language,
   onLanguageChange,
   onPasswordChange,
+  twoStep = null,
+  onSignOut,
 }: {
   name: string | null;
   email: string | null;
@@ -94,6 +100,10 @@ export default function Sidebar({
   onLanguageChange: (language: AppLanguage) => Promise<{ error?: string }>;
   /** Changes the signed-in user's own password; the form has `currentPassword` and `newPassword`. */
   onPasswordChange: (form: FormData) => Promise<PasswordChangeResult>;
+  /** The signed-in user's two-step verification and what its dialog does; null hides it. */
+  twoStep?: { status: MfaStatus; actions: TwoStepActions } | null;
+  /** Signs this browser out, back to the login page. */
+  onSignOut: () => Promise<void>;
 }) {
   const pathname = usePathname();
   const t = useTranslations("sidebar");
@@ -101,6 +111,8 @@ export default function Sidebar({
   const { id: projectId } = useParams<{ id?: string }>();
   // One dialog for both settings menus (the rail's foot and the top bar's corner).
   const [passwordOpen, setPasswordOpen] = useState(false);
+  const [twoStepOpen, setTwoStepOpen] = useState(false);
+  const onTwoStep = twoStep ? () => setTwoStepOpen(true) : undefined;
 
   return (
     <aside className="flex flex-col gap-3 bg-rail px-4 py-3 text-rail-foreground lg:sticky lg:top-0 lg:h-svh lg:gap-[18px] lg:overflow-y-auto lg:px-3.5 lg:py-[22px]">
@@ -119,9 +131,12 @@ export default function Sidebar({
         <SettingsMenu
           name={name}
           email={email}
+          isAdmin={isAdmin}
           language={language}
           onLanguageChange={onLanguageChange}
           onChangePassword={() => setPasswordOpen(true)}
+          onTwoStep={onTwoStep}
+          onSignOut={onSignOut}
           className="ml-auto max-w-[60%] lg:hidden"
         />
       </div>
@@ -154,36 +169,50 @@ export default function Sidebar({
         <SettingsMenu
           name={name}
           email={email}
+          isAdmin={isAdmin}
           language={language}
           onLanguageChange={onLanguageChange}
           onChangePassword={() => setPasswordOpen(true)}
+          onTwoStep={onTwoStep}
+          onSignOut={onSignOut}
           className="w-full"
         />
       </div>
       <ChangePasswordDialog open={passwordOpen} onOpenChange={setPasswordOpen} onSubmit={onPasswordChange} />
+      {twoStep && (
+        <TwoStepDialog open={twoStepOpen} onOpenChange={setTwoStepOpen} status={twoStep.status} actions={twoStep.actions} />
+      )}
     </aside>
   );
 }
 
 /**
- * Who is signed in, opening their settings (the portal's language, saved on their account, and
- * changing their password): at the foot of the rail on desktop, in the top bar's corner on phones
- * (avatar only below `sm`).
+ * Who is signed in, opening their settings (the portal's language, saved on their account,
+ * changing their password, and signing out): at the foot of the rail on desktop, in the top bar's
+ * corner on phones (avatar only below `sm`).
  */
 function SettingsMenu({
   name,
   email,
+  isAdmin,
   language,
   onLanguageChange,
   onChangePassword,
+  onTwoStep,
+  onSignOut,
   className,
 }: {
   name: string | null;
   email: string | null;
+  /** Admins also reach what users deleted, to restore it. */
+  isAdmin: boolean;
   language: AppLanguage;
   onLanguageChange: (language: AppLanguage) => Promise<{ error?: string }>;
   /** Opens the change-password dialog. */
   onChangePassword: () => void;
+  /** Opens the two-step verification dialog; without it the item is not offered. */
+  onTwoStep?: () => void;
+  onSignOut: () => Promise<void>;
   className: string;
 }) {
   const t = useTranslations("sidebar");
@@ -233,6 +262,30 @@ function SettingsMenu({
         <DropdownMenuItem onClick={onChangePassword}>
           <KeyRound aria-hidden strokeWidth={1.8} />
           {t("changePassword")}
+        </DropdownMenuItem>
+        {onTwoStep && (
+          <DropdownMenuItem onClick={onTwoStep}>
+            <ShieldCheck aria-hidden strokeWidth={1.8} />
+            {t("twoStep")}
+          </DropdownMenuItem>
+        )}
+        {isAdmin && (
+          <DropdownMenuItem render={<Link href={DELETED_HREF} />}>
+            <ArchiveRestore aria-hidden strokeWidth={1.8} />
+            {t("deleted")}
+          </DropdownMenuItem>
+        )}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          disabled={pending}
+          onClick={() => {
+            startTransition(async () => {
+              await onSignOut();
+            });
+          }}
+        >
+          <LogOut aria-hidden strokeWidth={1.8} />
+          {t("signOut")}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

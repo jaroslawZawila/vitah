@@ -106,7 +106,8 @@ describe("BudgetStartScreen", () => {
     await waitFor(() => expect(documents.registerBudgetInputAction).toHaveBeenCalledWith("p-1", { pathname: "t/projects/p-1/inputs/abc.pdf", budgetInput: "plans", filename: "Planos.pdf" }));
     expect(documents.budgetInputUploadAction).toHaveBeenCalledWith("p-1", "Planos.pdf");
     expect(blob.upload).toHaveBeenCalledWith("t/projects/p-1/inputs/abc.pdf", file, expect.objectContaining({ access: "private", handleUploadUrl: "/api/v1/projects/p-1/documents/uploads" }));
-    expect(refresh).toHaveBeenCalled();
+    // The page re-reads once the document is registered.
+    await waitFor(() => expect(refresh).toHaveBeenCalled());
   });
 
   it("shows why an upload failed", async () => {
@@ -140,7 +141,7 @@ describe("BudgetStartScreen", () => {
     await waitFor(() =>
       expect(actions.startGenerationAction).toHaveBeenCalledWith("p-1", { reference: "041/2026", quality: "framer", vatRateBp: 2100, documentIds: ["doc-1"] }),
     );
-    expect(refresh).toHaveBeenCalled();
+    await waitFor(() => expect(refresh).toHaveBeenCalled());
   });
 
   it("removes a document", async () => {

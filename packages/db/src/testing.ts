@@ -56,6 +56,22 @@ export async function resetDatabase(): Promise<void> {
   await db.execute(sql`TRUNCATE TABLE tenants, login_attempts CASCADE`);
 }
 
+/**
+ * Runs `fn` against a database that has no `table` yet, as when the portal is
+ * deployed ahead of the SQL file that makes it: a statement on it fails with
+ * "undefined_table" (42P01). The table (renamed aside, its rows kept) is back
+ * when `fn` ends, whatever happened, so the tests that follow find it.
+ */
+export async function withoutTable<T>(table: string, fn: () => Promise<T>): Promise<T> {
+  if (!/^[a-z_]+$/.test(table)) throw new Error(`Not a table name: ${table}`);
+  await db.execute(sql.raw(`ALTER TABLE ${table} RENAME TO ${table}_not_yet`));
+  try {
+    return await fn();
+  } finally {
+    await db.execute(sql.raw(`ALTER TABLE ${table}_not_yet RENAME TO ${table}`));
+  }
+}
+
 let counter = 0;
 const unique = () => `${Date.now().toString(36)}${(counter++).toString(36)}`;
 

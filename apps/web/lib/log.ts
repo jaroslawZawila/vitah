@@ -5,7 +5,7 @@ import { logError } from "@repo/core/log";
 // line per event on stderr, secrets and personal data left out), plus what
 // only the web app needs.
 
-export { logError, logWarn } from "@repo/core/log";
+export { logError, logWarn, scrub } from "@repo/core/log";
 
 /** A short id for one failure: logged with it and shown to whoever met it, to quote to support. */
 export const newErrorId = () => crypto.randomUUID().slice(0, 8);

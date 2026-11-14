@@ -7,8 +7,8 @@
 //    "error":{"name":"TypeError","message":"…","stack":["at …","at …"]}}
 //
 // A line never carries what identifies a person or opens a door: fields named
-// like a secret are dropped, and e-mail addresses and query strings are cut
-// out of every text (an error's message included).
+// like a secret are dropped, and e-mail addresses, session tokens and query
+// strings are cut out of every text (an error's message included).
 
 export type LogLevel = "error" | "warn";
 export type LogFields = Record<string, unknown>;
@@ -37,6 +37,10 @@ const NAME_OR_EMAIL = /[\w.%+-]+(?:@[\w-]+(?:\.[\w-]+)+)?/g;
 /** A path or URL's query string: `/a/b?x=1` → `/a/b`. */
 const QUERY = /(\/[^\s?#"'()]*)\?[^\s"'()]*/g;
 const NAME_CHAR = /[\w.%+-]/;
+/** A signed token (a JWT: the app's session, the portal's cookie) quoted in a text. */
+const TOKEN = /\beyJ[\w-]+\.[\w-]+(?:\.[\w-]+)?/g;
+/** An `Authorization` value quoted in a text, whatever kind of token follows. */
+const BEARER = /\bBearer\s+[^\s"']+/gi;
 
 /** `text` without the start of an address the cut may have left at its very end (`… ana@vit`). */
 function withoutCutEmail(text: string): string {
@@ -47,12 +51,16 @@ function withoutCutEmail(text: string): string {
   return start === at ? text : `${text.slice(0, start)}[email]`;
 }
 
-/** A text safe to log: no e-mail address, no query string, and not endless. */
+/** A text safe to log: no e-mail address, no token, no query string, and not endless. */
 export function scrub(text: string): string {
   // Cut before anything is matched, never after.
   const cut = text.length > MAX_INPUT;
   const head = cut ? withoutCutEmail(text.slice(0, MAX_INPUT)) : text;
-  const clean = head.replace(QUERY, "$1").replace(NAME_OR_EMAIL, (run) => (run.includes("@") ? "[email]" : run));
+  const clean = head
+    .replace(BEARER, "Bearer [token]")
+    .replace(TOKEN, "[token]")
+    .replace(QUERY, "$1")
+    .replace(NAME_OR_EMAIL, (run) => (run.includes("@") ? "[email]" : run));
   return cut || clean.length > MAX_TEXT ? `${clean.slice(0, MAX_TEXT)}…` : clean;
 }
 

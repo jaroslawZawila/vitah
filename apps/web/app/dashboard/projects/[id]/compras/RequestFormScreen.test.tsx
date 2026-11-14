@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -64,8 +64,11 @@ describe("RequestFormScreen", () => {
       neededBy: "2026-10-30",
       notes: "Hidrófuga en baños",
       lines: [{ lineageId: "lin-0701", amountCents: 625_000 }],
+      // The form's idempotency key: a double click or a retry is one request.
+      idempotencyKey: expect.stringMatching(/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/),
     });
-    expect(router.push).toHaveBeenCalledWith("/dashboard/projects/p-1/compras/solicitudes/req-4");
+    // Once the action answers, the request opens.
+    await waitFor(() => expect(router.push).toHaveBeenCalledWith("/dashboard/projects/p-1/compras/solicitudes/req-4"));
   });
 
   it("needs a concept and a line before sending, and shows the action's error", async () => {
@@ -97,7 +100,7 @@ describe("RequestFormScreen", () => {
         { lineageId: "lin-0704", amountCents: 100_000 },
       ],
     }));
-    expect(router.push).toHaveBeenCalledWith("/dashboard/projects/p-1/compras/solicitudes/req-3");
+    await waitFor(() => expect(router.push).toHaveBeenCalledWith("/dashboard/projects/p-1/compras/solicitudes/req-3"));
   });
 });
 
@@ -114,5 +117,6 @@ describe("RequestFormScreen on a request whose line left the budget", () => {
       { lineageId: "lin-0701", amountCents: 625_000 },
       { lineageId: "lin-0704", amountCents: 100_000 },
     ]);
+    await waitFor(() => expect(router.push).toHaveBeenCalledWith("/dashboard/projects/p-1/compras/solicitudes/req-3"));
   });
 });

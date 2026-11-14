@@ -17,6 +17,7 @@ const KNOWN = new Set([
   "document_expired",
   "assigned",
   "unassigned",
+  "assignment_restored",
   "worker_created",
   "worker_updated",
 ]);

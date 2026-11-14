@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -31,6 +31,9 @@ beforeEach(() => {
   vi.mocked(actions.updatePurchaseAction).mockReset().mockResolvedValue({ success: true });
   vi.mocked(actions.addOrderDocumentAction).mockReset().mockResolvedValue({ success: true });
 });
+
+/** The form's idempotency key: sent with every create, so a double click or a retry is one record. */
+const A_KEY = expect.stringMatching(/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/);
 
 const suppliers = () => within(screen.getByRole("group", { name: "Proveedores" }));
 const total = () => within(screen.getByRole("region", { name: "Total" }));
@@ -122,8 +125,10 @@ describe("OrderFormScreen", () => {
       retentionBp: 0,
       vatKind: null,
       status: "contracted",
+      idempotencyKey: A_KEY,
     });
-    expect(router.push).toHaveBeenCalledWith("/dashboard/projects/p-1/compras/order-57");
+    // Once the action answers, the order opens.
+    await waitFor(() => expect(router.push).toHaveBeenCalledWith("/dashboard/projects/p-1/compras/order-57"));
   });
 
   it("sends the terms its invoices start from: days to pay, retention and VAT", async () => {
@@ -136,6 +141,7 @@ describe("OrderFormScreen", () => {
     await userEvent.click(screen.getByRole("button", { name: "Guardar y marcar contratado" }));
 
     expect(actions.createPurchaseAction).toHaveBeenCalledWith("p-1", expect.objectContaining({ paymentDays: 60, retentionBp: 500, vatKind: "vat21" }));
+    await waitFor(() => expect(router.push).toHaveBeenCalled());
   });
 
   it("saves as pending without an order date, and uploads the PDF once the order exists", async () => {
@@ -146,13 +152,14 @@ describe("OrderFormScreen", () => {
     expect(screen.getByText("contrato.pdf")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Guardar como pendiente" }));
 
+    // The order is created, then its PDF goes up, then the order opens.
+    await waitFor(() => expect(router.push).toHaveBeenCalledWith("/dashboard/projects/p-1/compras/order-57"));
     const input = vi.mocked(actions.createPurchaseAction).mock.calls[0]![1];
     expect(input).toMatchObject({ status: "pending" });
     expect(input).not.toHaveProperty("orderedOn");
     const [, orderId, data] = vi.mocked(actions.addOrderDocumentAction).mock.calls[0]!;
     expect(orderId).toBe("order-57");
     expect([data.get("title"), (data.get("file") as File).name]).toEqual(["contrato", "contrato.pdf"]);
-    expect(router.push).toHaveBeenCalledWith("/dashboard/projects/p-1/compras/order-57");
   });
 
   it("refuses a PDF over 4 MB in the form", async () => {
@@ -174,9 +181,13 @@ describe("OrderFormScreen", () => {
     const alert = await screen.findByText("PED-057 se ha guardado, pero su documento no se ha subido:");
     expect(alert.closest("[role=alert]")).toHaveTextContent("El archivo supera el máximo de 4 MB.");
     expect(router.push).not.toHaveBeenCalled();
-    // Saving again doesn't create a second order.
-    await userEvent.click(screen.getByRole("button", { name: "Guardar como pendiente" }));
+    // Saving again doesn't create a second order: it only sends the PDF again.
+    const save = screen.getByRole("button", { name: "Guardar como pendiente" });
+    await waitFor(() => expect(save).toBeEnabled());
+    await userEvent.click(save);
+    await waitFor(() => expect(actions.addOrderDocumentAction).toHaveBeenCalledTimes(2));
     expect(actions.createPurchaseAction).toHaveBeenCalledTimes(1);
+    expect(router.push).not.toHaveBeenCalled();
   });
 
   it("asks for what is missing before saving, and shows core's errors", async () => {
@@ -190,6 +201,25 @@ describe("OrderFormScreen", () => {
     await userEvent.click(screen.getByRole("button", { name: "Guardar y marcar contratado" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Una de las partidas ya no está en el presupuesto aceptado.");
     expect(router.push).not.toHaveBeenCalled();
+  });
+
+  it("sends a refused order again under the same key, and a changed one under a new key", async () => {
+    vi.mocked(actions.createPurchaseAction).mockResolvedValue({ error: "unknown_line" });
+    renderScreen();
+    await fillSubcontract();
+    const save = screen.getByRole("button", { name: "Guardar y marcar contratado" });
+    await userEvent.click(save);
+    await userEvent.click(save);
+    await userEvent.type(screen.getByLabelText("Concepto"), " y falsos techos");
+    await userEvent.click(save);
+
+    await waitFor(() => expect(actions.createPurchaseAction).toHaveBeenCalledTimes(3));
+    const keys = vi.mocked(actions.createPurchaseAction).mock.calls.map(([, input]) => input.idempotencyKey);
+    expect(keys[0]).toEqual(A_KEY);
+    // Nothing was applied: the same submission is the same key; another one, another key.
+    expect(keys[1]).toBe(keys[0]);
+    expect(keys[2]).toEqual(A_KEY);
+    expect(keys[2]).not.toBe(keys[0]);
   });
 
   it("edits an order on its values, keeping lines in other chapters", async () => {
@@ -221,7 +251,7 @@ describe("OrderFormScreen", () => {
         ],
       }),
     );
-    expect(router.push).toHaveBeenCalledWith("/dashboard/projects/p-1/compras/order-49");
+    await waitFor(() => expect(router.push).toHaveBeenCalledWith("/dashboard/projects/p-1/compras/order-49"));
   });
 
   it("says so when the payment schedule can't take an edit's cut", async () => {
@@ -257,6 +287,7 @@ describe("OrderFormScreen from a purchase request", () => {
         { lineageId: "lin-0704", amountCents: 100_000, closesLine: true },
       ],
     }));
+    await waitFor(() => expect(router.push).toHaveBeenCalledWith("/dashboard/projects/p-1/compras/order-57"));
   });
 });
 

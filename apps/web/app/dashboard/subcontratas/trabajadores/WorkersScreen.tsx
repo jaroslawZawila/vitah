@@ -1,61 +1,53 @@
 "use client";
 
-// Container: the Trabajadores page. Filters by access, text and company in the
-// browser; the obra filter reloads the page (`?obra=`) so access is worked
-// out for that obra on the server. "Comprobar acceso" asks the server.
+// Container: the Trabajadores page, a page of workers at a time. The filters
+// (access, text, company, obra) live in the URL and the server applies them:
+// changing one loads its first page. "Comprobar acceso" asks the server.
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { IdCard, Plus } from "lucide-react";
-import {
-  workerName,
-  type AccessCheckResult,
-  type ProjectOption,
-  type SubcontractorError,
-  type WorkerListItem,
+import type {
+  AccessCheckResult,
+  ProjectOption,
+  SubcontractorError,
+  WorkerAccessFilter,
+  WorkersPage,
 } from "@repo/core/contract";
 import { checkWorkerAccessAction } from "../../../actions/subcontractors";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { Pager } from "@/components/ui/pager";
+import { useListQuery, useSearchText } from "../../components/useListQuery";
 import AccessRulesCard from "../components/workers/AccessRulesCard";
 import CheckAccessPanel from "../components/workers/CheckAccessPanel";
 import WorkersKpis from "../components/workers/WorkersKpis";
-import WorkersTable, { ACCESS_FILTERS, type AccessFilter } from "../components/workers/WorkersTable";
+import WorkersTable from "../components/workers/WorkersTable";
+
+/** The filters as the URL has them: `?obra=&acceso=&empresa=&q=`. */
+export type WorkersQuery = { projectId: string; access: WorkerAccessFilter; companyId: string; query: string };
 
 export default function WorkersScreen({
-  workers,
+  page,
   projects,
   companies,
-  projectId,
+  query,
   canManage,
 }: {
-  workers: WorkerListItem[];
+  /** The page of workers the URL asks for, with the whole list's counts. */
+  page: WorkersPage;
   projects: ProjectOption[];
   companies: { id: string; legalName: string }[];
-  projectId: string;
+  query: WorkersQuery;
   canManage: boolean;
 }) {
   const t = useTranslations("subcontractors.workers");
-  const router = useRouter();
-  const pathname = usePathname();
-  const [filter, setFilter] = useState<AccessFilter>("all");
-  const [query, setQuery] = useState("");
-  const [companyId, setCompanyId] = useState("");
+  const list = useListQuery();
+  const [text, setText] = useSearchText(query.query, (q) => list.set({ q }));
+  const { projectId } = query;
   const [checking, setChecking] = useState(false);
   const [check, setCheck] = useState<{ result: AccessCheckResult | null; error?: SubcontractorError }>({ result: null });
   const [pending, startTransition] = useTransition();
-
-  const q = query.trim().toLowerCase();
-  const matching = workers.filter(
-    (w) =>
-      (!companyId || w.subcontractorId === companyId) &&
-      (!q || `${workerName(w)} ${w.subcontractorName}`.toLowerCase().includes(q)),
-  );
-  const counts = Object.fromEntries(
-    ACCESS_FILTERS.map((key) => [key, key === "all" ? matching.length : matching.filter((w) => w.access.status === key).length]),
-  ) as Record<AccessFilter, number>;
-  const shown = filter === "all" ? matching : matching.filter((w) => w.access.status === filter);
 
   function runCheck(input: { query: string; projectId: string }) {
     startTransition(async () => {
@@ -97,22 +89,24 @@ export default function WorkersScreen({
         />
       )}
 
-      <WorkersKpis workers={workers} />
+      <WorkersKpis summary={page.summary} />
 
       <WorkersTable
-        workers={shown}
-        total={workers.length}
-        counts={counts}
-        filter={filter}
-        onFilter={setFilter}
-        query={query}
-        onQuery={setQuery}
+        workers={page.workers}
+        shown={page.paging.total}
+        total={page.summary.registered}
+        counts={page.counts}
+        filter={query.access}
+        onFilter={(access) => list.set({ acceso: access === "all" ? null : access })}
+        query={text}
+        onQuery={setText}
         companies={companies}
-        companyId={companyId}
-        onCompany={setCompanyId}
+        companyId={query.companyId}
+        onCompany={(empresa) => list.set({ empresa })}
         projects={projects}
         projectId={projectId}
-        onProject={(id) => router.push(id ? `${pathname}?obra=${encodeURIComponent(id)}` : pathname)}
+        onProject={(obra) => list.set({ obra })}
+        pager={<Pager paging={page.paging} hrefOf={list.pageHref} className="px-0" />}
       />
 
       <AccessRulesCard />

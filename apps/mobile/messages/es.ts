@@ -7,6 +7,11 @@ export const es = {
     close: "Cerrar",
     back: "Volver",
   },
+  // The whole app failed (the root error boundary): calm, nothing technical.
+  appError: {
+    title: "Algo no ha ido bien",
+    text: "La app ha tenido un problema inesperado. Vuelve a intentarlo.",
+  },
   tabs: {
     obra: "Obra",
     home: "Inicio",
@@ -22,6 +27,10 @@ export const es = {
     missingFields: "Introduce tu email y contraseña",
     invalidCredentials: "Email o contraseña incorrectos",
     tooManyAttempts: "Demasiados intentos fallidos. Espera unos minutos e inténtalo de nuevo.",
+    networkError: "No hay conexión con ViTAH. Comprueba tu conexión a internet e inténtalo de nuevo.",
+    timeout: "ViTAH está tardando demasiado en responder. Inténtalo de nuevo en unos instantes.",
+    serverError: "Tenemos un problema en nuestros servidores. Inténtalo de nuevo más tarde.",
+    failed: "No hemos podido iniciar sesión. Inténtalo de nuevo.",
     biometric: "Entrar con biometría",
     biometricPrompt: "Entrar en ViTAH",
     sessionExpired: "Tu sesión ha caducado. Entra con tu email y contraseña.",
@@ -102,6 +111,8 @@ export const es = {
   phase: {
     back: "Obra",
     label: "Fase {current} de {total} · {status}",
+    // A status this version of the app doesn't know (a newer server): no status.
+    position: "Fase {current} de {total}",
     status: { pending: "Pendiente", active: "En curso", done: "Terminada" },
     preScope: "Contrato, ingeniería BIM y licencia de obra: todo lo que va antes de empezar a construir.",
     chapters: "Capítulos del presupuesto",

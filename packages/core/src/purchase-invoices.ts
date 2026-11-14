@@ -4,7 +4,6 @@ import {
   db,
   desc,
   eq,
-  gte,
   inArray,
   isNull,
   or,
@@ -31,12 +30,15 @@ import {
   MAX_IRPF_BP,
   MAX_MILESTONES,
   MAX_RETENTION_BP,
+  PURCHASE_INVOICE_GROUPS,
   PURCHASE_INVOICE_KINDS,
   PURCHASE_PAYMENT_METHODS,
   PURCHASE_VAT_KINDS,
   countsAsContracted,
   type PurchaseInvoiceDetail,
+  type InvoiceListQuery,
   type PurchaseInvoiceForm,
+  type PurchaseInvoiceGroup,
   type PurchaseInvoiceKind,
   type PurchaseInvoiceListItem,
   type PurchasingCounts,
@@ -44,7 +46,10 @@ import {
   type TenantPayments,
 } from "./contract";
 import { requirePdf } from "./documents";
+import { idempotent, type Once } from "./idempotency";
 import { addDays, todayInSpain } from "./obra-calc";
+import { filterText, pageWindow, pagingOf, searchPattern, type PageQuery } from "./paging";
+import { orderLabelSql } from "./sql-labels";
 import {
   calendarDate,
   fail,
@@ -83,6 +88,7 @@ import {
   loadPayments,
   orderInvoicing,
   orderMilestones,
+  paymentTotals,
 } from "./purchase-invoice-data";
 import { contractLines, loadOrders, logEvent, projectList, releaseMilestones, requireOrder } from "./purchasing";
 
@@ -157,74 +163,231 @@ const invoiceFilter = (filters: Filters): SQL | undefined =>
 
 const monthStart = (today: string) => `${today.slice(0, 7)}-01`;
 
+const OWED = sql`('pending', 'partial', 'overdue')`;
+
+/**
+ * What the invoice or credit note `row` (a table alias) leaves to pay by its
+ * due date: its total less the retention held, as `withTotals`' `payableCents`.
+ */
+const payableOf = (row: string) => sql.raw(`(${row}.base_cents + ${row}.vat_cents - ${row}.irpf_cents - ${row}.retention_cents)`);
+
+/**
+ * Every invoice and credit note of the tenant (or of a project or supplier)
+ * with how it stands today, worked out in the database as `settle` and
+ * `invoiceState` do: what it owes (its payable amount, net of its credit
+ * notes, less its payments; deleted ones aside) and its state. The lists
+ * filter, count, add up and page on it; only a page's invoices are loaded.
+ * The rule itself is TypeScript's (./purchase-calc); that this SQL agrees
+ * with it for every invoice is tested ("one rule, two languages").
+ */
+export const settledInvoices = (tenantId: string, scope: Filters, today: string) => sql`
+  select i.id, i.kind, i.order_id, i.subcontractor_id, i.number, i.due_on, i.issued_on, i.created_at,
+    o.project_id, o.number as order_number, o.description as order_description, p.ref as project_ref, s.legal_name as supplier_name,
+    x.outstanding,
+    case when i.kind = 'credit_note' then 'credit' when x.outstanding <= 0 then 'paid'
+      when i.due_on < ${today}::date then 'overdue' when x.paid > 0 then 'partial' else 'pending' end as state
+  from ${purchaseInvoices} i
+  join ${purchaseOrders} o on o.id = i.order_id
+  join ${projects} p on p.id = o.project_id
+  join ${subcontractors} s on s.id = i.subcontractor_id
+  left join (
+    select invoice_id, sum(amount_cents) as paid from ${purchasePayments}
+    where tenant_id = ${tenantId} and deleted_at is null group by invoice_id
+  ) pay on pay.invoice_id = i.id
+  left join (
+    select n.rectifies_id, sum(${payableOf("n")}) as payable from ${purchaseInvoices} n
+    where n.tenant_id = ${tenantId} and n.kind = 'credit_note' and n.rectifies_id is not null and n.deleted_at is null group by n.rectifies_id
+  ) cr on cr.rectifies_id = i.id
+  cross join lateral (
+    select coalesce(pay.paid, 0) as paid, ${payableOf("i")} + coalesce(cr.payable, 0) - coalesce(pay.paid, 0) as outstanding
+  ) x
+  where i.tenant_id = ${tenantId} and i.deleted_at is null and p.deleted_at is null
+    ${scope.projectId ? sql`and o.project_id = ${scope.projectId}` : sql``}
+    ${scope.subcontractorId ? sql`and i.subcontractor_id = ${scope.subcontractorId}` : sql``}`;
+
+const INVOICE_GROUP_SQL: Record<PurchaseInvoiceGroup, SQL> = {
+  open: sql`state in ${OWED}`,
+  overdue: sql`state = 'overdue'`,
+  paid: sql`state = 'paid'`,
+  credit: sql`state = 'credit'`,
+};
+
+/** The invoices of these orders, built (each with its credit notes, settled). */
+async function buildOrders(tenantId: string, orderIds: string[], today: string) {
+  const ids = [...new Set(orderIds)];
+  const loaded = ids.length === 0 ? [] : await loadInvoices(tenantId, inArray(purchaseInvoices.orderId, ids), { lines: false });
+  return buildInvoices(loaded, today);
+}
+
 // ─── Reads ───────────────────────────────────────────────────────────────────
 
-/** Administration's invoices: every supplier invoice of the tenant (or of a project or supplier), with what is owed. */
-export async function listInvoices(ctx: Ctx, filters: Filters = {}): Promise<TenantInvoices> {
+/**
+ * Administration's invoices: the supplier invoices of the tenant (or of a
+ * project or supplier: `filters`), owed first, with what is owed. `query`
+ * asks for a page of them and narrows the list (see `InvoiceListQuery`);
+ * without one, all of them come (up to `MAX_UNPAGED`), as before lists were
+ * paged. The summary is that of every invoice of `filters`, whatever `query`.
+ */
+export async function listInvoices(ctx: Ctx, filters: Filters = {}, query: InvoiceListQuery = {}): Promise<TenantInvoices> {
   const today = todayInSpain();
-  const where = invoiceFilter(filters);
-  const [loaded, month, projectRows] = await Promise.all([
-    loadInvoices(ctx.tenantId, where, { lines: false }),
-    loadPayments(ctx.tenantId, and(where, gte(purchasePayments.paidOn, monthStart(today)))),
+  const window = pageWindow(query);
+  const group = orNull(pick(["all", ...PURCHASE_INVOICE_GROUPS] as const))(query.group) ?? "all";
+  const pattern = searchPattern(query.q);
+  const projectId = filterText(query.projectId);
+  const supplierId = filterText(query.supplierId);
+  const settled = settledInvoices(ctx.tenantId, filters, today);
+  // Every filter but the group: the counts beside it are of each group.
+  const kept = sql`(true
+    ${projectId ? sql`and project_id = ${projectId}` : sql``}
+    ${supplierId ? sql`and subcontractor_id = ${supplierId}` : sql``}
+    ${
+      pattern
+        ? sql`and (number ilike ${pattern} or supplier_name ilike ${pattern} or order_description ilike ${pattern}
+            or ${orderLabelSql(sql`order_number`)} ilike ${pattern} or project_ref ilike ${pattern})`
+        : sql``
+    })`;
+  const soon = addDays(today, DUE_SOON_DAYS);
+  const dueSoon = sql`state in ('pending', 'partial') and due_on <= ${soon}::date`;
+  const owedCents = (where: SQL) => sql`coalesce(sum(greatest(outstanding, 0)) filter (where ${where}), 0)::bigint`;
+  const many = (where: SQL) => sql`(count(*) filter (where ${where}))::int`;
+
+  type Totals = Record<
+    "all" | PurchaseInvoiceGroup | "outstanding_invoices" | "outstanding_suppliers" | "overdue_invoices" | "due_soon_invoices" | "outstanding_cents" | "overdue_cents" | "due_soon_cents",
+    number
+  >;
+  type Listed = { totals: Totals | null; page: { id: string; order_id: string }[]; suppliers: { id: string; name: string }[] };
+  // One statement: the invoices are settled once (`st`, referenced three times, so the database
+  // works it out a single time), and the totals, the page and the suppliers are read off it.
+  // The page's order is `byUrgency`'s: owed first, soonest due first; then the settled ones, newest first.
+  const [[listed], [month], projectRows] = await Promise.all([
+    db.execute<Listed>(sql`
+      with st as materialized (${settled}),
+      totals as (
+        select ${many(kept)} as "all",
+          ${many(sql`${kept} and ${INVOICE_GROUP_SQL.open}`)} as open,
+          ${many(sql`${kept} and ${INVOICE_GROUP_SQL.overdue}`)} as overdue,
+          ${many(sql`${kept} and ${INVOICE_GROUP_SQL.paid}`)} as paid,
+          ${many(sql`${kept} and ${INVOICE_GROUP_SQL.credit}`)} as credit,
+          ${owedCents(INVOICE_GROUP_SQL.open)} as outstanding_cents,
+          ${many(INVOICE_GROUP_SQL.open)} as outstanding_invoices,
+          (count(distinct subcontractor_id) filter (where ${INVOICE_GROUP_SQL.open}))::int as outstanding_suppliers,
+          ${owedCents(INVOICE_GROUP_SQL.overdue)} as overdue_cents,
+          ${many(INVOICE_GROUP_SQL.overdue)} as overdue_invoices,
+          ${owedCents(dueSoon)} as due_soon_cents,
+          ${many(dueSoon)} as due_soon_invoices
+        from st
+      ),
+      page as (
+        select id, order_id, row_number() over (
+          order by (state in ${OWED}) desc, case when state in ${OWED} then coalesce(due_on::text, '') end,
+            issued_on desc, created_at desc, id desc
+        ) as position
+        from st
+        where ${kept} ${group === "all" ? sql`` : sql`and ${INVOICE_GROUP_SQL[group]}`}
+        order by position
+        limit ${window.limit} offset ${window.offset}
+      )
+      select
+        (select to_jsonb(totals) from totals) as totals,
+        (select coalesce(jsonb_agg(jsonb_build_object('id', id, 'order_id', order_id) order by position), '[]'::jsonb) from page) as page,
+        (select coalesce(jsonb_agg(distinct jsonb_build_object('id', subcontractor_id, 'name', supplier_name)), '[]'::jsonb) from st) as suppliers`),
+    paymentTotals(ctx.tenantId, invoiceFilter(filters), monthStart(today)),
     projectList(ctx.tenantId),
   ]);
-  const invoices = [...buildInvoices(loaded, today).items.values()].sort(byUrgency);
-  const open = invoices.filter(owed);
-  const overdue = open.filter((i) => i.state === "overdue");
-  const dueSoon = open.filter((i) => isDueSoon(i, today));
+  const totals = listed?.totals;
+  const ids = listed?.page ?? [];
+  const supplierRows = listed?.suppliers ?? [];
+  const built = await buildOrders(ctx.tenantId, ids.map((row) => row.order_id), today);
+  const groupCounts = {
+    all: totals?.all ?? 0,
+    open: totals?.open ?? 0,
+    overdue: totals?.overdue ?? 0,
+    paid: totals?.paid ?? 0,
+    credit: totals?.credit ?? 0,
+  };
   return {
-    invoices,
+    invoices: ids.flatMap((row) => built.items.get(row.id) ?? []),
+    paging: pagingOf(window, groupCounts[group]),
+    groupCounts,
+    suppliers: [...supplierRows].sort((a, b) => a.name.localeCompare(b.name)),
     projects: projectRows,
     summary: {
-      outstandingCents: sumOwed(open),
-      outstandingInvoices: open.length,
-      outstandingSuppliers: new Set(open.map((i) => i.subcontractorId)).size,
-      overdueCents: sumOwed(overdue),
-      overdueInvoices: overdue.length,
-      dueSoonCents: sumOwed(dueSoon),
-      dueSoonInvoices: dueSoon.length,
-      paidThisMonthCents: month.reduce((sum, p) => sum + p.amountCents, 0),
-      paymentsThisMonth: month.length,
+      outstandingCents: Number(totals?.outstanding_cents ?? 0),
+      outstandingInvoices: totals?.outstanding_invoices ?? 0,
+      outstandingSuppliers: totals?.outstanding_suppliers ?? 0,
+      overdueCents: Number(totals?.overdue_cents ?? 0),
+      overdueInvoices: totals?.overdue_invoices ?? 0,
+      dueSoonCents: Number(totals?.due_soon_cents ?? 0),
+      dueSoonInvoices: totals?.due_soon_invoices ?? 0,
+      paidThisMonthCents: month?.monthCents ?? 0,
+      paymentsThisMonth: month?.monthPayments ?? 0,
     },
     today,
   };
 }
 
-/** What is owed by week of its due date (past due first), and the payments made. */
-export async function listPayments(ctx: Ctx, filters: Filters = {}): Promise<TenantPayments> {
+/**
+ * What is owed by week of its due date (past due first), and the payments
+ * made, newest first: the page `query` asks for, else all of them (up to
+ * `MAX_UNPAGED`). Only the invoices that owe something are loaded.
+ */
+export async function listPayments(ctx: Ctx, filters: Filters = {}, query: PageQuery = {}): Promise<TenantPayments> {
   const today = todayInSpain();
+  const window = pageWindow(query);
   const where = invoiceFilter(filters);
-  const [loaded, payments] = await Promise.all([
-    loadInvoices(ctx.tenantId, where, { lines: false }),
-    loadPayments(ctx.tenantId, where),
+  const [owing, payments, [totals]] = await Promise.all([
+    db.execute<{ order_id: string }>(sql`
+      with st as (${settledInvoices(ctx.tenantId, filters, today)})
+      select distinct order_id from st where state in ${OWED} and due_on is not null`),
+    loadPayments(ctx.tenantId, where, window),
+    paymentTotals(ctx.tenantId, where, monthStart(today)),
   ]);
-  const open = [...buildInvoices(loaded, today).items.values()].filter((i) => owed(i) && i.outstandingCents > 0 && i.dueOn);
+  const built = await buildOrders(ctx.tenantId, owing.map((row) => row.order_id), today);
+  const open = [...built.items.values()].filter((i) => owed(i) && i.outstandingCents > 0 && i.dueOn);
   const forecast = forecastWeeks(today).map((week) => {
     const invoices = open
       .filter((i) => (week.from === null || i.dueOn! >= week.from) && i.dueOn! <= week.to)
       .sort((a, b) => a.dueOn!.localeCompare(b.dueOn!));
     return { ...week, totalCents: sumOwed(invoices), invoices };
   });
-  const month = payments.filter((p) => p.paidOn >= monthStart(today));
   return {
     forecast,
     payments,
-    summary: { monthCents: month.reduce((sum, p) => sum + p.amountCents, 0), monthPayments: month.length },
+    paging: pagingOf(window, totals?.total ?? 0),
+    summary: { monthCents: totals?.monthCents ?? 0, monthPayments: totals?.monthPayments ?? 0 },
     today,
   };
 }
 
-/** What an invoice owes: payable, net of its credit notes, less what was paid (deleted ones aside). Mirrors `settle`. */
-const outstandingSql = sql`(${purchaseInvoices.baseCents} + ${purchaseInvoices.vatCents} - ${purchaseInvoices.irpfCents} - ${purchaseInvoices.retentionCents})
-  + coalesce((select sum(c.base_cents + c.vat_cents - c.irpf_cents - c.retention_cents) from ${purchaseInvoices} c where c.rectifies_id = ${purchaseInvoices.id} and c.deleted_at is null), 0)
-  - coalesce((select sum(p.amount_cents) from ${purchasePayments} p where p.invoice_id = ${purchaseInvoices.id} and p.deleted_at is null), 0)`;
-
-/** Compras' sections in the rail, and the invoices that need paying now (past due or due soon). */
+/**
+ * Compras' sections in the rail, and the invoices that need paying now (past
+ * due or due soon). The rail asks on every page: one round trip, each count a
+ * single pass over its table. Invoices are just counted; only those that could
+ * need paying now (an invoice due by the horizon) are settled, set-based as
+ * `settledInvoices` does it: its amount to pay, net of its credit notes, less
+ * its payments. Deleted invoices and payments, and deleted obras' rows, don't
+ * count.
+ */
 export async function getPurchasingCounts(ctx: Ctx): Promise<PurchasingCounts> {
-  const horizon = addDays(todayInSpain(), DUE_SOON_DAYS);
+  const today = todayInSpain();
+  const horizon = addDays(today, DUE_SOON_DAYS);
   const tenant = ctx.tenantId;
-  // One round trip: the rail asks on every page. Deleted invoices and payments, and deleted obras' rows, don't count.
   const [row] = await db.execute<{ requests: number; orders: number; invoices: number; payments: number; suppliers: number; due: number }>(sql`
+    with candidates as (
+      select i.id, ${payableOf("i")} as payable
+      from ${purchaseInvoices} i
+      where i.tenant_id = ${tenant} and i.deleted_at is null and i.kind = 'invoice' and i.due_on <= ${horizon}::date
+        and ${inLiveOrder(sql`i.order_id`)}
+    ),
+    paid as (
+      select p.invoice_id, sum(p.amount_cents) as paid from ${purchasePayments} p
+      where p.tenant_id = ${tenant} and p.deleted_at is null and p.invoice_id in (select id from candidates) group by p.invoice_id
+    ),
+    credited as (
+      select n.rectifies_id, sum(${payableOf("n")}) as payable from ${purchaseInvoices} n
+      where n.tenant_id = ${tenant} and n.kind = 'credit_note' and n.deleted_at is null and n.rectifies_id in (select id from candidates)
+      group by n.rectifies_id
+    )
     select
       (select count(*) from ${subcontractors} where tenant_id = ${tenant})::int as suppliers,
       (select count(*) from ${purchaseRequests} r join ${projects} rp on rp.id = r.project_id
@@ -235,10 +398,10 @@ export async function getPurchasingCounts(ctx: Ctx): Promise<PurchasingCounts> {
         where i.tenant_id = ${tenant} and i.deleted_at is null and ${inLiveOrder(sql`i.order_id`)})::int as invoices,
       (select count(*) from ${purchasePayments} p join ${purchaseInvoices} i on i.id = p.invoice_id
         where p.tenant_id = ${tenant} and p.deleted_at is null and i.deleted_at is null and ${inLiveOrder(sql`i.order_id`)})::int as payments,
-      (select count(*) from ${purchaseInvoices}
-        where ${purchaseInvoices.tenantId} = ${tenant} and ${purchaseInvoices.kind} = 'invoice'
-          and ${purchaseInvoices.deletedAt} is null and ${inLiveOrder(sql`${purchaseInvoices.orderId}`)}
-          and ${purchaseInvoices.dueOn} <= ${horizon} and ${outstandingSql} > 0)::int as due`);
+      (select count(*) from candidates c
+        left join paid on paid.invoice_id = c.id
+        left join credited on credited.rectifies_id = c.id
+        where c.payable + coalesce(credited.payable, 0) - coalesce(paid.paid, 0) > 0)::int as due`);
   return {
     requests: row?.requests ?? 0,
     orders: row?.orders ?? 0,
@@ -528,11 +691,16 @@ async function lockPlacedOrder(tx: Tx, orderId: string) {
  * schedule), rectifiesId? (a credit note's invoice, of the same order),
  * baseCents (negative for a credit note), vatKind?, irpfBp?, retentionBp?
  * (else the order's, or the rectified invoice's), lines? ([{ lineageId,
- * amountCents }], else in proportion), notes?, file? (PDF) }. Only a placed
- * order takes invoices. → { invoiceId }
+ * amountCents }], else in proportion), notes?, file? (PDF), idempotencyKey?
+ * (sent again with the same key, it is registered once: ./idempotency) }.
+ * Only a placed order takes invoices. → { invoiceId }
  */
 export async function createInvoice(ctx: Ctx, orderId: string, input: Record<string, unknown>) {
   requireEditor(ctx);
+  return idempotent<{ invoiceId: string }>(ctx, "purchase.invoice.create", { orderId }, input, (once) => registerInvoice(ctx, orderId, input, once));
+}
+
+async function registerInvoice(ctx: Ctx, orderId: string, input: Record<string, unknown>, once: Once<{ invoiceId: string }>) {
   const order = await requireOrder(ctx, orderId);
   if (!countsAsContracted(order.status)) fail("invalid_state");
   const kind = input.kind === undefined ? "invoice" : pick(PURCHASE_INVOICE_KINDS)(input.kind);
@@ -576,68 +744,106 @@ export async function createInvoice(ctx: Ctx, orderId: string, input: Record<str
   const pathname = `${folder}${crypto.randomUUID()}.pdf`;
   // No file: storeFiles just records it.
   await storeFiles(file ? [{ pathname, body: file, contentType: "application/pdf" }] : [], () =>
-    db.transaction(async (tx) => {
-      const locked = await lockPlacedOrder(tx, orderId);
-      if (rectified) await checkCreditRoom(tx, rectified.id, amounts.baseCents);
-      // Read again under the lock: an edit of the order's lines or schedule can't slip in between.
-      const [current, schedule] = await Promise.all([
-        tx.select({ lineageId: purchaseOrderLines.lineageId }).from(purchaseOrderLines).where(eq(purchaseOrderLines.orderId, orderId)),
-        milestoneId
-          ? tx.select({ id: purchaseOrderMilestones.id }).from(purchaseOrderMilestones).where(eq(purchaseOrderMilestones.id, milestoneId))
-          : [],
-      ]);
-      const contracted = new Set(current.map((l) => l.lineageId));
-      if (split.some((l) => !contracted.has(l.lineageId))) fail("unknown_line");
-      if (milestoneId && schedule.length === 0) fail("invalid_input");
-      const [row] = await tx
-        .insert(purchaseInvoices)
-        .values({
-          id: invoiceId,
-          tenantId: ctx.tenantId,
-          orderId,
-          subcontractorId: locked.subcontractorId,
-          kind,
+    db.transaction((tx) =>
+      once(tx, async () => {
+        const locked = await lockPlacedOrder(tx, orderId);
+        if (rectified) await checkCreditRoom(tx, rectified.id, amounts.baseCents);
+        await checkOnOrder(tx, orderId, split, milestoneId);
+        const [row] = await tx
+          .insert(purchaseInvoices)
+          .values({
+            id: invoiceId,
+            tenantId: ctx.tenantId,
+            orderId,
+            subcontractorId: locked.subcontractorId,
+            kind,
+            number,
+            milestoneId,
+            rectifiesId: rectified?.id ?? null,
+            issuedOn,
+            dueOn,
+            baseCents: amounts.baseCents,
+            vatKind: amounts.vatKind,
+            vatCents: amounts.vatCents,
+            irpfBp: amounts.irpfBp,
+            irpfCents: amounts.irpfCents,
+            retentionBp: amounts.retentionBp,
+            retentionCents: amounts.retentionCents,
+            notes,
+            createdById: ctx.userId,
+          })
+          .onConflictDoNothing()
+          .returning({ id: purchaseInvoices.id });
+        if (!row) fail("duplicate_number");
+        await tx.insert(purchaseInvoiceLines).values(split.map((l) => ({ ...l, tenantId: ctx.tenantId, invoiceId })));
+        if (file) {
+          await tx.insert(purchaseInvoiceFiles).values({
+            tenantId: ctx.tenantId,
+            invoiceId,
+            version: 1,
+            pathname,
+            filename: uploadedName(file, `${number}.pdf`),
+            sizeBytes: file.size,
+            uploadedById: ctx.userId,
+          });
+        }
+        await logEvent(tx, ctx, orderId, "invoice_created", {
+          invoiceId,
           number,
+          kind,
+          baseCents: amounts.baseCents,
           milestoneId,
           rectifiesId: rectified?.id ?? null,
-          issuedOn,
-          dueOn,
-          baseCents: amounts.baseCents,
-          vatKind: amounts.vatKind,
-          vatCents: amounts.vatCents,
-          irpfBp: amounts.irpfBp,
-          irpfCents: amounts.irpfCents,
-          retentionBp: amounts.retentionBp,
-          retentionCents: amounts.retentionCents,
-          notes,
-          createdById: ctx.userId,
-        })
-        .onConflictDoNothing()
-        .returning({ id: purchaseInvoices.id });
-      if (!row) fail("duplicate_number");
-      await tx.insert(purchaseInvoiceLines).values(split.map((l) => ({ ...l, tenantId: ctx.tenantId, invoiceId })));
-      if (file) {
-        await tx.insert(purchaseInvoiceFiles).values({
-          tenantId: ctx.tenantId,
-          invoiceId,
-          version: 1,
-          pathname,
-          filename: uploadedName(file, `${number}.pdf`),
-          sizeBytes: file.size,
-          uploadedById: ctx.userId,
         });
-      }
-      await logEvent(tx, ctx, orderId, "invoice_created", {
-        invoiceId,
-        number,
-        kind,
-        baseCents: amounts.baseCents,
-        milestoneId,
-        rectifiesId: rectified?.id ?? null,
-      });
-    }),
+        return { invoiceId };
+      }),
+    ),
   );
   return { invoiceId };
+}
+
+/**
+ * In `tx`, the order locked, so an edit of its lines or schedule can't slip in
+ * between: `lines` are still lines of the order, and `milestoneId` still one
+ * of its schedule.
+ */
+async function checkOnOrder(tx: Tx, orderId: string, lines: { lineageId: string }[], milestoneId: string | null) {
+  const [current, schedule] = await Promise.all([
+    tx.select({ lineageId: purchaseOrderLines.lineageId }).from(purchaseOrderLines).where(eq(purchaseOrderLines.orderId, orderId)),
+    milestoneId
+      ? tx.select({ id: purchaseOrderMilestones.id }).from(purchaseOrderMilestones).where(eq(purchaseOrderMilestones.id, milestoneId))
+      : [],
+  ]);
+  const contracted = new Set(current.map((l) => l.lineageId));
+  if (lines.some((l) => !contracted.has(l.lineageId))) fail("unknown_line");
+  if (milestoneId && schedule.length === 0) fail("invalid_input");
+}
+
+/**
+ * In `tx`, for a deleted invoice (or credit note) about to come back
+ * (./deleted): what `createInvoice` holds a new one to, as the order stands
+ * now. Its order is still placed and still its supplier's (`invalid_state`),
+ * its lines are still the order's (`unknown_line`), an order that has a
+ * payment schedule since has it on a milestone (`missing_fields`), and a
+ * credit note still fits in what its invoice leaves (`exceeds_amount`).
+ */
+export async function checkInvoiceRestorable(tx: Tx, invoice: InvoiceRow) {
+  const locked = await lockPlacedOrder(tx, invoice.orderId);
+  if (locked.subcontractorId !== invoice.subcontractorId) fail("invalid_state");
+  const lines = await tx
+    .select({ lineageId: purchaseInvoiceLines.lineageId })
+    .from(purchaseInvoiceLines)
+    .where(eq(purchaseInvoiceLines.invoiceId, invoice.id));
+  await checkOnOrder(tx, invoice.orderId, lines, invoice.milestoneId);
+  if (invoice.kind === "credit_note") return checkCreditRoom(tx, invoice.rectifiesId!, invoice.baseCents);
+  if (invoice.milestoneId) return;
+  // Its milestone went with the schedule it was deleted under (`releaseMilestones`).
+  const [scheduled] = await tx
+    .select({ id: purchaseOrderMilestones.id })
+    .from(purchaseOrderMilestones)
+    .where(eq(purchaseOrderMilestones.orderId, invoice.orderId))
+    .limit(1);
+  if (scheduled) fail("missing_fields");
 }
 
 /** Locks the invoice for this transaction; `not_found` if it was deleted meanwhile. */
@@ -848,14 +1054,49 @@ async function requirePayment(ctx: Ctx, paymentId: string) {
 }
 
 /**
+ * In `tx`: `amountCents` more fits in what the invoice can still be paid (its
+ * total, its credit notes off, less what was paid); `exceeds_amount` otherwise.
+ */
+async function checkPayable(tx: Tx, invoice: InvoiceRow, amountCents: number) {
+  // Locked: two payments at once can't both fit in what is left.
+  await lockInvoice(tx, invoice.id);
+  const group = await tx.select().from(purchaseInvoices).where(and(inGroup(invoice.id), isNull(purchaseInvoices.deletedAt)));
+  const own = group.find((g) => g.id === invoice.id)!;
+  const settlement = settle(
+    withTotals(own),
+    group.filter((g) => g.id !== invoice.id).map(withTotals),
+    await paidAgainst(tx, invoice),
+  );
+  if (amountCents > settlement.payableLeftCents) fail("exceeds_amount");
+}
+
+/**
+ * In `tx`, for a deleted payment about to come back (./deleted): what
+ * `createPayment` holds a new one to, as its invoice stands now. Never dated
+ * before the invoice (`invalid_date`), never more than is left to pay
+ * (`exceeds_amount`).
+ */
+export async function checkPaymentRestorable(tx: Tx, invoice: InvoiceRow, payment: { paidOn: string; amountCents: number }) {
+  if (invoice.kind !== "invoice") fail("invalid_state");
+  if (payment.paidOn < invoice.issuedOn) fail("invalid_date");
+  await checkPayable(tx, invoice, payment.amountCents);
+}
+
+/**
  * Body: { amountCents, paidOn? (today by default; not before the invoice nor
  * after today), method? (transfer by default), reference?, file? (PDF proof) }.
  * Partial payments add up; past what is due, the retention is being
  * released; never more than the invoice's total, its credit notes off.
- * → { paymentId }
+ * With an `idempotencyKey`, the same payment sent again (a double click, a
+ * retry after a timeout) is recorded once and answered the same
+ * (./idempotency). → { paymentId }
  */
 export async function createPayment(ctx: Ctx, invoiceId: string, input: Record<string, unknown>) {
   requireEditor(ctx);
+  return idempotent<{ paymentId: string }>(ctx, "purchase.payment.create", { invoiceId }, input, (once) => recordPayment(ctx, invoiceId, input, once));
+}
+
+async function recordPayment(ctx: Ctx, invoiceId: string, input: Record<string, unknown>, once: Once<{ paymentId: string }>) {
   const invoice = await requireInvoice(ctx, invoiceId);
   // A credit note is settled through its invoice.
   if (invoice.kind !== "invoice") fail("invalid_state");
@@ -869,37 +1110,31 @@ export async function createPayment(ctx: Ctx, invoiceId: string, input: Record<s
   const paymentId = crypto.randomUUID();
   const pathname = `${projectFolder(ctx.tenantId, order!.projectId)}purchases/${invoice.orderId}/payments/${paymentId}.pdf`;
   await storeFiles(file ? [{ pathname, body: file, contentType: "application/pdf" }] : [], () =>
-    db.transaction(async (tx) => {
-      // Locked: two payments at once can't both fit in what is left.
-      await lockInvoice(tx, invoiceId);
-      const group = await tx.select().from(purchaseInvoices).where(and(inGroup(invoiceId), isNull(purchaseInvoices.deletedAt)));
-      const own = group.find((g) => g.id === invoiceId)!;
-      const settlement = settle(
-        withTotals(own),
-        group.filter((g) => g.id !== invoiceId).map(withTotals),
-        await paidAgainst(tx, invoice),
-      );
-      if (amountCents > settlement.payableLeftCents) fail("exceeds_amount");
-      await tx.insert(purchasePayments).values({
-        id: paymentId,
-        tenantId: ctx.tenantId,
-        invoiceId,
-        paidOn: paidOn,
-        amountCents,
-        method,
-        reference,
-        ...(file ? { fileName: uploadedName(file, "justificante.pdf"), filePathname: pathname, fileSizeBytes: file.size } : {}),
-        createdById: ctx.userId,
-      });
-      await logEvent(tx, ctx, invoice.orderId, "payment_added", {
-        invoiceId,
-        number: invoice.number,
-        paymentId,
-        amountCents,
-        paidOn: paidOn,
-        method,
-      });
-    }),
+    db.transaction((tx) =>
+      once(tx, async () => {
+        await checkPayable(tx, invoice, amountCents);
+        await tx.insert(purchasePayments).values({
+          id: paymentId,
+          tenantId: ctx.tenantId,
+          invoiceId,
+          paidOn: paidOn,
+          amountCents,
+          method,
+          reference,
+          ...(file ? { fileName: uploadedName(file, "justificante.pdf"), filePathname: pathname, fileSizeBytes: file.size } : {}),
+          createdById: ctx.userId,
+        });
+        await logEvent(tx, ctx, invoice.orderId, "payment_added", {
+          invoiceId,
+          number: invoice.number,
+          paymentId,
+          amountCents,
+          paidOn: paidOn,
+          method,
+        });
+        return { paymentId };
+      }),
+    ),
   );
   return { paymentId };
 }

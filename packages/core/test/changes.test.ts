@@ -16,6 +16,7 @@ import {
   changesService as svc,
   constructionService,
   CHANGE_AREAS,
+  deletedService,
   documentsService,
   hitosService,
   obraService,
@@ -321,6 +322,33 @@ const cases: Case[] = [
       return () => planningService.approvePlanningDraft(ctx, project.id, {});
     },
   ],
+  // Bringing back what a user deleted (deleted.ts): the client sees it again.
+  [
+    "restoreDeleted",
+    ["documents"],
+    async ({ ctx, project, tenant }) => {
+      const doc = await createTestDocument(tenant.id, project.id);
+      await documentsService.deleteDocument(ctx, project.id, doc.id);
+      return () => deletedService.restoreDeleted(ctx, "document", doc.id);
+    },
+  ],
+  [
+    "restoreDeleted (a photo)",
+    ["photos"],
+    async ({ ctx, project, tenant }) => {
+      const photo = await createTestPhoto(tenant.id, project.id);
+      await photosService.deletePhoto(ctx, project.id, photo.id);
+      return () => deletedService.restoreDeleted(ctx, "photo", photo.id);
+    },
+  ],
+  [
+    "restoreDeleted (the project)",
+    CHANGE_AREAS,
+    async ({ ctx, project }) => {
+      await projectsService.deleteProject(ctx, project.id);
+      return () => deletedService.restoreDeleted(ctx, "project", project.id);
+    },
+  ],
 ];
 
 describe("writes the client sees", () => {
@@ -437,6 +465,7 @@ describe("writes the client sees", () => {
       hitosService,
       constructionService,
       planningService,
+      deletedService,
     ];
     const covered = new Set([...cases.map(([name]) => name), "createBudget"]);
     const unchecked = services

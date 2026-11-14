@@ -1,5 +1,7 @@
 import { and, db, eq, gt, inArray, loginAttempts, lt, sql } from "@repo/db";
 import { logError } from "./log";
+import { isConflict } from "./pg-errors";
+import { sweepNowAndThen } from "./sweep";
 
 // ─── Login throttling ─────────────────────────────────────────────────────────
 // Failed password attempts are counted per key in a fixed 15-minute window
@@ -36,6 +38,13 @@ import { logError } from "./log";
 //      it is taken back off (2) and (3), and (1) is forgotten altogether (what
 //      that IP got wrong for the email before). The email's and the IP's other
 //      failures stay.
+//   e. If the password was right but a second step is still to come (the
+//      portal's two-step verification asks for a code: `withdrawn`), the
+//      attempt was no guess either: it is taken back off every counter, and
+//      nothing is forgotten. The attempt that then brings the code is counted
+//      like any other: a wrong code is a failure on the same counters as a
+//      wrong password, so codes can't be guessed any faster, and asking for
+//      the code step again never resets what wrong codes have counted.
 //
 // Whether the email is under attack is read (not counted) at (a): the 101st
 // checked failure onwards. That threshold is deliberately soft: a few parallel
@@ -70,9 +79,8 @@ import { logError } from "./log";
 //
 // A window that has ended is reset by the next attempt on its key, so rows
 // left behind change nothing: they are only swept away now and then
-// (`SWEEP_ONE_IN`), to keep the table small. The attempt that draws the sweep
-// waits for it (a promise left behind may never run once a serverless
-// function has answered).
+// (./sweep.ts), to keep the table small. The attempt that draws the sweep
+// waits for it.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const THROTTLE_WINDOW_MS = 15 * 60 * 1000;
@@ -80,39 +88,25 @@ export const THROTTLE_WINDOW_MS = 15 * 60 * 1000;
 /** A throttled key and the attempts it may have per window. */
 export type ThrottleKey = { key: string; limit: number };
 
-/**
- * One attempt in this many also sweeps the expired windows away. The sweep
- * reads the whole table (its only index is the key), so not every attempt.
- */
-export const SWEEP_ONE_IN = 50;
-
-/** A number in [0, 1): `Math.random`, or a test's own to force a sweep (0) or rule one out (1). */
-export type Random = () => number;
-
 const windowCutoff = (now = new Date()) => new Date(now.getTime() - THROTTLE_WINDOW_MS);
 
 const byKey = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
 
 /**
- * On one attempt in `SWEEP_ONE_IN`, deletes the windows that have ended and
- * waits for it. A sweep that fails is logged: it never fails the attempt.
- * Rows are taken in key order and those another statement holds are left for
- * the next sweep, so it can't be part of a deadlock.
+ * Now and then (./sweep.ts), deletes the windows that have ended. Rows are
+ * taken in key order and those another statement holds are left for the next
+ * sweep, so it can't be part of a deadlock.
  */
-async function sweepExpired(random: Random) {
-  if (random() >= 1 / SWEEP_ONE_IN) return;
-  try {
+const sweepExpired = () =>
+  sweepNowAndThen("throttle.sweep_failed", () => {
     const expired = db
       .select({ key: loginAttempts.key })
       .from(loginAttempts)
       .where(lt(loginAttempts.windowStart, windowCutoff()))
       .orderBy(loginAttempts.key)
       .for("update", { skipLocked: true });
-    await db.delete(loginAttempts).where(inArray(loginAttempts.key, expired));
-  } catch (error) {
-    logError("throttle.sweep_failed", error);
-  }
-}
+    return db.delete(loginAttempts).where(inArray(loginAttempts.key, expired));
+  });
 
 /**
  * Counts an attempt against every key, atomically (one statement, the rows
@@ -151,9 +145,9 @@ async function currentCount(key: string): Promise<number> {
  * Counts an attempt against every key and says whether any is now over its
  * limit (then don't check the password).
  */
-export async function overLimit(keys: ThrottleKey[], random: Random = Math.random): Promise<boolean> {
+export async function overLimit(keys: ThrottleKey[]): Promise<boolean> {
   const counts = await countAttempt(keys.map((k) => k.key));
-  await sweepExpired(random);
+  await sweepExpired();
   return keys.some(({ key, limit }) => (counts.get(key) ?? 0) > limit);
 }
 
@@ -172,14 +166,6 @@ async function uncountAttempt(key: string) {
     .update(loginAttempts)
     .set({ failures: sql`GREATEST(${loginAttempts.failures} - 1, 0)` })
     .where(eq(loginAttempts.key, key));
-}
-
-/** Postgres aborted the statement to let another go on: a deadlock, or a serialization failure. */
-function isConflict(error: unknown): boolean {
-  const codeOf = (value: unknown) => (value as { code?: unknown } | null | undefined)?.code;
-  // The ORM wraps the database's error: its code is on the cause.
-  const code = codeOf(error) ?? codeOf((error as { cause?: unknown } | null | undefined)?.cause);
-  return code === "40P01" || code === "40001";
 }
 
 /**
@@ -223,12 +209,7 @@ const MAX_KEY_EMAIL = 320;
  * right, so the attempt doesn't count as a failure. What is counted when is
  * at the top of this file.
  */
-export async function countSignIn(
-  scope: string,
-  email: string,
-  ip: string | undefined,
-  random: Random = Math.random,
-) {
+export async function countSignIn(scope: string, email: string, ip: string | undefined) {
   // JSON keeps the parts apart whatever they contain: the email is whatever
   // the caller typed, and must not be able to spell another key.
   const key = (kind: string, ...parts: string[]) => `signin-${kind}:${JSON.stringify(parts)}`;
@@ -254,7 +235,7 @@ export async function countSignIn(
 
   // Only an attempt whose password is about to be checked counts email-wide.
   if (!blocked) await counted(() => countAttempt([anywhere]), null);
-  await sweepExpired(random);
+  await sweepExpired();
 
   return {
     blocked,
@@ -272,6 +253,17 @@ export async function countSignIn(
         for (const k of [wholeIp, noIp, anywhere]) if (k) await uncountAttempt(k);
       } catch (error) {
         logError("throttle.success_failed", error);
+      }
+    },
+    /**
+     * The password was right, but the sign-in is not done (a second step is
+     * asked for): this attempt alone comes back off its counters. Never throws.
+     */
+    async withdrawn() {
+      try {
+        for (const k of [fromIp, wholeIp, noIp, anywhere]) if (k) await uncountAttempt(k);
+      } catch (error) {
+        logError("throttle.withdraw_failed", error);
       }
     },
   };

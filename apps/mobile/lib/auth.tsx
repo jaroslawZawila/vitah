@@ -7,6 +7,7 @@ import { clearDocuments } from "./document-store";
 import { clearHitoFiles } from "./hito-files";
 import { clearProjectChoice } from "./project-choice";
 import { retryPendingRemoval, unregisterPush } from "./push";
+import { setReportSession } from "./report-error";
 
 const TOKEN_KEY = "vitah_token";
 const USER_KEY = "vitah_user";
@@ -52,6 +53,15 @@ async function readSession(key: string): Promise<Session | null> {
 
 function saveBiometricSession(session: Session) {
   return SecureStore.setItemAsync(BIOMETRIC_KEY, JSON.stringify(session));
+}
+
+/** A step of signing out: one that fails must not stop the rest. */
+async function quietly(step: () => unknown) {
+  try {
+    await step();
+  } catch {
+    // Nothing to do about it here; the session is cleared all the same.
+  }
 }
 
 async function saveSession({ token, user }: Session) {
@@ -109,6 +119,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [],
   );
 
+  // So an error report can say whose phone it was: the token goes as its Authorization header.
+  useEffect(() => setReportSession(state.token), [state.token]);
+
   const signInWithBiometrics = useCallback(async (promptMessage: string) => {
     const saved = await readSession(BIOMETRIC_KEY).catch(() => null);
     if (!saved) return { error: "unavailable" as const };
@@ -153,19 +166,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   const signOut = useCallback(async () => {
-    // While the token still works: stop this phone getting the client's pushes.
-    if (state.token) await unregisterPush(state.token).catch(() => {});
-    await Promise.all([
-      SecureStore.deleteItemAsync(TOKEN_KEY),
-      SecureStore.deleteItemAsync(USER_KEY),
-    ]);
-    // The phone may be shared: don't leave the client's documents or photos behind.
-    clearDocuments();
-    clearHitoFiles();
-    await clearProjectChoice();
-    await Promise.all([Image.clearDiskCache(), Image.clearMemoryCache()]);
-    // Biometric sign-in stays on: it's how the client gets back in.
-    setState((s) => ({ ...s, token: null, user: null, isLoading: false, signedOut: true }));
+    const token = state.token;
+    try {
+      // Everything here is on the phone, so signing out never waits for the
+      // network. Stopping this phone's pushes is only noted (the token still
+      // works) and sent to the server in the background, again on the next
+      // open if it didn't get there.
+      if (token) await quietly(() => unregisterPush(token));
+      await quietly(() => SecureStore.deleteItemAsync(TOKEN_KEY));
+      await quietly(() => SecureStore.deleteItemAsync(USER_KEY));
+      // The phone may be shared: don't leave the client's documents or photos behind.
+      await quietly(clearDocuments);
+      await quietly(clearHitoFiles);
+      await quietly(clearProjectChoice);
+      await quietly(() => Image.clearDiskCache());
+      await quietly(() => Image.clearMemoryCache());
+    } finally {
+      // Biometric sign-in stays on: it's how the client gets back in.
+      setState((s) => ({ ...s, token: null, user: null, isLoading: false, signedOut: true }));
+    }
   }, [state.token]);
 
   return (

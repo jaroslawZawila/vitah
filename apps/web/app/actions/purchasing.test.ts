@@ -11,6 +11,7 @@ import {
   amendPurchaseAction,
   createPurchaseAction,
   deleteOrderDocumentAction,
+  exportPurchases,
   getProjectPurchases,
   getPurchase,
   getPurchaseForm,
@@ -144,6 +145,35 @@ describe("purchasing actions", () => {
     expect(await getProjectPurchases(project.id)).toMatchObject({ canManage: false, purchases: { orders: [] } });
     expect(await getPurchases()).toMatchObject({ canManage: false, purchases: { orders: [] } });
     expect((await getPurchaseForm(project.id))!.form.suppliers).toHaveLength(1);
+  });
+
+  it("read a page of the tenant's orders with its filters, and every filtered order for the export", async () => {
+    const { project, order, admin } = await setup("viewer");
+    const ids: string[] = [];
+    for (const description of ["Piedra", "Lámina", "Grava"]) {
+      ids.unshift((await purchasingService.createPurchase(admin, project.id, { ...order, description, status: description === "Lámina" ? "pending" : "ordered" })).orderId);
+    }
+    const idsOf = (orders: { id: string }[]) => orders.map((o) => o.id);
+
+    // Without a query: all of them, as before.
+    expect(idsOf((await getPurchases())!.purchases.orders)).toEqual(ids);
+    const page = (await getPurchases({ page: 2, limit: 2 }))!;
+    expect(page.canManage).toBe(false);
+    expect(idsOf(page.purchases.orders)).toEqual(ids.slice(2));
+    expect(page.purchases.paging).toEqual({ page: 2, limit: 2, total: 3, pages: 2 });
+    expect(page.purchases.groupCounts).toMatchObject({ all: 3, open: 2, pending: 1 });
+    expect(idsOf((await getPurchases({ page: 1, group: "pending" }))!.purchases.orders)).toEqual([ids[1]]);
+    expect(idsOf((await getPurchases({ page: 1, q: "grava" }))!.purchases.orders)).toEqual([ids[0]]);
+    expect((await getPurchases({ page: 1, by: "supplier" }))!.purchases.bySupplier).toMatchObject([{ orders: 3 }]);
+    // A page that isn't one is the service's error: nothing is read.
+    expect(await getPurchases({ page: "abc" })).toBeNull();
+
+    // The export: every order the filters keep, whatever page the screen shows.
+    expect(idsOf(await exportPurchases({ group: "open" }))).toEqual([ids[0], ids[2]]);
+    expect(idsOf(await exportPurchases({ ...({ page: 2, limit: 1 } as object), q: "" }))).toEqual(ids);
+    // Signed out meanwhile: on to the login page, like every other read.
+    signInAs(null);
+    await expect(exportPurchases()).rejects.toEqual(TO_LOGIN);
   });
 
   it("return the service's errors and nothing for another tenant", async () => {

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -59,10 +59,14 @@ describe("RequestScreen", () => {
     await userEvent.click(decision().getByRole("button", { name: "Aprobar" }));
     expect(actions.decideRequestAction).toHaveBeenCalledWith("req-3", { decision: "approve", note: "" });
 
-    await userEvent.click(decision().getByRole("button", { name: "Rechazar" }));
+    // Both buttons are disabled while the decision is sent.
+    const toReject = decision().getByRole("button", { name: "Rechazar" });
+    await waitFor(() => expect(toReject).toBeEnabled());
+    await userEvent.click(toReject);
     const reject = decision().getByRole("button", { name: "Rechazar solicitud" });
     expect(reject).toBeDisabled();
     await userEvent.type(decision().getByLabelText("Motivo del rechazo"), "Hay stock en VTH-26-003");
+    expect(reject).toBeEnabled();
     await userEvent.click(reject);
     expect(actions.decideRequestAction).toHaveBeenLastCalledWith("req-3", { decision: "reject", note: "Hay stock en VTH-26-003" });
   });

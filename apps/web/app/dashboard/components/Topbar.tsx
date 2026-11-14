@@ -9,12 +9,18 @@ export default function Topbar() {
 
   const titleKey = pathname.startsWith("/dashboard/subcontratas")
     ? "subcontractors"
+    : pathname.startsWith("/dashboard/eliminados")
+    ? "deleted"
+    : pathname.startsWith("/dashboard/compras")
+    ? "purchases"
     : pathname.startsWith("/dashboard/users")
     ? "users"
     : pathname.startsWith("/dashboard/clients")
       ? "clients"
       : pathname === "/dashboard/projects/new"
         ? "newProject"
+        : /^\/dashboard\/projects\/(compras|presupuestos)(\/|$)/.test(pathname)
+        ? "projects"
         : pathname.startsWith("/dashboard/projects/")
       ? "projectDetail"
       : "projects";

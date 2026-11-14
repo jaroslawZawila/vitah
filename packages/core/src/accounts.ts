@@ -2,9 +2,12 @@ import bcrypt from "bcryptjs";
 import { db, inArray, pushTokens, users, type SQL } from "@repo/db";
 import { isStrongPassword } from "./contract";
 import { CoreError, invalid, notFound } from "./errors";
-import { clearAttempts, overLimit } from "./throttle";
+import { clearAttempts, overLimit, type ThrottleKey } from "./throttle";
 
 // Helpers shared by everything that creates or authenticates user accounts.
+
+// Where it always was for its callers; the database's errors are read in ./pg-errors.
+export { isUniqueViolation } from "./pg-errors";
 
 // Tests lower the cost (see @repo/db/vitest); production always uses 12.
 // Outside tests a lower or malformed BCRYPT_COST is ignored, so a stray
@@ -18,22 +21,6 @@ export function bcryptCost(raw: string | undefined, nodeEnv: string | undefined)
 }
 
 export const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-type PgError = { code?: unknown; constraint_name?: unknown };
-
-function pgError(error: unknown): PgError | undefined {
-  // Drizzle wraps driver errors, keeping the original as `cause`.
-  const candidates = [error, (error as { cause?: unknown } | null)?.cause];
-  return candidates.find(
-    (e): e is PgError => typeof e === "object" && e !== null && (e as PgError).code === "23505",
-  );
-}
-
-/** True for a Postgres unique-constraint violation (e.g. a taken email). */
-export function isUniqueViolation(error: unknown, constraint?: string): boolean {
-  const pg = pgError(error);
-  return pg !== undefined && (constraint === undefined || pg.constraint_name === constraint);
-}
 
 export function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
@@ -83,6 +70,9 @@ export async function replacePassword(where: SQL | undefined, password: string) 
 /** Wrong current passwords a user may enter per throttle window. */
 const PASSWORD_ATTEMPTS = 10;
 
+/** The counter of a signed-in user's wrong current passwords, wherever one is asked for. */
+export const passwordThrottle = (userId: string): ThrottleKey => ({ key: `password:${userId}`, limit: PASSWORD_ATTEMPTS });
+
 /**
  * The user matching `where` changes their own password.
  * Body: { currentPassword, newPassword }. Needs the current one (throttled per
@@ -102,7 +92,7 @@ export async function changeOwnPassword(
   }
   newPassword(next);
 
-  const throttle = [{ key: `password:${userId}`, limit: PASSWORD_ATTEMPTS }];
+  const throttle = [passwordThrottle(userId)];
   if (await overLimit(throttle)) throw new CoreError("too_many_attempts", 429);
 
   const [user] = await db.select({ passwordHash: users.passwordHash }).from(users).where(where).limit(1);

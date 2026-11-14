@@ -117,6 +117,13 @@ const credit = invoiceItem({
 
 export const invoices: TenantInvoices = {
   invoices: [overdue, invoiceItem(), paid, credit],
+  // The whole list fits in its first page.
+  paging: { page: 1, limit: 50, total: 4, pages: 1 },
+  groupCounts: { all: 4, open: 2, overdue: 1, paid: 1, credit: 1 },
+  suppliers: [
+    { id: "sup-msn", name: "Montajes Steel Norte S.L." },
+    { id: "sup-soc", name: "Suministros de Obra Cantabria S.L." },
+  ],
   projects: [
     { id: "p-1", ref: "VTH-26-001", address: "Barrio La Iglesia 14, Caviedes" },
     { id: "p-2", ref: "VTH-25-014", address: "Calle Mayor 3, Comillas" },
@@ -182,6 +189,7 @@ export const payments: TenantPayments = {
     { from: "2026-10-26", to: "2026-11-01", totalCents: 0, invoices: [] },
   ],
   payments: [payment],
+  paging: { page: 1, limit: 50, total: 1, pages: 1 },
   summary: { monthCents: 1_500_000, monthPayments: 1 },
   today: TODAY,
 };

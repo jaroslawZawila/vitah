@@ -1,9 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createTestProject, createTestTenant, createTestUser, resetDatabase } from "@repo/db/testing";
+import { db, eq, purchaseOrders, sql } from "@repo/db";
+import { MAX_UNPAGED, orderLabel } from "../src/contract";
 import {
   budgetService,
   constructionService,
   planningService,
+  projectsService,
   purchasingService as svc,
   subcontractorsService,
   type Ctx,
@@ -364,10 +367,286 @@ describe("listPurchases", () => {
       pendingCents: 80_000,
       pendingOrders: 1,
       lateDeliveries: 1,
+      lateProjectRefs: [s.project.ref],
     });
     expect(all.projects.map((p) => p.ref).sort()).toEqual([s.project.ref, other.ref].sort());
     expect((await svc.listSupplierOrders(s.ctx, s.subcontractorId)).map((o) => o.projectRef)).toEqual([other.ref]);
     await expect(svc.listSupplierOrders(s.ctx, "nope")).rejects.toMatchObject({ code: "not_found" });
+  });
+});
+
+describe("listPurchases, a page at a time", () => {
+  /**
+   * Seven orders on two obras, read by a viewer: on the first a late delivery
+   * (PED-001), a subcontract (002), one not sent (003), one delivered (004)
+   * and one cancelled (005); on the second a subcontract not sent (001) and
+   * an order placed last year (002). Besides, an order of a deleted obra and
+   * one of another tenant, which nothing may show.
+   */
+  async function many() {
+    const s = await setup("viewer");
+    const { admin } = s;
+    const budgeted = async (ctx: Ctx, tenantId: string) => {
+      const project = await createTestProject(tenantId);
+      const { revisionId } = await framerDraft(ctx, project.id, ["01"]);
+      await budgetService.acceptRevision(ctx, project.id, revisionId, {}, { unissued: true });
+      return { project, lineageId: (await svc.getPurchaseForm(ctx, project.id)).chapters[0]!.lines[0]!.lineageId };
+    };
+    const order = async (ctx: Ctx, projectId: string, input: Record<string, unknown>) => (await svc.createPurchase(ctx, projectId, input)).orderId;
+
+    const a1 = await order(admin, s.project.id, material(s, { description: "Mampostería de piedra", status: "ordered", orderedOn: "2026-10-03", expectedOn: "2026-10-10" }));
+    const a2 = await order(admin, s.project.id, {
+      kind: "subcontract",
+      subcontractorId: s.subcontractorId,
+      description: "Montaje de la estructura",
+      status: "contracted",
+      orderedOn: "2026-09-15",
+      lines: [{ lineageId: s.lineage("03"), amountCents: 98_000 }],
+    });
+    const a3 = await order(admin, s.project.id, material(s, { description: "Hormigón de limpieza", lines: [{ lineageId: s.lineage("02"), amountCents: 50_000 }] }));
+    const a4 = await order(admin, s.project.id, material(s, { description: "Lámina 100% impermeable", status: "ordered", orderedOn: "2026-08-01", lines: [{ lineageId: s.lineage("02"), amountCents: 20_000 }] }));
+    await svc.setPurchaseStatus(admin, a4, { status: "delivered", date: "2026-08-20" });
+    const a5 = await order(admin, s.project.id, material(s, { description: "Oferta descartada", lines: [{ lineageId: s.lineage("01"), amountCents: 10_000 }] }));
+    await svc.setPurchaseStatus(admin, a5, { status: "cancelled" });
+
+    const second = await budgeted(admin, s.tenant.id);
+    const b1 = await order(admin, second.project.id, {
+      kind: "subcontract",
+      subcontractorId: s.subcontractorId,
+      description: "Montaje en la otra obra",
+      lines: [{ lineageId: second.lineageId, amountCents: 80_000 }],
+    });
+    const b2 = await order(admin, second.project.id, material(s, { description: "Ventanas", status: "ordered", orderedOn: "2025-12-20", expectedOn: "2026-12-01", lines: [{ lineageId: second.lineageId, amountCents: 30_000 }] }));
+
+    // An obra deleted with its order, late and placed this year: it counts nowhere.
+    const gone = await budgeted(admin, s.tenant.id);
+    await order(admin, gone.project.id, material(s, { description: "Piedra de la obra borrada", status: "ordered", expectedOn: "2026-10-01", lines: [{ lineageId: gone.lineageId, amountCents: 77_000 }] }));
+    await projectsService.deleteProject(admin, gone.project.id);
+
+    const otherTenant = await createTestTenant();
+    const stranger: Ctx = { tenantId: otherTenant.id, userId: (await createTestUser(otherTenant.id, { role: "admin" })).id, role: "admin" };
+    const theirs = await budgeted(stranger, otherTenant.id);
+    const { id: theirSupplier } = await subcontractorsService.createSubcontractor(stranger, company({ legalName: "Piedra Ajena S.L.", suppliesOnly: true }));
+    const strangerOrder = await order(stranger, theirs.project.id, {
+      kind: "material",
+      subcontractorId: theirSupplier,
+      description: "Piedra de otro",
+      status: "ordered",
+      expectedOn: "2026-10-01",
+      lines: [{ lineageId: theirs.lineageId, amountCents: 66_000 }],
+    });
+    // Newest first.
+    return { ...s, second: second.project, gone: gone.project, stranger, strangerOrder, theirProject: theirs.project, ids: [b2, b1, a5, a4, a3, a2, a1] };
+  }
+
+  const idsOf = (list: { orders: { id: string }[] }) => list.orders.map((o) => o.id);
+
+  it("gives the whole list when no page is asked for, as before", async () => {
+    const s = await many();
+    const all = await svc.listPurchases(s.ctx);
+
+    expect(idsOf(all)).toEqual(s.ids);
+    expect(all.paging).toEqual({ page: 1, limit: 5000, total: 7, pages: 1 });
+    expect(all.groupCounts).toEqual({ all: 7, open: 3, pending: 2, done: 1, cancelled: 1 });
+    // 95.000 + 98.000 + 20.000 + 30.000: pending and cancelled ones don't add up.
+    expect(all.shownContractedCents).toBe(243_000);
+    expect(all.suppliers).toEqual([
+      { id: s.subcontractorId, name: "Montajes Steel Norte S.L." },
+      { id: s.supplierId, name: "Piedra de Liébana S.L." },
+    ]);
+    expect(all.bySupplier).toBeUndefined();
+    // The order placed in 2025 isn't this year's; the deleted obra's and the other tenant's count nowhere.
+    expect(all.summary).toEqual({
+      yearContractedCents: 213_000,
+      yearOrders: 3,
+      yearProjects: 1,
+      openCents: 223_000,
+      openOrders: 3,
+      pendingCents: 130_000,
+      pendingOrders: 2,
+      lateDeliveries: 1,
+      lateProjectRefs: [s.project.ref],
+    });
+    expect(all.projects.map((p) => p.id).sort()).toEqual([s.project.id, s.second.id].sort());
+    expect(all.orders.at(-1)).toMatchObject({ number: 1, amountCents: 95_000, lateDays: 7, caeStatus: "apta", chapterCodes: ["01"] });
+    expect(all.orders.find((o) => o.id === s.ids[5])).toMatchObject({ caeStatus: "pendiente", supplierName: "Montajes Steel Norte S.L." });
+  });
+
+  it("says when a list asked for whole was cut at its cap, and exports every order all the same", async () => {
+    const s = await setup("viewer");
+    const total = MAX_UNPAGED + 1;
+    // One more order than a whole list returns, each a second older than the last.
+    await db.execute(sql`
+      insert into purchase_orders (id, tenant_id, project_id, number, kind, subcontractor_id, description, status, ordered_on, created_at)
+      select gen_random_uuid()::text, ${s.tenant.id}, ${s.project.id}, n, 'material', ${s.supplierId}, 'Pedido ' || n, 'ordered', '2026-09-01',
+        now() - make_interval(secs => n)
+      from generate_series(1, ${total}) n`);
+
+    const whole = await svc.listPurchases(s.ctx);
+    expect(whole.orders).toHaveLength(MAX_UNPAGED);
+    expect(whole.paging).toEqual({ page: 1, limit: MAX_UNPAGED, total, pages: 2, truncated: true });
+    // The oldest is the one the cap left out.
+    expect(whole.orders.map((o) => o.number)).not.toContain(total);
+
+    // The export reads the pages in turn: every order, once, in the list's order.
+    const exported = await svc.listAllPurchases(s.ctx);
+    expect(exported).toHaveLength(total);
+    expect(exported.map((o) => o.number)).toEqual(Array.from({ length: total }, (_, i) => i + 1));
+    // With the screen's filters, and whatever page or breakdown came along with them.
+    const filtered = await svc.listAllPurchases(s.ctx, { q: "Pedido 500", ...({ page: 3, limit: 1, by: "supplier" } as object) });
+    expect(filtered.map((o) => o.number).sort((a, b) => a - b)).toEqual([500, 5000, 5001]);
+    expect(await svc.listAllPurchases(s.ctx, { group: "pending" })).toEqual([]);
+
+    // A list that fits says nothing of the kind, and a page never does.
+    expect((await svc.listPurchases(s.ctx, { q: "Pedido 500" })).paging).toEqual({ page: 1, limit: MAX_UNPAGED, total: 3, pages: 1 });
+    expect((await svc.listPurchases(s.ctx, { page: 1 })).paging).toEqual({ page: 1, limit: 50, total, pages: Math.ceil(total / 50) });
+  }, 120_000);
+
+  it("cuts pages in a stable order: first, next, last and beyond the end", async () => {
+    const s = await many();
+    const page = (n: number) => svc.listPurchases(s.ctx, { page: n, limit: 3 });
+
+    const [first, next, last, beyond] = await Promise.all([page(1), page(2), page(3), page(4)]);
+    expect(idsOf(first)).toEqual(s.ids.slice(0, 3));
+    expect(idsOf(next)).toEqual(s.ids.slice(3, 6));
+    expect(idsOf(last)).toEqual(s.ids.slice(6));
+    expect(idsOf(beyond)).toEqual([]);
+    expect(first.paging).toEqual({ page: 1, limit: 3, total: 7, pages: 3 });
+    expect(beyond.paging).toEqual({ page: 4, limit: 3, total: 7, pages: 3 });
+    // The counts and the totals are the whole list's on every page.
+    for (const each of [first, next, last, beyond]) {
+      expect(each.groupCounts).toEqual({ all: 7, open: 3, pending: 2, done: 1, cancelled: 1 });
+      expect(each.shownContractedCents).toBe(243_000);
+      expect(each.summary).toMatchObject({ yearContractedCents: 213_000, openOrders: 3, lateDeliveries: 1 });
+    }
+    // As a URL carries them, and a page with the default size.
+    expect(idsOf(await svc.listPurchases(s.ctx, { page: "2", limit: "3" }))).toEqual(s.ids.slice(3, 6));
+    expect((await svc.listPurchases(s.ctx, { page: 1 })).paging).toEqual({ page: 1, limit: 50, total: 7, pages: 1 });
+  });
+
+  it("caps a huge limit and refuses a page that isn't one", async () => {
+    const s = await many();
+    expect((await svc.listPurchases(s.ctx, { limit: 1_000_000 })).paging).toMatchObject({ limit: 200, total: 7 });
+    for (const bad of [{ page: 0 }, { page: "abc" }, { page: -1 }, { page: 1.5 }, { limit: 0 }, { limit: "x" }]) {
+      await expect(svc.listPurchases(s.ctx, bad)).rejects.toMatchObject({ code: "invalid_page", status: 400 });
+    }
+    await expect(svc.listPurchases(s.ctx, { group: "nope" })).rejects.toMatchObject({ code: "invalid_input" });
+    await expect(svc.listPurchases(s.ctx, { kind: "nope" })).rejects.toMatchObject({ code: "invalid_input" });
+    await expect(svc.listPurchases(s.ctx, { from: "2026-02-31" })).rejects.toMatchObject({ code: "invalid_date" });
+  });
+
+  it("filters on the server: state, obra, supplier, type, order date, lateness and text", async () => {
+    const s = await many();
+    const [b2, b1, a5, a4, a3, a2, a1] = s.ids;
+    const kept = async (query: Record<string, unknown>) => idsOf(await svc.listPurchases(s.ctx, { page: 1, ...query }));
+
+    expect(await kept({ group: "open" })).toEqual([b2, a2, a1]);
+    expect(await kept({ group: "pending" })).toEqual([b1, a3]);
+    expect(await kept({ group: "done" })).toEqual([a4]);
+    expect(await kept({ group: "cancelled" })).toEqual([a5]);
+    expect(await kept({ group: "all" })).toEqual(s.ids);
+    expect(await kept({ projectId: s.second.id })).toEqual([b2, b1]);
+    expect(await kept({ supplierId: s.subcontractorId })).toEqual([b1, a2]);
+    expect(await kept({ kind: "subcontract" })).toEqual([b1, a2]);
+    expect(await kept({ kind: "material", group: "open" })).toEqual([b2, a1]);
+    expect(await kept({ from: "2026-10-01", to: "2026-10-05" })).toEqual([a1]);
+    expect(await kept({ from: "2026-08-01", to: "2026-09-30" })).toEqual([a4, a2]);
+    expect(await kept({ to: "2025-12-31" })).toEqual([b2]);
+    expect(await kept({ late: "1" })).toEqual([a1]);
+    expect(await kept({ late: true, projectId: s.second.id })).toEqual([]);
+    // Text: in the number, the supplier, the description or the obra, whatever its case.
+    expect(await kept({ q: "MONTAJE" })).toEqual([b1, a2]);
+    expect(await kept({ q: "ped-002" })).toEqual([b2, a2]);
+    expect(await kept({ q: "steel norte" })).toEqual([b1, a2]);
+    expect(await kept({ q: s.second.ref })).toEqual([b2, b1]);
+    expect(await kept({ q: "  hormigón " })).toEqual([a3]);
+    // % and _ are text, not wildcards.
+    expect(await kept({ q: "100%" })).toEqual([a4]);
+    expect(await kept({ q: "1_0" })).toEqual([]);
+    expect(await kept({ q: "%" })).toEqual([a4]);
+    // The deleted obra's order never matches, nor another tenant's obra or supplier.
+    expect(await kept({ q: "borrada" })).toEqual([]);
+    expect(await kept({ projectId: s.gone.id })).toEqual([]);
+    expect(await kept({ projectId: s.theirProject.id })).toEqual([]);
+  });
+
+  it("finds an order by its number as the list shows it, short or long: PED-007, PED-123, PED-1000", async () => {
+    const s = await many();
+    const [, , , , a3, a2, a1] = s.ids;
+    const renumber = (id: string, number: number) => db.update(purchaseOrders).set({ number }).where(eq(purchaseOrders.id, id));
+    await renumber(a1!, 7);
+    await renumber(a2!, 123);
+    await renumber(a3!, 1000);
+    const kept = async (q: string) => idsOf(await svc.listPurchases(s.ctx, { page: 1, projectId: s.project.id, q }));
+    const shown = (await svc.listPurchases(s.ctx, { page: 1, projectId: s.project.id })).orders;
+
+    // What the list shows for each is what finds it.
+    for (const [id, label] of [[a1, "PED-007"], [a2, "PED-123"], [a3, "PED-1000"]] as const) {
+      expect(orderLabel(shown.find((o) => o.id === id)!.number)).toBe(label);
+      expect(await kept(label)).toEqual([id]);
+      expect(await kept(label.toLowerCase())).toEqual([id]);
+    }
+    // A number past 999 is not cut to three digits: PED-1000 is no PED-100, and has no zero in front.
+    expect(await kept("PED-100")).toEqual([a3]);
+    expect(await kept("PED-0100")).toEqual([]);
+    expect(await kept("PED-01000")).toEqual([]);
+    expect(await kept("PED-0123")).toEqual([]);
+    expect(await kept("PED-0007")).toEqual([]);
+    expect(await kept("PED-12")).toEqual([a2]);
+  });
+
+  it("counts and totals the filtered orders, whatever page and state are shown", async () => {
+    const s = await many();
+    const material_ = await svc.listPurchases(s.ctx, { page: 1, limit: 2, kind: "material", group: "open" });
+    // Material: PED-001 late, 003 not sent, 004 delivered, 005 cancelled, and the second obra's 002.
+    expect(material_.groupCounts).toEqual({ all: 5, open: 2, pending: 1, done: 1, cancelled: 1 });
+    expect(material_.paging).toEqual({ page: 1, limit: 2, total: 2, pages: 1 });
+    expect(material_.shownContractedCents).toBe(125_000);
+    // The KPIs stay the whole tenant's.
+    expect(material_.summary).toMatchObject({ openCents: 223_000, openOrders: 3, pendingOrders: 2 });
+
+    expect((await svc.listPurchases(s.ctx, { page: 1, group: "pending" })).shownContractedCents).toBe(0);
+    expect((await svc.listPurchases(s.ctx, { page: 1, q: "nada de nada" }))).toMatchObject({
+      orders: [],
+      paging: { total: 0, pages: 1 },
+      groupCounts: { all: 0, open: 0, pending: 0, done: 0, cancelled: 0 },
+      shownContractedCents: 0,
+    });
+  });
+
+  it("groups the filtered orders by supplier when asked, the most contracted first", async () => {
+    const s = await many();
+    const { bySupplier } = await svc.listPurchases(s.ctx, { page: 1, by: "supplier" });
+    expect(bySupplier).toEqual([
+      {
+        id: s.supplierId,
+        name: "Piedra de Liébana S.L.",
+        suppliesOnly: true,
+        orders: 5,
+        projectRefs: [s.project.ref, s.second.ref].sort(),
+        contractedCents: 145_000,
+        openCents: 125_000,
+      },
+      { id: s.subcontractorId, name: "Montajes Steel Norte S.L.", suppliesOnly: false, orders: 2, projectRefs: [s.project.ref, s.second.ref].sort(), contractedCents: 98_000, openCents: 98_000 },
+    ]);
+    expect((await svc.listPurchases(s.ctx, { page: 1, by: "supplier", group: "pending", projectId: s.project.id })).bySupplier).toEqual([
+      { id: s.supplierId, name: "Piedra de Liébana S.L.", suppliesOnly: true, orders: 1, projectRefs: [s.project.ref], contractedCents: 0, openCents: 0 },
+    ]);
+  });
+
+  it("keeps tenants apart", async () => {
+    const s = await many();
+    const theirs = await svc.listPurchases(s.stranger, { page: 1 });
+    expect(idsOf(theirs)).toEqual([s.strangerOrder]);
+    expect(theirs).toMatchObject({
+      paging: { total: 1 },
+      groupCounts: { all: 1, open: 1 },
+      suppliers: [{ name: "Piedra Ajena S.L." }],
+      summary: { openCents: 66_000, lateDeliveries: 1, lateProjectRefs: [s.theirProject.ref] },
+    });
+    // Asking for another tenant's obra or supplier finds nothing of it.
+    expect(idsOf(await svc.listPurchases(s.stranger, { page: 1, projectId: s.project.id }))).toEqual([]);
+    expect(idsOf(await svc.listPurchases(s.stranger, { page: 1, supplierId: s.supplierId }))).toEqual([]);
   });
 });
 

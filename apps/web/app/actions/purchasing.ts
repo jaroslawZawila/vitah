@@ -3,16 +3,26 @@
 // Thin portal adapters over @repo/core's purchasing (packages/core/src/purchasing.ts):
 // the project's Compras tab, the company-wide Compras list and an order's page.
 
-import { purchaseAmendmentsService as amendments, purchaseDocumentsService as documents, purchasingService as svc } from "@repo/core";
+import {
+  purchaseAmendmentsService as amendments,
+  purchaseDocumentsService as documents,
+  purchasingService as svc,
+  type PurchaseListQuery,
+} from "@repo/core";
 import { fieldsWithFile } from "../../lib/api";
 import { mutateDashboard, read, type ObraState } from "./run";
 
 // ─── Reads ───────────────────────────────────────────────────────────────────
 
-/** Every order of the tenant, for Administration. */
-export async function getPurchases() {
-  const result = await read((ctx) => svc.listPurchases(ctx));
+/** The tenant's orders, for Administration: the page and filters of `query` (all of them without one). */
+export async function getPurchases(query: PurchaseListQuery = {}) {
+  const result = await read((ctx) => svc.listPurchases(ctx, query));
   return result && { purchases: result.data, canManage: result.canManage };
+}
+
+/** Every order `filters` keep, however many (never a page of them), for the CSV export; [] when they can't be read. */
+export async function exportPurchases(filters: Omit<PurchaseListQuery, "page" | "limit" | "by"> = {}) {
+  return (await read((ctx) => svc.listAllPurchases(ctx, filters)))?.data ?? [];
 }
 
 /** One supplier's orders, for its Subcontratas ficha; [] when it can't be read. */
@@ -47,7 +57,7 @@ export async function getPurchase(orderId: string) {
 /** Refreshes the project's tabs too; `review` when it uploads a PDF (the AI's review follows). */
 const write = (projectId: string, fn: Parameters<typeof mutateDashboard>[1], review = false) => mutateDashboard(projectId, fn, { review });
 
-/** → the new order's id and number too. */
+/** → the new order's id and number too. With the form's `idempotencyKey` in `input`, sent twice it is one order. */
 export async function createPurchaseAction(
   projectId: string,
   input: Record<string, unknown>,
@@ -88,8 +98,9 @@ export async function addOrderDocumentVersionAction(
 }
 
 /**
- * Form data: `data` (the modificado as JSON) and `file` (its signed PDF,
- * optional). → its number too, and `documentFailed` when the PDF didn't go up.
+ * Form data: `data` (the modificado as JSON, with the form's `idempotencyKey`:
+ * sent twice, it is one modificado) and `file` (its signed PDF, optional).
+ * → its number too, and `documentFailed` when the PDF didn't go up.
  */
 export async function amendPurchaseAction(
   projectId: string,

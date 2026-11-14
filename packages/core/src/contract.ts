@@ -30,6 +30,50 @@ export type PasswordError =
   | "not_found"
   | "forbidden";
 
+// ─── Two-step verification (staff, portal) ───────────────────────────────
+
+/** Recovery codes a user gets when two-step verification is switched on, each good once. */
+export const MFA_RECOVERY_CODES = 10;
+
+/** A staff user's two-step verification (GET /api/v1/me/mfa). */
+export type MfaStatus = {
+  /** On: signing in asks for a code after the password. */
+  enabled: boolean;
+  /** Recovery codes not spent yet. */
+  recoveryCodesLeft: number;
+};
+
+/**
+ * What a user needs to add the portal to their authenticator app (POST
+ * /api/v1/me/mfa/begin). Shown once, while enrolling: never readable later.
+ */
+export type MfaEnrolment = {
+  /** The secret in base32, to type by hand. */
+  secret: string;
+  /** The same as an `otpauth://` URI. */
+  uri: string;
+  /** That URI as a QR code: an SVG `data:` URL for an `<img>`. */
+  qr: string;
+};
+
+/** The recovery codes, in the clear: answered once, when they are made. */
+export type MfaRecoveryCodes = { recoveryCodes: string[] };
+
+/** Error codes of the two-step verification endpoints (`{ error: code }`). */
+export type MfaError =
+  | "missing_fields"
+  | "wrong_code"
+  | "wrong_password"
+  | "too_many_attempts"
+  | "mfa_already_enabled"
+  | "mfa_not_started"
+  | "mfa_not_enabled"
+  /** 503: its table isn't in the database yet (the portal deployed ahead of its SQL). */
+  | "mfa_unavailable"
+  | "cannot_remove_own_mfa"
+  | "not_found"
+  | "forbidden";
+
 /**
  * A project of the client, as the mobile app shows it (GET /api/mobile/project
  * and /api/mobile/projects). Dates are calendar dates (YYYY-MM-DD).
@@ -572,6 +616,8 @@ export type ProjectBudget = {
 
 export * from "./budget-overview-rules";
 export * from "./project-filters";
+export { DEFAULT_PAGE_SIZE, MAX_ALL_ROWS, MAX_PAGE_SIZE, MAX_UNPAGED, type PageQuery, type Paging } from "./paging";
+import type { PageQuery, Paging } from "./paging";
 
 /** A budget as the project list shows it: its newest revision, else the AI's run drafting the first. */
 export type BudgetState = {
@@ -809,6 +855,7 @@ export type ObraError =
   | "file_too_large"
   | "project_not_found"
   | "dependency_cycle"
+  | "idempotency_key_reused"
   | "not_found"
   | "forbidden";
 
@@ -1270,8 +1317,66 @@ export type ProjectPurchases = {
 export const UPCOMING_DAYS = 30;
 
 /** GET /api/v1/purchases: every order of the tenant (GET /api/v1/subcontractors/:id/purchases: one supplier's). */
+/** How the lists group an order: open (placed, not completed), not sent yet, completed or cancelled. */
+export const PURCHASE_ORDER_GROUPS = ["open", "pending", "done", "cancelled"] as const;
+export type PurchaseOrderGroup = (typeof PURCHASE_ORDER_GROUPS)[number];
+
+/** The group an order's status falls in. */
+export function purchaseOrderGroup(status: PurchaseStatus): PurchaseOrderGroup {
+  if (status === "pending" || status === "cancelled") return status;
+  return isCompletedOrder(status) ? "done" : "open";
+}
+
+/** The orders of one supplier among those a list's filters keep. */
+export type PurchaseSupplierGroup = {
+  id: string;
+  name: string;
+  suppliesOnly: boolean;
+  orders: number;
+  projectRefs: string[];
+  contractedCents: number;
+  openCents: number;
+};
+
+/** What narrows the tenant's orders list, as a URL carries it. */
+export type PurchaseListQuery = PageQuery & {
+  /** all (default) | open | pending | done | cancelled */
+  group?: unknown;
+  projectId?: unknown;
+  supplierId?: unknown;
+  /** material | subcontract */
+  kind?: unknown;
+  /** The order's day (its order date, or the day it was created while pending), from and to. */
+  from?: unknown;
+  to?: unknown;
+  /** Only late deliveries. */
+  late?: unknown;
+  /** Text in its number (PED-007), supplier, description or obra. */
+  q?: unknown;
+  /** "supplier": also the orders the filters keep, by supplier. */
+  by?: unknown;
+};
+
+/**
+ * GET /api/v1/purchases: the tenant's orders, newest first. With `?page=` /
+ * `?limit=` one page of them (see `paging`); without, all of them (up to
+ * `MAX_UNPAGED`; cut there, `paging.truncated` is true and `paging.total` says
+ * how many there are). `?group`, `?projectId`, `?supplierId`, `?kind`, `?from`,
+ * `?to` (order date), `?late=1` and `?q` narrow the list; the summary is
+ * always the whole tenant's.
+ */
 export type TenantPurchases = {
+  /** The page asked for of the orders the filters keep. */
   orders: PurchaseOrderListItem[];
+  paging: Paging;
+  /** How many orders the filters keep in each group (whatever group is asked for). */
+  groupCounts: Record<"all" | PurchaseOrderGroup, number>;
+  /** What the orders the filters keep (the group too) contract: pending and cancelled ones don't add up. */
+  shownContractedCents: number;
+  /** Every supplier with orders, by name: the list's supplier filter. */
+  suppliers: { id: string; name: string }[];
+  /** With `?by=supplier`: the orders the filters keep, by supplier, the most contracted first. */
+  bySupplier?: PurchaseSupplierGroup[];
   projects: { id: string; ref: string; address: string }[];
   summary: {
     /** Contracted this calendar year (by order date). */
@@ -1283,6 +1388,8 @@ export type TenantPurchases = {
     pendingCents: number;
     pendingOrders: number;
     lateDeliveries: number;
+    /** The obras with a late delivery. */
+    lateProjectRefs: string[];
   };
   today: string;
 };
@@ -1643,8 +1750,34 @@ export type ProjectPurchaseLines = {
 };
 
 /** GET /api/v1/purchases/invoices: the tenant's invoices (`?projectId`, `?subcontractorId`). */
+/** How the invoices list groups them: owed (pending, part paid or past due), past due, paid, credit notes. */
+export const PURCHASE_INVOICE_GROUPS = ["open", "overdue", "paid", "credit"] as const;
+export type PurchaseInvoiceGroup = (typeof PURCHASE_INVOICE_GROUPS)[number];
+
+/** What narrows the invoices list (never its summary), as a URL carries it. */
+export type InvoiceListQuery = PageQuery & {
+  /** all (default) | open | overdue | paid | credit */
+  group?: unknown;
+  projectId?: unknown;
+  supplierId?: unknown;
+  /** Text in its number, supplier, order (PED-007 or its description) or obra. */
+  q?: unknown;
+};
+
+/**
+ * GET /api/v1/purchases/invoices: with `?page=` / `?limit=` one page of the
+ * invoices (see `paging`); without, all of them (up to `MAX_UNPAGED`).
+ * `?group` and `?q` narrow the list; the summary is that of every invoice of
+ * the tenant (or of `?projectId` / `?subcontractorId`).
+ */
 export type TenantInvoices = {
+  /** The page asked for of the invoices the filters keep, owed first. */
   invoices: PurchaseInvoiceListItem[];
+  paging: Paging;
+  /** How many invoices the filters keep in each group (whatever group is asked for). */
+  groupCounts: Record<"all" | PurchaseInvoiceGroup, number>;
+  /** Every supplier with invoices, by name: the list's supplier filter. */
+  suppliers: { id: string; name: string }[];
   projects: { id: string; ref: string; address: string }[];
   summary: {
     outstandingCents: number;
@@ -1665,8 +1798,9 @@ export type TenantInvoices = {
 export type TenantPayments = {
   /** What is owed: past due first (`from` null), then 7-day weeks from today over `PAYMENT_FORECAST_DAYS`. */
   forecast: { from: string | null; to: string; totalCents: number; invoices: PurchaseInvoiceListItem[] }[];
-  /** Newest first. */
+  /** Newest first: the page asked for (`?page=` / `?limit=`), else all of them (up to `MAX_UNPAGED`). */
   payments: PurchasePayment[];
+  paging: Paging;
   summary: { monthCents: number; monthPayments: number };
   today: string;
 };
@@ -2205,6 +2339,33 @@ export type WorkerListItem = {
   access: WorkerAccess;
 };
 
+export const WORKER_ACCESS_FILTERS = ["all", "ok", "pending", "blocked"] as const;
+export type WorkerAccessFilter = (typeof WORKER_ACCESS_FILTERS)[number];
+
+/** What narrows the workers list (never its summary), as a URL carries it. */
+export type WorkerListQuery = PageQuery & {
+  /** Access on this obra (and only its companies' workers); else anywhere. */
+  projectId?: unknown;
+  companyId?: unknown;
+  /** all (default) | ok | pending | blocked */
+  access?: unknown;
+  /** Text in their name or their company's. */
+  q?: unknown;
+};
+
+/**
+ * GET /api/v1/subcontractors/workers with `?page=` / `?limit=`: one page of
+ * the workers the filters keep (`?access`, `?companyId`, `?q`), by surname.
+ * The summary is that of every worker (of the obra, with `?projectId`).
+ */
+export type WorkersPage = {
+  workers: WorkerListItem[];
+  paging: Paging;
+  /** How many workers the company and text filters keep, by access (whatever access is asked for). */
+  counts: Record<WorkerAccessFilter, number>;
+  summary: { registered: number; companies: number; ok: number; pending: number; blocked: number; preventive: number };
+};
+
 /** Editable worker fields. */
 export type WorkerFields = {
   subcontractorId: string;
@@ -2251,3 +2412,74 @@ export type AccessCheckResult = {
   access: WorkerAccess | null;
 };
 
+
+// ─── Deleted records (Elementos eliminados) ──────────────────────────────────
+// What a user deletes keeps its row (`deleted_at`, `deleted_by_id`) and its
+// files; an admin sees those records here and brings one back (./deleted).
+
+export const DELETED_KINDS = [
+  "project",
+  "document",
+  "photo",
+  "issue_file",
+  "assignment",
+  "order_document",
+  "invoice",
+  "payment",
+] as const;
+export type DeletedKind = (typeof DELETED_KINDS)[number];
+export const isDeletedKind = (value: unknown): value is DeletedKind => DELETED_KINDS.includes(value as DeletedKind);
+
+/** Why a deleted record can't come back as things stand (known before trying). */
+export type DeletedBlock = "parent_deleted" | "ref_taken" | "duplicate_number";
+
+/**
+ * A deleted record, as a person recognises it. `label` and `detail` by kind:
+ * a project's ref and address; a document's title and file name; a photo's
+ * caption (else its day); an incident file's name and its incident (INC-003);
+ * a company's name (the obra is `projectRef`); an order document's title and
+ * its order (PED-001 · description); an invoice's number and supplier; a
+ * payment's invoice number and supplier. `day` is a photo's day, an invoice's
+ * date or a payment's; `amountCents` an invoice's total or a payment's amount.
+ */
+export type DeletedItem = {
+  kind: DeletedKind;
+  id: string;
+  label: string;
+  detail: string | null;
+  day: string | null;
+  amountCents: number | null;
+  projectId: string;
+  projectRef: string;
+  deletedAt: string;
+  deletedBy: { id: string; name: string } | null;
+  /** True, or why not: the parent that is itself deleted is in `parent`. */
+  restorable: true | DeletedBlock;
+  parent: { kind: "project" | "invoice"; label: string } | null;
+};
+
+/** An obra with deleted records (itself deleted, maybe), to filter by. */
+export type DeletedProjectOption = { id: string; ref: string; deleted: boolean };
+
+/** A page of deleted records, newest deletion first. `projects` comes with the first page only. */
+export type DeletedList = {
+  items: DeletedItem[];
+  /** For the next page; null on the last one. */
+  nextCursor: string | null;
+  projects?: DeletedProjectOption[];
+};
+
+export type DeletedFilters = { kind?: DeletedKind; projectId?: string; limit?: number; cursor?: string };
+
+/** What restoring answers: its own refusals, and those of the record's module (an invoice's, a payment's, an assignment's). */
+export type DeletedError =
+  | DeletedBlock
+  | "invalid_input"
+  | "invalid_state"
+  | "invalid_date"
+  | "unknown_line"
+  | "missing_fields"
+  | "exceeds_amount"
+  | "supplies_only"
+  | "not_found"
+  | "forbidden";

@@ -6,6 +6,9 @@ import { NOT_FOUND, TO_FORBIDDEN, TO_LOGIN, redirectTo } from "../../test/naviga
 import { signInAs } from "../../test/session";
 import ClientsPage from "./clients/page";
 import InvoicePage from "./compras/facturas/[invoiceId]/page";
+import InvoicesPage from "./compras/facturas/page";
+import PaymentsPage from "./compras/pagos/page";
+import CompanyPurchasesPage from "./compras/page";
 import ProjectLinesPage from "./projects/[id]/budget/(obras)/lines/page";
 import ProjectBudgetPage from "./projects/[id]/budget/(obras)/page";
 import BudgetPdfPage from "./projects/[id]/budget/pdf/page";
@@ -133,7 +136,16 @@ describe("a page that can show what was asked for", () => {
     signInAs({ tenantId: tenant.id, userId: user.id, role: "viewer" });
 
     expect(propsOf(await ProjectsPage())).toMatchObject({ canCreate: false, projects: [] });
-    expect(propsOf(await WorkersPage(search({})))).toMatchObject({ canManage: false, workers: [], projects: [], companies: [] });
+    expect(propsOf(await WorkersPage(search({})))).toMatchObject({
+      canManage: false,
+      page: { workers: [], paging: { page: 1, total: 0, pages: 1 }, counts: { all: 0 }, summary: { registered: 0 } },
+      projects: [],
+      companies: [],
+    });
+    // Compras' lists too: an empty first page, not an error.
+    expect(propsOf(await CompanyPurchasesPage(search({})))).toMatchObject({ purchases: { orders: [], paging: { page: 1, total: 0, pages: 1 } } });
+    expect(propsOf(await InvoicesPage(search({})))).toMatchObject({ canManage: false, invoices: { invoices: [], paging: { page: 1, total: 0, pages: 1 } } });
+    expect(propsOf(await PaymentsPage(search({})))).toMatchObject({ canManage: false, payments: { payments: [], paging: { page: 1, total: 0, pages: 1 } } });
   });
 
   it("lists the users for an admin, saying which one they are", async () => {
@@ -147,9 +159,31 @@ describe("a page that can show what was asked for", () => {
 
     expect(propsOf(await WorkersPage(search({ obra: project.id })))).toMatchObject({
       canManage: true,
-      projectId: project.id,
+      query: { projectId: project.id, access: "all", companyId: "", query: "" },
       projects: [expect.objectContaining({ id: project.id })],
     });
+  });
+
+  it("reads a list's page and filters from the URL, and takes a mistyped one as none", async () => {
+    const { project } = await setup("manager");
+
+    expect(propsOf(await WorkersPage(search({ acceso: "blocked", empresa: "c-1", q: " ana ", page: "1" })))).toMatchObject({
+      query: { projectId: "", access: "blocked", companyId: "c-1", query: "ana" },
+      page: { workers: [], paging: { page: 1 } },
+    });
+    expect(propsOf(await CompanyPurchasesPage(search({ estado: "open", obra: project.id, tipo: "material", desde: "2026-10-01", retraso: "1", q: "piedra" })))).toMatchObject({
+      query: { view: "orders", group: "open", projectId: project.id, kind: "material", from: "2026-10-01", to: "", lateOnly: true, query: "piedra", page: 1 },
+      purchases: { orders: [], paging: { page: 1, total: 0 } },
+    });
+    expect(propsOf(await InvoicesPage(search({ estado: "overdue", proveedor: "s-1" })))).toMatchObject({
+      query: { group: "overdue", supplierId: "s-1", page: 1 },
+      invoices: { invoices: [] },
+    });
+    // Not a page, a state or a day: the first page of everything, never an error.
+    expect(propsOf(await CompanyPurchasesPage(search({ estado: "nope", desde: "2026-13-40", page: "abc" })))).toMatchObject({
+      query: { group: "all", from: "", page: 1 },
+    });
+    expect(propsOf(await PaymentsPage(search({ page: "0" })))).toMatchObject({ payments: { paging: { page: 1 } } });
   });
 });
 
@@ -164,6 +198,9 @@ describe("no session", () => {
     await expect(ProjectsPage()).rejects.toEqual(TO_LOGIN);
     await expect(UsersPage()).rejects.toEqual(TO_LOGIN);
     await expect(WorkersPage(search({}))).rejects.toEqual(TO_LOGIN);
+    await expect(CompanyPurchasesPage(search({}))).rejects.toEqual(TO_LOGIN);
+    await expect(InvoicesPage(search({}))).rejects.toEqual(TO_LOGIN);
+    await expect(PaymentsPage(search({}))).rejects.toEqual(TO_LOGIN);
     await expect(NewProjectPage()).rejects.toEqual(TO_LOGIN);
     await expect(InvoicePage(params({ invoiceId: "any" }))).rejects.toEqual(TO_LOGIN);
   });
@@ -174,5 +211,16 @@ describe("a redirect that is part of a flow", () => {
     const { project } = await setup();
 
     await expect(EditPlanPage(params({ id: project.id }))).rejects.toEqual(redirectTo(`/dashboard/projects/${project.id}/obra/planificacion`));
+  });
+
+  it("stays: a list's page past its end goes to the last one there is, with the same filters", async () => {
+    const { project } = await setup();
+
+    await expect(WorkersPage(search({ obra: project.id, page: "9" }))).rejects.toEqual(
+      redirectTo(`/dashboard/subcontratas/trabajadores?obra=${project.id}`),
+    );
+    await expect(CompanyPurchasesPage(search({ estado: "open", page: "4" }))).rejects.toEqual(redirectTo("/dashboard/compras?estado=open"));
+    await expect(InvoicesPage(search({ q: "msn", page: "2" }))).rejects.toEqual(redirectTo("/dashboard/compras/facturas?q=msn"));
+    await expect(PaymentsPage(search({ page: "3" }))).rejects.toEqual(redirectTo("/dashboard/compras/pagos"));
   });
 });

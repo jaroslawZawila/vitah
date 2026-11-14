@@ -456,12 +456,16 @@ export function EventText({ event }: { event: PurchaseOrderEvent }) {
     }
     case "invoice_deleted":
       return <>{t("invoiceDeleted", { number: text(d.number) })}</>;
+    case "invoice_restored":
+      return <>{t("invoiceRestored", { number: text(d.number) })}</>;
     case "invoice_file_added":
       return <>{t("invoiceFileAdded", { number: text(d.number), version: num(d.version) })}</>;
     case "payment_added":
       return <>{t("paymentAdded", { number: text(d.number), amount: f.amount(num(d.amountCents)) })}</>;
     case "payment_deleted":
       return <>{t("paymentDeleted", { number: text(d.number), amount: f.amount(num(d.amountCents)) })}</>;
+    case "payment_restored":
+      return <>{t("paymentRestored", { number: text(d.number), amount: f.amount(num(d.amountCents)) })}</>;
     case "milestones":
       return <>{t("milestones", { count: Array.isArray(d.to) ? d.to.length : 0 })}</>;
     case "document_added":
@@ -470,6 +474,8 @@ export function EventText({ event }: { event: PurchaseOrderEvent }) {
       return <>{t("documentVersionAdded", { title: text(d.title), version: num(d.version) })}</>;
     case "document_removed":
       return <>{t("documentRemoved", { title: text(d.title) })}</>;
+    case "document_restored":
+      return <>{t("documentRestored", { title: text(d.title) })}</>;
     case "file_added":
       return <>{t("fileAdded", { name: text(d.name) })}</>;
     case "file_removed":

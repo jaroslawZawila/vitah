@@ -13,6 +13,7 @@ import {
   getSubcontractorsOverview,
   getWorker,
   getWorkers,
+  getWorkersPage,
   markNotApplicableAction,
   rejectSubcontractorDocumentAction,
   removeSubcontractorAssignmentAction,
@@ -129,6 +130,17 @@ describe("subcontractor actions", () => {
 
     expect((await getWorker(worker!.id!))!.roles).toEqual(["preventive_resource"]);
     expect((await getWorkers(project.id))!.map((w) => w.surnames)).toEqual(["Llata Ceballos"]);
+    // A page of them, with the filters of the list and the whole list's counts.
+    await createWorkerAction({ subcontractorId: id, firstName: "Ana", surnames: "Abascal Ruiz", idDocument: "00000001R" });
+    const page = (await getWorkersPage({ page: 2, limit: 1, projectId: project.id }))!;
+    expect(page.workers.map((w) => w.surnames)).toEqual(["Llata Ceballos"]);
+    expect(page.paging).toEqual({ page: 2, limit: 1, total: 2, pages: 2 });
+    expect(page.summary).toMatchObject({ registered: 2, companies: 1, preventive: 1 });
+    expect((await getWorkersPage({ page: 1, q: "abascal" }))!.workers.map((w) => w.surnames)).toEqual(["Abascal Ruiz"]);
+    expect((await getWorkersPage({ page: 1, access: "ok" }))!).toMatchObject({ workers: [], counts: { all: 2 } });
+    expect((await getWorkersPage())!.workers).toHaveLength(2);
+    // A page that isn't one is the service's error: nothing is read.
+    expect(await getWorkersPage({ page: "abc" })).toBeNull();
     expect(await checkWorkerAccessAction({ query: "72145836B" })).toEqual({
       result: expect.objectContaining({ worker: expect.objectContaining({ name: "Pedro Llata Ceballos" }) }),
     });

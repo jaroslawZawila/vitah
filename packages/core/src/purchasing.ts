@@ -4,7 +4,10 @@ import {
   db,
   desc,
   eq,
+  ilike,
   inArray,
+  lt,
+  or,
   projects,
   purchaseInvoiceLines,
   purchaseInvoices,
@@ -28,7 +31,9 @@ import {
   MAX_ORDER_LINES,
   MAX_PAYMENT_DAYS,
   MAX_RETENTION_BP,
+  PURCHASE_FLOWS,
   PURCHASE_KINDS,
+  PURCHASE_ORDER_GROUPS,
   PURCHASE_PROGRESS,
   PURCHASE_VAT_KINDS,
   UPCOMING_DAYS,
@@ -39,6 +44,7 @@ import {
   isOpenOrder,
   maskIdNumber,
   placedStatus,
+  purchaseOrderGroup,
   statusesOf,
   type LineContracting,
   type ProjectPurchaseLines,
@@ -46,15 +52,20 @@ import {
   type PurchaseForm,
   type PurchaseKind,
   type PurchaseLineItem,
+  type PurchaseListQuery,
   type PurchaseOrderDetail,
   type PurchaseOrderLine,
   type PurchaseOrderListItem,
+  type PurchaseOrderGroup,
   type PurchaseProgress,
   type PurchaseStatus,
   type PurchaseUpcoming,
   type TenantPurchases,
 } from "./contract";
 import { contractSchedule, contractTotals, daysPast, deviation, lateDays, type LineContract } from "./control-calc";
+import { idempotent, type Once } from "./idempotency";
+import { allPages, filterText, pageWindow, pagingOf, searchPattern } from "./paging";
+import { orderLabelSql } from "./sql-labels";
 import { orderByDate, templateLeadDays } from "./planning-calc";
 import { loadDocuments, ordersWithDocuments } from "./purchase-document-data";
 import { loadAmendments } from "./purchase-amendment-data";
@@ -91,7 +102,7 @@ import {
   workDate,
 } from "./obra-data";
 import { projectInTenant, projectNotDeleted, projectsInTenant, type Tx } from "./project-client";
-import { loadNetwork, requireCompany, type Network } from "./subcontractor-network";
+import { loadCompanyStatuses, requireCompany, type Network } from "./subcontractor-network";
 
 // ─── Purchasing (Compras) ────────────────────────────────────────────────────
 // A project's orders of material and subcontracts. Each splits its amount
@@ -141,7 +152,7 @@ export async function loadOrders(tenantId: string, where?: SQL, { documents = fa
     .innerJoin(subcontractors, eq(subcontractors.id, purchaseOrders.subcontractorId))
     .innerJoin(projects, eq(projects.id, purchaseOrders.projectId))
     .where(and(eq(purchaseOrders.tenantId, tenantId), projectNotDeleted(), where))
-    .orderBy(desc(purchaseOrders.createdAt), desc(purchaseOrders.number));
+    .orderBy(desc(purchaseOrders.createdAt), desc(purchaseOrders.number), desc(purchaseOrders.id));
   const ids = rows.map((r) => r.order.id);
   const [lineRows, invoiced, documented] = await Promise.all([
     ids.length === 0
@@ -165,7 +176,7 @@ export async function loadOrders(tenantId: string, where?: SQL, { documents = fa
 type LoadedOrder = Awaited<ReturnType<typeof loadOrders>>[number];
 
 /** `net` gives the supplier's CAE status; without it, null. */
-export function toListItem(loaded: LoadedOrder, net: Network | null, today: string): PurchaseOrderListItem {
+export function toListItem(loaded: LoadedOrder, net: Pick<Network, "status"> | null, today: string): PurchaseOrderListItem {
   const { order, lines } = loaded;
   return {
     id: order.id,
@@ -193,10 +204,10 @@ export function toListItem(loaded: LoadedOrder, net: Network | null, today: stri
   };
 }
 
-/** The suppliers' CAE network, for the orders' list. */
+/** The CAE status of the orders' suppliers, for their list: their own documents, not their workers'. */
 function networkOf(tenantId: string, orders: LoadedOrder[]) {
   const ids = [...new Set(orders.map((o) => o.order.subcontractorId))];
-  return ids.length > 0 ? loadNetwork(tenantId, ids) : null;
+  return ids.length > 0 ? loadCompanyStatuses(tenantId, ids) : null;
 }
 
 /**
@@ -292,37 +303,179 @@ export const projectList = (tenantId: string) =>
     .where(projectsInTenant(tenantId))
     .orderBy(asc(projects.ref));
 
-/** Every order of the tenant, with the totals Administration watches. */
-export async function listPurchases(ctx: Ctx): Promise<TenantPurchases> {
-  const [loaded, projectRows] = await Promise.all([
-    loadOrders(ctx.tenantId, undefined, { documents: true }),
-    projectList(ctx.tenantId),
-  ]);
-  // Only the suppliers with orders: not the tenant's whole network.
-  const net = await networkOf(ctx.tenantId, loaded);
+const ORDER_STATUSES: PurchaseStatus[] = [...new Set([...PURCHASE_FLOWS.material, ...PURCHASE_FLOWS.subcontract, "cancelled" as const])];
+const statusesIn = (group: PurchaseOrderGroup) => ORDER_STATUSES.filter((status) => purchaseOrderGroup(status) === group);
+const inGroup = (group: PurchaseOrderGroup) => inArray(purchaseOrders.status, statusesIn(group));
+const CONTRACTED = ORDER_STATUSES.filter(countsAsContracted);
+
+/** As ./control-calc's `lateDays`: a material order placed, not delivered, past its expected day. */
+const isLate = (today: string) => and(eq(purchaseOrders.kind, "material"), inGroup("open"), lt(purchaseOrders.expectedOn, today))!;
+/** The day an order counts from: its order date, or the day it was created while pending. */
+const orderDay = sql`coalesce(${purchaseOrders.orderedOn}, (${purchaseOrders.createdAt})::date)`;
+/** An order's amount: its lines'. */
+const orderAmount = sql`(select coalesce(sum(l.amount_cents), 0) from ${purchaseOrderLines} l where l.order_id = ${purchaseOrders.id})`;
+
+/**
+ * The tenant's orders, newest first, with the totals Administration watches.
+ * `query` asks for a page of them and narrows them (see `PurchaseListQuery`);
+ * without one, all of them come (up to `MAX_UNPAGED`: `paging.truncated` says
+ * when that cut them), as before lists were paged. Filtering, counting and the totals happen in the database: only the
+ * page's orders are loaded. The totals are the whole tenant's, whatever the
+ * filters.
+ */
+export async function listPurchases(ctx: Ctx, query: PurchaseListQuery = {}): Promise<TenantPurchases> {
   const today = todayInSpain();
-  const orders = loaded.map((o) => toListItem(o, net, today));
-  const year = today.slice(0, 4);
-  const thisYear = orders.filter(
-    (o) => countsAsContracted(o.status) && (o.orderedOn ?? o.createdAt).slice(0, 4) === year,
+  const window = pageWindow(query);
+  const group = orNull(pick(["all", ...PURCHASE_ORDER_GROUPS] as const))(query.group) ?? "all";
+  const kind = orNull(pick(["all", ...PURCHASE_KINDS] as const))(query.kind) ?? "all";
+  const from = orNull(calendarDate)(query.from);
+  const to = orNull(calendarDate)(query.to);
+  const pattern = searchPattern(query.q);
+  const late = query.late === true || query.late === "1" || query.late === "true";
+  const projectId = filterText(query.projectId);
+  const supplierId = filterText(query.supplierId);
+
+  const orderRows = () =>
+    db
+      .select({ id: purchaseOrders.id })
+      .from(purchaseOrders)
+      .innerJoin(subcontractors, eq(subcontractors.id, purchaseOrders.subcontractorId))
+      .innerJoin(projects, eq(projects.id, purchaseOrders.projectId));
+  const ofTenant = and(inTenant(ctx), projectNotDeleted());
+  // Every filter but the group: the counts beside it are of each group.
+  const kept = and(
+    ofTenant,
+    projectId ? eq(purchaseOrders.projectId, projectId) : undefined,
+    supplierId ? eq(purchaseOrders.subcontractorId, supplierId) : undefined,
+    kind === "all" ? undefined : eq(purchaseOrders.kind, kind),
+    from ? sql`${orderDay} >= ${from}::date` : undefined,
+    to ? sql`${orderDay} <= ${to}::date` : undefined,
+    late ? isLate(today) : undefined,
+    pattern
+      ? or(
+          sql`${orderLabelSql(purchaseOrders.number)} ilike ${pattern}`,
+          ilike(subcontractors.legalName, pattern),
+          ilike(purchaseOrders.description, pattern),
+          ilike(projects.ref, pattern),
+        )
+      : undefined,
   );
-  const open = orders.filter((o) => isOpenOrder(o.status));
-  const pending = orders.filter((o) => o.status === "pending");
+  const shown = and(kept, group === "all" ? undefined : inGroup(group));
+  const year = today.slice(0, 4);
+  const thisYear = and(inArray(purchaseOrders.status, CONTRACTED), sql`to_char(${orderDay}, 'YYYY') = ${year}`)!;
+  const cents = (where: SQL) => sql<string>`coalesce(sum(${orderAmount}) filter (where ${where}), 0)`;
+  const many = (where: SQL) => sql<number>`(count(*) filter (where ${where}))::int`;
+
+  const [ids, [counts], [totals], supplierRows, projectRows, bySupplier] = await Promise.all([
+    orderRows()
+      .where(shown)
+      .orderBy(desc(purchaseOrders.createdAt), desc(purchaseOrders.number), desc(purchaseOrders.id))
+      .limit(window.limit)
+      .offset(window.offset),
+    db
+      .select({
+        all: sql<number>`count(*)::int`,
+        open: many(inGroup("open")),
+        pending: many(inGroup("pending")),
+        done: many(inGroup("done")),
+        cancelled: many(inGroup("cancelled")),
+        // What the orders shown contract (pending and cancelled ones don't add up).
+        contractedCents: cents(and(inArray(purchaseOrders.status, CONTRACTED), group === "all" ? undefined : inGroup(group))!),
+      })
+      .from(purchaseOrders)
+      .innerJoin(subcontractors, eq(subcontractors.id, purchaseOrders.subcontractorId))
+      .innerJoin(projects, eq(projects.id, purchaseOrders.projectId))
+      .where(kept),
+    db
+      .select({
+        yearContractedCents: cents(thisYear),
+        yearOrders: many(thisYear),
+        yearProjects: sql<number>`(count(distinct ${purchaseOrders.projectId}) filter (where ${thisYear}))::int`,
+        openCents: cents(inGroup("open")),
+        openOrders: many(inGroup("open")),
+        pendingCents: cents(inGroup("pending")),
+        pendingOrders: many(inGroup("pending")),
+        lateDeliveries: many(isLate(today)),
+        lateProjectRefs: sql<string[] | null>`array_agg(distinct ${projects.ref}) filter (where ${isLate(today)})`,
+      })
+      .from(purchaseOrders)
+      .innerJoin(projects, eq(projects.id, purchaseOrders.projectId))
+      .where(ofTenant),
+    db
+      .selectDistinct({ id: subcontractors.id, name: subcontractors.legalName })
+      .from(purchaseOrders)
+      .innerJoin(subcontractors, eq(subcontractors.id, purchaseOrders.subcontractorId))
+      .innerJoin(projects, eq(projects.id, purchaseOrders.projectId))
+      .where(ofTenant),
+    projectList(ctx.tenantId),
+    query.by === "supplier"
+      ? db
+          .select({
+            id: subcontractors.id,
+            name: subcontractors.legalName,
+            suppliesOnly: subcontractors.suppliesOnly,
+            orders: sql<number>`count(*)::int`,
+            projectRefs: sql<string[]>`array_agg(distinct ${projects.ref})`,
+            contractedCents: cents(inArray(purchaseOrders.status, CONTRACTED)),
+            openCents: cents(inGroup("open")),
+          })
+          .from(purchaseOrders)
+          .innerJoin(subcontractors, eq(subcontractors.id, purchaseOrders.subcontractorId))
+          .innerJoin(projects, eq(projects.id, purchaseOrders.projectId))
+          .where(shown)
+          .groupBy(subcontractors.id, subcontractors.legalName, subcontractors.suppliesOnly)
+      : undefined,
+  ]);
+
+  const position = new Map(ids.map((row, index) => [row.id, index]));
+  const loaded =
+    ids.length === 0 ? [] : await loadOrders(ctx.tenantId, inArray(purchaseOrders.id, [...position.keys()]), { documents: true });
+  loaded.sort((a, b) => position.get(a.order.id)! - position.get(b.order.id)!);
+  // Only the suppliers on the page: not the tenant's whole network.
+  const net = await networkOf(ctx.tenantId, loaded);
+  const { contractedCents = 0, ...groupCounts } = counts ?? { all: 0, open: 0, pending: 0, done: 0, cancelled: 0 };
+  const byName = <T extends { name: string }>(a: T, b: T) => a.name.localeCompare(b.name);
   return {
-    orders,
+    orders: loaded.map((o) => toListItem(o, net, today)),
+    paging: pagingOf(window, groupCounts[group]),
+    groupCounts,
+    shownContractedCents: Number(contractedCents),
+    suppliers: supplierRows.sort(byName),
+    ...(bySupplier && {
+      bySupplier: bySupplier
+        .map((g) => ({ ...g, projectRefs: [...g.projectRefs].sort(), contractedCents: Number(g.contractedCents), openCents: Number(g.openCents) }))
+        .sort((a, b) => b.contractedCents - a.contractedCents || byName(a, b)),
+    }),
     projects: projectRows,
     summary: {
-      yearContractedCents: sumOf(thisYear),
-      yearOrders: thisYear.length,
-      yearProjects: new Set(thisYear.map((o) => o.projectId)).size,
-      openCents: sumOf(open),
-      openOrders: open.length,
-      pendingCents: sumOf(pending),
-      pendingOrders: pending.length,
-      lateDeliveries: orders.filter((o) => o.lateDays !== null).length,
+      yearContractedCents: Number(totals?.yearContractedCents ?? 0),
+      yearOrders: totals?.yearOrders ?? 0,
+      yearProjects: totals?.yearProjects ?? 0,
+      openCents: Number(totals?.openCents ?? 0),
+      openOrders: totals?.openOrders ?? 0,
+      pendingCents: Number(totals?.pendingCents ?? 0),
+      pendingOrders: totals?.pendingOrders ?? 0,
+      lateDeliveries: totals?.lateDeliveries ?? 0,
+      lateProjectRefs: [...(totals?.lateProjectRefs ?? [])].sort(),
     },
     today,
   };
+}
+
+/**
+ * Every order `filters` keep, newest first: all of them, however many (the
+ * CSV export). Read a page at a time, so no cap cuts it; a tenant with more
+ * than `MAX_ALL_ROWS` fails instead of exporting a part (see `allPages`).
+ */
+export async function listAllPurchases(ctx: Ctx, filters: Omit<PurchaseListQuery, "page" | "limit" | "by"> = {}): Promise<PurchaseOrderListItem[]> {
+  return allPages(
+    async (page) => {
+      // Whatever came with the filters, never a page of its own nor the suppliers' breakdown.
+      const { orders, paging } = await listPurchases(ctx, { ...filters, by: undefined, ...page });
+      return { rows: orders, paging };
+    },
+    { key: (order) => order.id },
+  );
 }
 
 /** One supplier's orders, across the tenant's projects (its Subcontratas ficha). */
@@ -529,7 +682,8 @@ export async function getPurchaseForm(ctx: Ctx, projectId: string, orderId?: str
   const [plan, loaded, net] = await Promise.all([
     contractPlan(ctx.tenantId, projectId),
     loadOrders(ctx.tenantId, ofProject(projectId)),
-    loadNetwork(ctx.tenantId),
+    // Every company to pick from, with its status: none of their workers.
+    loadCompanyStatuses(ctx.tenantId),
   ]);
   const edited = orderId ? loaded.find((o) => o.order.id === orderId) : undefined;
   if (orderId && !edited) fail("not_found");
@@ -642,7 +796,7 @@ export async function getPurchase(ctx: Ctx, orderId: string): Promise<PurchaseOr
     order.createdById
       ? db.select({ by: userName }).from(users).where(eq(users.id, order.createdById))
       : Promise.resolve([]),
-    loadNetwork(ctx.tenantId, order.subcontractorId),
+    loadCompanyStatuses(ctx.tenantId, [order.subcontractorId]),
     loadInvoices(ctx.tenantId, eq(purchaseInvoices.orderId, orderId)),
     loadMilestones(ctx.tenantId, eq(purchaseOrders.id, orderId)),
     loadDocuments(ctx.tenantId, [orderId]),
@@ -822,7 +976,13 @@ export async function replaceOrderLines(
     if (!line) fail("has_invoices");
     if (line.amountCents < cents) fail("below_invoiced");
   }
-  const before = await tx.select().from(purchaseOrderLines).where(eq(purchaseOrderLines.orderId, orderId)).for("update");
+  // In budget order: the log lists the changes the same way whatever order the rows are read in.
+  const before = await tx
+    .select()
+    .from(purchaseOrderLines)
+    .where(eq(purchaseOrderLines.orderId, orderId))
+    .orderBy(asc(purchaseOrderLines.chapterCode), asc(purchaseOrderLines.lineageId))
+    .for("update");
   const changes = diffLines(before, lines, contract);
   if (changes.length > 0) {
     await tx.delete(purchaseOrderLines).where(eq(purchaseOrderLines.orderId, orderId));
@@ -915,10 +1075,15 @@ export async function logEvent(
  * amountCents, closesLine? }], status? (pending, or ordered / contracted to
  * place it now), orderedOn?, expectedOn?, workStart?, workEnd?, notes?,
  * paymentDays?, retentionBp?, vatKind?, requestId? (the approved purchase
- * request it comes from) }. → { orderId, number }
+ * request it comes from), idempotencyKey? (sent again with the same key, it
+ * is one order with one number: ./idempotency) }. → { orderId, number }
  */
 export async function createPurchase(ctx: Ctx, projectId: string, input: Record<string, unknown>) {
   requireEditor(ctx);
+  return idempotent<{ orderId: string; number: number }>(ctx, "purchase.order.create", { projectId }, input, (once) => placeOrder(ctx, projectId, input, once));
+}
+
+async function placeOrder(ctx: Ctx, projectId: string, input: Record<string, unknown>, once: Once<{ orderId: string; number: number }>) {
   await requireProject(ctx.tenantId, projectId);
   const kind = pick(PURCHASE_KINDS)(input.kind);
   const [subcontractorId, contract] = await Promise.all([
@@ -947,30 +1112,32 @@ export async function createPurchase(ctx: Ctx, projectId: string, input: Record<
   });
   const sameProject = and(ofProject(projectId), inTenant(ctx));
   const amountCents = lines.reduce((sum, l) => sum + l.amountCents, 0);
-  // Two orders made at once may take the same number: the later one tries the next.
-  for (let attempt = 0; attempt < 5; attempt++) {
-    const made = await db.transaction(async (tx) => {
-      const [row] = await tx
-        .insert(purchaseOrders)
-        .values({
-          ...fields,
-          status,
-          tenantId: ctx.tenantId,
-          projectId,
-          number: sql`(select coalesce(max(${purchaseOrders.number}), 0) + 1 from ${purchaseOrders} where ${sameProject})`,
-          createdById: ctx.userId,
-        })
-        .onConflictDoNothing()
-        .returning({ id: purchaseOrders.id, number: purchaseOrders.number });
-      if (!row) return null;
-      await tx.insert(purchaseOrderLines).values(lines.map((l) => ({ ...l, tenantId: ctx.tenantId, orderId: row.id })));
-      if (requestId) await orderRequest(tx, ctx, projectId, requestId, row);
-      await logEvent(tx, ctx, row.id, "created", { number: row.number, status, amountCents, lines: lines.length, ...(requestId ? { requestId } : {}) });
-      return { orderId: row.id, number: row.number };
-    });
-    if (made) return made;
-  }
-  throw new Error("Could not number the order");
+  return db.transaction((tx) =>
+    once(tx, async () => {
+      // Two orders made at once may take the same number: the later one waits
+      // for the first, then tries the next (each statement sees what is in by then).
+      for (let attempt = 0; attempt < 5; attempt++) {
+        const [row] = await tx
+          .insert(purchaseOrders)
+          .values({
+            ...fields,
+            status,
+            tenantId: ctx.tenantId,
+            projectId,
+            number: sql`(select coalesce(max(${purchaseOrders.number}), 0) + 1 from ${purchaseOrders} where ${sameProject})`,
+            createdById: ctx.userId,
+          })
+          .onConflictDoNothing()
+          .returning({ id: purchaseOrders.id, number: purchaseOrders.number });
+        if (!row) continue;
+        await tx.insert(purchaseOrderLines).values(lines.map((l) => ({ ...l, tenantId: ctx.tenantId, orderId: row.id })));
+        if (requestId) await orderRequest(tx, ctx, projectId, requestId, row);
+        await logEvent(tx, ctx, row.id, "created", { number: row.number, status, amountCents, lines: lines.length, ...(requestId ? { requestId } : {}) });
+        return { orderId: row.id, number: row.number };
+      }
+      throw new Error("Could not number the order");
+    }),
+  );
 }
 
 /**

@@ -14,16 +14,24 @@ import {
   type NotificationPrefs,
   type PhotoSize,
 } from "@repo/core/contract";
-
-const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
+import { API_BASE, REQUEST_TIMEOUT_MS } from "./api-config";
 
 export type AuthUser = MobileSession["user"];
 export type Project = MobileProject;
 
-type ApiError =
+/**
+ * How a call failed, each told apart so the app can say what happened:
+ * - `network_error`: the server couldn't be reached (offline, DNS, TLS)
+ * - `timeout`: no full answer within the call's time
+ * - `server_error`: a 5xx, or an answer the app can't read
+ * - `unauthorized`: the session was rejected (expired, revoked): sign in again
+ * - `invalid_credentials`: wrong email or password, on sign-in only
+ */
+export type ApiError =
   | "invalid_credentials"
   | "unauthorized"
   | "network_error"
+  | "timeout"
   | "server_error"
   // The code of another 4xx, e.g. "wrong_password" from /password.
   | AccountError;
@@ -49,31 +57,48 @@ function forProject(path: string, projectId: string | null | undefined) {
 }
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<Result<T>> {
-  let res: Response;
-  try {
-    res = await fetch(`${API_BASE}${path}`, init);
-  } catch {
-    return { ok: false, error: "network_error" };
-  }
-
-  if (res.status === 401) {
-    const body = (await res.json().catch(() => null)) as { error?: string } | null;
-    return {
-      ok: false,
-      error: body?.error === "invalid_credentials" ? "invalid_credentials" : "unauthorized",
-    };
-  }
-  if (!res.ok) {
-    // A 4xx says what was wrong in `{ error: code }`; anything else is ours.
-    const body = (await res.json().catch(() => null)) as { error?: unknown } | null;
-    const code = res.status < 500 && typeof body?.error === "string" ? body.error : null;
-    return { ok: false, error: (code as AccountError | null) ?? "server_error" };
-  }
+  // Nothing may hang: past the timeout the call is aborted, whether it was
+  // still connecting or half-way through the answer.
+  const controller = new AbortController();
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, REQUEST_TIMEOUT_MS);
+  const failed = (): Result<T> => ({ ok: false, error: timedOut ? "timeout" : "network_error" });
 
   try {
-    return { ok: true, data: (await res.json()) as T };
-  } catch {
-    return { ok: false, error: "server_error" };
+    let res: Response;
+    try {
+      res = await fetch(`${API_BASE}${path}`, { ...init, signal: controller.signal });
+    } catch {
+      return failed();
+    }
+
+    if (res.status === 401) {
+      const body = (await res.json().catch(() => null)) as { error?: string } | null;
+      if (timedOut) return failed();
+      return {
+        ok: false,
+        error: body?.error === "invalid_credentials" ? "invalid_credentials" : "unauthorized",
+      };
+    }
+    if (!res.ok) {
+      // A 4xx says what was wrong in `{ error: code }`; anything else is ours.
+      const body = (await res.json().catch(() => null)) as { error?: unknown } | null;
+      if (timedOut) return failed();
+      const code = res.status < 500 && typeof body?.error === "string" ? body.error : null;
+      return { ok: false, error: (code as AccountError | null) ?? "server_error" };
+    }
+
+    try {
+      return { ok: true, data: (await res.json()) as T };
+    } catch {
+      // Cut off while reading the answer, or an answer that isn't JSON.
+      return timedOut ? failed() : { ok: false, error: "server_error" };
+    }
+  } finally {
+    clearTimeout(timer);
   }
 }
 

@@ -123,6 +123,27 @@ describe("describeError", () => {
     expect(scrub("user@localhost and 3 @ 4")).toBe("user@localhost and 3 @ 4");
   });
 
+  it("cuts session tokens and Authorization values out of every text", () => {
+    const jwt = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1LTEiLCJ0ZW5hbnRJZCI6InQtMSJ9.c2lnbmF0dXJl-_x";
+
+    expect(scrub(`session ${jwt} expired`)).toBe("session [token] expired");
+    expect(scrub(`sent "Authorization: Bearer ${jwt}" twice`)).toBe('sent "Authorization: Bearer [token]" twice');
+    // Whatever follows Bearer, a JWT or not, in any case; an unsigned token too.
+    expect(scrub("bearer sk_live_51Hxyz and BEARER\tabc.def")).toBe("Bearer [token] and Bearer [token]");
+    expect(scrub("got eyJhbGciOiJub25lIn0.eyJzdWIiOiJ4In0")).toBe("got [token]");
+    // What only looks like one stays: a word, a file, a header with nothing after it.
+    expect(scrub("eyJ alone, keys.json and eyebrow.tsx failed; no Bearer")).toBe("eyJ alone, keys.json and eyebrow.tsx failed; no Bearer");
+  });
+
+  it("takes tokens out of a logged line's fields and of an error's message", () => {
+    const jwt = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1LTEifQ.c2ln";
+    const line = logLine("error", "x", new Error(`401 for Bearer ${jwt}`, { cause: new Error(`token ${jwt} revoked`) }), { note: `retry with ${jwt}` }, NOW);
+
+    expect(line.note).toBe("retry with [token]");
+    expect(line.error).toMatchObject({ message: "401 for Bearer [token]", cause: "token [token] revoked" });
+    expect(JSON.stringify(line)).not.toContain("eyJ");
+  });
+
   it("returns at once on a huge unbroken token: it is cut before anything is matched", () => {
     const tokens = [
       "a".repeat(200_000),

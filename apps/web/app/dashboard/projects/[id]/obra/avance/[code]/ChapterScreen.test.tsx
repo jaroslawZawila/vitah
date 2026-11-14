@@ -158,8 +158,11 @@ describe("ChapterScreen", () => {
     // Says what happens: it stops being shown, and the file is kept.
     expect(confirm).toHaveBeenCalledWith("¿Quitar el adjunto albaran.pdf? Dejará de verse en el portal; el archivo se conserva.");
     expect(actions.deleteIssueFileAction).toHaveBeenCalledWith("p-1", "issue-7", "file-1");
+    // The form is busy ("Guardando…") until the attachment is gone.
+    const save = await dialog.findByRole("button", { name: "Guardar registro" });
+    await waitFor(() => expect(save).toBeEnabled());
     await userEvent.selectOptions(dialog.getByLabelText("Estado"), "resolved");
-    await userEvent.click(dialog.getByRole("button", { name: "Guardar registro" }));
+    await userEvent.click(save);
 
     expect(actions.updateIssueAction).toHaveBeenCalledWith(
       "p-1",

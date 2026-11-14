@@ -172,6 +172,18 @@ export const tenantPurchases: TenantPurchases = {
       lateDays: 7,
     }),
   ],
+  // The whole list fits in its first page.
+  paging: { page: 1, limit: 50, total: 6, pages: 1 },
+  groupCounts: { all: 6, open: 3, pending: 1, done: 1, cancelled: 1 },
+  // Pending and cancelled ones don't add up: 3.120 + 7.300 + 19.860 + 19.480.
+  shownContractedCents: 4_976_000,
+  suppliers: [
+    { id: "sup-cabezon", name: "Carpinterías Cabezón" },
+    { id: "sup-besaya", name: "Cubiertas Besaya" },
+    { id: "sup-liebana", name: "Piedra de Liébana" },
+    { id: "sup-revocos", name: "Revocos Cantábrico" },
+    { id: "sup-yesos", name: "Yesos y Placas del Norte" },
+  ],
   projects: [
     { id: "p-1", ref: "VTH-26-001", address: "Caviedes" },
     { id: "p-3", ref: "VTH-26-003", address: "Suances" },
@@ -185,6 +197,7 @@ export const tenantPurchases: TenantPurchases = {
     pendingCents: 4_860_000,
     pendingOrders: 4,
     lateDeliveries: 2,
+    lateProjectRefs: ["VTH-26-001", "VTH-26-003"],
   },
   today: TODAY,
 };

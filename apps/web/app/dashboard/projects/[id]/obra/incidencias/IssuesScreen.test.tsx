@@ -79,7 +79,15 @@ describe("IssuesScreen", () => {
     await waitFor(() => expect(actions.addIssueFileAction).toHaveBeenCalledTimes(2));
     expect(actions.createIssueAction).toHaveBeenCalledWith(
       "p-1",
-      expect.objectContaining({ kind: "issue", chapterCode: "04", description: "Arqueta rota", party: "other", occurredOn: TODAY }),
+      expect.objectContaining({
+        kind: "issue",
+        chapterCode: "04",
+        description: "Arqueta rota",
+        party: "other",
+        occurredOn: TODAY,
+        // The form's idempotency key: a double click or a retry is one record.
+        idempotencyKey: expect.stringMatching(/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/),
+      }),
     );
     expect(vi.mocked(actions.addIssueFileAction).mock.calls.map(([, id, , data]) => [id, (data.get("file") as File).name])).toEqual([
       ["issue-new", "foto.jpg"],
@@ -99,7 +107,8 @@ describe("IssuesScreen", () => {
     await userEvent.click(form.getByRole("button", { name: "Guardar registro" }));
 
     expect(await form.findByRole("alert")).toHaveTextContent("Un adjunto supera el máximo de 4 MB.");
-    await userEvent.click(form.getByRole("button", { name: "Guardar registro" }));
+    // The button reads "Guardando…" and is disabled until the first try settles.
+    await userEvent.click(await form.findByRole("button", { name: "Guardar registro" }));
 
     await waitFor(() => expect(actions.updateIssueAction).toHaveBeenCalledWith("p-1", "issue-new", expect.anything()));
     expect(actions.createIssueAction).toHaveBeenCalledTimes(1);

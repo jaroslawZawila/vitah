@@ -8,7 +8,7 @@ import { clearDocuments } from "../lib/document-store";
 import { clearHitoFiles } from "../lib/hito-files";
 import { secureStore } from "../test-utils/secure-store";
 
-jest.mock("../lib/api", () => ({ api: { signIn: jest.fn(), getChanges: jest.fn() } }));
+jest.mock("../lib/api", () => ({ api: { signIn: jest.fn(), getChanges: jest.fn(), removePushToken: jest.fn() } }));
 jest.mock("../lib/document-store", () => ({ clearDocuments: jest.fn() }));
 jest.mock("../lib/hito-files", () => ({ clearHitoFiles: jest.fn() }));
 jest.mock("expo-image", () => ({
@@ -23,6 +23,10 @@ const wrapper = ({ children }: { children: ReactNode }) => <AuthProvider>{childr
 beforeEach(() => {
   store.clear();
   jest.mocked(api.signIn).mockReset();
+  jest.mocked(api.removePushToken).mockReset().mockResolvedValue({ ok: true, data: { success: true } });
+  jest.mocked(clearDocuments).mockReset();
+  jest.mocked(clearHitoFiles).mockReset();
+  jest.mocked(Image.clearDiskCache).mockReset().mockResolvedValue(true);
 });
 
 describe("AuthProvider", () => {
@@ -91,6 +95,80 @@ describe("AuthProvider", () => {
     expect(clearHitoFiles).toHaveBeenCalled();
     // Cached site photos go too.
     expect(Image.clearDiskCache).toHaveBeenCalled();
+    expect(Image.clearMemoryCache).toHaveBeenCalled();
+  });
+});
+
+describe("sign-out", () => {
+  /** A signed-in client whose phone is registered for pushes. */
+  async function signedIn() {
+    store.set("vitah_token", "stored-token");
+    store.set("vitah_user", JSON.stringify(user));
+    store.set("vitah_push_registration", JSON.stringify({ token: "ExponentPushToken[x]", language: "es" }));
+    const hook = renderHook(useAuth, { wrapper });
+    await waitFor(() => expect(hook.result.current.token).toBe("stored-token"));
+    return hook.result;
+  }
+
+  it("completes while the server hasn't answered, leaving the push removal for later", async () => {
+    let answer!: (result: { ok: false; error: "timeout" }) => void;
+    jest.mocked(api.removePushToken).mockReturnValue(new Promise((resolve) => (answer = resolve)));
+    const result = await signedIn();
+
+    // Resolves although the request is still hanging.
+    await act(() => result.current.signOut());
+
+    expect(result.current.token).toBeNull();
+    expect(result.current.signedOut).toBe(true);
+    expect(store.has("vitah_token")).toBe(false);
+    expect(store.has("vitah_user")).toBe(false);
+    expect(clearDocuments).toHaveBeenCalled();
+    expect(api.removePushToken).toHaveBeenCalledWith("stored-token", "ExponentPushToken[x]");
+    expect(JSON.parse(store.get("vitah_push_pending_removal")!)).toEqual({
+      authToken: "stored-token",
+      pushToken: "ExponentPushToken[x]",
+    });
+
+    // The request gives up at last: the removal stays noted for the next open.
+    await act(async () => answer({ ok: false, error: "timeout" }));
+    expect(store.has("vitah_push_pending_removal")).toBe(true);
+  });
+
+  it.each([
+    ["the network is down", () => Promise.resolve({ ok: false as const, error: "network_error" as const })],
+    ["the server fails", () => Promise.resolve({ ok: false as const, error: "server_error" as const })],
+    ["the request throws", () => Promise.reject(new Error("boom"))],
+  ])("completes when %s, and sends the push removal on the next open", async (_case, outcome) => {
+    jest.mocked(api.removePushToken).mockImplementationOnce(outcome);
+    const result = await signedIn();
+
+    await act(() => result.current.signOut());
+    await act(async () => {});
+
+    expect(result.current.token).toBeNull();
+    expect(store.has("vitah_token")).toBe(false);
+    expect(store.has("vitah_push_pending_removal")).toBe(true);
+
+    // The app opens again.
+    renderHook(useAuth, { wrapper });
+    await waitFor(() => expect(store.has("vitah_push_pending_removal")).toBe(false));
+    expect(api.removePushToken).toHaveBeenLastCalledWith("stored-token", "ExponentPushToken[x]");
+  });
+
+  it("still signs out when a step on the phone fails", async () => {
+    jest.mocked(clearDocuments).mockImplementation(() => {
+      throw new Error("disk error");
+    });
+    jest.mocked(Image.clearDiskCache).mockRejectedValue(new Error("cache error"));
+    const result = await signedIn();
+
+    await act(() => result.current.signOut());
+
+    expect(result.current.token).toBeNull();
+    expect(result.current.signedOut).toBe(true);
+    expect(store.has("vitah_token")).toBe(false);
+    // The steps after the failed ones ran too.
+    expect(clearHitoFiles).toHaveBeenCalled();
     expect(Image.clearMemoryCache).toHaveBeenCalled();
   });
 });

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -25,6 +25,9 @@ function renderScreen(props: Partial<Parameters<typeof InvoiceScreen>[0]> = {}) 
     </NextIntlClientProvider>,
   );
 }
+
+/** The form's idempotency key: sent with every create, so a double click or a retry is one record. */
+const A_KEY = expect.stringMatching(/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/);
 
 /** The `data` a FormData action was called with, and its file. */
 const sent = (call: unknown[] | undefined) => {
@@ -85,10 +88,38 @@ describe("InvoiceScreen", () => {
     const call = vi.mocked(actions.createPaymentAction).mock.calls[0];
     expect(call?.[0]).toBe("inv-148");
     expect(sent(call)).toEqual({
-      data: { paidOn: "2026-10-19", amountCents: 1_350_000, method: "confirming", reference: "CF-77" },
+      // With the form's idempotency key: the payment sent twice is recorded once.
+      data: { paidOn: "2026-10-19", amountCents: 1_350_000, method: "confirming", reference: "CF-77", idempotencyKey: A_KEY },
       file: proof,
     });
-    expect(screen.queryByRole("form", { name: "Registrar pago" })).not.toBeInTheDocument();
+    // The form closes once the action answers.
+    await waitFor(() => expect(screen.queryByRole("form", { name: "Registrar pago" })).not.toBeInTheDocument());
+  });
+
+  it("sends a refused payment again under the same key, and the next payment under a new one", async () => {
+    vi.mocked(actions.createPaymentAction).mockResolvedValueOnce({ error: "exceeds_amount" }).mockResolvedValueOnce({ error: "exceeds_amount" });
+    renderScreen();
+    await userEvent.click(screen.getByRole("button", { name: "Registrar pago" }));
+    const form = () => within(screen.getByRole("form", { name: "Registrar pago" }));
+    // The button is back once the last answer is in.
+    const pay = async () => userEvent.click(await form().findByRole("button", { name: /Registrar pago de/ }));
+    await pay();
+    expect(await form().findByRole("alert")).toHaveTextContent("El importe supera lo que queda por pagar o por abonar.");
+    await pay();
+    // Now it goes in; the form closes.
+    await pay();
+    await waitFor(() => expect(screen.queryByRole("form", { name: "Registrar pago" })).not.toBeInTheDocument());
+    // Another payment is another submission.
+    await userEvent.click(screen.getByRole("button", { name: "Registrar pago" }));
+    await pay();
+
+    await waitFor(() => expect(actions.createPaymentAction).toHaveBeenCalledTimes(4));
+    const keys = vi.mocked(actions.createPaymentAction).mock.calls.map((call) => sent(call).data.idempotencyKey as string);
+    expect(keys[0]).toEqual(A_KEY);
+    // Refused, so nothing was paid: sent again as it was, it is the same payment.
+    expect([keys[1], keys[2]]).toEqual([keys[0], keys[0]]);
+    expect(keys[3]).toEqual(A_KEY);
+    expect(keys[3]).not.toBe(keys[0]);
   });
 
   it("takes a payment back, adds a version of the PDF and deletes the invoice", async () => {
@@ -99,6 +130,8 @@ describe("InvoiceScreen", () => {
       expect.stringMatching(/^¿Quitar el pago de 15\.000,00\s€\? Sale de las listas y de los totales; sus datos y su justificante se conservan\.$/),
     );
     expect(actions.deletePaymentAction).toHaveBeenCalledWith("pay-1");
+    // Its button is disabled while the action runs.
+    await waitFor(() => expect(screen.getByRole("button", { name: "Quitar el pago del 15 oct" })).toBeEnabled());
 
     await userEvent.click(screen.getByRole("button", { name: "+ Nueva versión" }));
     const upload = within(screen.getByRole("form", { name: "+ Nueva versión" }));
@@ -108,11 +141,13 @@ describe("InvoiceScreen", () => {
     await userEvent.click(upload.getByRole("button", { name: "Subir versión" }));
     const form = vi.mocked(actions.addInvoiceFileAction).mock.calls[0]?.[1] as FormData;
     expect([form.get("file"), form.get("note")]).toEqual([pdf, "Importe corregido"]);
+    // The form closes once the version is in.
+    await waitFor(() => expect(screen.queryByRole("form", { name: "+ Nueva versión" })).not.toBeInTheDocument());
 
     await userEvent.click(screen.getByRole("button", { name: "Eliminar" }));
     expect(window.confirm).toHaveBeenLastCalledWith("¿Eliminar MSN-2026/148? Sale de las listas y de los totales; sus datos y sus PDF se conservan.");
     expect(actions.deleteInvoiceAction).toHaveBeenCalledWith("inv-148");
-    expect(router.push).toHaveBeenCalledWith("/dashboard/compras/facturas");
+    await waitFor(() => expect(router.push).toHaveBeenCalledWith("/dashboard/compras/facturas"));
   });
 
   it("links a credit note on it, and shows a paid one's retention; read-only for viewers", () => {

@@ -9,6 +9,19 @@
     "submitting": "Accediendo…",
     "error": "Credenciales incorrectas. Inténtalo de nuevo.",
     "tooManyAttempts": "Demasiados intentos fallidos. Espera unos minutos e inténtalo de nuevo.",
+    "invalidCode": "Código incorrecto. Inténtalo de nuevo.",
+    "code": {
+      "title": "Verificación en dos pasos",
+      "label": "Código de verificación",
+      "hint": "El código de 6 dígitos de tu aplicación de autenticación.",
+      "recoveryLabel": "Código de recuperación",
+      "recoveryHint": "Uno de los códigos que guardaste al activarla. Cada uno sirve una sola vez.",
+      "useRecovery": "Usar un código de recuperación",
+      "useApp": "Usar la aplicación de autenticación",
+      "submit": "Verificar",
+      "submitting": "Verificando…",
+      "back": "Volver"
+    },
     "footer": "© {year} ViTAH. Todos los derechos reservados."
   },
   "dashboard": {
@@ -41,6 +54,9 @@
     "purchases": "Compras",
     "settings": "Ajustes",
     "changePassword": "Cambiar contraseña",
+    "twoStep": "Verificación en dos pasos",
+    "deleted": "Elementos eliminados",
+    "signOut": "Cerrar sesión",
     "language": {
       "label": "Idioma",
       "es": "Español",
@@ -81,6 +97,69 @@
         "too_many_attempts": "Demasiados intentos fallidos. Espera unos minutos e inténtalo de nuevo.",
         "generic": "No se ha podido cambiar la contraseña. Inténtalo de nuevo."
       }
+    },
+    "twoStep": {
+      "title": "Verificación en dos pasos",
+      "description": "Al iniciar sesión, además de la contraseña, se pide un código de tu aplicación de autenticación.",
+      "close": "Cerrar",
+      "cancel": "Cancelar",
+      "back": "Volver",
+      "anyCode": "Código de verificación",
+      "anyCodeHint": "El código de 6 dígitos de tu aplicación, o un código de recuperación.",
+      "off": {
+        "status": "Desactivada",
+        "intro": "Necesitas una aplicación de autenticación en el móvil (Google Authenticator, Microsoft Authenticator, 1Password u otra compatible).",
+        "start": "Activar",
+        "starting": "Preparando…"
+      },
+      "setup": {
+        "scan": "1. Escanea este código QR con tu aplicación de autenticación.",
+        "qrAlt": "Código QR para la aplicación de autenticación",
+        "manual": "¿No puedes escanearlo? Escribe esta clave en la aplicación:",
+        "secretLabel": "Clave de configuración",
+        "enter": "2. Escribe el código de 6 dígitos que muestra la aplicación.",
+        "code": "Código de verificación",
+        "confirm": "Activar",
+        "confirming": "Comprobando…"
+      },
+      "codes": {
+        "enabled": "Verificación en dos pasos activada. Te pediremos un código la próxima vez que inicies sesión.",
+        "regenerated": "Códigos nuevos generados. Los anteriores ya no sirven.",
+        "title": "Códigos de recuperación",
+        "help": "Guárdalos en un lugar seguro: no se volverán a mostrar. Cada uno sirve una sola vez para entrar si no tienes el móvil.",
+        "copy": "Copiar",
+        "copied": "Copiados",
+        "done": "Los he guardado"
+      },
+      "on": {
+        "status": "Activada",
+        "codesLeft": "{count, plural, =0 {No te queda ningún código de recuperación.} one {Te queda # código de recuperación.} other {Te quedan # códigos de recuperación.}}",
+        "regenerate": "Generar códigos nuevos",
+        "disable": "Desactivar"
+      },
+      "regenerate": {
+        "help": "Se generan diez códigos de recuperación nuevos; los anteriores dejan de servir.",
+        "submit": "Generar códigos",
+        "submitting": "Generando…"
+      },
+      "disable": {
+        "help": "Para desactivarla, confirma tu contraseña y un código.",
+        "password": "Contraseña actual",
+        "submit": "Desactivar",
+        "submitting": "Desactivando…",
+        "done": "Verificación en dos pasos desactivada."
+      },
+      "errors": {
+        "missing_fields": "Completa todos los campos.",
+        "wrong_code": "Código incorrecto. Inténtalo de nuevo.",
+        "wrong_password": "La contraseña actual no es correcta.",
+        "too_many_attempts": "Demasiados intentos fallidos. Espera unos minutos e inténtalo de nuevo.",
+        "mfa_already_enabled": "La verificación en dos pasos ya está activada.",
+        "mfa_not_started": "La activación ha caducado. Empieza de nuevo.",
+        "mfa_not_enabled": "La verificación en dos pasos no está activada.",
+        "mfa_unavailable": "La verificación en dos pasos todavía no está disponible. Inténtalo más tarde.",
+        "generic": "No se ha podido completar. Inténtalo de nuevo."
+      }
     }
   },
   "topbar": {
@@ -90,7 +169,9 @@
       "projectDetail": "Detalle de Proyecto",
       "clients": "Clientes de la app",
       "newProject": "Nuevo proyecto",
-      "subcontractors": "Subcontratas"
+      "subcontractors": "Subcontratas",
+      "purchases": "Compras",
+      "deleted": "Elementos eliminados"
     }
   },
   "navigation": {
@@ -237,6 +318,7 @@
       "email": "Correo electrónico",
       "role": "Rol",
       "status": "Estado",
+      "twoStep": "2 pasos",
       "created": "Fecha alta",
       "actions": "Acciones"
     },
@@ -254,7 +336,13 @@
       "deactivate": "Desactivar",
       "activate": "Activar",
       "resetPassword": "Restablecer contraseña",
-      "resetPasswordFor": "Restablecer contraseña de {name}"
+      "resetPasswordFor": "Restablecer contraseña de {name}",
+      "removeTwoStep": "Quitar",
+      "removeTwoStepFor": "Quitar verificación en dos pasos de {name}"
+    },
+    "twoStep": {
+      "on": "Activada",
+      "off": "No"
     },
     "inviteForm": {
       "title": "Nuevo Usuario",
@@ -279,11 +367,23 @@
       "last_admin": "La organización debe tener al menos un administrador activo.",
       "generic": "Error al procesar la solicitud.",
       "invalid_email": "Introduce un correo válido.",
-      "too_long": "El nombre o el correo son demasiado largos."
+      "too_long": "El nombre o el correo son demasiado largos.",
+      "cannot_remove_own_mfa": "Tu propia verificación en dos pasos se desactiva desde Ajustes › Verificación en dos pasos.",
+      "mfa_not_enabled": "Este usuario no tiene activada la verificación en dos pasos.",
+      "mfa_unavailable": "La verificación en dos pasos todavía no está disponible. Inténtalo más tarde."
     },
     "success": {
       "created": "Usuario creado correctamente.",
-      "passwordReset": "Contraseña de {name} restablecida. Sus sesiones se han cerrado."
+      "passwordReset": "Contraseña de {name} restablecida. Sus sesiones se han cerrado.",
+      "twoStepRemoved": "Verificación en dos pasos de {name} quitada. Sus sesiones se han cerrado."
+    },
+    "removeTwoStep": {
+      "title": "Quitar verificación en dos pasos de {name}",
+      "description": "Para cuando ha perdido el móvil. Podrá entrar solo con su contraseña y se cerrarán todas sus sesiones. Después puede volver a activarla desde sus ajustes.",
+      "confirm": "Quitar verificación en dos pasos",
+      "confirming": "Quitando…",
+      "cancel": "Cancelar",
+      "close": "Cerrar"
     },
     "resetPassword": {
       "title": "Nueva contraseña para {name}",
@@ -1098,6 +1198,7 @@
         "file_too_large": "Un adjunto supera el máximo de 4 MB.",
         "project_not_found": "Proyecto no encontrado.",
         "not_found": "No se ha encontrado el registro. Recarga la página.",
+        "idempotency_key_reused": "Este envío ya se había registrado con otros datos. Recarga la página y comprueba si ya está guardado antes de repetirlo.",
         "forbidden": "Solo administradores y gestores pueden hacer cambios."
       }
     },
@@ -2259,6 +2360,7 @@
       "document_expired": "«{document}» caducado → empresa bloqueada; {count, plural, one {# trabajador} other {# trabajadores}} sin acceso",
       "assigned": "Asignó a {project}",
       "unassigned": "Quitó de una obra",
+      "assignment_restored": "Restauró su asignación a {project}",
       "worker_created": "Registró al trabajador {name}",
       "worker_updated": "Editó al trabajador: {fields}"
     },
@@ -2990,13 +3092,16 @@
       "creditCreated": "Abono {number} registrado, {amount} €",
       "invoiceUpdated": "{number} modificada",
       "invoiceDeleted": "{number} eliminada",
+      "invoiceRestored": "{number} restaurada",
       "invoiceFileAdded": "Nueva versión del PDF de {number} (v{version})",
       "paymentAdded": "Pago de {amount} € a {number}",
       "paymentDeleted": "Pago de {amount} € a {number} quitado",
+      "paymentRestored": "Pago de {amount} € a {number} restaurado",
       "milestones": "{count, plural, =0 {Hitos de pago quitados} one {Hitos de pago: # hito} other {Hitos de pago: # hitos}}",
       "documentAdded": "Documento añadido: {title}",
       "documentVersionAdded": "Nueva versión de {title} (v{version})",
       "documentRemoved": "Documento quitado: {title}",
+      "documentRestored": "Documento restaurado: {title}",
       "request": {
         "approved": "Aprobada",
         "rejected": "Rechazada",
@@ -3164,6 +3269,7 @@
       "supplies_only": "Un proveedor de material solo recibe pedidos de material, no subcontratos.",
       "invalid_state": "El pedido ya no está en ese estado. Recarga la página.",
       "not_found": "No se ha encontrado el pedido.",
+      "idempotency_key_reused": "Este envío ya se había registrado con otros datos. Recarga la página y comprueba si ya está guardado antes de repetirlo.",
       "forbidden": "Solo administradores y gestores pueden hacer cambios.",
       "project_not_found": "Proyecto no encontrado.",
       "no_budget": "Todavía no hay un presupuesto aceptado.",
@@ -3667,6 +3773,7 @@
       "supplies_only": "Un proveedor de material solo recibe pedidos de material, no subcontratos.",
       "invalid_state": "La solicitud ya no está en ese estado. Recarga la página.",
       "not_found": "No se ha encontrado la solicitud.",
+      "idempotency_key_reused": "Este envío ya se había registrado con otros datos. Recarga la página y comprueba si ya está guardado antes de repetirlo.",
       "forbidden": "No tienes permiso: solo un administrador aprueba o rechaza, y administradores y gestores solicitan.",
       "project_not_found": "Proyecto no encontrado.",
       "no_budget": "Todavía no hay un presupuesto aceptado.",
@@ -3817,6 +3924,92 @@
       "failed": "La IA no terminó"
     }
   },
+  "deletedPage": {
+    "eyebrow": "Administración",
+    "title": "Elementos eliminados",
+    "intro": "Nada de lo que elimina un usuario se borra: queda guardado, con quién lo eliminó y cuándo. Aquí puedes verlo y restaurarlo.",
+    "listTitle": "Eliminados",
+    "filters": {
+      "kind": "Tipo",
+      "allKinds": "Todos",
+      "project": "Obra",
+      "allProjects": "Todas",
+      "deletedProject": "{ref} (eliminada)"
+    },
+    "kinds": {
+      "project": "Proyecto",
+      "document": "Documento",
+      "photo": "Foto",
+      "issue_file": "Archivo de incidencia",
+      "assignment": "Subcontrata en obra",
+      "order_document": "Documento de pedido",
+      "invoice": "Factura",
+      "payment": "Pago"
+    },
+    "cols": {
+      "kind": "Tipo",
+      "what": "Elemento",
+      "project": "Obra",
+      "deleted": "Eliminado",
+      "actions": "Acciones"
+    },
+    "what": {
+      "photoOf": "Foto del {date}",
+      "issue": "Registro {number}",
+      "assignment": "Asignación a la obra",
+      "invoice": "Factura {number}",
+      "creditNote": "Abono {number}",
+      "payment": "Pago de {amount}",
+      "paymentOf": "Factura {number}"
+    },
+    "deletedBy": "por {name}",
+    "deletedByUnknown": "por un usuario que ya no existe",
+    "restore": "Restaurar",
+    "restoreItem": "Restaurar {item}",
+    "blocked": {
+      "parent_project": "Su obra {label} está eliminada: restáurala primero.",
+      "parent_invoice": "Su factura {label} está eliminada: restáurala primero.",
+      "ref_taken": "La referencia {label} la usa ahora otro proyecto. Mientras sea así, no se puede restaurar.",
+      "duplicate_number": "Ese proveedor tiene ahora otra factura con el número {label}. Cambia el número de esa para restaurar esta."
+    },
+    "empty": "No hay nada eliminado.",
+    "noMatch": "No hay nada eliminado con estos filtros.",
+    "loadMore": "Cargar más",
+    "loading": "Cargando…",
+    "restored": "Restaurado: {item}.",
+    "confirm": {
+      "title": "¿Restaurar {item}?",
+      "description": {
+        "project": "El proyecto vuelve a la lista con todo lo que contiene, y a la app de su cliente.",
+        "document": "Vuelve a los documentos de la obra. Si el cliente lo veía, lo verá otra vez en su app; no recibe ninguna notificación.",
+        "photo": "Vuelve a las fotos de la obra. Si el cliente la veía, la verá otra vez en su app; no recibe ninguna notificación.",
+        "issue_file": "Vuelve a su incidencia o cambio, tal como estaba.",
+        "assignment": "La empresa vuelve a estar asignada a la obra, con los capítulos y fechas que tenía.",
+        "order_document": "Vuelve a su pedido, con todas sus versiones.",
+        "invoice": "Vuelve a contar en los importes de su pedido, de la obra y del proveedor.",
+        "payment": "Vuelve a contar como pagado en su factura."
+      },
+      "cancel": "Cancelar",
+      "confirm": "Restaurar",
+      "restoring": "Restaurando…",
+      "close": "Cerrar"
+    },
+    "errors": {
+      "generic": "No se ha podido restaurar. Inténtalo de nuevo.",
+      "not_found": "Ya no está eliminado: puede que alguien lo haya restaurado.",
+      "forbidden": "Solo un administrador puede ver y restaurar lo eliminado.",
+      "invalid_input": "No se ha podido cargar la lista con esos filtros.",
+      "parent_deleted": "Lo que lo contiene (su obra o su factura) está eliminado: restáuralo primero.",
+      "ref_taken": "Su referencia la usa ahora otro proyecto. Mientras sea así, no se puede restaurar.",
+      "duplicate_number": "Ese proveedor tiene ahora otra factura con el mismo número. Cambia el número de esa para restaurar esta.",
+      "invalid_state": "Su pedido ya no admite esta factura: está cancelado, sin cursar o es de otro proveedor.",
+      "unknown_line": "Su pedido ya no tiene las partidas a las que se imputó esta factura.",
+      "missing_fields": "Su pedido tiene ahora un calendario de pagos y esta factura no está en ninguno de sus hitos. Regístrala de nuevo en el suyo.",
+      "exceeds_amount": "Ya no cabe: supera lo que queda por pagar de la factura o, si es un abono, lo que queda de la factura que rectifica.",
+      "invalid_date": "El pago es anterior a la fecha que tiene ahora su factura.",
+      "supplies_only": "La empresa es ahora un proveedor de material, y esos no se asignan a obras."
+    }
+  },
   "errorPages": {
     "error": {
       "eyebrow": "Error",
@@ -3837,5 +4030,13 @@
     },
     "toProjects": "Volver a Proyectos",
     "loading": "Cargando…"
+  },
+  "pager": {
+    "label": "Páginas",
+    "showing": "{from}–{to} de {total}",
+    "none": "Ninguno en esta página · {total} en total",
+    "previous": "Anterior",
+    "next": "Siguiente",
+    "page": "Página {page} de {pages}"
   }
 }

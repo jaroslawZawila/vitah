@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react-native";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 import { Alert } from "react-native";
 import FaseScreen from "../app/(app)/obra/fase/[key]";
 import PagoScreen from "../app/(app)/obra/pago/[id]";
@@ -25,8 +25,10 @@ jest.mock("../lib/use-project", () => {
     useProjectData: (fetch: (token: string, projectId: string) => never) => useClientData(useMemo(() => (token: string) => fetch(token, "p1"), [fetch])),
   };
 });
+// One `signOut` for every render, as the real one is: a new one each time would reload the obra on every render.
+const mockSignOut = jest.fn();
 jest.mock("../lib/auth", () => ({
-  useAuth: () => ({ token: "tok", user: { name: "Ana" }, signOut: jest.fn() }),
+  useAuth: () => ({ token: "tok", user: { name: "Ana" }, signOut: mockSignOut }),
 }));
 jest.mock("../lib/api", () => ({
   api: { getObra: jest.fn(), listPhotos: jest.fn(), photoUrl: (id: string) => `/photos/${id}` },
@@ -104,6 +106,102 @@ describe("FaseScreen", () => {
     mockParams = { key: "H7" };
     render(wrap(<FaseScreen />));
     expect(await screen.findByText("No encontramos esta fase.")).toBeOnTheScreen();
+  });
+});
+
+// Opened before the obra is there (a notification, a slow connection) or when
+// it can't be loaded: never an empty screen.
+describe.each([
+  ["FaseScreen", FaseScreen, { key: "H4" }, "Obra", "Fase 3 de 4 · En curso", "No encontramos esta fase."],
+  ["PagoScreen", PagoScreen, { id: "h3" }, "Pagos", "Hito H3 · 15 % del presupuesto", "No encontramos este pago."],
+] as const)("%s without the obra", (_name, Screen, params, back, loadedText, missing) => {
+  beforeEach(() => {
+    mockParams = { ...params };
+  });
+
+  it("shows it is loading, then the screen", async () => {
+    let answer!: (result: { ok: true; data: { obra: typeof obra } }) => void;
+    jest.mocked(api.getObra).mockReturnValue(new Promise((resolve) => (answer = resolve)));
+    render(wrap(<Screen />));
+
+    expect(await screen.findByLabelText("Cargando tu obra")).toBeOnTheScreen();
+    expect(screen.getByRole("button", { name: back })).toBeOnTheScreen();
+    expect(screen.queryByText(missing)).toBeNull();
+    expect(screen.queryByRole("button", { name: "Reintentar" })).toBeNull();
+
+    await act(async () => answer({ ok: true, data: { obra } }));
+
+    expect(await screen.findByText(loadedText)).toBeOnTheScreen();
+    expect(screen.queryByLabelText("Cargando tu obra")).toBeNull();
+  });
+
+  it.each(["network_error", "timeout", "server_error"] as const)(
+    "says the obra couldn't be loaded after a %s, and loads it on retry",
+    async (error) => {
+      jest.mocked(api.getObra).mockResolvedValue({ ok: false, error });
+      render(wrap(<Screen />));
+
+      expect(await screen.findByText("No hemos podido cargar tu obra. Comprueba tu conexión.")).toBeOnTheScreen();
+      expect(screen.queryByText(missing)).toBeNull();
+      expect(screen.getByRole("button", { name: back })).toBeOnTheScreen();
+
+      jest.mocked(api.getObra).mockResolvedValue({ ok: true, data: { obra } });
+      fireEvent.press(screen.getByRole("button", { name: "Reintentar" }));
+
+      expect(await screen.findByText(loadedText)).toBeOnTheScreen();
+    },
+  );
+
+  it("says so when the client has no obra", async () => {
+    jest.mocked(api.getObra).mockResolvedValue({ ok: true, data: { obra: null } });
+    render(wrap(<Screen />));
+
+    expect(await screen.findByText(missing)).toBeOnTheScreen();
+    expect(screen.queryByRole("button", { name: "Reintentar" })).toBeNull();
+  });
+});
+
+// A newer server may send a status this version of the app has no text for.
+describe("a status the app doesn't know", () => {
+  const withStatus = (status: string) => ({
+    ...obra,
+    phases: obra.phases.map((p) => (p.key === "H4" || p.key === "pre" ? { ...p, status: status as never } : p)),
+    hitos: obra.hitos.map((h) => ({ ...h, status: status as never, dueOn: null, paidOn: null })),
+  });
+
+  beforeEach(() => {
+    jest.spyOn(console, "warn").mockImplementation(() => {});
+    jest.mocked(api.getObra).mockResolvedValue({ ok: true, data: { obra: withStatus("on_hold") } });
+  });
+  afterEach(() => jest.mocked(console.warn).mockRestore());
+
+  it("leaves the phase's status out", async () => {
+    mockParams = { key: "H4" };
+    render(wrap(<FaseScreen />));
+
+    expect(await screen.findByText("Fase 3 de 4")).toBeOnTheScreen();
+    expect(screen.queryByText(/undefined|on_hold/)).toBeNull();
+    expect(screen.queryByText("—")).toBeNull();
+  });
+
+  it("leaves it out of the phase's payments", async () => {
+    mockParams = { key: "pre" };
+    render(wrap(<FaseScreen />));
+
+    await screen.findByRole("header", { name: "Proyecto y licencia" });
+    expect(screen.getByText("31.374,35 € + IVA")).toBeOnTheScreen();
+    expect(screen.queryByText(/undefined|on_hold/)).toBeNull();
+    expect(screen.queryByText("—")).toBeNull();
+  });
+
+  it("shows the payment without a status pill", async () => {
+    mockParams = { id: "h4" };
+    render(wrap(<PagoScreen />));
+
+    expect(await screen.findByRole("header", { name: "Envolvente estanca" })).toBeOnTheScreen();
+    expect(screen.getByText("Hito H4 · 13 % del presupuesto")).toBeOnTheScreen();
+    expect(screen.queryByText(/undefined|on_hold/)).toBeNull();
+    expect(screen.queryByText("—")).toBeNull();
   });
 });
 

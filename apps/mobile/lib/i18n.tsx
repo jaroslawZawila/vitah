@@ -3,6 +3,7 @@ import React, { createContext, use, useCallback, useEffect, useMemo, useState } 
 import type { AppLanguage } from "@repo/core/contract";
 import { en } from "../messages/en";
 import { es, type Messages } from "../messages/es";
+import { reportError } from "./report-error";
 
 // The app's text in Spanish or English. The client picks the language in
 // Perfil; until then it follows the phone (English phones get English,
@@ -21,20 +22,67 @@ type Keys<T, Prefix extends string = ""> = {
 export type MessageKey = Keys<Messages>;
 
 type Params = Record<string, string | number>;
-export type Translate = (key: MessageKey, params?: Params) => string;
+/**
+ * `fallback` is what a key that doesn't exist reads as ("—" unless given):
+ * pass one wherever the key is built from what the server sent (a status the
+ * app doesn't know yet), e.g. `t(`hitoStatus.${status}`, undefined, "")`.
+ */
+export type Translate = (key: MessageKey, params?: Params, fallback?: string) => string;
+
+/** What a missing text reads as when the caller gave nothing better. */
+const MISSING_TEXT = "—";
+
+/** The text at `key`, or undefined when there is none there (never throws, whatever the key). */
+function lookup(messages: Messages, key: unknown): string | { one: string; other: string } | undefined {
+  if (typeof key !== "string") return undefined;
+  let value: unknown = messages;
+  for (const part of key.split(".")) {
+    // Own keys only: "constructor" or "__proto__" from a server value are not texts.
+    if (typeof value !== "object" || value === null || !Object.prototype.hasOwnProperty.call(value, part)) {
+      return undefined;
+    }
+    value = (value as Record<string, unknown>)[part];
+  }
+  if (typeof value === "string") return value;
+  const forms = value as { one?: unknown; other?: unknown } | null;
+  if (typeof forms === "object" && forms !== null && typeof forms.one === "string" && typeof forms.other === "string") {
+    return forms as { one: string; other: string };
+  }
+  return undefined; // A group of texts, not a text.
+}
+
+const missingSeen = new Set<string>();
+/** Far more than the app's server-built keys could miss; past it, missing keys go unsaid. */
+const MAX_MISSING_SEEN = 200;
+
+/** A key without a text: said once, in development on the console, in a build to the portal. */
+function noteMissing(language: AppLanguage, key: unknown) {
+  try {
+    const name = String(key).slice(0, 120);
+    if (missingSeen.has(name) || missingSeen.size >= MAX_MISSING_SEEN) return;
+    missingSeen.add(name);
+    if (__DEV__) console.warn(`[i18n] No "${language}" text for "${name}"`);
+    void reportError(new Error(`Missing translation: ${name}`));
+  } catch {
+    // A key that can't even be named: the fallback is shown all the same.
+  }
+}
 
 function translator(language: AppLanguage): Translate {
-  return (key, params = {}) => {
-    let value: unknown = MESSAGES[language];
-    for (const part of key.split(".")) value = (value as Record<string, unknown>)[part];
-    if (typeof value === "object" && value !== null) {
+  return (key, params, fallback = MISSING_TEXT) => {
+    const values = params ?? {};
+    let value = lookup(MESSAGES[language], key);
+    if (value === undefined) {
+      noteMissing(language, key);
+      return fallback;
+    }
+    if (typeof value === "object") {
       // Spanish and English: "one" for exactly 1. (Not Intl.PluralRules:
       // Hermes, the app's JS engine, doesn't have it.)
-      const forms = value as { one: string; other: string };
-      value = Number(params.count) === 1 ? forms.one : forms.other;
+      value = Number(values.count) === 1 ? value.one : value.other;
     }
-    return String(value).replace(/\{(\w+)\}/g, (match, name: string) =>
-      name in params ? String(params[name]) : match,
+    return value.replace(/\{(\w+)\}/g, (match, name: string) =>
+      name in values ? String(values[name]) : match,
     );
   };
 }

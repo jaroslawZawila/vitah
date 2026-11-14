@@ -1,16 +1,21 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createTestProject, createTestTenant, createTestUser, resetDatabase } from "@repo/db/testing";
-import { db, eq, projects, purchaseInvoiceFiles, purchaseInvoices, purchasePayments } from "@repo/db";
+import { db, eq, projects, purchaseInvoiceFiles, purchaseInvoices, purchaseOrders, purchasePayments, sql } from "@repo/db";
 import {
   budgetService,
   constructionService,
   isValidCif,
+  projectsService,
   purchaseInvoicesService as svc,
   purchaseSuppliersService,
   purchasingService,
   subcontractorsService,
   type Ctx,
 } from "../src";
+import { DUE_SOON_DAYS, orderLabel, PAYMENT_FORECAST_DAYS, PURCHASE_INVOICE_GROUPS } from "../src/contract";
+import { lateDays } from "../src/control-calc";
+import { addDays } from "../src/obra-calc";
+import { isDueSoon, isOwed } from "../src/purchase-calc";
 import { files } from "../src/testing";
 import { framerDraft } from "./budget-fixture";
 
@@ -927,6 +932,221 @@ describe("Administration's lists", () => {
   });
 });
 
+describe("Administration's lists, a page at a time", () => {
+  /**
+   * Five invoices read by a viewer, as the list orders them: SOC-1 past due,
+   * MSN-2026/112 due soon, SOC-3 part paid with a credit note (SOC-R1) and
+   * SOC-2 paid. Besides, an invoice and a payment deleted, an invoice of a
+   * deleted obra and one of another tenant, which nothing may show.
+   */
+  async function many() {
+    const s = await setup("viewer");
+    const { admin } = s;
+    const overdue = await svc.createInvoice(admin, s.materialId, invoice({ number: "SOC-1", baseCents: 10_000, dueOn: "2026-10-15" }));
+    const soon = await svc.createInvoice(admin, s.subId, invoice({ dueOn: "2026-10-22" }));
+    const paid = await svc.createInvoice(admin, s.materialId, invoice({ number: "SOC-2", issuedOn: "2026-09-25", baseCents: 1_000, dueOn: "2026-11-30" }));
+    await svc.createPayment(admin, paid.invoiceId, { amountCents: 1_210, paidOn: "2026-10-02" });
+    const partial = await svc.createInvoice(admin, s.materialId, invoice({ number: "SOC-3", baseCents: 20_000, dueOn: "2026-11-10" }));
+    await svc.createPayment(admin, partial.invoiceId, { amountCents: 5_000, paidOn: "2026-10-10" });
+    const credit = await svc.createInvoice(admin, s.materialId, invoice({ kind: "credit_note", rectifiesId: partial.invoiceId, number: "SOC-R1", issuedOn: "2026-10-01", baseCents: -2_000 }));
+
+    // Deleted by a user: an invoice past due, and a payment that would have settled the one due soon.
+    const removed = await svc.createInvoice(admin, s.materialId, invoice({ number: "SOC-4", baseCents: 3_000, dueOn: "2026-09-30" }));
+    await svc.deleteInvoice(admin, removed.invoiceId);
+    const mistaken = await svc.createPayment(admin, soon.invoiceId, { amountCents: 46_550, paidOn: "2026-10-05" });
+    await svc.deletePayment(admin, mistaken.paymentId);
+
+    // A deleted obra with an invoice past due and a payment this month.
+    const gone = await createTestProject(s.tenant.id);
+    const { revisionId } = await framerDraft(admin, gone.id, ["01"]);
+    await budgetService.acceptRevision(admin, gone.id, revisionId, {}, { unissued: true });
+    const goneLine = (await purchasingService.getPurchaseForm(admin, gone.id)).chapters[0]!.lines[0]!.lineageId;
+    const goneOrder = await purchasingService.createPurchase(admin, gone.id, {
+      kind: "material",
+      subcontractorId: s.supplierId,
+      description: "Piedra de la obra borrada",
+      status: "ordered",
+      orderedOn: "2026-06-01",
+      lines: [{ lineageId: goneLine, amountCents: 40_000 }],
+    });
+    const goneInvoice = await svc.createInvoice(admin, goneOrder.orderId, invoice({ number: "SOC-9", baseCents: 40_000, dueOn: "2026-10-01" }));
+    await svc.createPayment(admin, goneInvoice.invoiceId, { amountCents: 100, paidOn: "2026-10-03" });
+    await projectsService.deleteProject(admin, gone.id);
+
+    const other = await setup();
+    await svc.createInvoice(other.ctx, other.materialId, invoice({ number: "SOC-1", baseCents: 99_000, dueOn: "2026-10-01" }));
+
+    // Owed first, soonest due first; then the settled ones, newest first.
+    const ids = [overdue, soon, partial, credit, paid].map((i) => i.invoiceId);
+    return { ...s, other, ids, gone };
+  }
+
+  const idsOf = (list: { invoices: { id: string }[] }) => list.invoices.map((i) => i.id);
+  const SUMMARY = {
+    // 12.100 past due + 46.550 due soon + 16.780 (24.200 less its credit note's 2.420 and the 5.000 paid).
+    outstandingCents: 75_430,
+    outstandingInvoices: 3,
+    outstandingSuppliers: 2,
+    overdueCents: 12_100,
+    overdueInvoices: 1,
+    dueSoonCents: 46_550,
+    dueSoonInvoices: 1,
+    paidThisMonthCents: 6_210,
+    paymentsThisMonth: 2,
+  };
+
+  it("gives the whole list when no page is asked for, as before", async () => {
+    const s = await many();
+    const all = await svc.listInvoices(s.ctx);
+
+    expect(all.invoices.map((i) => [i.number, i.state, i.outstandingCents])).toEqual([
+      ["SOC-1", "overdue", 12_100],
+      ["MSN-2026/112", "pending", 46_550],
+      ["SOC-3", "partial", 16_780],
+      ["SOC-R1", "credit", 0],
+      ["SOC-2", "paid", 0],
+    ]);
+    expect(idsOf(all)).toEqual(s.ids);
+    expect(all.paging).toEqual({ page: 1, limit: 5000, total: 5, pages: 1 });
+    expect(all.groupCounts).toEqual({ all: 5, open: 3, overdue: 1, paid: 1, credit: 1 });
+    expect(all.suppliers).toEqual([
+      { id: s.subcontractorId, name: "Montajes Steel Norte S.L." },
+      { id: s.supplierId, name: "Piedra de Liébana S.L." },
+    ]);
+    expect(all.summary).toEqual(SUMMARY);
+    expect(all.invoices[3]).toMatchObject({ rectifiesNumber: "SOC-3", kind: "credit_note" });
+  });
+
+  it("cuts pages in a stable order: first, next, last and beyond the end", async () => {
+    const s = await many();
+    const page = (n: number) => svc.listInvoices(s.ctx, {}, { page: n, limit: 2 });
+
+    const [first, next, last, beyond] = await Promise.all([page(1), page(2), page(3), page(4)]);
+    expect(idsOf(first)).toEqual(s.ids.slice(0, 2));
+    expect(idsOf(next)).toEqual(s.ids.slice(2, 4));
+    expect(idsOf(last)).toEqual(s.ids.slice(4));
+    expect(idsOf(beyond)).toEqual([]);
+    expect(first.paging).toEqual({ page: 1, limit: 2, total: 5, pages: 3 });
+    expect(beyond.paging).toEqual({ page: 4, limit: 2, total: 5, pages: 3 });
+    for (const each of [first, next, last, beyond]) {
+      expect(each.summary).toEqual(SUMMARY);
+      expect(each.groupCounts).toEqual({ all: 5, open: 3, overdue: 1, paid: 1, credit: 1 });
+    }
+    // A part-paid invoice on a page without its credit note is still settled with it; the credit note names its invoice.
+    expect(next.invoices.map((i) => [i.number, i.state, i.outstandingCents, i.rectifiesNumber])).toEqual([
+      ["SOC-3", "partial", 16_780, null],
+      ["SOC-R1", "credit", 0, "SOC-3"],
+    ]);
+    expect((await svc.listInvoices(s.ctx, {}, { page: 2, limit: 3 })).invoices.map((i) => [i.number, i.rectifiesNumber])).toEqual([
+      ["SOC-R1", "SOC-3"],
+      ["SOC-2", null],
+    ]);
+  });
+
+  it("caps a huge limit and refuses a page that isn't one", async () => {
+    const s = await many();
+    expect((await svc.listInvoices(s.ctx, {}, { limit: 1_000_000 })).paging).toMatchObject({ limit: 200, total: 5 });
+    expect((await svc.listPayments(s.ctx, {}, { limit: "99999" })).paging).toMatchObject({ limit: 200, total: 2 });
+    for (const bad of [{ page: 0 }, { page: "abc" }, { limit: -5 }]) {
+      await expect(svc.listInvoices(s.ctx, {}, bad)).rejects.toMatchObject({ code: "invalid_page", status: 400 });
+      await expect(svc.listPayments(s.ctx, {}, bad)).rejects.toMatchObject({ code: "invalid_page", status: 400 });
+    }
+    await expect(svc.listInvoices(s.ctx, {}, { group: "pending" })).rejects.toMatchObject({ code: "invalid_input" });
+  });
+
+  it("finds an invoice by its order's number as shown, short or long: PED-007, PED-123, PED-1000", async () => {
+    const s = await many();
+    const [, soon] = s.ids;
+    const kept = async (q: string) => idsOf(await svc.listInvoices(s.ctx, {}, { page: 1, q }));
+
+    for (const [number, label] of [[7, "PED-007"], [123, "PED-123"], [1000, "PED-1000"]] as const) {
+      await db.update(purchaseOrders).set({ number }).where(eq(purchaseOrders.id, s.subId));
+      expect(await kept(label)).toEqual([soon]);
+      expect((await svc.listInvoices(s.ctx, {}, { page: 1, q: label })).invoices.map((i) => orderLabel(i.orderNumber))).toEqual([label]);
+    }
+    // Number 1000 is not cut to "100", and takes no zero in front.
+    expect(await kept("PED-100")).toEqual([soon]);
+    expect(await kept("PED-0100")).toEqual([]);
+    expect(await kept("PED-01000")).toEqual([]);
+  });
+
+  it("filters the list on the server by state, obra, supplier and text, never the summary", async () => {
+    const s = await many();
+    const [overdue, soon, partial, credit, paid] = s.ids;
+    const list = (query: Record<string, unknown>) => svc.listInvoices(s.ctx, {}, { page: 1, ...query });
+    const kept = async (query: Record<string, unknown>) => idsOf(await list(query));
+
+    expect(await kept({ group: "open" })).toEqual([overdue, soon, partial]);
+    expect(await kept({ group: "overdue" })).toEqual([overdue]);
+    expect(await kept({ group: "paid" })).toEqual([paid]);
+    expect(await kept({ group: "credit" })).toEqual([credit]);
+    expect(await kept({ supplierId: s.subcontractorId })).toEqual([soon]);
+    expect(await kept({ projectId: s.project.id })).toEqual(s.ids);
+    expect(await kept({ projectId: s.gone.id })).toEqual([]);
+    expect(await kept({ projectId: s.other.project.id })).toEqual([]);
+    // Text: the invoice's number, its supplier, its order (PED-…, its description) or its obra.
+    expect(await kept({ q: "soc-r" })).toEqual([credit]);
+    expect(await kept({ q: "PED-001" })).toEqual([soon]);
+    expect(await kept({ q: "liébana" })).toEqual([overdue, partial, credit, paid]);
+    expect(await kept({ q: "steel frame" })).toEqual([soon]);
+    expect(await kept({ q: s.project.ref })).toEqual(s.ids);
+    expect(await kept({ q: "SOC-4" })).toEqual([]);
+    expect(await kept({ q: "SOC-_" })).toEqual([]);
+
+    const narrowed = await list({ supplierId: s.supplierId, group: "open", limit: 1 });
+    expect(idsOf(narrowed)).toEqual([overdue]);
+    expect(narrowed.paging).toEqual({ page: 1, limit: 1, total: 2, pages: 2 });
+    // The counts follow the supplier and the text, not the state asked for.
+    expect(narrowed.groupCounts).toEqual({ all: 4, open: 2, overdue: 1, paid: 1, credit: 1 });
+    expect(narrowed.summary).toEqual(SUMMARY);
+    // A project or a supplier given as the list's scope (the API's ?projectId, ?subcontractorId) narrows the summary too.
+    const scoped = await svc.listInvoices(s.ctx, { subcontractorId: s.subcontractorId }, { page: 1 });
+    expect(idsOf(scoped)).toEqual([soon]);
+    expect(scoped.summary).toMatchObject({ outstandingCents: 46_550, outstandingInvoices: 1, outstandingSuppliers: 1, overdueInvoices: 0, paymentsThisMonth: 0 });
+    expect(scoped.suppliers).toEqual([{ id: s.subcontractorId, name: "Montajes Steel Norte S.L." }]);
+  });
+
+  it("pages the payments made, with the month's total and the whole forecast on every page", async () => {
+    const s = await many();
+    const all = await svc.listPayments(s.ctx);
+    expect(all.payments.map((p) => [p.invoiceNumber, p.amountCents])).toEqual([
+      ["SOC-3", 5_000],
+      ["SOC-2", 1_210],
+    ]);
+    expect(all.paging).toEqual({ page: 1, limit: 5000, total: 2, pages: 1 });
+
+    const page = (n: number) => svc.listPayments(s.ctx, {}, { page: n, limit: 1 });
+    const [first, last, beyond] = await Promise.all([page(1), page(2), page(3)]);
+    expect(first.payments.map((p) => p.invoiceNumber)).toEqual(["SOC-3"]);
+    expect(last.payments.map((p) => p.invoiceNumber)).toEqual(["SOC-2"]);
+    expect(beyond.payments).toEqual([]);
+    expect(first.paging).toEqual({ page: 1, limit: 1, total: 2, pages: 2 });
+    for (const each of [first, last, beyond]) {
+      expect(each.summary).toEqual({ monthCents: 6_210, monthPayments: 2 });
+      expect(each.forecast).toEqual(all.forecast);
+    }
+    // Past due first, then by week: only what is owed, each settled with its credit note.
+    expect(all.forecast[0]).toMatchObject({ from: null, totalCents: 12_100, invoices: [{ number: "SOC-1" }] });
+    expect(all.forecast[1]).toMatchObject({ totalCents: 46_550, invoices: [{ number: "MSN-2026/112" }] });
+    expect(all.forecast.flatMap((week) => week.invoices.map((i) => [i.number, i.outstandingCents]))).toEqual([
+      ["SOC-1", 12_100],
+      ["MSN-2026/112", 46_550],
+      ["SOC-3", 16_780],
+    ]);
+    expect((await svc.listPayments(s.ctx, { subcontractorId: s.subcontractorId }, { page: 1 })).paging.total).toBe(0);
+  });
+
+  it("keeps tenants apart", async () => {
+    const s = await many();
+    const theirs = await svc.listInvoices(s.other.ctx, {}, { page: 1 });
+    expect(theirs.invoices.map((i) => [i.number, i.baseCents])).toEqual([["SOC-1", 99_000]]);
+    expect(theirs.summary).toMatchObject({ outstandingInvoices: 1, overdueInvoices: 1, paymentsThisMonth: 0 });
+    expect(theirs.groupCounts).toEqual({ all: 1, open: 1, overdue: 1, paid: 0, credit: 0 });
+    expect(idsOf(await svc.listInvoices(s.other.ctx, {}, { page: 1, supplierId: s.supplierId }))).toEqual([]);
+    expect((await svc.listPayments(s.other.ctx, {}, { page: 1 })).payments).toEqual([]);
+  });
+});
+
 describe("access", () => {
   it("lets viewers read but not write", async () => {
     const s = await setup("viewer");
@@ -1011,5 +1231,220 @@ describe("seedPurchaseInvoices", () => {
     expect(structure.milestones.map((m) => m.progress)).toEqual(["paid", "invoiced", "contracted"]);
     // The Obra tab still reads the same contracts.
     expect((await constructionService.getCosts(admin, project.id)).chapters.length).toBeGreaterThan(0);
+  });
+});
+
+// ─── One rule, two languages ─────────────────────────────────────────────────
+// An invoice's state and an order's late delivery are worked out twice: in SQL,
+// where the lists filter, count and add up (`settledInvoices`, `isLate`), and
+// in TypeScript for the rows shown (`settle` / `invoiceState` in purchase-calc,
+// `lateDays` in control-calc). They must agree for every row.
+
+describe("the SQL of the lists and the TypeScript rules", () => {
+  const TODAY = "2026-10-19";
+  const HORIZON = addDays(TODAY, DUE_SOON_DAYS);
+
+  /**
+   * Invoices in every state there is, by number. On the material order (21 %
+   * VAT: 5.000 € of base is 6.050 € to pay) and on the subcontract (reverse
+   * charge, 5 % retention: 10.000 € of base is 9.500 € to pay, 500 € held).
+   */
+  async function variedInvoices() {
+    const s = await setup("viewer");
+    const { admin } = s;
+    const made = new Map<string, string>();
+    const add = async (orderId: string, number: string, dueOn: string, overrides: Record<string, unknown> = {}) => {
+      const { invoiceId } = await svc.createInvoice(admin, orderId, invoice({ number, baseCents: 5_000, dueOn, ...overrides }));
+      made.set(number, invoiceId);
+      return invoiceId;
+    };
+    const pay = (invoiceId: string, amountCents: number, paidOn = "2026-10-02") => svc.createPayment(admin, invoiceId, { amountCents, paidOn });
+    const credit = (invoiceId: string, number: string, baseCents: number) =>
+      add(s.materialId, number, "2026-11-30", { kind: "credit_note", rectifiesId: invoiceId, issuedOn: "2026-10-01", baseCents, dueOn: undefined });
+    const material = (number: string, dueOn: string) => add(s.materialId, number, dueOn);
+    const retained = (number: string, dueOn: string) => add(s.subId, number, dueOn, { baseCents: 10_000 });
+
+    // Unpaid: due later, today, yesterday, on the last day of "due soon" and the day after.
+    await material("UNPAID-LATER", "2026-11-30");
+    await material("UNPAID-TODAY", TODAY);
+    await material("UNPAID-YESTERDAY", addDays(TODAY, -1));
+    await material("UNPAID-HORIZON", HORIZON);
+    await material("UNPAID-PAST-HORIZON", addDays(HORIZON, 1));
+    // Part paid: not yet due, and past due.
+    await pay(await material("PART-LATER", "2026-11-10"), 1_000);
+    await pay(await material("PART-PAST", "2026-10-01"), 1_000);
+    // Paid: to the cent, though past due.
+    await pay(await material("PAID", "2026-10-01"), 6_050);
+    // A payment deleted: the invoice it had settled is owed again; one of two deleted leaves it part paid, past due.
+    const undone = await pay(await material("PAYMENT-DELETED", "2026-10-22"), 6_050);
+    await svc.deletePayment(admin, undone.paymentId);
+    const twice = await material("ONE-PAYMENT-DELETED", "2026-10-10");
+    await pay(twice, 3_000);
+    await svc.deletePayment(admin, (await pay(twice, 3_050)).paymentId);
+    // Credit notes: part of the invoice, all of it, one deleted, and one with a payment for the rest or less.
+    await credit(await material("CREDITED-PART", "2026-11-15"), "CN-PART", -2_000);
+    await credit(await material("CREDITED-WHOLE", "2026-10-05"), "CN-WHOLE", -5_000);
+    await svc.deleteInvoice(admin, await credit(await material("CREDIT-DELETED", "2026-10-05"), "CN-DELETED", -5_000));
+    const settledWithCredit = await material("CREDITED-AND-PAID", "2026-10-22");
+    await credit(settledWithCredit, "CN-AND-PAID", -1_000);
+    await pay(settledWithCredit, 4_840);
+    const owedWithCredit = await material("CREDITED-PART-PAID", "2026-10-24");
+    await credit(owedWithCredit, "CN-PART-PAID", -1_000);
+    await pay(owedWithCredit, 1_000);
+    // Without a due date (older rows): never past due, never due soon.
+    const undated = [await material("NO-DUE-DATE", "2026-11-30"), await material("NO-DUE-DATE-PART", "2026-11-30")];
+    await pay(undated[1]!, 500);
+    for (const id of undated) await db.update(purchaseInvoices).set({ dueOn: null }).where(eq(purchaseInvoices.id, id));
+    // An invoice deleted: in neither.
+    await svc.deleteInvoice(admin, await material("DELETED", "2026-10-01"));
+    // With a retention: paid but for what is held, paid with the retention released (more than was due), and short of it.
+    await pay(await retained("RETENTION-HELD", "2026-10-22"), 9_500);
+    const released = await retained("RETENTION-RELEASED", "2026-10-22");
+    await pay(released, 9_500);
+    await pay(released, 500, "2026-10-12");
+    await pay(await retained("RETENTION-SHORT", "2026-10-01"), 9_000);
+
+    const numberOf = new Map([...made].map(([number, id]) => [id, number]));
+    return { ...s, made, numberOf };
+  }
+
+  it("agree on every invoice's state and on what it owes", async () => {
+    const s = await variedInvoices();
+    const shown = (await svc.listInvoices(s.ctx)).invoices;
+    const inSql = await db.execute<{ id: string; kind: string; state: string; outstanding: string }>(
+      sql`select id, kind, state, outstanding from (${svc.settledInvoices(s.tenant.id, {}, TODAY)}) st`,
+    );
+
+    // The same invoices, each in the same state, owing the same.
+    const byNumber = <R extends { id: string }, T>(rows: R[], value: (row: R) => T) =>
+      Object.fromEntries(rows.map((row) => [s.numberOf.get(row.id)!, value(row)] as const));
+    const statesInSql = byNumber([...inSql], (row) => row.state);
+    const statesShown = byNumber(shown, (row) => row.state);
+    expect(inSql).toHaveLength(shown.length);
+    expect(statesInSql).toEqual(statesShown);
+    expect(byNumber(inSql.filter((row) => row.kind === "invoice"), (row) => Number(row.outstanding))).toEqual(
+      byNumber(shown.filter((row) => row.kind === "invoice"), (row) => row.outstandingCents),
+    );
+
+    // And the set is what it was built to be: every state, each case where it belongs.
+    expect(statesShown).toEqual({
+      "CN-AND-PAID": "credit",
+      "CN-PART": "credit",
+      "CN-PART-PAID": "credit",
+      "CN-WHOLE": "credit",
+      "CREDIT-DELETED": "overdue",
+      "CREDITED-AND-PAID": "paid",
+      "CREDITED-PART": "pending",
+      "CREDITED-PART-PAID": "partial",
+      "CREDITED-WHOLE": "paid",
+      "NO-DUE-DATE": "pending",
+      "NO-DUE-DATE-PART": "partial",
+      "ONE-PAYMENT-DELETED": "overdue",
+      PAID: "paid",
+      "PART-LATER": "partial",
+      "PART-PAST": "overdue",
+      "PAYMENT-DELETED": "pending",
+      "RETENTION-HELD": "paid",
+      "RETENTION-RELEASED": "paid",
+      "RETENTION-SHORT": "overdue",
+      "UNPAID-HORIZON": "pending",
+      "UNPAID-LATER": "pending",
+      "UNPAID-PAST-HORIZON": "pending",
+      "UNPAID-TODAY": "pending",
+      "UNPAID-YESTERDAY": "overdue",
+    });
+    expect(shown.find((i) => i.number === "RETENTION-RELEASED")).toMatchObject({ outstandingCents: -500, retainedCents: 0 });
+    expect(shown.find((i) => i.number === "RETENTION-HELD")).toMatchObject({ outstandingCents: 0, retainedCents: 500 });
+  });
+
+  it("agree on what each filter keeps, every count and every total", async () => {
+    const s = await variedInvoices();
+    const all = await svc.listInvoices(s.ctx);
+    const shown = all.invoices;
+    const numbers = (list: { number: string }[]) => list.map((i) => i.number).sort();
+    // The lists' groups, as TypeScript has them.
+    const inGroup: Record<(typeof PURCHASE_INVOICE_GROUPS)[number], (i: (typeof shown)[number]) => boolean> = {
+      open: (i) => isOwed(i.state),
+      overdue: (i) => i.state === "overdue",
+      paid: (i) => i.state === "paid",
+      credit: (i) => i.state === "credit",
+    };
+
+    for (const group of PURCHASE_INVOICE_GROUPS) {
+      const kept = await svc.listInvoices(s.ctx, {}, { page: 1, limit: 200, group });
+      expect(numbers(kept.invoices), group).toEqual(numbers(shown.filter(inGroup[group])));
+      expect(kept.groupCounts[group], group).toBe(shown.filter(inGroup[group]).length);
+      expect(kept.invoices.every(inGroup[group]), group).toBe(true);
+    }
+    expect(all.groupCounts.all).toBe(shown.length);
+
+    const owed = shown.filter((i) => isOwed(i.state));
+    const overdue = shown.filter((i) => i.state === "overdue");
+    const dueSoon = shown.filter((i) => isDueSoon(i, TODAY));
+    expect(all.summary).toMatchObject({
+      outstandingCents: svc.sumOwed(owed),
+      outstandingInvoices: owed.length,
+      outstandingSuppliers: new Set(owed.map((i) => i.subcontractorId)).size,
+      overdueCents: svc.sumOwed(overdue),
+      overdueInvoices: overdue.length,
+      dueSoonCents: svc.sumOwed(dueSoon),
+      dueSoonInvoices: dueSoon.length,
+    });
+    expect(numbers(dueSoon)).toEqual(["CREDITED-PART-PAID", "PAYMENT-DELETED", "UNPAID-HORIZON", "UNPAID-TODAY"]);
+
+    // The rail's badge: owed and due by the horizon, past due included; counted without settling the rest.
+    const needsPaying = shown.filter((i) => isOwed(i.state) && i.dueOn !== null && i.dueOn <= HORIZON);
+    expect(await svc.getPurchasingCounts(s.ctx)).toMatchObject({ invoices: shown.length, dueAttention: needsPaying.length });
+    expect(needsPaying.length).toBe(dueSoon.length + overdue.length);
+    // The payments forecast lists exactly what is owed and falls due within its weeks, past due included.
+    const forecast = (await svc.listPayments(s.ctx)).forecast.flatMap((week) => week.invoices);
+    const lastDay = addDays(TODAY, PAYMENT_FORECAST_DAYS);
+    expect(numbers(forecast)).toEqual(numbers(owed.filter((i) => i.dueOn !== null && i.dueOn <= lastDay)));
+    expect(numbers(forecast)).not.toContain("UNPAID-LATER");
+  });
+
+  it("agree on which orders are a late delivery", async () => {
+    const s = await setup("viewer");
+    const { admin } = s;
+    const yesterday = addDays(TODAY, -1);
+    const order = async (description: string, expectedOn: string | null, overrides: Record<string, unknown> = {}) => {
+      const { orderId } = await purchasingService.createPurchase(admin, s.project.id, {
+        kind: "material",
+        subcontractorId: s.supplierId,
+        description,
+        status: "ordered",
+        orderedOn: "2026-09-01",
+        ...(expectedOn ? { expectedOn } : {}),
+        lines: [{ lineageId: s.lineage("01"), amountCents: 1_000 }],
+        ...overrides,
+      });
+      return orderId;
+    };
+    const move = (orderId: string, status: string) => purchasingService.setPurchaseStatus(admin, orderId, { status, date: "2026-10-01" });
+
+    await order("ordered, expected yesterday", yesterday);
+    await order("ordered, expected today", TODAY);
+    await order("ordered, expected later", "2026-11-30");
+    await order("ordered, no expected day", null);
+    await order("not sent, expected yesterday", yesterday, { status: "pending", orderedOn: undefined });
+    await move(await order("confirmed, expected yesterday", yesterday), "confirmed");
+    await move(await order("in transit, expected long ago", "2026-09-15"), "in_transit");
+    await move(await order("delivered, expected yesterday", yesterday), "delivered");
+    await move(await order("cancelled, expected yesterday", yesterday), "cancelled");
+    // A subcontract is never a delivery, whatever day it carries (the setup's two orders have none).
+    await db.update(purchaseOrders).set({ expectedOn: yesterday }).where(eq(purchaseOrders.id, s.subId));
+
+    const all = await purchasingService.listPurchases(s.ctx);
+    const late = await purchasingService.listPurchases(s.ctx, { page: 1, limit: 200, late: "1" });
+    const described = (orders: { description: string }[]) => orders.map((o) => o.description).sort();
+
+    // TypeScript's rule on each row shown, and SQL's filter and count, name the same orders.
+    const lateShown = all.orders.filter((o) => o.lateDays !== null);
+    expect(all.orders.map((o) => lateDays(o, TODAY))).toEqual(all.orders.map((o) => o.lateDays));
+    expect(described(late.orders)).toEqual(described(lateShown));
+    expect(late.paging.total).toBe(lateShown.length);
+    expect(all.summary.lateDeliveries).toBe(lateShown.length);
+    expect(described(lateShown)).toEqual(["confirmed, expected yesterday", "in transit, expected long ago", "ordered, expected yesterday"]);
+    expect(all.orders).toHaveLength(11);
   });
 });

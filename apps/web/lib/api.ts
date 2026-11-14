@@ -85,6 +85,9 @@ export function projectParam(request: Request): string | undefined {
   return new URL(request.url).searchParams.get("projectId") || undefined;
 }
 
+/** A paged list's query string (lib/list-query.ts). */
+export { asksForPage, queryOf } from "./list-query";
+
 export async function readJson(request: Request): Promise<Record<string, unknown>> {
   try {
     const body: unknown = await request.json();
@@ -139,6 +142,20 @@ export async function readWithFile(request: Request): Promise<Record<string, unk
     if (error instanceof CoreError) throw error;
     throw new CoreError("invalid_body", 400);
   }
+}
+
+/**
+ * The body of a POST that creates a record, with the caller's idempotency key
+ * in it for core (`idempotencyKey`): the standard `Idempotency-Key` header,
+ * else the body's own field, else none. Sent again with the same key, the
+ * create is applied once and answers what it answered first
+ * (packages/core/src/idempotency.ts). `read` is `readWithFile` for a body that
+ * may carry a file.
+ */
+export async function readCreate(request: Request, read: (request: Request) => Promise<Record<string, unknown>> = readJson) {
+  const body = await read(request);
+  const key = request.headers.get("idempotency-key");
+  return key === null ? body : { ...body, idempotencyKey: key };
 }
 
 /**

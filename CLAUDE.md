@@ -194,6 +194,13 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
   a deactivation sets `password_changed_at`: sessions from before it (their `authAt` claim; `iat` for Bearer tokens)
   stop at the next 60 s re-check (cookie sessions) or request (Bearer), after a 30 s grace so the browser that
   just changed it is not thrown out (`revokedByPasswordChange` in `@repo/auth`, the one rule for all three)
+- Two-step sign-in for staff (TOTP, optional, self-enrolled in the rail's settings; `packages/core/src/{totp,mfa,
+  mfa-secret}.ts`, table `user_mfa`): the secret is AES-256-GCM encrypted with a key derived from `NEXTAUTH_SECRET`
+  (rotating it means re-enrolling), ten single-use recovery codes, a replayed code is refused. `authorize` asks for the
+  code only after a correct password (so a wrong password never reveals whether MFA is on) and a wrong code counts in
+  the throttle. An admin removes another user's on Usuarios (it ends their sessions). API `/api/v1/me/mfa/*`,
+  `DELETE /api/v1/users/:id/mfa`. Clients (the app) have none. Prod SQL: `packages/db/sql/2026-11-14-1710-user-mfa.sql`
+- Sign out: "Cerrar sesión" at the foot of the rail's settings menu (`signOutAction`)
 - Sign-in throttle (`packages/core/src/throttle.ts`, portal and app): an IP gets 10 failures per email and 100 across
   emails per window, then is refused even with the right password; failures on one email from elsewhere never lock its
   owner out, they only cut each IP's allowance for it to 3. Only failures count
@@ -206,7 +213,7 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
   Subcontratas tables `subcontractors`, `subcontractor_workers`, `subcontractor_documents`, `subcontractor_document_versions`,
   `subcontractor_assignments`, `subcontractor_audit`, Compras' `purchase_orders`, `purchase_order_lines`,
   `purchase_order_events`, `purchase_order_documents`, `purchase_order_document_versions`, `purchase_order_milestones`, `purchase_invoices`, `purchase_invoice_lines`, `purchase_invoice_files`,
-  `purchase_payments`, `purchase_requests`, `purchase_request_lines`, `purchase_request_events`, `purchase_order_amendments`, `purchase_document_checks`, and Planning's `planning_versions`, `planning_items`. A project is deliberately minimal — exactly what the mobile app shows: `ref`, `address`, `start_date`, `completion_date`, plus `client_user_id` linking it to its mobile app client (a client may have several)
+  `purchase_payments`, `purchase_requests`, `purchase_request_lines`, `purchase_request_events`, `purchase_order_amendments`, `purchase_document_checks`, Planning's `planning_versions`, `planning_items`, and `idempotency_keys`, `user_mfa` (`schema_migrations` is the migration runner's, not in `schema.ts`). A project is deliberately minimal — exactly what the mobile app shows: `ref`, `address`, `start_date`, `completion_date`, plus `client_user_id` linking it to its mobile app client (a client may have several)
 - **Deletes are soft.** What a user deletes is never erased: a project (admins; it leaves the portal and the client's
   app, whatever it holds), a project document or photo, an incident's file, a subcontractor's assignment to an obra
   (assigning again takes the same row back, and an obra's CAE document counts only while the company is assigned to
@@ -217,8 +224,13 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
   (`projectInTenant`, `projectsInTenant`, `projectIdsInTenant`, `projectNotDeleted` and, in raw SQL, `inLiveProject` /
   `inLiveOrder` in `project-client.ts`; a child row read by its own id checks its project too, e.g. `requireOrder`,
   `requireInvoice`, `documentInProject`). A delete writes `softDeleted(ctx)`. A project's
-  ref and a supplier's invoice number are unique among the rows not deleted. No restore screen yet: restoring is a
-  database change. Drafts (a budget's, a plan's) and rows rewritten while editing are still deleted for real.
+  ref and a supplier's invoice number are unique among the rows not deleted. Admins see and restore them on
+  **Elementos eliminados** (`/dashboard/eliminados`, in the rail's settings menu; `deletedService` in
+  `packages/core/src/deleted.ts`: `listDeleted`, `restoreDeleted`; API `GET /api/v1/deleted`, `POST
+  /api/v1/deleted/:kind/:id/restore`): a restore passes the same checks as creating the record (`checkOnOrder`,
+  `checkPayable` in `purchase-invoices.ts`), is refused while its parent is deleted (`parent_deleted`) or its ref or
+  number was reused, and leaves a trace (the order's events, the subcontractor audit, or a `deleted.restored` log line).
+  Nothing is ever purged. Drafts (a budget's, a plan's) and rows rewritten while editing are still deleted for real.
   Prod SQL: `packages/db/sql/2026-11-soft-delete.sql`
 - Prod migrations are SQL files in `packages/db/sql/` (rules in its `README.md`: additive or expand-then-contract,
   never edit an applied file, new files named `YYYY-MM-DD-HHmm-topic.sql`), recorded once each in the table
@@ -242,10 +254,23 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
   an hour, or a tenant at 90 % of its AI limit) and `migrations` (`untracked` until `schema_migrations` exists). No
   figures, no tenant data; one result is shared for 10 s per instance (2 s when down), each check time-limited in the
   database
-- Runbooks: `doc/ops/` (deploy, rollback, database, incident, secrets)
+- Runbooks: `doc/ops/` (deploy, rollback, database, incident, secrets, capacity, mobile-release)
 - Logs: one JSON line per event on stderr (`logError` / `logWarn` in `@repo/core/log` and `apps/web/lib/log.ts`;
   `instrumentation.ts` › `onRequestError` for unhandled server errors). Never a body, cookie, header, email or query
   string. An API 500 answers `{ "error": "internal_error", "id" }` and logs the same id. No `console.*` in app code
+
+- Retries: the six creates that make a numbered or money record (a supplier payment, invoice or credit note, an
+  order, a purchase request, a modificado, an incident) take an idempotency key (`Idempotency-Key` header or
+  `idempotencyKey` in the body; `idempotent` in `packages/core/src/idempotency.ts`, table `idempotency_keys`,
+  kept 7 days): the same key answers with the first result and creates nothing; with a different request it is 409
+  `idempotency_key_reused`. The portal's forms send one (`useIdempotencyKey`). Optional: without a key a create runs as
+  before, and so does a keyed one while the table is missing (code deployed ahead of its SQL: a warning, not a 500;
+  the MFA endpoints then answer `mfa_unavailable`). A new create of that kind must use it. Prod SQL: `packages/db/sql/2026-11-14-1700-idempotency-keys.sql`
+- Lists: tenant-wide lists are paged and filtered on the server (`packages/core/src/paging.ts`; orders, supplier
+  invoices, payments, workers: `?page=` and the filters in the URL, `components/ui/pager.tsx`, `useListQuery`), with
+  their counts and totals computed in SQL for the whole filtered set. `/api/v1` without `?page`/`?limit` answers as
+  before, capped. Don't load a tenant's whole table to filter it in the browser. Measured at ten times a realistic
+  volume in `doc/ops/capacity.md` (`pnpm db:seed:volume` into a local scratch database, `pnpm db:bench`)
 
 ### Obra (construction process)
 
@@ -498,6 +523,18 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
 - Portal: rail group "Red" › Subcontratas (`dashboard/subcontratas/`: `empresas`, `empresas/nueva` wizard,
   `empresas/[id]` ficha + `editar`, `trabajadores`, `trabajadores/nuevo`, `trabajadores/[id]`); API `/api/v1/subcontractors/**`.
   `pnpm db:seed` adds eight fictional companies on VTH-26-001. Prod SQL: `packages/db/sql/2026-10-subcontractors.sql`
+
+### App errors and releases (apps/mobile)
+
+- The app reports its own errors to `POST /api/mobile/client-error` (with or without a token; one `mobile.client_error`
+  log line, nothing stored, rate-limited per instance): a render error caught by the root error boundary, an uncaught
+  JS error, an unhandled rejection, a missing translation key (`lib/report-error.ts`: once per error per session, never
+  a token, an email or project data; silent in dev, Expo Go and tests). No third-party SDK
+- Every request times out (`lib/api.ts`: 15 s, 90 s for downloads) and maps to `network_error` | `timeout` |
+  `server_error` | `unauthorized`; screens show the matching message, never "wrong password" for a network failure. A
+  status the app doesn't know (from a newer server) is left out, never shown as "undefined"
+- `expo-updates` is configured (`runtimeVersion` policy `appVersion`: raise `version` with any native change) so a
+  store build can take a JS-only fix; not yet proven on a device. Releases: `doc/ops/mobile-release.md`
 
 ### Live updates (app open)
 

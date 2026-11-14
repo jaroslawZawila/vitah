@@ -9,7 +9,15 @@ import Sidebar from "./components/Sidebar";
 import Topbar from "./components/Topbar";
 import { getPurchasingCounts } from "../actions/purchase-invoices";
 import { getSubcontractorCounts } from "../actions/subcontractors";
+import { signOutAction } from "../actions/auth";
 import { changePasswordAction, setLanguageAction } from "../actions/users";
+import {
+  beginMfaAction,
+  confirmMfaAction,
+  disableMfaAction,
+  getMfaStatus,
+  regenerateRecoveryCodesAction,
+} from "../actions/mfa";
 
 export default async function DashboardLayout({
   children,
@@ -27,7 +35,12 @@ export default async function DashboardLayout({
       logError("dashboard.badges_failed", error);
       return null;
     });
-  const [subcontractors, purchases] = await Promise.all([badges(getSubcontractorCounts()), badges(getPurchasingCounts())]);
+  const [subcontractors, purchases, mfaStatus] = await Promise.all([
+    badges(getSubcontractorCounts()),
+    badges(getPurchasingCounts()),
+    // Likewise: without it the settings menu just does not offer two-step verification.
+    badges(getMfaStatus()),
+  ]);
 
   return (
     <div className="min-h-svh lg:grid lg:grid-cols-[236px_minmax(0,1fr)]">
@@ -41,6 +54,18 @@ export default async function DashboardLayout({
         language={isAppLanguage(locale) ? locale : DEFAULT_LOCALE}
         onLanguageChange={setLanguageAction}
         onPasswordChange={changePasswordAction}
+        onSignOut={signOutAction}
+        twoStep={
+          mfaStatus && {
+            status: mfaStatus,
+            actions: {
+              begin: beginMfaAction,
+              confirm: confirmMfaAction,
+              disable: disableMfaAction,
+              regenerate: regenerateRecoveryCodesAction,
+            },
+          }
+        }
       />
       <div className="flex min-w-0 flex-col">
         <Topbar />

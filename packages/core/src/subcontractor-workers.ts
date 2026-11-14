@@ -5,6 +5,7 @@ import {
   CONTRACT_TYPES,
   PPE_ITEMS,
   SUBCONTRACTOR_TRADES,
+  WORKER_ACCESS_FILTERS,
   WORKER_CATEGORIES,
   WORKER_ROLES,
   docState,
@@ -19,7 +20,10 @@ import {
   type WorkerDetail,
   type WorkerFields,
   type WorkerListItem,
+  type WorkerListQuery,
+  type WorkersPage,
 } from "./contract";
+import { pageWindow, pagingOf } from "./paging";
 import {
   allVersions,
   audit,
@@ -131,6 +135,40 @@ export async function listWorkers(ctx: Ctx, options: { projectId?: string | null
     if (projectId && !assignment) return [];
     return [workerListItem(net, w, companies.get(w.subcontractorId)!, assignment ?? null)];
   });
+}
+
+/**
+ * One page of the workers, by surname, with the counts and KPIs of the whole
+ * list. A worker's access is worked out from the documents (never stored), so
+ * the list is still built in memory from the tenant's network and then cut:
+ * what paging saves is the response, not the load.
+ */
+export async function listWorkersPage(ctx: Ctx, query: WorkerListQuery = {}): Promise<WorkersPage> {
+  const window = pageWindow(query);
+  const access = query.access === undefined || query.access === "" ? "all" : WORKER_ACCESS_FILTERS.find((a) => a === query.access);
+  if (!access) fail("invalid_option");
+  const text = (value: unknown) => (typeof value === "string" ? value.trim() : "");
+  const companyId = text(query.companyId);
+  const q = text(query.q).toLowerCase();
+  const all = await listWorkers(ctx, { projectId: text(query.projectId) || null });
+  const matching = all.filter(
+    (w) => (!companyId || w.subcontractorId === companyId) && (!q || `${workerName(w)} ${w.subcontractorName}`.toLowerCase().includes(q)),
+  );
+  const having = (list: WorkerListItem[], status: string) => list.filter((w) => w.access.status === status).length;
+  const shown = access === "all" ? matching : matching.filter((w) => w.access.status === access);
+  return {
+    workers: shown.slice(window.offset, window.offset + window.limit),
+    paging: pagingOf(window, shown.length),
+    counts: { all: matching.length, ok: having(matching, "ok"), pending: having(matching, "pending"), blocked: having(matching, "blocked") },
+    summary: {
+      registered: all.length,
+      companies: new Set(all.map((w) => w.subcontractorId)).size,
+      ok: having(all, "ok"),
+      pending: having(all, "pending"),
+      blocked: having(all, "blocked"),
+      preventive: all.filter((w) => w.roles.includes("preventive_resource")).length,
+    },
+  };
 }
 
 export async function getWorker(ctx: Ctx, workerId: string): Promise<WorkerDetail> {

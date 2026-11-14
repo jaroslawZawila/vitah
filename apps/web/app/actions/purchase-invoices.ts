@@ -4,19 +4,21 @@
 // (packages/core/src/purchase-invoices.ts): Compras › Facturas and Pagos, an
 // invoice's page and form, and an order's payment schedule.
 
-import { purchaseInvoicesService as svc } from "@repo/core";
+import { purchaseInvoicesService as svc, type InvoiceListQuery, type PageQuery } from "@repo/core";
 import { fieldsWithFile } from "../../lib/api";
 import { mutateDashboard, read, type ObraState } from "./run";
 
 // ─── Reads ───────────────────────────────────────────────────────────────────
 
-export async function getInvoices() {
-  const result = await read((ctx) => svc.listInvoices(ctx));
+/** The tenant's invoices: the page and filters of `query` (all of them without one). */
+export async function getInvoices(query: InvoiceListQuery = {}) {
+  const result = await read((ctx) => svc.listInvoices(ctx, {}, query));
   return result && { invoices: result.data, canManage: result.canManage };
 }
 
-export async function getPayments() {
-  const result = await read((ctx) => svc.listPayments(ctx));
+/** The payments forecast and the payments made: the page of `query` (all of them without one). */
+export async function getPayments(query: PageQuery = {}) {
+  const result = await read((ctx) => svc.listPayments(ctx, {}, query));
   return result && { payments: result.data, canManage: result.canManage };
 }
 
@@ -41,7 +43,10 @@ export async function getPurchasingCounts() {
 /** `review` when it uploads a PDF: the AI's review follows. */
 const write = (fn: Parameters<typeof mutateDashboard>[1], review = false) => mutateDashboard(null, fn, { review });
 
-/** Form data: `data` (the invoice as JSON) and `file` (PDF, optional). → the new invoice's id too. */
+/**
+ * Form data: `data` (the invoice as JSON, with the form's `idempotencyKey`: sent
+ * twice, it is registered once) and `file` (PDF, optional). → the new invoice's id too.
+ */
 export async function createInvoiceAction(
   orderId: string,
   formData: FormData,
@@ -66,7 +71,11 @@ export async function addInvoiceFileAction(invoiceId: string, formData: FormData
   return write((ctx) => svc.addInvoiceFile(ctx, invoiceId, Object.fromEntries(formData)), true);
 }
 
-/** Form data: `data` ({ amountCents, paidOn, method, reference }) and `file` (the proof, optional). */
+/**
+ * Form data: `data` ({ amountCents, paidOn, method, reference, idempotencyKey })
+ * and `file` (the proof, optional). The form's `idempotencyKey` makes a payment
+ * sent twice (a double click, a retry) one payment.
+ */
 export async function createPaymentAction(invoiceId: string, formData: FormData): Promise<ObraState> {
   return write((ctx) => svc.createPayment(ctx, invoiceId, fieldsWithFile(formData)), formData.has("file"));
 }

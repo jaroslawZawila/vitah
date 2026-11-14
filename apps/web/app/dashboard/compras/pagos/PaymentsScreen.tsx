@@ -1,11 +1,14 @@
 "use client";
 
 // Container for Compras › Pagos: what falls due by week, and the payments
-// made (a manager may take one back). The views in ../components take props only.
+// made, a page at a time (`?page=`; a manager may take one back). The views in
+// ../components take props only.
 
 import { useTranslations } from "next-intl";
 import type { TenantPayments } from "@repo/core/contract";
+import { Pager } from "@/components/ui/pager";
 import { deletePaymentAction } from "../../../actions/purchase-invoices";
+import { useListQuery } from "../../components/useListQuery";
 import FormError from "../../components/FormError";
 import { useObraAction } from "../../projects/[id]/components/obra/useObraAction";
 import { usePurchaseFormat } from "../../projects/[id]/components/purchasing/format";
@@ -22,6 +25,7 @@ export default function PaymentsScreen({
   const tr = useTranslations("purchasing.invoice.payments");
   const f = usePurchaseFormat();
   const remove = useObraAction();
+  const list = useListQuery();
   return (
     <div className="flex flex-col gap-[18px]">
       <header className="min-w-0">
@@ -37,6 +41,7 @@ export default function PaymentsScreen({
         empty={t("none")}
         footer={t("month", { amount: f.money(payments.summary.monthCents), count: payments.summary.monthPayments })}
         pending={remove.pending}
+        pager={<Pager paging={payments.paging} hrefOf={list.pageHref} />}
         onRemove={
           canManage
             ? (payment) =>

@@ -4,7 +4,7 @@ No secret is in the repository (it is public; the CI secret scan fails a push th
 
 | Secret | What it protects | Where it is set | Rotating it |
 |--------|------------------|-----------------|-------------|
-| `NEXTAUTH_SECRET` | Signs portal sessions and the app's 30-day tokens | Vercel (Production, Preview) | New value → redeploy. **Everyone is signed out**, staff and clients; the app asks its users to sign in again. Do it at a quiet time and tell people first. |
+| `NEXTAUTH_SECRET` | Signs portal sessions and the app's 30-day tokens; the key that encrypts staff's two-step verification secrets is derived from it | Vercel (Production, Preview) | New value → redeploy. **Everyone is signed out**, staff and clients; the app asks its users to sign in again. **Every two-step verification enrolment stops working** (its secret can no longer be decrypted: `packages/core/src/mfa-secret.ts`): the authenticator's codes are refused from then on. Each enrolled user gets back in with a recovery code and enrols again, or an admin removes theirs on Usuarios ("Quitar verificación en dos pasos") and they sign in with the password; an admin without recovery codes needs another admin, or `DELETE FROM user_mfa WHERE user_id = …`. Do it at a quiet time and tell people first. |
 | Database credentials (`POSTGRES_URL` and its siblings) | All data | Injected by the Neon integration | Reset the role's password in Neon; the integration updates Vercel; redeploy. Old connections drop. |
 | `BLOB_READ_WRITE_TOKEN` | Every stored file | Injected by the Blob store connection | Rotate in the store's settings; redeploy. |
 | `ANTHROPIC_API_KEY` | AI spend | Vercel (Production), set by hand | Create a new key at the provider, set it, redeploy, revoke the old one. |

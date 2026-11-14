@@ -4,6 +4,7 @@ import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import type { HitoFileKind } from "@repo/core/contract";
 import { Button } from "../../../../components/button";
 import { CheckMark, SectionLabel, obraStyles } from "../../../../components/obra-parts";
+import { ObraPending } from "../../../../components/obra-pending";
 import { PhotoImage } from "../../../../components/photo-image";
 import { PushedScreen } from "../../../../components/pushed-screen";
 import { card, colors, radius, type } from "../../../../constants/theme";
@@ -26,13 +27,7 @@ export default function PagoScreen() {
   const { byId } = usePhotos();
   const hito = obra?.hitos.find((h) => h.id === id);
 
-  if (!obra || !hito) {
-    return (
-      <PushedScreen back={t("pago.back")}>
-        {obra !== undefined && <Text style={type.subhead}>{t("pago.notFound")}</Text>}
-      </PushedScreen>
-    );
-  }
+  if (!obra || !hito) return <ObraPending back={t("pago.back")} missing={t("pago.notFound")} />;
 
   const open = async (kind: HitoFileKind) => {
     if (!token) return;
@@ -49,7 +44,8 @@ export default function PagoScreen() {
       ? t("pago.paid", { date: formatMediumDate(hito.paidOn, language) })
       : hito.dueOn
         ? t("pago.due", { date: formatMediumDate(hito.dueOn, language) })
-        : t(`hitoStatus.${hito.status}`);
+        : // A status from a newer server reads as nothing rather than as a wrong one.
+          t(`hitoStatus.${hito.status}`, undefined, "");
   const documents = [
     hito.actaSignedOn && { kind: "acta" as const, name: t("pago.actaFile", { code: hito.code }), date: hito.actaSignedOn },
     hito.invoicedOn && { kind: "invoice" as const, name: t("pago.invoiceFile", { code: hito.code }), date: hito.invoicedOn },
@@ -82,7 +78,7 @@ export default function PagoScreen() {
         <Text accessibilityRole="header" style={[type.display, { lineHeight: 34 }]}>
           {hito.name}
         </Text>
-        <Text style={styles.pill}>{status}</Text>
+        {!!status && <Text style={styles.pill}>{status}</Text>}
       </View>
 
       <View style={styles.amounts}>

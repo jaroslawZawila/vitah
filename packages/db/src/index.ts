@@ -19,6 +19,8 @@ export {
   clientSettings,
   pushTokens,
   loginAttempts,
+  userMfa,
+  type MfaRecoveryCode,
   budgetRevisions,
   budgetChapters,
   budgetLines,
@@ -64,9 +66,10 @@ export {
   planningVersions,
   planningItems,
   type PlanningVersionStatus,
+  idempotencyKeys,
 } from "./schema";
 export { seedConfig, seedPassword } from "./seed-config";
 export type { AnyColumn } from "drizzle-orm";
 export type { PgTable } from "drizzle-orm/pg-core";
-export { eq, ne, gt, gte, lt, lte, and, or, desc, asc, sql, count, sum, inArray, isNull, isNotNull, max, type SQL } from "drizzle-orm";
+export { eq, ne, gt, gte, lt, lte, and, or, desc, asc, sql, count, sum, inArray, ilike, isNull, isNotNull, max, type SQL } from "drizzle-orm";
 

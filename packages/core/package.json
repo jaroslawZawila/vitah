@@ -16,6 +16,7 @@
     "./users": "./src/users.ts",
     "./storage": "./src/storage.ts",
     "./throttle": "./src/throttle.ts",
+    "./totp": "./src/totp.ts",
     "./testing": "./src/testing.ts",
     "./seed": "./src/seed/seed-obra.ts",
     "./budget-pipeline": "./src/budget-ai/pipeline.ts",
@@ -24,6 +25,8 @@
   "scripts": {
     "check-types": "tsc --noEmit",
     "db:seed": "tsx src/seed/run.ts",
+    "db:seed:volume": "tsx src/seed/volume-run.ts",
+    "db:bench": "tsx src/seed/volume-bench.ts",
     "test": "vitest run --configLoader runner"
   },
   "dependencies": {
@@ -34,6 +37,7 @@
     "bcryptjs": "^2.4.3",
     "exceljs": "^4.4.0",
     "fflate": "^0.8.3",
+    "qrcode-generator": "2.0.4",
     "react": "^19.2.3",
     "sharp": "^0.35.4",
     "zod": "^4.6.5"

@@ -83,35 +83,64 @@ export async function registerForPush(
     const { data: token } = await Notifications.getExpoPushTokenAsync({ projectId });
     const last = await lastRegistration();
     if (last?.token === token && last.language === language) return "registered";
+    // A removal from the last sign-out still on its way must land first, or it would undo this.
+    await removing;
     const result = await api.registerPushToken(authToken, token, language);
     if (!result.ok) return "unavailable";
     await SecureStore.setItemAsync(REGISTERED_KEY, JSON.stringify({ token, language }));
+    // One that never got there is moot now: the token is this client's again.
+    await dropPendingRemoval(token);
     return "registered";
   } catch {
     return "unavailable";
   }
 }
 
+/** The removal being sent to the server, if any; never rejects. */
+let removing: Promise<void> = Promise.resolve();
+
 /**
  * Stops this phone getting the client's notifications; called on sign-out.
- * If the server can't be reached, the removal is kept and retried later.
+ * It only writes the removal down on the phone and returns: the server is
+ * told in the background, so signing out never waits for the network. A
+ * removal that doesn't get there (offline, the app closed) is kept and sent
+ * again when the app next opens.
  */
 export async function unregisterPush(authToken: string) {
   const last = await lastRegistration();
   // Whoever signs in next registers afresh.
   await SecureStore.deleteItemAsync(REGISTERED_KEY).catch(() => {});
   if (!last) return;
-  const pending = { authToken, pushToken: last.token };
-  if (!(await removeOnServer(pending))) {
-    await SecureStore.setItemAsync(PENDING_REMOVAL_KEY, JSON.stringify(pending)).catch(() => {});
-  }
+  const pending: PendingRemoval = { authToken, pushToken: last.token };
+  await SecureStore.setItemAsync(PENDING_REMOVAL_KEY, JSON.stringify(pending)).catch(() => {});
+  void retryPendingRemoval();
 }
 
-/** Retries a removal that failed at sign-out; call when the app opens. */
-export async function retryPendingRemoval() {
-  const json = await SecureStore.getItemAsync(PENDING_REMOVAL_KEY).catch(() => null);
-  if (json && (await removeOnServer(JSON.parse(json) as PendingRemoval))) {
-    await SecureStore.deleteItemAsync(PENDING_REMOVAL_KEY).catch(() => {});
+/**
+ * Sends a removal the server hasn't had yet; also called when the app opens.
+ * Never rejects. One at a time, and a registration waits for it.
+ */
+export function retryPendingRemoval(): Promise<void> {
+  removing = removing.then(sendPendingRemoval).catch(() => {});
+  return removing;
+}
+
+async function sendPendingRemoval() {
+  const json = await SecureStore.getItemAsync(PENDING_REMOVAL_KEY);
+  if (!json) return;
+  const pending = JSON.parse(json) as PendingRemoval;
+  if (await removeOnServer(pending)) await dropPendingRemoval(pending.pushToken);
+}
+
+/** Forgets the removal noted for `pushToken` (not a newer one, for another token). */
+async function dropPendingRemoval(pushToken: string) {
+  try {
+    const json = await SecureStore.getItemAsync(PENDING_REMOVAL_KEY);
+    if (json && (JSON.parse(json) as PendingRemoval).pushToken === pushToken) {
+      await SecureStore.deleteItemAsync(PENDING_REMOVAL_KEY);
+    }
+  } catch {
+    // Kept: it is sent again on the next open.
   }
 }
 

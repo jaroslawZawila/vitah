@@ -1,6 +1,7 @@
 import { and, asc, db, desc, eq, isNull, purchaseOrderDocumentVersions, purchaseOrderDocuments, sql } from "@repo/db";
 import { requireEditor, type Ctx } from "./context";
 import { requirePdf } from "./documents";
+import { idempotent, type Once } from "./idempotency";
 import { fail, optionalText, requiredText } from "./obra-data";
 import { softDeleted } from "./project-client";
 import { openStoredFile, projectFolder, storeFiles, uploadedName, type StoredFile } from "./project-files";
@@ -49,69 +50,92 @@ const firstDocument = (ctx: Ctx, orderId: string) =>
 const documentFolder = (ctx: Ctx, order: OrderRow, documentId: string) =>
   `${projectFolder(ctx.tenantId, order.projectId)}purchases/${order.id}/documents/${documentId}/`;
 
-/** Stores `file` as the document's next version (retried if two land at once). → its number. */
-async function addVersion(ctx: Ctx, order: OrderRow, document: { id: string; title: string }, file: Blob, note: string | null, created: boolean) {
+/**
+ * Stores `file` as the document's next version (retried if two land at once). → its number.
+ * `once` makes a new document once per idempotency key (addOrderDocument).
+ */
+async function addVersion(
+  ctx: Ctx,
+  order: OrderRow,
+  document: { id: string; title: string },
+  file: Blob,
+  note: string | null,
+  created: boolean,
+  once: Once<number> = (_tx, add) => add(),
+) {
   const pathname = `${documentFolder(ctx, order, document.id)}${crypto.randomUUID()}.pdf`;
   const filename = uploadedName(file, `${document.title}.pdf`);
   let version = 0;
   await storeFiles([{ pathname, body: file, contentType: "application/pdf" }], async () => {
     for (let attempt = 0; attempt < 5 && version === 0; attempt++) {
-      version = await db.transaction(async (tx) => {
-        if (created) {
-          await tx
-            .insert(purchaseOrderDocuments)
-            .values({ id: document.id, tenantId: ctx.tenantId, orderId: order.id, title: document.title, createdById: ctx.userId })
-            .onConflictDoNothing();
-        } else {
-          // Shared lock: a removal at the same time waits, or this finds the document gone.
-          const [still] = await tx
-            .select({ id: purchaseOrderDocuments.id })
-            .from(purchaseOrderDocuments)
-            .where(and(eq(purchaseOrderDocuments.id, document.id), isNull(purchaseOrderDocuments.deletedAt)))
-            .for("share");
-          if (!still) fail("not_found");
-        }
-        const [row] = await tx
-          .insert(purchaseOrderDocumentVersions)
-          .values({
-            tenantId: ctx.tenantId,
-            documentId: document.id,
-            version: sql`(select coalesce(max(${purchaseOrderDocumentVersions.version}), 0) + 1 from ${purchaseOrderDocumentVersions} where ${purchaseOrderDocumentVersions.documentId} = ${document.id})`,
-            pathname,
-            filename,
-            sizeBytes: file.size,
+      version = await db.transaction((tx) =>
+        once(tx, async () => {
+          if (created) {
+            await tx
+              .insert(purchaseOrderDocuments)
+              .values({ id: document.id, tenantId: ctx.tenantId, orderId: order.id, title: document.title, createdById: ctx.userId })
+              .onConflictDoNothing();
+          } else {
+            // Shared lock: a removal at the same time waits, or this finds the document gone.
+            const [still] = await tx
+              .select({ id: purchaseOrderDocuments.id })
+              .from(purchaseOrderDocuments)
+              .where(and(eq(purchaseOrderDocuments.id, document.id), isNull(purchaseOrderDocuments.deletedAt)))
+              .for("share");
+            if (!still) fail("not_found");
+          }
+          const [row] = await tx
+            .insert(purchaseOrderDocumentVersions)
+            .values({
+              tenantId: ctx.tenantId,
+              documentId: document.id,
+              version: sql`(select coalesce(max(${purchaseOrderDocumentVersions.version}), 0) + 1 from ${purchaseOrderDocumentVersions} where ${purchaseOrderDocumentVersions.documentId} = ${document.id})`,
+              pathname,
+              filename,
+              sizeBytes: file.size,
+              note,
+              uploadedById: ctx.userId,
+            })
+            .onConflictDoNothing()
+            .returning({ version: purchaseOrderDocumentVersions.version });
+          if (!row) return 0;
+          await logEvent(
+            tx,
+            ctx,
+            order.id,
+            created ? "document_added" : "document_version_added",
+            { documentId: document.id, title: document.title, version: row.version, name: filename },
             note,
-            uploadedById: ctx.userId,
-          })
-          .onConflictDoNothing()
-          .returning({ version: purchaseOrderDocumentVersions.version });
-        if (!row) return 0;
-        await logEvent(
-          tx,
-          ctx,
-          order.id,
-          created ? "document_added" : "document_version_added",
-          { documentId: document.id, title: document.title, version: row.version, name: filename },
-          note,
-        );
-        return row.version;
-      });
+          );
+          return row.version;
+        }),
+      );
     }
     if (version === 0) throw new Error("Could not version the order's document");
   });
   return version;
 }
 
-/** Body: { title, file (PDF), note? }: a new document of the order. → { documentId, version } */
-export async function addOrderDocument(ctx: Ctx, orderId: string, input: Record<string, unknown>) {
+/**
+ * Body: { title, file (PDF), note? }: a new document of the order. → { documentId, version }
+ * `idempotencyKey` is the caller's in core (a modificado's signed PDF, attached
+ * once however often its request comes: ./purchase-amendments), not the body's.
+ */
+export async function addOrderDocument(ctx: Ctx, orderId: string, input: Record<string, unknown>, idempotencyKey?: string) {
   requireEditor(ctx);
-  const order = await requireOrder(ctx, orderId);
-  const title = requiredText(input.title, MAX_TITLE);
-  const file = await requirePdf(input.file);
-  const note = optionalText(input.note, MAX_NOTE);
-  const documentId = crypto.randomUUID();
-  const version = await addVersion(ctx, order, { id: documentId, title }, file, note, true);
-  return { documentId, version };
+  return idempotent<{ documentId: string; version: number }>(ctx, "purchase.document.create", { orderId }, { ...input, idempotencyKey }, async (once) => {
+    const order = await requireOrder(ctx, orderId);
+    const title = requiredText(input.title, MAX_TITLE);
+    const file = await requirePdf(input.file);
+    const note = optionalText(input.note, MAX_NOTE);
+    const documentId = crypto.randomUUID();
+    // The key is kept with the document and its version (a new document's first version is never taken already: no 0).
+    const version = await addVersion(ctx, order, { id: documentId, title }, file, note, true, async (tx, add) => {
+      const made = await once(tx, async () => ({ documentId, version: await add() }));
+      return made.version;
+    });
+    return { documentId, version };
+  });
 }
 
 /** Body: { file (PDF), note? (why it replaces the last) }: the document's next version. → { documentId, version } */

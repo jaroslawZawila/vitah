@@ -8,6 +8,10 @@ export const en: Messages = {
     close: "Close",
     back: "Back",
   },
+  appError: {
+    title: "Something went wrong",
+    text: "The app ran into an unexpected problem. Please try again.",
+  },
   tabs: {
     obra: "Works",
     home: "Home",
@@ -24,6 +28,10 @@ export const en: Messages = {
     missingFields: "Enter your email and password",
     invalidCredentials: "Incorrect email or password",
     tooManyAttempts: "Too many failed attempts. Wait a few minutes and try again.",
+    networkError: "Can't reach ViTAH. Check your internet connection and try again.",
+    timeout: "ViTAH is taking too long to answer. Try again in a moment.",
+    serverError: "We have a problem on our servers. Please try again later.",
+    failed: "We couldn't sign you in. Please try again.",
     biometric: "Sign in with biometrics",
     biometricPrompt: "Sign in to ViTAH",
     sessionExpired: "Your session has expired. Sign in with your email and password.",
@@ -104,6 +112,7 @@ export const en: Messages = {
   phase: {
     back: "Works",
     label: "Phase {current} of {total} · {status}",
+    position: "Phase {current} of {total}",
     status: { pending: "Pending", active: "In progress", done: "Done" },
     preScope: "Contract, BIM engineering and building licence: everything before building starts.",
     chapters: "Budget chapters",

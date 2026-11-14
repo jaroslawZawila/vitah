@@ -33,6 +33,7 @@ function Cell({ badge }: { badge: DocBadge | undefined }) {
 /** Presentational: the workers table with its filters (state lives in the container). */
 export default function WorkersTable({
   workers,
+  shown = workers.length,
   total,
   counts,
   filter,
@@ -45,9 +46,12 @@ export default function WorkersTable({
   projects,
   projectId,
   onProject,
+  pager,
 }: {
-  /** The workers left after the filters. */
+  /** The page shown of the workers left after the filters. */
   workers: WorkerListItem[];
+  /** How many the filters leave, of how many there are (`total`). */
+  shown?: number;
   total: number;
   counts: Record<AccessFilter, number>;
   filter: AccessFilter;
@@ -60,6 +64,8 @@ export default function WorkersTable({
   projects: ProjectOption[];
   projectId: string;
   onProject: (id: string) => void;
+  /** A paged list's foot. */
+  pager?: React.ReactNode;
 }) {
   const t = useTranslations("subcontractors");
   const tw = useTranslations("subcontractors.workers");
@@ -69,7 +75,7 @@ export default function WorkersTable({
     <Card aria-labelledby="workers-title">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 id="workers-title">{tw("listTitle")}</h2>
-        <span className="text-[12.5px] text-muted-foreground">{tw("showing", { shown: workers.length, total })}</span>
+        <span className="text-[12.5px] text-muted-foreground">{tw("showing", { shown, total })}</span>
       </div>
       <div className="flex flex-wrap items-center gap-2.5">
         <div className="flex flex-wrap gap-1.5" role="group" aria-label={tw("filterLabel")}>
@@ -184,6 +190,7 @@ export default function WorkersTable({
           </TableBody>
         </Table>
       )}
+      {pager}
     </Card>
   );
 }

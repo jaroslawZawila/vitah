@@ -53,6 +53,7 @@ import {
   type ProgressEvent,
 } from "./contract";
 import { chapterState, chapterTiming, contractSchedule, contractTotals, deviation, milestoneState } from "./control-calc";
+import { idempotent } from "./idempotency";
 import { MAX_TEXT } from "./input";
 import {
   fail,
@@ -810,36 +811,42 @@ function issueParsers(codes: Set<string>) {
 
 /**
  * Body: { kind, occurredOn, chapterCode, description, party, partyName?,
- * costImpactCents?, scheduleImpactDays?, status? } — the impacts are
- * estimates and optional. → { issueId, number }
+ * costImpactCents?, scheduleImpactDays?, status?, idempotencyKey? (sent again
+ * with the same key, it is one record with one number: ./idempotency) } — the
+ * impacts are estimates and optional. → { issueId, number }
  */
 export async function createIssue(ctx: Ctx, projectId: string, input: Record<string, unknown>) {
   requireEditor(ctx);
-  const codes = await contractCodes(ctx, projectId);
-  for (const key of REQUIRED_ISSUE_FIELDS) {
-    if (input[key] === undefined || input[key] === "") fail("missing_fields");
-  }
-  const values = { status: "pending", ...pickChanges<IssueValues>(input, issueParsers(codes)) } as IssueValues;
-  const sameKind = and(eq(obraIssues.projectId, projectId), eq(obraIssues.tenantId, ctx.tenantId), eq(obraIssues.kind, values.kind));
-  const insert = () =>
-    db
-      .insert(obraIssues)
-      .values({
-        ...values,
-        tenantId: ctx.tenantId,
-        projectId,
-        // Numbered per project and kind.
-        number: sql`(select coalesce(max(${obraIssues.number}), 0) + 1 from ${obraIssues} where ${sameKind})`,
-        createdById: ctx.userId,
-      })
-      .onConflictDoNothing()
-      .returning({ id: obraIssues.id, number: obraIssues.number });
-  // Two records made at once may take the same number: the later one tries the next.
-  for (let attempt = 0; attempt < 5; attempt++) {
-    const [row] = await insert();
-    if (row) return { issueId: row.id, number: row.number };
-  }
-  throw new Error("Could not number the issue");
+  return idempotent<{ issueId: string; number: number }>(ctx, "obra.issue.create", { projectId }, input, async (once) => {
+    const codes = await contractCodes(ctx, projectId);
+    for (const key of REQUIRED_ISSUE_FIELDS) {
+      if (input[key] === undefined || input[key] === "") fail("missing_fields");
+    }
+    const values = { status: "pending", ...pickChanges<IssueValues>(input, issueParsers(codes)) } as IssueValues;
+    const sameKind = and(eq(obraIssues.projectId, projectId), eq(obraIssues.tenantId, ctx.tenantId), eq(obraIssues.kind, values.kind));
+    return db.transaction((tx) =>
+      once(tx, async () => {
+        // Two records made at once may take the same number: the later one waits
+        // for the first, then tries the next (each statement sees what is in by then).
+        for (let attempt = 0; attempt < 5; attempt++) {
+          const [row] = await tx
+            .insert(obraIssues)
+            .values({
+              ...values,
+              tenantId: ctx.tenantId,
+              projectId,
+              // Numbered per project and kind.
+              number: sql`(select coalesce(max(${obraIssues.number}), 0) + 1 from ${obraIssues} where ${sameKind})`,
+              createdById: ctx.userId,
+            })
+            .onConflictDoNothing()
+            .returning({ id: obraIssues.id, number: obraIssues.number });
+          if (row) return { issueId: row.id, number: row.number };
+        }
+        throw new Error("Could not number the issue");
+      }),
+    );
+  });
 }
 
 /** The project's issue, by its id; not found once its project is deleted. */

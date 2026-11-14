@@ -110,7 +110,8 @@ describe("OrderScreen", () => {
       date: "2026-10-16",
       note: "Albarán 3321",
     });
-    expect(screen.queryByRole("form", { name: "Registrar entrega" })).not.toBeInTheDocument();
+    // The form closes once the action answers.
+    await waitFor(() => expect(screen.queryByRole("form", { name: "Registrar entrega" })).not.toBeInTheDocument());
   });
 
   it("moves a pending subcontract on at once, and shows the error core returns", async () => {
@@ -127,6 +128,8 @@ describe("OrderScreen", () => {
     await userEvent.click(screen.getByRole("button", { name: "Cancelar pedido" }));
     expect(window.confirm).toHaveBeenCalledWith("¿Cancelar PED-049? Dejará de sumar a lo contratado.");
     expect(actions.setPurchaseStatusAction).toHaveBeenCalledWith("p-1", "order-49", { status: "cancelled" });
+    // The buttons come back once the action answers.
+    await waitFor(() => expect(screen.getByRole("button", { name: "Cancelar pedido" })).toBeEnabled());
   });
 
   it("lists the order's documents, each with its versions", () => {
@@ -150,6 +153,10 @@ describe("OrderScreen", () => {
     await userEvent.click(documents.getByRole("button", { name: "Subir" }));
     const [projectId, orderId, added] = vi.mocked(actions.addOrderDocumentAction).mock.calls[0]!;
     expect([projectId, orderId, added.get("title"), added.get("file")]).toEqual(["p-1", "order-49", "Contrato firmado", contract]);
+    // The form closes once the upload is in: only then is the next thing clicked.
+    await waitFor(() => expect(documents.queryByRole("form", { name: "+ Añadir documento" })).not.toBeInTheDocument());
+    const remove = documents.getByRole("button", { name: "Quitar Pedido PED-049" });
+    await waitFor(() => expect(remove).toBeEnabled());
 
     await userEvent.click(documents.getByRole("button", { name: "Nueva versión" }));
     const v3 = new File(["%PDF"], "v3.pdf", { type: "application/pdf" });
@@ -158,13 +165,17 @@ describe("OrderScreen", () => {
     await userEvent.click(documents.getByRole("button", { name: "Subir" }));
     const [, , documentId, version] = vi.mocked(actions.addOrderDocumentVersionAction).mock.calls[0]!;
     expect([documentId, version.get("file"), version.get("note")]).toEqual(["doc-1", v3, "Precio corregido"]);
+    await waitFor(() => expect(documents.queryByRole("form", { name: "Nueva versión de Pedido PED-049" })).not.toBeInTheDocument());
+    // "Quitar" is disabled while an upload runs.
+    await waitFor(() => expect(remove).toBeEnabled());
 
-    await userEvent.click(documents.getByRole("button", { name: "Quitar Pedido PED-049" }));
+    await userEvent.click(remove);
     // It says what happens: it leaves the order, and nothing is erased.
     expect(window.confirm).toHaveBeenCalledWith(
       "¿Quitar «Pedido PED-049» con todas sus versiones? Deja de verse en el pedido; el documento y sus archivos se conservan.",
     );
     expect(actions.deleteOrderDocumentAction).toHaveBeenCalledWith("p-1", "order-49", "doc-1");
+    await waitFor(() => expect(remove).toBeEnabled());
   });
 
   it("says why a document couldn't be removed", async () => {

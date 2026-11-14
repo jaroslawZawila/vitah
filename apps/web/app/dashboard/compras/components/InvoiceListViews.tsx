@@ -184,6 +184,7 @@ export function PaymentTable({
   invoiceColumns = true,
   onRemove,
   pending,
+  pager,
 }: {
   payments: PurchasePayment[];
   title: React.ReactNode;
@@ -194,6 +195,8 @@ export function PaymentTable({
   /** Omitted for viewers. */
   onRemove?: (payment: PurchasePayment) => void;
   pending: boolean;
+  /** A paged list's foot (the company's payments). */
+  pager?: React.ReactNode;
 }) {
   const t = useTranslations("purchasing.payments.cols");
   const tm = useTranslations("purchasing.method");
@@ -281,6 +284,7 @@ export function PaymentTable({
           )}
         </Table>
       )}
+      {pager}
     </section>
   );
 }

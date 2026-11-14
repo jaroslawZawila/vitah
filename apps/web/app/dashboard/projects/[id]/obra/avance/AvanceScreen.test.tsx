@@ -177,6 +177,8 @@ describe("AvanceScreen", () => {
       costImpactCents: 125_050,
       scheduleImpactDays: null,
       status: "pending",
+      // The form's idempotency key: a double click or a retry is one record.
+      idempotencyKey: expect.stringMatching(/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/),
     });
     const [projectId, issueId, , data] = vi.mocked(actions.addIssueFileAction).mock.calls[0]!;
     expect([projectId, issueId]).toEqual(["p-1", "issue-new"]);

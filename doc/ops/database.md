@@ -47,7 +47,33 @@ Until this has been done once, assume a restore takes hours, not minutes.
 
 ## Bringing back something a user deleted
 
-Deletes are soft: the row is still there with `deleted_at` and `deleted_by_id`. Until the portal has a screen for it, restoring is one statement, in a transaction, after checking it is the right row:
+Deletes are soft: the row is still there with `deleted_at` and `deleted_by_id`, and its files are still in the Blob store. An admin restores it in the portal: the settings menu at the foot of the rail › **Elementos eliminados** (`/dashboard/eliminados`; `GET /api/v1/deleted`, `POST /api/v1/deleted/:kind/:id/restore`). It lists what was deleted, by whom and when, and "Restaurar" brings a record back as it was. Each restore leaves a trace: an entry in the order's history (an invoice, a payment, an order's document) or in the company's Historial (an assignment), else a log line `deleted.restored` with the kind, the id, the tenant and the user.
+
+The screen refuses a restore that would break what the record's module holds a new one to, and says why. What to do then:
+
+| It says | Do this, in the portal |
+| --- | --- |
+| Its obra (or its invoice) is deleted | Restore that one first, on the same screen. |
+| Another invoice of that supplier has its number | Change the other invoice's number (Compras › Facturas › Editar), then restore. |
+| It no longer fits what is left to pay, or what its invoice leaves | Delete or correct the payment or credit note registered in its place, then restore. |
+| Its order is cancelled, not placed, of another supplier, or lost the lines it was split across | Put the order back as it was (its status, supplier and lines), then restore; or register the invoice again. |
+| Its order now has a payment schedule and the invoice is on no milestone | Register the invoice again on its milestone (the deleted one stays deleted). |
+| The company is now a material supplier | Nothing to restore: a material supplier has no obras. |
+| Another project uses its ref | The portal cannot rename a project: see below. |
+
+### By hand, when the screen refuses
+
+Only for what the screen cannot do, and by the rules of "By hand, in production" below. The one case today is a project whose `ref` was reused: give one of the two another ref, then restore on the screen.
+
+```sql
+BEGIN;
+SELECT id, ref, address, deleted_at, deleted_by_id FROM projects WHERE tenant_id = '<tenant>' AND ref = '<ref>';
+-- The deleted one takes a ref nobody has; the live one keeps its own.
+UPDATE projects SET ref = '<new ref>' WHERE id = '<id>' AND tenant_id = '<tenant>' AND deleted_at IS NOT NULL;
+COMMIT;
+```
+
+Clearing the marks by hand is the last resort (the screen's checks do not run, nothing is logged, and the client's open app is not told):
 
 ```sql
 BEGIN;
@@ -56,7 +82,7 @@ UPDATE projects SET deleted_at = NULL, deleted_by_id = NULL WHERE id = '<id>' AN
 COMMIT;
 ```
 
-The same two columns exist on `project_documents`, `project_photos`, `obra_issue_files`, `subcontractor_assignments`, `purchase_order_documents`, `purchase_invoices` and `purchase_payments`. Two cautions: a project's `ref` and a supplier's invoice `number` may have been reused since (the restore then fails on the unique index: rename one first), and restoring an invoice or a payment changes the order's and the supplier's totals.
+The same two columns exist on `project_documents`, `project_photos`, `obra_issue_files`, `subcontractor_assignments`, `purchase_order_documents`, `purchase_invoices` and `purchase_payments`. Two cautions: a project's `ref` and a supplier's invoice `number` may have been reused since (the restore then fails on the unique index: rename one first), and restoring an invoice or a payment changes the order's and the supplier's totals. Nothing is ever purged: there is no hard delete of these rows, in the portal or here.
 
 ## By hand, in production
 

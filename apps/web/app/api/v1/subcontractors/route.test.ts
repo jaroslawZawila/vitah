@@ -222,6 +222,52 @@ describe("/api/v1/subcontractors", () => {
     expect(await checked.json()).toMatchObject({ worker: { id: workerId }, access: { status: "pending" } });
   });
 
+  it("lists every worker without parameters, and a page of them with ?page or ?limit", async () => {
+    const { token } = await setup();
+    const id = await createCompany(token);
+    const people = [
+      ["Ana", "Abascal Ruiz", "00000001R"],
+      ["Laura", "Cobo Gil", "00000002W"],
+      ["Hugo", "Díaz Mazo", "00000003A"],
+    ] as const;
+    const ids: string[] = [];
+    for (const [firstName, surnames, idDocument] of people) {
+      const created = await createWorker(apiRequest(token, { method: "POST", body: { subcontractorId: id, firstName, surnames, idDocument } }));
+      ids.push(((await created.json()) as { id: string }).id);
+    }
+    const get = async (query = "") => {
+      const response = await listWorkers(apiRequest(token, { query }));
+      return { status: response.status, body: await response.json() };
+    };
+
+    // As it always answered: an array of every worker.
+    const all = await get();
+    expect(Array.isArray(all.body)).toBe(true);
+    expect(all.body.map((w: { id: string }) => w.id)).toEqual(ids);
+
+    const first = await get("?page=1&limit=2");
+    expect(first.body.workers.map((w: { id: string }) => w.id)).toEqual(ids.slice(0, 2));
+    expect(first.body.paging).toEqual({ page: 1, limit: 2, total: 3, pages: 2 });
+    expect(first.body.counts).toEqual({ all: 3, ok: 0, pending: 3, blocked: 0 });
+    expect(first.body.summary).toEqual({ registered: 3, companies: 1, ok: 0, pending: 3, blocked: 0, preventive: 0 });
+    expect((await get("?page=2&limit=2")).body.workers.map((w: { id: string }) => w.id)).toEqual(ids.slice(2));
+    expect((await get("?page=5&limit=2")).body).toMatchObject({ workers: [], paging: { page: 5, total: 3, pages: 2 } });
+    expect((await get("?limit=1000000")).body.paging).toMatchObject({ page: 1, limit: 200, total: 3 });
+    expect((await get("?page=1&q=cobo")).body.workers.map((w: { id: string }) => w.id)).toEqual([ids[1]]);
+    expect((await get("?page=1&access=ok")).body).toMatchObject({ workers: [], paging: { total: 0 }, counts: { all: 3 } });
+    expect((await get(`?page=1&companyId=${id}`)).body.paging.total).toBe(3);
+
+    for (const query of ["?page=0", "?page=abc", "?limit=0"]) {
+      expect(await get(query), query).toEqual({ status: 400, body: { error: "invalid_page" } });
+    }
+    expect(await get("?page=1&access=nope")).toEqual({ status: 400, body: { error: "invalid_option" } });
+
+    // Another tenant pages through nothing.
+    const { token: stranger } = await setup();
+    expect(await (await listWorkers(apiRequest(stranger, { query: `?page=1&companyId=${id}` }))).json()).toMatchObject({ workers: [], paging: { total: 0 } });
+    expect((await listWorkers(apiRequest(null, { query: "?page=1" }))).status).toBe(401);
+  });
+
   it("keeps viewers to reading and tenants apart", async () => {
     const { token } = await setup();
     const id = await createCompany(token);

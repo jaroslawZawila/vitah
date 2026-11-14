@@ -15,6 +15,7 @@ import { contingencyDescription } from "./budget-template";
 import { ofBp } from "./obra-calc";
 import { fail, linesTotalSql, requireProject, type RevisionRow } from "./obra-data";
 import { projectNotDeleted, type Tx } from "./project-client";
+import { zeroPadded } from "./sql-labels";
 
 // ─── Budget: finding what a call acts on, and writing to drafts ───────────────
 // Shared by the budget services (budget.ts, budget-options.ts, budget-issue.ts).
@@ -216,7 +217,7 @@ export async function syncDraft(tx: Tx, revisionId: string, { tenantId, continge
     update ${budgetLines} as target
     set code = numbered.code
     from (
-      select line.id, 'OP.' || lpad((row_number() over (order by chapter.position, line.position))::text, 2, '0') as code
+      select line.id, 'OP.' || ${zeroPadded(sql`row_number() over (order by chapter.position, line.position)`, 2)} as code
       from ${budgetLines} as line
       join ${budgetChapters} as chapter on chapter.id = line.chapter_id
       where chapter.revision_id = ${revisionId} and chapter.kind = 'option'

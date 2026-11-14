@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -71,10 +71,13 @@ describe("InvoiceFormScreen", () => {
         vatKind: "reverse_charge",
         irpfBp: 0,
         retentionBp: 500,
+        // The form's idempotency key: a double click or a retry is one invoice.
+        idempotencyKey: expect.stringMatching(/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/),
       },
       file: pdf,
     });
-    expect(router.push).toHaveBeenCalledWith("/dashboard/compras/facturas/inv-171");
+    // Once the action answers, the page of the invoice opens.
+    await waitFor(() => expect(router.push).toHaveBeenCalledWith("/dashboard/compras/facturas/inv-171"));
   });
 
   it("splits by line in proportion unless typed, and refuses a split that doesn't add up", async () => {
@@ -160,6 +163,6 @@ describe("InvoiceFormScreen", () => {
       dueOn: "2026-10-22",
       notes: null,
     });
-    expect(router.push).toHaveBeenCalledWith("/dashboard/compras/facturas/inv-148");
+    await waitFor(() => expect(router.push).toHaveBeenCalledWith("/dashboard/compras/facturas/inv-148"));
   });
 });

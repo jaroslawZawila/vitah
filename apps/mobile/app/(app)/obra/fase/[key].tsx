@@ -11,6 +11,7 @@ import {
   SectionLabel,
   obraStyles,
 } from "../../../../components/obra-parts";
+import { ObraPending } from "../../../../components/obra-pending";
 import { PhotoImage } from "../../../../components/photo-image";
 import { PushedScreen } from "../../../../components/pushed-screen";
 import { colors, radius, type } from "../../../../constants/theme";
@@ -32,29 +33,22 @@ export default function FaseScreen() {
   const index = obra?.phases.findIndex((p) => p.key === key) ?? -1;
   const phase = obra?.phases[index];
 
-  if (!obra || !phase) {
-    return (
-      <PushedScreen back={t("phase.back")}>
-        {obra !== undefined && <Text style={type.subhead}>{t("phase.notFound")}</Text>}
-      </PushedScreen>
-    );
-  }
+  if (!obra || !phase) return <ObraPending back={t("phase.back")} missing={t("phase.notFound")} />;
 
   // One hito (its payment card), or for the pre-construction phase several.
   const hitos = phase.hitoIds.flatMap((id) => obra.hitos.find((h) => h.id === id) ?? []);
   const hito = hitos.length === 1 ? hitos[0] : undefined;
   const phasePhotos = phase.photoIds.flatMap((id) => byId.get(id) ?? []);
   const openPago = (id: string) => router.push({ pathname: "/obra/pago/[id]", params: { id } });
+  // A status from a newer server (one this version doesn't know) is left out, not guessed.
+  const position = { current: index + 1, total: obra.phases.length };
+  const phaseStatus = t(`phase.status.${phase.status}`, undefined, "");
 
   return (
     <PushedScreen back={t("phase.back")}>
       <View style={{ gap: 8 }}>
         <Text style={[type.label, { color: colors.verdeOlivaLight }]}>
-          {t("phase.label", {
-            current: index + 1,
-            total: obra.phases.length,
-            status: t(`phase.status.${phase.status}`),
-          })}
+          {phaseStatus ? t("phase.label", { ...position, status: phaseStatus }) : t("phase.position", position)}
         </Text>
         <Text accessibilityRole="header" style={[type.display, { lineHeight: 34 }]}>
           {phaseName(phase, t)}
@@ -131,7 +125,12 @@ export default function FaseScreen() {
               <LinkCard key={h.id} onPress={() => openPago(h.id)} label={title}>
                 <Text style={type.row}>{title}</Text>
                 <Text style={type.meta}>
-                  {`${formatMoney(h.amountCents, language)} ${t("phase.plusVat")} · ${t(`hitoStatus.${h.status}`)}`}
+                  {[
+                    `${formatMoney(h.amountCents, language)} ${t("phase.plusVat")}`,
+                    t(`hitoStatus.${h.status}`, undefined, ""),
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
                 </Text>
               </LinkCard>
             );

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -78,7 +78,8 @@ describe("EditPlanScreen", () => {
       },
       "Retraso de la bomba de calor",
     );
-    expect(router.push).toHaveBeenCalledWith(PLAN);
+    // Once approved, back to the plan.
+    await waitFor(() => expect(router.push).toHaveBeenCalledWith(PLAN));
   });
 
   it("sets how far ahead a chapter is ordered, showing the order-by date", async () => {
@@ -132,11 +133,15 @@ describe("EditPlanScreen", () => {
     await userEvent.selectOptions(screen.getByLabelText("Festivos autonómicos"), "md");
     await userEvent.click(screen.getByRole("button", { name: "Guardar borrador" }));
     expect(actions.updatePlanningDraftAction).toHaveBeenCalledWith("p-1", expect.objectContaining({ region: "md" }));
+    // The buttons are disabled until the draft is saved.
+    expect(await screen.findByText("Borrador guardado.")).toBeInTheDocument();
+    const discard = screen.getByRole("button", { name: "Descartar borrador" });
+    await waitFor(() => expect(discard).toBeEnabled());
 
-    await userEvent.click(screen.getByRole("button", { name: "Descartar borrador" }));
+    await userEvent.click(discard);
     expect(window.confirm).toHaveBeenCalledWith("¿Descartar el borrador v3? Se pierden sus cambios.");
     expect(actions.discardPlanningDraftAction).toHaveBeenCalledWith("p-1");
-    expect(router.push).toHaveBeenCalledWith(PLAN);
+    await waitFor(() => expect(router.push).toHaveBeenCalledWith(PLAN));
   });
 
   it("shows core's error and stays", async () => {

@@ -225,3 +225,87 @@ describe("api.getChanges", () => {
     expect((await api.getChanges("tok")).ok).toBe(false);
   });
 });
+
+describe("timeouts", () => {
+  /** A fetch that never answers, until the call's signal aborts it (as the real one does). */
+  function hang(_url: string, init: RequestInit) {
+    return new Promise<Response>((_resolve, reject) => {
+      init.signal!.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")));
+    });
+  }
+
+  beforeEach(() => jest.useFakeTimers());
+  afterEach(() => jest.useRealTimers());
+
+  it("gives every call a signal to abort it with", async () => {
+    respond(200, { projects: [] });
+
+    await api.listProjects("tok");
+
+    expect(fetchMock.mock.calls[0][1].signal).toBeInstanceOf(AbortSignal);
+    expect(jest.getTimerCount()).toBe(0); // The timer goes with the answer.
+  });
+
+  it("gives up on a server that doesn't answer, as a timeout", async () => {
+    fetchMock.mockImplementationOnce(hang);
+
+    const call = api.getObra("tok");
+    await jest.advanceTimersByTimeAsync(14_999);
+    expect(fetchMock.mock.calls[0][1].signal.aborted).toBe(false);
+    await jest.advanceTimersByTimeAsync(1);
+
+    expect(await call).toEqual({ ok: false, error: "timeout" });
+    expect(fetchMock.mock.calls[0][1].signal.aborted).toBe(true);
+  });
+
+  it("times sign-in out too", async () => {
+    fetchMock.mockImplementationOnce(hang);
+
+    const call = api.signIn("a@b.c", "pw");
+    await jest.advanceTimersByTimeAsync(15_000);
+
+    expect(await call).toEqual({ ok: false, error: "timeout" });
+  });
+
+  it.each([200, 401, 500])("gives up on a %i answer that never finishes arriving", async (status) => {
+    fetchMock.mockImplementationOnce(async (_url: string, init: RequestInit) => ({
+      status,
+      ok: status < 400,
+      json: () =>
+        new Promise((_resolve, reject) => {
+          init.signal!.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")));
+        }),
+    }));
+
+    const call = api.listPhotos("tok");
+    await jest.advanceTimersByTimeAsync(15_000);
+
+    // Not "unauthorized": a cut-off 401 must not sign the client out.
+    expect(await call).toEqual({ ok: false, error: "timeout" });
+  });
+
+  it("tells a lost connection from a timeout", async () => {
+    fetchMock.mockRejectedValueOnce(new TypeError("Network request failed"));
+
+    expect(await api.getObra("tok")).toEqual({ ok: false, error: "network_error" });
+    expect(jest.getTimerCount()).toBe(0);
+  });
+});
+
+describe("error mapping", () => {
+  it.each([
+    [401, { error: "invalid_credentials" }, "invalid_credentials"],
+    [401, { error: "unauthorized" }, "unauthorized"],
+    [401, undefined, "unauthorized"],
+    [429, { error: "too_many_attempts" }, "too_many_attempts"],
+    [400, { error: "wrong_password" }, "wrong_password"],
+    [404, undefined, "server_error"],
+    [500, { error: "internal_error" }, "server_error"],
+    [502, undefined, "server_error"],
+    [503, { error: "too_many_attempts" }, "server_error"],
+  ])("%i %j → %s", async (status, body, error) => {
+    respond(status, body);
+
+    expect(await api.signIn("a@b.c", "pw")).toEqual({ ok: false, error });
+  });
+});

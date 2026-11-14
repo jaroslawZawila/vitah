@@ -176,9 +176,59 @@ describe("/api/v1 purchases", () => {
     ]);
   });
 
+  it("pages and filters the tenant's orders, and without parameters answers as it always did", async () => {
+    const { tenant, project, supplierId, lineageId } = await setup();
+    const ctx = { tenantId: tenant.id, userId: (await createTestUser(tenant.id, { role: "admin" })).id, role: "admin" as const };
+    const ids: string[] = [];
+    for (const [description, status] of [["Piedra", "ordered"], ["Lámina", "pending"], ["Grava", "ordered"]] as const) {
+      const input = { kind: "material", subcontractorId: supplierId, description, status, expectedOn: "2026-10-10", lines: [{ lineageId, amountCents: 100_000 }] };
+      ids.unshift((await purchasingService.createPurchase(ctx, project.id, input)).orderId);
+    }
+    const { token } = await staffToken(tenant.id, "viewer");
+    const get = async (query = "") => {
+      const response = await listAll(apiRequest(token, { query }));
+      return { status: response.status, body: await response.json() };
+    };
+    const idsOf = (body: { orders: { id: string }[] }) => body.orders.map((o) => o.id);
+
+    // No parameters: every order, with the fields older clients read (and the new ones beside them).
+    const all = await get();
+    expect(all.status).toBe(200);
+    expect(idsOf(all.body)).toEqual(ids);
+    expect(Object.keys(all.body)).toEqual(expect.arrayContaining(["orders", "projects", "summary", "today"]));
+    expect(all.body.summary).toMatchObject({ openOrders: 2, pendingOrders: 1, lateDeliveries: 2 });
+    expect(all.body.paging).toEqual({ page: 1, limit: 5000, total: 3, pages: 1 });
+
+    // A page at a time; the totals stay the whole list's.
+    const first = await get("?page=1&limit=2");
+    expect(idsOf(first.body)).toEqual(ids.slice(0, 2));
+    expect(first.body.paging).toEqual({ page: 1, limit: 2, total: 3, pages: 2 });
+    expect(first.body.groupCounts).toEqual({ all: 3, open: 2, pending: 1, done: 0, cancelled: 0 });
+    expect(first.body.summary).toEqual(all.body.summary);
+    expect(idsOf((await get("?page=2&limit=2")).body)).toEqual(ids.slice(2));
+    expect((await get("?page=3&limit=2")).body).toMatchObject({ orders: [], paging: { page: 3, total: 3, pages: 2 } });
+    // A huge limit is cut, not refused.
+    expect((await get("?limit=1000000")).body.paging).toMatchObject({ limit: 200, total: 3 });
+
+    // Filters, applied by the server.
+    expect(idsOf((await get("?page=1&group=pending")).body)).toEqual([ids[1]]);
+    expect(idsOf((await get("?page=1&q=gra")).body)).toEqual([ids[0]]);
+    expect(idsOf((await get(`?page=1&late=1&projectId=${project.id}&supplierId=${supplierId}&kind=material&from=2026-10-01`)).body)).toEqual([ids[0], ids[2]]);
+    expect(idsOf((await get("?page=1&projectId=nope")).body)).toEqual([]);
+    expect((await get("?page=1&by=supplier")).body.bySupplier).toMatchObject([{ id: supplierId, orders: 3, contractedCents: 200_000 }]);
+
+    // A page, a limit or a filter that isn't one: 400, never a 500 nor everything.
+    for (const query of ["?page=0", "?page=abc", "?page=-1", "?page=1.5", "?limit=0", "?limit=x"]) {
+      expect(await get(query), query).toEqual({ status: 400, body: { error: "invalid_page" } });
+    }
+    expect(await get("?group=nope")).toEqual({ status: 400, body: { error: "invalid_input" } });
+    expect(await get("?from=2026-02-31")).toEqual({ status: 400, body: { error: "invalid_date" } });
+  });
+
   it("needs a token, lets viewers only read, and keeps tenants apart", async () => {
     const { tenant, project, supplierId, lineageId } = await setup();
     expect((await listAll(apiRequest(null))).status).toBe(401);
+    expect((await listAll(apiRequest(null, { query: "?page=1" }))).status).toBe(401);
 
     const viewer = await staffToken(tenant.id, "viewer");
     const denied = await create(
@@ -199,5 +249,6 @@ describe("/api/v1 purchases", () => {
     expect((await listProject(apiRequest(token), routeParams({ id: project.id }))).status).toBe(404);
     expect((await listAll(apiRequest(token))).status).toBe(200);
     expect((await (await listAll(apiRequest(token))).json()).orders).toEqual([]);
+    expect(await (await listAll(apiRequest(token, { query: `?page=1&projectId=${project.id}` }))).json()).toMatchObject({ orders: [], paging: { total: 0 } });
   });
 });

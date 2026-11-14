@@ -1,14 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { db, eq, loginAttempts, sql } from "@repo/db";
 import { resetDatabase } from "@repo/db/testing";
-import {
-  countSignIn,
-  overLimit,
-  SIGN_IN_LIMITS,
-  SWEEP_ONE_IN,
-  THROTTLE_WINDOW_MS,
-  type Random,
-} from "../src/throttle";
+import { setSweepDraw, SWEEP_ONE_IN, type Random } from "../src/sweep";
+import { countSignIn as countAttempt, overLimit as overKeyLimit, SIGN_IN_LIMITS, THROTTLE_WINDOW_MS, type ThrottleKey } from "../src/throttle";
 
 // The counters of the sign-in throttle, without passwords: `fail` is an
 // attempt whose password was wrong (or refused unchecked), `succeed` one whose
@@ -21,6 +15,17 @@ const SWEEP: Random = () => 0;
 const NO_SWEEP: Random = () => 1;
 /** What the attempts below draw: set by each suite. */
 let random = NO_SWEEP;
+
+/** An attempt that draws `draw` for the sweep (./sweep.ts takes it from its module, not from its callers). */
+function countSignIn(scope: string, email: string, ip: string | undefined, draw: Random = random) {
+  setSweepDraw(draw);
+  return countAttempt(scope, email, ip);
+}
+
+function overLimit(keys: ThrottleKey[], draw: Random = random) {
+  setSweepDraw(draw);
+  return overKeyLimit(keys);
+}
 
 /** Whether the attempt was let through to the password check. */
 async function fail(ip: string | undefined, email = EMAIL, scope = "portal") {
@@ -46,6 +51,7 @@ async function failuresOf(kind: string, ...parts: string[]) {
 }
 
 beforeEach(resetDatabase);
+afterEach(() => setSweepDraw());
 
 // The limits are the same whether an attempt sweeps or not.
 describe.each([
@@ -470,5 +476,62 @@ describe("the counters of a correct sign-in", () => {
     expect(updates).toHaveBeenCalledTimes(2);
     expect(deletes.mock.invocationCallOrder[0]!).toBeLessThan(updates.mock.invocationCallOrder[0]!);
     expect(await db.select().from(loginAttempts)).toSatisfy((rows: { failures: number }[]) => rows.length === 2 && rows.every((row) => row.failures === 0));
+  });
+});
+
+// The portal's two-step verification: the password was right, the code is still to come.
+describe("an attempt withdrawn (right password, second step to come)", () => {
+  beforeEach(() => {
+    random = NO_SWEEP;
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  async function withdraw(ip: string | undefined) {
+    const attempt = await countSignIn("portal", EMAIL, ip, NO_SWEEP);
+    if (!attempt.blocked) await attempt.withdrawn();
+    return !attempt.blocked;
+  }
+
+  it("counts for nothing: any number of them leaves every counter where it was", async () => {
+    await failTimes(3, "1.2.3.4");
+    for (let i = 0; i < SIGN_IN_LIMITS.emailFromIp + 5; i++) expect(await withdraw("1.2.3.4")).toBe(true);
+
+    expect(await failuresOf("pair", "portal", EMAIL, "1.2.3.4")).toBe(3);
+    expect(await failuresOf("ip", "1.2.3.4")).toBe(3);
+    expect(await failuresOf("email", "portal", EMAIL)).toBe(3);
+  });
+
+  it("forgets nothing, unlike a sign-in that went through: failures before it still count", async () => {
+    await failTimes(SIGN_IN_LIMITS.emailFromIp - 1, "1.2.3.4");
+    expect(await withdraw("1.2.3.4")).toBe(true);
+    expect(await fail("1.2.3.4")).toBe(true);
+
+    // The tenth failure was the last allowed: withdrawing in between reset nothing.
+    expect(await fail("1.2.3.4")).toBe(false);
+    expect(await withdraw("1.2.3.4")).toBe(false);
+  });
+
+  it("without an IP, comes back off the counter those callers share and off the email's", async () => {
+    await failTimes(2, undefined);
+    await withdraw(undefined);
+
+    expect(await failuresOf("noip", "portal", EMAIL)).toBe(2);
+    expect(await failuresOf("email", "portal", EMAIL)).toBe(2);
+  });
+
+  it("writes one row per statement, and never fails the sign-in: counters that can't be put right are logged", async () => {
+    const attempt = await countSignIn("portal", EMAIL, "1.2.3.4", NO_SWEEP);
+    const updates = vi.spyOn(db, "update");
+    await attempt.withdrawn();
+    expect(updates).toHaveBeenCalledTimes(3);
+
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    updates.mockImplementation(() => {
+      throw new Error("connection lost");
+    });
+    await expect(attempt.withdrawn()).resolves.toBeUndefined();
+    expect(JSON.parse(error.mock.calls[0]![0] as string)).toMatchObject({ level: "error", event: "throttle.withdraw_failed" });
   });
 });

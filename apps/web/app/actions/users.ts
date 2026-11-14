@@ -4,6 +4,7 @@
 
 import {
   CoreError,
+  mfaService,
   usersService as svc,
   type AppLanguage,
   type Ctx,
@@ -65,6 +66,14 @@ export async function resetUserPasswordAction(userId: string, formData: FormData
   return mutate((ctx) => svc.resetUserPassword(ctx, userId, { password: formData.get("password") }));
 }
 
+/**
+ * An admin removes another staff user's two-step verification (their phone is
+ * lost): they sign in with the password alone, and their sessions end.
+ */
+export async function removeUserMfaAction(userId: string) {
+  return mutate((ctx) => mfaService.removeUserMfa(ctx, userId));
+}
+
 export type PasswordChangeState = {
   error?: PasswordError;
   success?: boolean;
@@ -78,7 +87,9 @@ export type PasswordChangeState = {
  * action's logged arguments). The change revokes every session of the user,
  * this one included, so this browser is signed in again with the new password:
  * the others are out within a minute, this one carries on. Should that fail
- * (e.g. the IP is throttled), it is signed out too and told so.
+ * (e.g. the IP is throttled), it is signed out too and told so. That is also
+ * what happens to a user with two-step verification: the password alone does
+ * not sign them in (`MfaRequired`), so they sign in again, with their code.
  */
 export async function changePasswordAction(formData: FormData): Promise<PasswordChangeState> {
   const ctx = await requireSession();

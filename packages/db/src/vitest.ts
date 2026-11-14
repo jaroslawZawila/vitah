@@ -24,7 +24,14 @@ export function testDatabase(name: `${string}_test`) {
     // Test files share one database, so run them one at a time.
     fileParallelism: false,
     // Real-DB tests (some render PDFs) run beside the other packages' suites in
-    // the commit gate: 5 s is too tight once the CPU is shared.
-    testTimeout: 20_000,
+    // the commit gate: 5 s is too tight once the CPU is shared. The slowest take
+    // about 4 s alone on a 12-core laptop; a 4-vCPU CI runner sharing its cores
+    // with the other suites, tsc and eslint is several times slower.
+    testTimeout: 30_000,
+    // `beforeEach(resetDatabase)` is one TRUNCATE … CASCADE over every table:
+    // milliseconds on an idle machine, but it waits its turn on a busy Postgres
+    // (a 4-vCPU CI runner, or several checkouts testing at once here). The
+    // default 10 s failed there with nothing wrong.
+    hookTimeout: 60_000,
   };
 }

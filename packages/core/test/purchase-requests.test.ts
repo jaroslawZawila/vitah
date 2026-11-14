@@ -229,6 +229,15 @@ describe("purchase requests", () => {
     expect(cancelled.events[0]).toMatchObject({ action: "cancelled", detail: { from: "approved" }, note: "Lo pone el cliente" });
   });
 
+  it("logs the lines that changed in budget order, whatever order they were asked in", async () => {
+    const s = await setup();
+    const lines = (codes: string[]) => codes.map((code) => ({ lineageId: s.lineage(code), amountCents: 10_000 }));
+    const { requestId } = await svc.createRequest(s.ctx, s.project.id, request(s, { lines: lines(["03", "01", "02"]) }));
+    await svc.updateRequest(s.ctx, requestId, { lines: [{ lineageId: s.lineage("02"), amountCents: 20_000 }] });
+    const changes = (await svc.getRequest(s.ctx, requestId)).events.find((e) => e.action === "lines")!.detail.changes as { lineageId: string }[];
+    expect(changes.map((c) => c.lineageId)).toEqual(["01", "02", "03"].map(s.lineage));
+  });
+
   it("checks what it asks for", async () => {
     const s = await setup();
     const reject = (overrides: Record<string, unknown>) => svc.createRequest(s.ctx, s.project.id, request(s, overrides));

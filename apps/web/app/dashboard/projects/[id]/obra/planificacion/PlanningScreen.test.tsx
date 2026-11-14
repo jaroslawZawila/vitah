@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -74,7 +74,8 @@ describe("PlanningScreen", () => {
     const { unmount } = renderScreen();
     await userEvent.click(screen.getByRole("button", { name: "Editar plan" }));
     expect(actions.createPlanningDraftAction).toHaveBeenCalledWith("p-1", { from: "baseline" });
-    expect(router.push).toHaveBeenCalledWith("/dashboard/projects/p-1/obra/planificacion/editar");
+    // Once the draft exists, its editor opens.
+    await waitFor(() => expect(router.push).toHaveBeenCalledWith("/dashboard/projects/p-1/obra/planificacion/editar"));
     unmount();
 
     renderScreen({ planning: { ...planning, draft: { ...planning.baseline!, id: "v3", number: 3, status: "draft", approvedAt: null, approvedBy: null } } });
@@ -106,7 +107,7 @@ describe("PlanningScreen", () => {
       augustClosure: true,
       christmasClosure: false,
     });
-    expect(router.push).toHaveBeenCalledWith("/dashboard/projects/p-1/obra/planificacion/editar");
+    await waitFor(() => expect(router.push).toHaveBeenCalledWith("/dashboard/projects/p-1/obra/planificacion/editar"));
   });
 
   it("can copy another project's plan", async () => {
@@ -115,6 +116,7 @@ describe("PlanningScreen", () => {
     expect(screen.getByLabelText("Obra")).toHaveValue("p-2");
     await userEvent.click(screen.getByRole("button", { name: "Crear borrador" }));
     expect(actions.createPlanningDraftAction).toHaveBeenCalledWith("p-1", expect.objectContaining({ from: "project", projectId: "p-2" }));
+    await waitFor(() => expect(router.push).toHaveBeenCalledWith("/dashboard/projects/p-1/obra/planificacion/editar"));
   });
 
   it("only tells viewers there is no plan, and says when there is no budget", () => {

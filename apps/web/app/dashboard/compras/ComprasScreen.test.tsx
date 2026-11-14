@@ -1,16 +1,28 @@
 // @vitest-environment jsdom
-import { render, screen, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import messages from "../../../messages/es.json";
 import { tenantPurchases } from "../../../test/purchasing-fixture";
 import ComprasScreen from "./ComprasScreen";
+import { parseOrdersQuery } from "./list-query";
 
-function renderScreen(purchases = tenantPurchases) {
+// The list's filters live in the URL: the screen replaces it and the server renders the page again.
+const navigation = vi.hoisted(() => ({ search: "", replace: vi.fn() }));
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ replace: navigation.replace }),
+  usePathname: () => "/dashboard/compras",
+  useSearchParams: () => new URLSearchParams(navigation.search),
+}));
+vi.mock("../../actions/purchasing", () => ({ exportPurchases: vi.fn() }));
+const actions = await import("../../actions/purchasing");
+
+function renderScreen(purchases = tenantPurchases, search = "") {
+  navigation.search = search;
   return render(
     <NextIntlClientProvider locale="es" messages={messages} timeZone="Europe/Madrid">
-      <ComprasScreen purchases={purchases} />
+      <ComprasScreen purchases={purchases} query={parseOrdersQuery(Object.fromEntries(new URLSearchParams(search)))} />
     </NextIntlClientProvider>,
   );
 }
@@ -20,9 +32,15 @@ const numbers = () =>
     .queryAllByRole("link")
     .map((link) => link.textContent)
     .filter((text) => text?.startsWith("PED-"));
+const replaced = () => navigation.replace.mock.lastCall?.[0];
+
+beforeEach(() => {
+  navigation.replace.mockReset();
+  vi.mocked(actions.exportPurchases).mockReset().mockResolvedValue([]);
+});
 
 describe("ComprasScreen", () => {
-  it("shows every order of every obra, with the company's totals", () => {
+  it("shows the page of orders, with the company's totals", () => {
     renderScreen();
 
     expect(screen.getByRole("heading", { level: 1, name: "Pedidos" })).toBeInTheDocument();
@@ -41,41 +59,94 @@ describe("ComprasScreen", () => {
     expect(within(row).getByRole("link", { name: "PED-014" })).toHaveAttribute("href", "/dashboard/projects/p-3/compras/order-14");
     expect(within(row).getByText("7 d tarde")).toBeInTheDocument();
     expect(within(row).getByText("30 sept")).toBeInTheDocument();
-    // Pending and cancelled ones don't add up: 3.120 + 7.300 + 19.860 + 19.480.
-    expect(table.getByText("6 pedidos · contratado").closest("tr")).toHaveTextContent("49.760,00");
+    // One page holds them all: no pager.
+    expect(screen.queryByRole("navigation", { name: "Páginas" })).not.toBeInTheDocument();
   });
 
-  it("filters by state, obra, supplier, type, order date, lateness and text", async () => {
-    renderScreen();
+  it("totals every order the filters keep, not only the page shown, and pages through them", () => {
+    renderScreen(
+      { ...tenantPurchases, paging: { page: 2, limit: 50, total: 141, pages: 3 }, shownContractedCents: 123_456_700 },
+      "estado=open&page=2",
+    );
+
+    const table = within(screen.getByRole("table", { name: "Pedidos" }));
+    expect(table.getByText("141 pedidos · contratado").closest("tr")).toHaveTextContent("1.234.567,00");
+    const pager = within(screen.getByRole("navigation", { name: "Páginas" }));
+    expect(pager.getByText("51–100 de 141")).toBeInTheDocument();
+    expect(pager.getByText("Página 2 de 3")).toBeInTheDocument();
+    expect(pager.getByRole("link", { name: "Anterior" })).toHaveAttribute("href", "/dashboard/compras?estado=open");
+    expect(pager.getByRole("link", { name: "Siguiente" })).toHaveAttribute("href", "/dashboard/compras?estado=open&page=3");
+  });
+
+  it("has no next page on the last one, and a way back from a page past the end", () => {
+    const { unmount } = renderScreen({ ...tenantPurchases, paging: { page: 3, limit: 50, total: 141, pages: 3 } }, "page=3");
+    let pager = within(screen.getByRole("navigation", { name: "Páginas" }));
+    expect(pager.getByText("101–141 de 141")).toBeInTheDocument();
+    expect(pager.queryByRole("link", { name: "Siguiente" })).not.toBeInTheDocument();
+    unmount();
+
+    renderScreen({ ...tenantPurchases, orders: [], paging: { page: 9, limit: 50, total: 141, pages: 3 } }, "page=9");
+    pager = within(screen.getByRole("navigation", { name: "Páginas" }));
+    expect(pager.getByText("Ninguno en esta página · 141 en total")).toBeInTheDocument();
+    expect(pager.getByRole("link", { name: "Anterior" })).toHaveAttribute("href", "/dashboard/compras?page=3");
+  });
+
+  it("shows the filters of the URL, with the counts the server gives each state", () => {
+    renderScreen(tenantPurchases, "estado=open&obra=p-3&tipo=subcontract&desde=2026-10-01&retraso=1&q=ventanas");
+
+    const states = within(screen.getByRole("group", { name: "Estado" }));
+    expect(states.getByRole("button", { name: /Abiertos/ })).toHaveAttribute("aria-pressed", "true");
+    expect(states.getByRole("button", { name: /Abiertos/ })).toHaveTextContent("3");
+    expect(states.getByRole("button", { name: /Todos/ })).toHaveTextContent("6");
+    expect(screen.getByRole("combobox", { name: "Obra" })).toHaveValue("p-3");
+    expect(screen.getByRole("combobox", { name: "Tipo" })).toHaveValue("subcontract");
+    expect(within(screen.getByRole("group", { name: "Fecha de pedido" })).getByLabelText("Desde")).toHaveValue("2026-10-01");
+    expect(screen.getByRole("checkbox", { name: "Solo con retraso" })).toBeChecked();
+    expect(screen.getByRole("searchbox", { name: "Nº, proveedor o concepto" })).toHaveValue("ventanas");
+  });
+
+  it("puts each filter in the URL, back on the first page", async () => {
+    renderScreen(tenantPurchases, "page=3");
 
     await userEvent.click(within(screen.getByRole("group", { name: "Estado" })).getByRole("button", { name: /Cancelados/ }));
-    expect(numbers()).toEqual(["PED-038"]);
-    await userEvent.click(within(screen.getByRole("group", { name: "Estado" })).getByRole("button", { name: /Todos/ }));
-
+    expect(replaced()).toBe("/dashboard/compras?estado=cancelled");
     await userEvent.selectOptions(screen.getByRole("combobox", { name: "Obra" }), "VTH-26-003 Suances");
-    expect(numbers()).toEqual(["PED-014"]);
-    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Obra" }), "Todas");
-
+    expect(replaced()).toBe("/dashboard/compras?obra=p-3");
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Proveedor" }), "Piedra de Liébana");
+    expect(replaced()).toBe("/dashboard/compras?proveedor=sup-liebana");
     await userEvent.selectOptions(screen.getByRole("combobox", { name: "Tipo" }), "Subcontrato");
-    expect(numbers()).toEqual(["PED-056", "PED-047", "PED-040"]);
-    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Tipo" }), "Todos");
-
-    const period = within(screen.getByRole("group", { name: "Fecha de pedido" }));
-    await userEvent.type(period.getByLabelText("Desde"), "2026-10-01");
-    expect(numbers()).toEqual(["PED-056", "PED-049", "PED-047"]);
-    await userEvent.clear(period.getByLabelText("Desde"));
-
+    expect(replaced()).toBe("/dashboard/compras?tipo=subcontract");
+    await userEvent.type(within(screen.getByRole("group", { name: "Fecha de pedido" })).getByLabelText("Desde"), "2026-10-01");
+    expect(replaced()).toBe("/dashboard/compras?desde=2026-10-01");
     await userEvent.click(screen.getByRole("checkbox", { name: "Solo con retraso" }));
-    expect(numbers()).toEqual(["PED-049", "PED-014"]);
-    await userEvent.click(screen.getByRole("checkbox", { name: "Solo con retraso" }));
-
-    await userEvent.type(screen.getByRole("searchbox", { name: "Nº, proveedor o concepto" }), "ventanas");
-    expect(numbers()).toEqual(["PED-014"]);
+    expect(replaced()).toBe("/dashboard/compras?retraso=1");
+    await userEvent.click(screen.getByRole("button", { name: "Por proveedor" }));
+    expect(replaced()).toBe("/dashboard/compras?vista=proveedores");
   });
 
-  it("groups the orders by supplier", async () => {
-    renderScreen();
-    await userEvent.click(screen.getByRole("button", { name: "Por proveedor" }));
+  it("searches once typing stops, keeping the other filters", async () => {
+    renderScreen(tenantPurchases, "estado=open&page=2");
+    navigation.replace.mockClear();
+
+    await userEvent.type(screen.getByRole("searchbox", { name: "Nº, proveedor o concepto" }), "ventanas");
+    expect(screen.getByRole("searchbox", { name: "Nº, proveedor o concepto" })).toHaveValue("ventanas");
+    await waitFor(() => expect(replaced()).toBe("/dashboard/compras?estado=open&q=ventanas"));
+    // One search for the word, not one per letter.
+    expect(navigation.replace).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows the orders by supplier as the server groups them", () => {
+    renderScreen(
+      {
+        ...tenantPurchases,
+        orders: [],
+        bySupplier: [
+          { id: "sup-besaya", name: "Cubiertas Besaya", suppliesOnly: false, orders: 1, projectRefs: ["VTH-26-001"], contractedCents: 1_986_000, openCents: 0 },
+          { id: "sup-liebana", name: "Piedra de Liébana", suppliesOnly: true, orders: 1, projectRefs: ["VTH-26-001"], contractedCents: 312_000, openCents: 312_000 },
+        ],
+      },
+      "vista=proveedores",
+    );
 
     const table = within(screen.getByRole("table", { name: "Pedidos por proveedor" }));
     const rows = table.getAllByRole("row").slice(1);
@@ -83,6 +154,7 @@ describe("ComprasScreen", () => {
     const stone = table.getByRole("link", { name: "Piedra de Liébana" });
     expect(stone).toHaveAttribute("href", "/dashboard/subcontratas/empresas/sup-liebana");
     expect(stone.closest("tr")).toHaveTextContent("Proveedor de material");
+    expect(screen.queryByRole("navigation", { name: "Páginas" })).not.toBeInTheDocument();
   });
 
   describe("CSV", () => {
@@ -98,11 +170,24 @@ describe("ComprasScreen", () => {
     });
     afterEach(() => vi.restoreAllMocks());
 
-    it("exports the filtered orders", async () => {
-      renderScreen();
-      await userEvent.click(screen.getByRole("checkbox", { name: "Solo con retraso" }));
-      await userEvent.click(screen.getByRole("button", { name: "Exportar CSV" }));
+    it("exports every order the filters keep, asked of the server", async () => {
+      const late = tenantPurchases.orders.filter((o) => o.lateDays !== null);
+      vi.mocked(actions.exportPurchases).mockResolvedValue(late);
+      // The page shown holds none of them: the export doesn't come from it.
+      renderScreen({ ...tenantPurchases, orders: [], paging: { page: 2, limit: 50, total: 2, pages: 1 } }, "retraso=1&page=2");
+      await act(() => userEvent.click(screen.getByRole("button", { name: "Exportar CSV" })));
 
+      expect(actions.exportPurchases).toHaveBeenCalledWith({
+        group: "all",
+        projectId: "",
+        supplierId: "",
+        kind: "all",
+        from: "",
+        to: "",
+        late: "1",
+        q: "",
+      });
+      await waitFor(() => expect(blobs).toHaveLength(1));
       const text = await blobs[0]!.text();
       const rows = text.replace(/^\uFEFF/, "").split("\r\n");
       expect(rows[0]).toBe(
@@ -115,9 +200,14 @@ describe("ComprasScreen", () => {
     });
   });
 
-  it("says so when there are no orders", () => {
-    renderScreen({ ...tenantPurchases, orders: [] });
+  it("says so when there are no orders, or none with the filters", () => {
+    const none = { ...tenantPurchases, orders: [], paging: { page: 1, limit: 50, total: 0, pages: 1 }, groupCounts: { all: 0, open: 0, pending: 0, done: 0, cancelled: 0 } };
+    const { unmount } = renderScreen(none);
     expect(screen.getAllByText("Todavía no hay pedidos.").length).toBeGreaterThan(0);
     expect(screen.getByRole("button", { name: "Exportar CSV" })).toBeDisabled();
+    unmount();
+
+    renderScreen(none, "q=nada");
+    expect(screen.getAllByText("Ningún pedido con estos filtros.").length).toBeGreaterThan(0);
   });
 });

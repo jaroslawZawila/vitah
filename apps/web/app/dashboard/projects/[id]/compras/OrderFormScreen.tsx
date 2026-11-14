@@ -13,6 +13,7 @@ import { orderLabel, placedStatus, requestLabel, type PurchaseForm, type Purchas
 import { buttonVariants } from "@/components/ui/button";
 import { addOrderDocumentAction, createPurchaseAction, updatePurchaseAction } from "../../../../actions/purchasing";
 import FormError from "../../../components/FormError";
+import { useIdempotencyKey } from "../../../components/useIdempotencyKey";
 import { StageEyebrow } from "../components/construction/ObraFrame";
 import { useObraFormat } from "../components/obra/format";
 import {
@@ -52,6 +53,8 @@ export default function OrderFormScreen({
   // Set once a new order exists; `error` when its PDF didn't go up (saving again only retries the upload).
   const [created, setCreated] = useState<{ id: string; number: number; error?: string } | null>(null);
   const [pending, startTransition] = useTransition();
+  // A new order sent twice (a double click, a retry) is one order, with one number.
+  const createKey = useIdempotencyKey();
   const parse = f.hundredths;
   const back = order ? orderHref(projectId, order.id) : request ? requestHref(projectId, request.id) : purchasesHref(projectId);
 
@@ -67,11 +70,8 @@ export default function OrderFormScreen({
       let made = created;
       if (!made) {
         const status = placed ? placedStatus(draft.kind) : "pending";
-        const state = await createPurchaseAction(projectId, {
-          ...orderInput(draft, parse, placed),
-          status,
-          ...(request ? { requestId: request.id } : {}),
-        });
+        const input = { ...orderInput(draft, parse, placed), status, ...(request ? { requestId: request.id } : {}) };
+        const state = await createKey.submit(input, (idempotencyKey) => createPurchaseAction(projectId, { ...input, idempotencyKey }));
         if (!state?.success || !state.orderId) return setError(state?.error ?? "generic");
         made = { id: state.orderId, number: state.number ?? form.nextNumber };
       }

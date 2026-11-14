@@ -376,7 +376,7 @@ describe("BudgetScreen", () => {
     await userEvent.click(screen.getByRole("button", { name: "Más acciones de 05.91" }));
     await userEvent.click(screen.getByRole("button", { name: /Ofrecer como deducción/ }));
     await waitFor(() => expect(actions.optionFromLineAction).toHaveBeenCalledWith("p-1", "line-2", { kind: "deduction" }));
-    expect(push).toHaveBeenCalledWith("/dashboard/projects/p-1/budget/options");
+    await waitFor(() => expect(push).toHaveBeenCalledWith("/dashboard/projects/p-1/budget/options"));
   });
 
   it("adds a line from outside the price base, marked estimated", async () => {

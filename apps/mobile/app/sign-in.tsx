@@ -11,9 +11,22 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useEffect, useRef, useState } from "react";
 import { Redirect } from "expo-router";
 import { useAuth } from "../lib/auth";
-import { useI18n } from "../lib/i18n";
+import { useI18n, type MessageKey } from "../lib/i18n";
 import { colors } from "../constants/theme";
 import { Button } from "../components/button";
+
+/**
+ * What to say for each way a sign-in fails: only a rejected email or password
+ * reads as one. Anything else the server may answer is "couldn't sign in".
+ */
+const SIGN_IN_ERRORS = new Map<string, MessageKey>([
+  ["invalid_credentials", "signIn.invalidCredentials"],
+  ["unauthorized", "signIn.invalidCredentials"],
+  ["too_many_attempts", "signIn.tooManyAttempts"],
+  ["network_error", "signIn.networkError"],
+  ["timeout", "signIn.timeout"],
+  ["server_error", "signIn.serverError"],
+]);
 
 export default function SignInScreen() {
   const {
@@ -65,12 +78,14 @@ export default function SignInScreen() {
     }
     setLoading(true);
     setError("");
-    const result = await signIn(email.trim(), password);
-    setLoading(false);
-    if (result.error) {
-      setError(
-        t(result.error === "too_many_attempts" ? "signIn.tooManyAttempts" : "signIn.invalidCredentials"),
-      );
+    try {
+      const result = await signIn(email.trim(), password);
+      if (result.error) setError(t(SIGN_IN_ERRORS.get(result.error) ?? "signIn.failed"));
+    } catch {
+      // E.g. the phone couldn't save the session: never leave the button spinning.
+      setError(t("signIn.failed"));
+    } finally {
+      setLoading(false);
     }
   }
 

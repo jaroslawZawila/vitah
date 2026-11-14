@@ -55,6 +55,7 @@ export default function OrderList({
   orderHref,
   projectHref,
   empty,
+  totals,
 }: {
   /** Already filtered. */
   orders: PurchaseOrderListItem[];
@@ -64,6 +65,8 @@ export default function OrderList({
   projectHref?: (order: PurchaseOrderListItem) => string;
   /** What to say when there is nothing to show. */
   empty: string;
+  /** A paged list's foot: how many orders its filters keep and what they contract, beyond the page shown. */
+  totals?: { count: number; contractedCents: number };
 }) {
   const t = useTranslations("purchasing.list");
   const tp = useTranslations("purchasing");
@@ -91,7 +94,7 @@ export default function OrderList({
     </Link>
   );
   const chapters = (order: PurchaseOrderListItem) => order.chapterCodes.join(", ");
-  const footer = isCompany ? t("footer", { count: orders.length }) : t("supplierFooter");
+  const footer = isCompany ? t("footer", { count: totals?.count ?? orders.length }) : t("supplierFooter");
 
   return (
     <>
@@ -186,7 +189,7 @@ export default function OrderList({
                 <TableCell className="pl-[18px]" colSpan={isCompany ? 3 : 2}>
                   {footer}
                 </TableCell>
-                <TableCell className="num text-right">{f.amount(contractedCents(orders))}</TableCell>
+                <TableCell className="num text-right">{f.amount(totals?.contractedCents ?? contractedCents(orders))}</TableCell>
                 <TableCell colSpan={isCompany ? 4 : 3} className="pr-[18px] text-[12px] font-normal text-muted-foreground">
                   {tp("notCounted")}
                 </TableCell>

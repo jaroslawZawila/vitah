@@ -11,6 +11,7 @@ import { useTranslations } from "next-intl";
 import { requestLabel, type PurchaseForm, type PurchaseRequestDetail } from "@repo/core/contract";
 import { createRequestAction, updateRequestAction } from "../../../../actions/purchase-requests";
 import BackLink from "../../../components/BackLink";
+import { useIdempotencyKey } from "../../../components/useIdempotencyKey";
 import { StageEyebrow } from "../components/construction/ObraFrame";
 import { useObraFormat } from "../components/obra/format";
 import { requestHref, requestsViewHref } from "../components/purchasing/links";
@@ -34,6 +35,8 @@ export default function RequestFormScreen({
   const [draft, setDraft] = useState<RequestDraft>(() => (request ? requestDraftFrom(request, form, f) : newRequestDraft(form)));
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  // A new request sent twice (a double click, a retry) is one request, with one number.
+  const createKey = useIdempotencyKey();
   const parse = f.hundredths;
   const back = request ? requestHref(projectId, request.id) : requestsViewHref(projectId);
 
@@ -46,7 +49,8 @@ export default function RequestFormScreen({
         if (!state?.success) return setError(state?.error ?? "generic");
         return router.push(requestHref(projectId, request.id));
       }
-      const state = await createRequestAction(projectId, requestInput(draft, parse));
+      const input = requestInput(draft, parse);
+      const state = await createKey.submit(input, (idempotencyKey) => createRequestAction(projectId, { ...input, idempotencyKey }));
       if (!state?.success || !state.requestId) return setError(state?.error ?? "generic");
       router.push(requestHref(projectId, state.requestId));
     });

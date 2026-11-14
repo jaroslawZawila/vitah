@@ -2,8 +2,8 @@ import Feather from "@react-native-vector-icons/feather";
 import { useRouter } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { isAwaitingPayment, type Hito } from "@repo/core/contract";
-import { LoadState } from "../../../components/load-state";
 import { Bar, Marker, SectionLabel, SegmentedBar, obraStyles } from "../../../components/obra-parts";
+import { ObraPending } from "../../../components/obra-pending";
 import { PushedScreen } from "../../../components/pushed-screen";
 import { card, colors, radius, type } from "../../../constants/theme";
 import { formatDayMonth, formatMediumDate, formatMoney, formatShare } from "../../../lib/format";
@@ -17,21 +17,8 @@ import { useObra } from "../../../lib/use-obra";
 export default function PagosScreen() {
   const router = useRouter();
   const { t, language } = useI18n();
-  const { obra, error, retry } = useObra();
-  if (!obra) {
-    return (
-      <PushedScreen back={t("pagos.back")}>
-        <LoadState
-          loaded={obra !== undefined}
-          error={error}
-          loadingLabel={t("obra.loading")}
-          failedText={t("obra.loadFailed")}
-          onRetry={retry}
-        />
-        {obra === null && <Text style={type.subhead}>{t("home.noProject")}</Text>}
-      </PushedScreen>
-    );
-  }
+  const { obra } = useObra();
+  if (!obra) return <ObraPending back={t("pagos.back")} missing={t("home.noProject")} />;
 
   const due = nextPayment(obra);
   const open = (hito: Hito) => router.push({ pathname: "/obra/pago/[id]", params: { id: hito.id } });

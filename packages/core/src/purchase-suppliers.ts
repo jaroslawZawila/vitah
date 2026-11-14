@@ -14,7 +14,7 @@ import { isOwed } from "./purchase-calc";
 import { buildInvoices, loadInvoices, loadPayments, type BuiltInvoices } from "./purchase-invoice-data";
 import { byUrgency, sumOwed } from "./purchase-invoices";
 import { listSupplierOrders, loadOrders, toListItem } from "./purchasing";
-import { loadNetwork, requireCompany } from "./subcontractor-network";
+import { loadCompanyStatuses, requireCompany } from "./subcontractor-network";
 
 // ─── Suppliers (Compras › Proveedores) ───────────────────────────────────────
 // Every Subcontratas company as Compras sees it: what it was ordered across
@@ -73,7 +73,7 @@ export async function listSuppliers(ctx: Ctx): Promise<TenantSuppliers> {
       .orderBy(asc(subcontractors.legalName)),
     loadOrders(ctx.tenantId),
     loadInvoices(ctx.tenantId, undefined, { lines: false }),
-    loadNetwork(ctx.tenantId),
+    loadCompanyStatuses(ctx.tenantId),
   ]);
   const built = buildInvoices(invoices, today);
   const ordersBy = groupBy(
@@ -107,7 +107,7 @@ export async function getSupplierPurchasing(ctx: Ctx, subcontractorId: string): 
     listSupplierOrders(ctx, subcontractorId),
     loadInvoices(ctx.tenantId, ofInvoices, { lines: false }),
     loadPayments(ctx.tenantId, ofInvoices),
-    loadNetwork(ctx.tenantId, subcontractorId),
+    loadCompanyStatuses(ctx.tenantId, [subcontractorId]),
   ]);
   const built = buildInvoices(invoices, today);
   const items = [...built.items.values()].sort(byUrgency);

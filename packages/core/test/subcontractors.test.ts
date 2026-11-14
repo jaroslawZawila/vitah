@@ -479,6 +479,157 @@ describe("workers", () => {
   });
 });
 
+describe("listWorkersPage", () => {
+  /**
+   * Five workers of two companies, by surname: Abascal and Cobo (with access:
+   * their company is apta and they have every document), Díaz and Gómez (the
+   * same company; no documents: pending), and Zubieta of a company with an
+   * expired certificate (blocked with it). Gómez is a preventive resource.
+   */
+  async function crew() {
+    const s = await setup();
+    await makeApta(s.ctx, s.id);
+    const abascal = await readyWorker(s.ctx, s.id, { firstName: "Ana", surnames: "Abascal Ruiz", idDocument: "00000001R" });
+    const cobo = await readyWorker(s.ctx, s.id, { firstName: "Laura", surnames: "Cobo Gil", idDocument: "00000002W" });
+    const diaz = (await workers.createWorker(s.ctx, workerInput(s.id, { firstName: "Hugo", surnames: "Díaz Mazo", idDocument: "00000003A" }))).id;
+    const gomez = (await workers.createWorker(s.ctx, workerInput(s.id, { roles: ["preventive_resource"] }))).id;
+    const { id: blockedCompany } = await svc.createSubcontractor(s.ctx, company({ legalName: "Cubiertas Besaya S.L.", taxId: "B39654322" }));
+    await validDoc(s.ctx, blockedCompany, "cert_tgss");
+    await db
+      .update(subcontractorDocumentVersions)
+      .set({ expiresAt: inDays(-3) })
+      .where(sql`document_id in (select id from subcontractor_documents where subcontractor_id = ${blockedCompany})`);
+    const zubieta = (await workers.createWorker(s.ctx, workerInput(blockedCompany, { firstName: "Unai", surnames: "Zubieta Ortiz", idDocument: "00000004G" }))).id;
+    return { ...s, blockedCompany, ids: [abascal, cobo, diaz, gomez, zubieta] };
+  }
+
+  const idsOf = (page: { workers: { id: string }[] }) => page.workers.map((w) => w.id);
+  const SUMMARY = { registered: 5, companies: 2, ok: 2, pending: 2, blocked: 1, preventive: 1 };
+
+  it("cuts pages by surname: first, next, last and beyond the end, with the whole list's counts", async () => {
+    const s = await crew();
+    const page = (n: number) => workers.listWorkersPage(s.ctx, { page: n, limit: 2 });
+
+    const [first, next, last, beyond] = await Promise.all([page(1), page(2), page(3), page(4)]);
+    expect(idsOf(first)).toEqual(s.ids.slice(0, 2));
+    expect(idsOf(next)).toEqual(s.ids.slice(2, 4));
+    expect(idsOf(last)).toEqual(s.ids.slice(4));
+    expect(idsOf(beyond)).toEqual([]);
+    expect(first.paging).toEqual({ page: 1, limit: 2, total: 5, pages: 3 });
+    expect(beyond.paging).toEqual({ page: 4, limit: 2, total: 5, pages: 3 });
+    for (const each of [first, next, last, beyond]) {
+      expect(each.counts).toEqual({ all: 5, ok: 2, pending: 2, blocked: 1 });
+      expect(each.summary).toEqual(SUMMARY);
+    }
+    // The same workers, in the same order, as the whole list.
+    expect((await workers.listWorkers(s.ctx)).map((w) => w.id)).toEqual(s.ids);
+    expect(first.workers[0]).toMatchObject({ surnames: "Abascal Ruiz", access: { status: "ok" }, idDocumentMasked: expect.stringContaining("•") });
+    // Without a page, everything (up to the cap), as the list was before.
+    expect((await workers.listWorkersPage(s.ctx)).paging).toEqual({ page: 1, limit: 5000, total: 5, pages: 1 });
+  });
+
+  it("filters on the server by access, company and text", async () => {
+    const s = await crew();
+    const [abascal, cobo, diaz, gomez, zubieta] = s.ids;
+    const kept = async (query: Record<string, unknown>) => idsOf(await workers.listWorkersPage(s.ctx, { page: 1, ...query }));
+
+    expect(await kept({ access: "ok" })).toEqual([abascal, cobo]);
+    expect(await kept({ access: "pending" })).toEqual([diaz, gomez]);
+    expect(await kept({ access: "blocked" })).toEqual([zubieta]);
+    expect(await kept({ access: "all" })).toEqual(s.ids);
+    expect(await kept({ companyId: s.blockedCompany })).toEqual([zubieta]);
+    expect(await kept({ q: "  GÓMEZ " })).toEqual([gomez]);
+    expect(await kept({ q: "besaya" })).toEqual([zubieta]);
+    expect(await kept({ q: "laura cobo" })).toEqual([cobo]);
+    expect(await kept({ q: "nadie" })).toEqual([]);
+
+    const narrowed = await workers.listWorkersPage(s.ctx, { page: 1, limit: 1, companyId: s.id, access: "pending" });
+    expect(idsOf(narrowed)).toEqual([diaz]);
+    expect(narrowed.paging).toEqual({ page: 1, limit: 1, total: 2, pages: 2 });
+    // The counts follow the company and the text, not the access asked for; the KPIs stay the whole list's.
+    expect(narrowed.counts).toEqual({ all: 4, ok: 2, pending: 2, blocked: 0 });
+    expect(narrowed.summary).toEqual(SUMMARY);
+  });
+
+  it("gives the access on one obra, and only its companies' workers", async () => {
+    const s = await crew();
+    const project = await createTestProject(s.tenant.id);
+    await svc.assignToProject(s.ctx, s.blockedCompany, project.id, { chapterCodes: ["05"] });
+
+    const onObra = await workers.listWorkersPage(s.ctx, { page: 1, projectId: project.id });
+    expect(idsOf(onObra)).toEqual([s.ids[4]]);
+    expect(onObra.summary).toEqual({ registered: 1, companies: 1, ok: 0, pending: 0, blocked: 1, preventive: 0 });
+    expect(onObra.counts).toEqual({ all: 1, ok: 0, pending: 0, blocked: 1 });
+    // A deleted obra has nobody.
+    await db.update(projects).set({ deletedAt: new Date() }).where(eq(projects.id, project.id));
+    expect((await workers.listWorkersPage(s.ctx, { page: 1, projectId: project.id })).paging.total).toBe(0);
+  });
+
+  it("caps a huge limit and refuses a page or an access that isn't one", async () => {
+    const s = await crew();
+    expect((await workers.listWorkersPage(s.ctx, { limit: 1_000_000 })).paging).toMatchObject({ limit: 200, total: 5 });
+    for (const bad of [{ page: 0 }, { page: "abc" }, { limit: 0 }]) {
+      await expect(workers.listWorkersPage(s.ctx, bad)).rejects.toMatchObject({ code: "invalid_page", status: 400 });
+    }
+    await expect(workers.listWorkersPage(s.ctx, { access: "nope" })).rejects.toMatchObject({ code: "invalid_option" });
+  });
+
+  it("is read by viewers with masked documents, and keeps tenants apart", async () => {
+    const s = await crew();
+    const viewer: Ctx = { tenantId: s.tenant.id, userId: (await createTestUser(s.tenant.id, { role: "viewer" })).id, role: "viewer" };
+    const seen = await workers.listWorkersPage(viewer, { page: 1 });
+    expect(idsOf(seen)).toEqual(s.ids);
+    expect(JSON.stringify(seen)).not.toContain("00000001R");
+
+    const other = await createTestTenant();
+    const stranger: Ctx = { tenantId: other.id, userId: (await createTestUser(other.id, { role: "admin" })).id, role: "admin" };
+    expect(await workers.listWorkersPage(stranger, { page: 1, companyId: s.id })).toMatchObject({
+      workers: [],
+      paging: { total: 0 },
+      counts: { all: 0 },
+      summary: { registered: 0, companies: 0 },
+    });
+  });
+});
+
+describe("the status Compras shows of its suppliers", () => {
+  it("is the one the whole network gives, loading only the companies' own documents", async () => {
+    const { ctx, id, tenant } = await setup();
+    const { loadCompanyStatuses, loadNetwork } = await import("../src/subcontractor-network");
+    // Apta, but for a renewal uploaded early and one rejected: the versions validated before still hold.
+    await makeApta(ctx, id);
+    await svc.uploadDocument(ctx, id, { requirementId: "cert_tgss", issuedAt: inDays(-1), file: pdf("%PDF-1.7 renovado") });
+    await svc.uploadDocument(ctx, id, { requirementId: "poliza_rc_subcontrata", issuedAt: inDays(-1), file: pdf("%PDF-1.7 otra") });
+    const rejected = await findDoc(ctx, id, "poliza_rc_subcontrata");
+    await svc.rejectDocument(ctx, id, rejected.id!, { reason: "Ilegible" });
+    // A worker's documents and an obra's aren't the company's: they change nothing here.
+    await workers.createWorker(ctx, workerInput(id));
+    const { id: expired } = await svc.createSubcontractor(ctx, company({ legalName: "Cubiertas Besaya S.L.", taxId: "B39654322" }));
+    await makeApta(ctx, expired);
+    await db
+      .update(subcontractorDocumentVersions)
+      .set({ expiresAt: inDays(-3) })
+      .where(sql`document_id in (select id from subcontractor_documents where subcontractor_id = ${expired} and requirement_id = 'cert_tgss')`);
+    const { id: missing } = await svc.createSubcontractor(ctx, company({ legalName: "Sin Papeles S.L.", taxId: "B39000013" }));
+    const { id: supplier } = await svc.createSubcontractor(ctx, company({ legalName: "Áridos S.A.", taxId: "A39000013", suppliesOnly: true }));
+
+    const whole = await loadNetwork(tenant.id);
+    const all = await loadCompanyStatuses(tenant.id);
+    for (const company of [id, expired, missing, supplier]) expect(all.status(company)).toEqual(whole.status(company));
+    expect([id, expired, missing, supplier].map((c) => all.status(c).status)).toEqual(["apta", "bloqueada", "pendiente", "apta"]);
+    expect(all.companies.map((c) => c.legalName)).toEqual(whole.companies.map((c) => c.legalName));
+
+    // A few of them, and none.
+    const some = await loadCompanyStatuses(tenant.id, [expired, supplier]);
+    expect(some.companies.map((c) => c.id).sort()).toEqual([expired, supplier].sort());
+    expect(some.status(expired)).toEqual(whole.status(expired));
+    expect((await loadCompanyStatuses(tenant.id, [])).companies).toEqual([]);
+    // Another tenant's companies aren't loaded.
+    const other = await createTestTenant();
+    expect((await loadCompanyStatuses(other.id, [id])).companies).toEqual([]);
+  });
+});
+
 describe("assignments", () => {
   it("assigns a company to an obra and updates it in place", async () => {
     const { ctx, id, tenant } = await setup();

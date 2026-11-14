@@ -118,6 +118,31 @@ export const loginAttempts = pgTable("login_attempts", {
   windowStart: timestamp("window_start", { mode: "date" }).defaultNow().notNull(),
 });
 
+// --- Two-step verification (TOTP) ---
+
+/** One recovery code as stored: its salt and SHA-256, never the code; `usedAt` (ISO) once it was spent. */
+export type MfaRecoveryCode = { salt: string; hash: string; usedAt: string | null };
+
+// A staff user's authenticator (packages/core/src/mfa.ts). The row exists from
+// the moment they start enrolling; it only gates sign-in once `confirmed_at`
+// is set. `secret` is the TOTP key encrypted at rest (mfa-secret.ts), never
+// the key itself. `last_step` is the last 30-second step a code was accepted
+// for: the same code is refused a second time.
+export const userMfa = pgTable("user_mfa", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  tenantId: text("tenant_id")
+    .notNull()
+    .references(() => tenants.id, { onDelete: "cascade" }),
+  secret: text("secret").notNull(),
+  confirmedAt: timestamp("confirmed_at", { mode: "date" }),
+  recoveryCodes: jsonb("recovery_codes").$type<MfaRecoveryCode[]>().default([]).notNull(),
+  lastStep: integer("last_step"),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+});
+
 // --- Client profiles ---
 
 // Personal details of a mobile-app client (a `users` row with role "client").
@@ -1777,6 +1802,36 @@ export const planningItems = pgTable(
   },
   (table) => ({
     versionChapterUnique: unique("planning_items_version_chapter_unique").on(table.versionId, table.chapterCode),
+  }),
+);
+
+// --- Idempotency keys ---
+
+// A create its caller may send twice (a double click, a retry after a timeout)
+// is applied once: the caller's key, per tenant and operation, with what the
+// first call answered; see packages/core/src/idempotency.ts. Written in the
+// create's own transaction, so a create that fails keeps no key. Rows older
+// than a week are swept away.
+export const idempotencyKeys = pgTable(
+  "idempotency_keys",
+  {
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    // Which operation: purchase.payment.create …
+    scope: text("scope").notNull(),
+    // The caller's key: a UUID, or 16–100 URL-safe characters.
+    key: text("key").notNull(),
+    userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
+    // SHA-256 of the request: the same key with another request is refused.
+    requestHash: text("request_hash").notNull(),
+    // What the first call returned: a retry is answered with it.
+    result: jsonb("result").$type<unknown>(),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => ({
+    pk: primaryKey({ name: "idempotency_keys_pk", columns: [table.tenantId, table.scope, table.key] }),
+    createdIdx: index("idempotency_keys_created_idx").on(table.createdAt),
   }),
 );
 

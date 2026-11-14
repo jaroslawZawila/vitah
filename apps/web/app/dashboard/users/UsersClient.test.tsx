@@ -11,16 +11,19 @@ vi.mock("../../actions/users", () => ({
   updateUserRole: vi.fn(async () => ({})),
   toggleUserActive: vi.fn(async () => ({})),
   resetUserPasswordAction: vi.fn(async () => ({})),
+  removeUserMfaAction: vi.fn(async () => ({})),
 }));
 const actions = await import("../../actions/users");
 
-const laura = { id: "u-admin", name: "Laura", email: "laura@vitah.es", role: "admin", active: true, createdAt: "2026-09-01T10:00:00.000Z" } as const;
-const marcos = { id: "u-marcos", name: "Marcos", email: "marcos@vitah.es", role: "viewer", active: true, createdAt: "2026-09-02T10:00:00.000Z" } as const;
+const laura = { id: "u-admin", name: "Laura", email: "laura@vitah.es", role: "admin", active: true, mfaEnabled: false, createdAt: "2026-09-01T10:00:00.000Z" } as const;
+const marcos = { id: "u-marcos", name: "Marcos", email: "marcos@vitah.es", role: "viewer", active: true, mfaEnabled: false, createdAt: "2026-09-02T10:00:00.000Z" } as const;
 
-function renderUsers() {
+type Row = Parameters<typeof UsersClient>[0]["users"][number];
+
+function renderUsers(users: Row[] = [laura, marcos]) {
   return render(
     <NextIntlClientProvider locale="es" messages={messages} timeZone="Europe/Madrid">
-      <UsersClient users={[laura, marcos]} currentUserId={laura.id} />
+      <UsersClient users={users} currentUserId={laura.id} />
     </NextIntlClientProvider>,
   );
 }
@@ -32,6 +35,7 @@ const openReset = async () => {
 
 beforeEach(() => {
   vi.mocked(actions.resetUserPasswordAction).mockReset().mockResolvedValue({});
+  vi.mocked(actions.removeUserMfaAction).mockReset().mockResolvedValue({});
 });
 
 describe("the Users page: resetting a password", () => {
@@ -107,5 +111,81 @@ describe("the Users page: resetting a password", () => {
     const password = screen.getByLabelText("Contraseña temporal");
     expect(password).toHaveAttribute("minlength", "10");
     expect(password).toHaveAccessibleDescription("Mínimo 10 caracteres, con al menos una mayúscula y un número.");
+  });
+});
+
+describe("the Users page: two-step verification", () => {
+  const withMfa = [
+    { ...laura, mfaEnabled: true },
+    { ...marcos, mfaEnabled: true },
+    { id: "u-ines", name: "Inés", email: "ines@vitah.es", role: "manager", active: true, mfaEnabled: false, createdAt: "2026-09-03T10:00:00.000Z" },
+  ] satisfies Row[];
+  const rowOf = (name: string) => within(screen.getByRole("cell", { name }).closest("tr")!);
+  const openRemove = async () => {
+    await userEvent.click(screen.getByRole("button", { name: "Quitar verificación en dos pasos de Marcos" }));
+    return within(await screen.findByRole("dialog", { name: "Quitar verificación en dos pasos de Marcos" }));
+  };
+
+  it("shows who has it on", () => {
+    renderUsers(withMfa);
+
+    expect(screen.getByRole("columnheader", { name: "2 pasos" })).toBeInTheDocument();
+    expect(rowOf("Marcos").getByText("Activada")).toBeInTheDocument();
+    expect(rowOf("Inés").queryByText("Activada")).not.toBeInTheDocument();
+    expect(rowOf("Inés").getByText("No")).toBeInTheDocument();
+  });
+
+  it("offers removing it only where it is on, and never the admin's own", () => {
+    renderUsers(withMfa);
+
+    expect(screen.getByRole("button", { name: "Quitar verificación en dos pasos de Marcos" })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: "Quitar verificación en dos pasos de Inés" })).not.toBeInTheDocument();
+    const own = screen.getByRole("button", { name: "Quitar verificación en dos pasos de Laura" });
+    expect(own).toBeDisabled();
+    expect(own).toHaveAttribute(
+      "title",
+      "Tu propia verificación en dos pasos se desactiva desde Ajustes › Verificación en dos pasos.",
+    );
+  });
+
+  it("asks first, then removes it and says whose sessions were closed", async () => {
+    renderUsers(withMfa);
+    const dialog = await openRemove();
+    expect(dialog.getByText(/ha perdido el móvil/)).toBeInTheDocument();
+    expect(dialog.getByText(/se cerrarán todas sus sesiones/)).toBeInTheDocument();
+    expect(actions.removeUserMfaAction).not.toHaveBeenCalled();
+
+    await userEvent.click(dialog.getByRole("button", { name: "Quitar verificación en dos pasos" }));
+
+    await waitFor(() => expect(actions.removeUserMfaAction).toHaveBeenCalledExactlyOnceWith(marcos.id));
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      "Verificación en dos pasos de Marcos quitada. Sus sesiones se han cerrado.",
+    );
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  });
+
+  it("does nothing on Cancelar", async () => {
+    renderUsers(withMfa);
+    const dialog = await openRemove();
+
+    await userEvent.click(dialog.getByRole("button", { name: "Cancelar" }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(actions.removeUserMfaAction).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["forbidden", "Solo los administradores pueden gestionar usuarios."],
+    ["mfa_not_enabled", "Este usuario no tiene activada la verificación en dos pasos."],
+    ["not_found", "Usuario no encontrado."],
+  ])("shows the server's refusal %s and stays open", async (error, text) => {
+    vi.mocked(actions.removeUserMfaAction).mockResolvedValue({ error });
+    renderUsers(withMfa);
+    const dialog = await openRemove();
+
+    await userEvent.click(dialog.getByRole("button", { name: "Quitar verificación en dos pasos" }));
+
+    expect(await dialog.findByRole("alert")).toHaveTextContent(text);
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
 });

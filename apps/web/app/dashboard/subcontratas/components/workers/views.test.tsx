@@ -95,7 +95,7 @@ describe("WorkersTable", () => {
 
 describe("WorkersKpis", () => {
   it("counts by access and the preventive resources", () => {
-    wrap(<WorkersKpis workers={[marcos, sergio]} />);
+    wrap(<WorkersKpis summary={{ registered: 2, companies: 1, ok: 1, pending: 1, blocked: 0, preventive: 1 }} />);
     const tile = (name: string) => screen.getByText(name).parentElement!;
 
     expect(tile("Registrados")).toHaveTextContent("2");

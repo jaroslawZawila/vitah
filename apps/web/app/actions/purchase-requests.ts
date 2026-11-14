@@ -25,7 +25,7 @@ export async function getRequest(requestId: string) {
 
 const write = (fn: Parameters<typeof mutateDashboard>[1]) => mutateDashboard(null, fn);
 
-/** → the new request's id and number too. */
+/** → the new request's id and number too. With the form's `idempotencyKey` in `input`, sent twice it is one request. */
 export async function createRequestAction(
   projectId: string,
   input: Record<string, unknown>,

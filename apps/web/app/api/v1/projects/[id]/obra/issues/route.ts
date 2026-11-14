@@ -1,10 +1,12 @@
 import { constructionService } from "@repo/core";
-import { readJson, withContext } from "../../../../../../../lib/api";
+import { readCreate, withContext } from "../../../../../../../lib/api";
 
 // ─── /api/v1/projects/:id/obra/issues ─────────────────────────────────────────
 // GET (?kind=issue|change) → ObraIssue[]
 // POST { kind, occurredOn, chapterCode, description, party, partyName?,
-//   costImpactCents?, scheduleImpactDays?, status? } → { issueId, number }
+//   costImpactCents?, scheduleImpactDays?, status? } → { issueId, number }.
+//   Sent again with the same `Idempotency-Key` header (or `idempotencyKey` in
+//   the body) it is one record, answered the same.
 // ─────────────────────────────────────────────────────────────────────────────
 
 type Params = { params: Promise<{ id: string }> };
@@ -17,5 +19,5 @@ export async function GET(request: Request, { params }: Params) {
 
 export async function POST(request: Request, { params }: Params) {
   const { id } = await params;
-  return withContext(request, async (ctx) => constructionService.createIssue(ctx, id, await readJson(request)), 201);
+  return withContext(request, async (ctx) => constructionService.createIssue(ctx, id, await readCreate(request)), 201);
 }

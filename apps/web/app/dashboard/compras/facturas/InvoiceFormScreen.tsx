@@ -11,6 +11,7 @@ import { useTranslations } from "next-intl";
 import type { PurchaseInvoiceForm } from "@repo/core/contract";
 import { createInvoiceAction, updateInvoiceAction } from "../../../actions/purchase-invoices";
 import BackLink from "../../components/BackLink";
+import { useIdempotencyKey } from "../../components/useIdempotencyKey";
 import { useObraFormat } from "../../projects/[id]/components/obra/format";
 import { INVOICES_HREF, invoiceHref, newInvoiceHref } from "../../projects/[id]/components/purchasing/links";
 import InvoiceForm from "../components/InvoiceForm";
@@ -36,6 +37,8 @@ export default function InvoiceFormScreen({ form, rectifiesId }: { form: Purchas
   );
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  // A new invoice sent twice (a double click, a retry) is registered once.
+  const createKey = useIdempotencyKey();
   const parse = f.hundredths;
   // Paid against already: its amounts stay as they are.
   const locked = !!editing && editing.payments.length > 0;
@@ -68,7 +71,10 @@ export default function InvoiceFormScreen({ form, rectifiesId }: { form: Purchas
         if (!state?.success) return setError(state?.error ?? "generic");
         return router.push(invoiceHref(editing.id));
       }
-      const state = await createInvoiceAction(order.id, formWithFile(invoiceInput(draft, order, parse), draft.file));
+      const input = invoiceInput(draft, order, parse);
+      const state = await createKey.submit({ orderId: order.id, input, file: draft.file }, (idempotencyKey) =>
+        createInvoiceAction(order.id, formWithFile({ ...input, idempotencyKey }, draft.file)),
+      );
       if (!state?.success || !state.invoiceId) return setError(state?.error ?? "generic");
       router.push(invoiceHref(state.invoiceId));
     });

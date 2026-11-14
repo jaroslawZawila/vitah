@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -49,9 +49,12 @@ describe("AmendmentFormScreen", () => {
       signedOn: "2026-10-17",
       documentTitle: "Modificado nº {n}",
       lines: [{ lineageId: "lin-0605", amountCents: 330_000, closesLine: true }],
+      // The form's idempotency key: a double click or a retry is one modificado.
+      idempotencyKey: expect.stringMatching(/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/),
     });
     expect((form.get("file") as File).name).toBe("mod.pdf");
-    expect(router.push).toHaveBeenCalledWith("/dashboard/projects/p-1/compras/order-49");
+    // Once the action answers, back to the order.
+    await waitFor(() => expect(router.push).toHaveBeenCalledWith("/dashboard/projects/p-1/compras/order-49"));
   });
 
   it("needs a reason, shows the action's error, and says when the PDF didn't go up", async () => {
@@ -66,7 +69,9 @@ describe("AmendmentFormScreen", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("El modificado no cambia ninguna partida");
 
     vi.mocked(actions.amendPurchaseAction).mockResolvedValueOnce({ success: true, number: 1, documentFailed: true });
-    await userEvent.click(screen.getByRole("button", { name: "Registrar modificado nº 1" }));
+    // The button reads "Guardando…" and is disabled until the first try settles.
+    await userEvent.click(await screen.findByRole("button", { name: "Registrar modificado nº 1" }));
+    expect(actions.amendPurchaseAction).toHaveBeenCalledTimes(2);
     expect(await screen.findByRole("alert")).toHaveTextContent("está registrado, pero su PDF no se ha podido subir");
     expect(router.push).not.toHaveBeenCalled();
   });

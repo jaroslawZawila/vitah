@@ -9,6 +9,19 @@
     "submitting": "Signing in…",
     "error": "Invalid credentials. Please try again.",
     "tooManyAttempts": "Too many failed attempts. Wait a few minutes and try again.",
+    "invalidCode": "Incorrect code. Try again.",
+    "code": {
+      "title": "Two-step verification",
+      "label": "Verification code",
+      "hint": "The 6-digit code from your authenticator app.",
+      "recoveryLabel": "Recovery code",
+      "recoveryHint": "One of the codes you saved when you turned it on. Each works once.",
+      "useRecovery": "Use a recovery code",
+      "useApp": "Use the authenticator app",
+      "submit": "Verify",
+      "submitting": "Verifying…",
+      "back": "Back"
+    },
     "footer": "© {year} ViTAH. All rights reserved."
   },
   "dashboard": {
@@ -41,6 +54,9 @@
     "purchases": "Purchasing",
     "settings": "Settings",
     "changePassword": "Change password",
+    "twoStep": "Two-step verification",
+    "deleted": "Deleted items",
+    "signOut": "Sign out",
     "language": {
       "label": "Language",
       "es": "Spanish",
@@ -81,6 +97,69 @@
         "too_many_attempts": "Too many failed attempts. Wait a few minutes and try again.",
         "generic": "The password could not be changed. Try again."
       }
+    },
+    "twoStep": {
+      "title": "Two-step verification",
+      "description": "When you sign in, a code from your authenticator app is asked for as well as your password.",
+      "close": "Close",
+      "cancel": "Cancel",
+      "back": "Back",
+      "anyCode": "Verification code",
+      "anyCodeHint": "The 6-digit code from your app, or a recovery code.",
+      "off": {
+        "status": "Off",
+        "intro": "You need an authenticator app on your phone (Google Authenticator, Microsoft Authenticator, 1Password or another compatible one).",
+        "start": "Turn on",
+        "starting": "Preparing…"
+      },
+      "setup": {
+        "scan": "1. Scan this QR code with your authenticator app.",
+        "qrAlt": "QR code for the authenticator app",
+        "manual": "Can't scan it? Type this key into the app:",
+        "secretLabel": "Setup key",
+        "enter": "2. Type the 6-digit code the app shows.",
+        "code": "Verification code",
+        "confirm": "Turn on",
+        "confirming": "Checking…"
+      },
+      "codes": {
+        "enabled": "Two-step verification is on. We'll ask for a code the next time you sign in.",
+        "regenerated": "New codes generated. The old ones no longer work.",
+        "title": "Recovery codes",
+        "help": "Keep them somewhere safe: they won't be shown again. Each one works once to sign in when you don't have your phone.",
+        "copy": "Copy",
+        "copied": "Copied",
+        "done": "I've saved them"
+      },
+      "on": {
+        "status": "On",
+        "codesLeft": "{count, plural, =0 {You have no recovery codes left.} one {You have # recovery code left.} other {You have # recovery codes left.}}",
+        "regenerate": "Generate new codes",
+        "disable": "Turn off"
+      },
+      "regenerate": {
+        "help": "Ten new recovery codes are generated; the old ones stop working.",
+        "submit": "Generate codes",
+        "submitting": "Generating…"
+      },
+      "disable": {
+        "help": "To turn it off, confirm your password and a code.",
+        "password": "Current password",
+        "submit": "Turn off",
+        "submitting": "Turning off…",
+        "done": "Two-step verification is off."
+      },
+      "errors": {
+        "missing_fields": "Fill in every field.",
+        "wrong_code": "Incorrect code. Try again.",
+        "wrong_password": "The current password is not correct.",
+        "too_many_attempts": "Too many failed attempts. Wait a few minutes and try again.",
+        "mfa_already_enabled": "Two-step verification is already on.",
+        "mfa_not_started": "The setup expired. Start again.",
+        "mfa_not_enabled": "Two-step verification is not on.",
+        "mfa_unavailable": "Two-step verification is not available yet. Try again later.",
+        "generic": "It could not be completed. Try again."
+      }
     }
   },
   "topbar": {
@@ -90,7 +169,9 @@
       "projectDetail": "Project Detail",
       "clients": "App Clients",
       "newProject": "New project",
-      "subcontractors": "Subcontractors"
+      "subcontractors": "Subcontractors",
+      "purchases": "Purchasing",
+      "deleted": "Deleted items"
     }
   },
   "navigation": {
@@ -237,6 +318,7 @@
       "email": "Email",
       "role": "Role",
       "status": "Status",
+      "twoStep": "2-step",
       "created": "Created",
       "actions": "Actions"
     },
@@ -254,7 +336,13 @@
       "deactivate": "Deactivate",
       "activate": "Activate",
       "resetPassword": "Reset password",
-      "resetPasswordFor": "Reset the password of {name}"
+      "resetPasswordFor": "Reset the password of {name}",
+      "removeTwoStep": "Remove",
+      "removeTwoStepFor": "Remove the two-step verification of {name}"
+    },
+    "twoStep": {
+      "on": "On",
+      "off": "No"
     },
     "inviteForm": {
       "title": "New User",
@@ -279,11 +367,23 @@
       "last_admin": "The organisation must keep at least one active administrator.",
       "generic": "Error processing the request.",
       "invalid_email": "Enter a valid email.",
-      "too_long": "The name or email is too long."
+      "too_long": "The name or email is too long.",
+      "cannot_remove_own_mfa": "Your own two-step verification is turned off in Settings › Two-step verification.",
+      "mfa_not_enabled": "This user does not have two-step verification on.",
+      "mfa_unavailable": "Two-step verification is not available yet. Try again later."
     },
     "success": {
       "created": "User created successfully.",
-      "passwordReset": "Password of {name} reset. Their sessions were closed."
+      "passwordReset": "Password of {name} reset. Their sessions were closed.",
+      "twoStepRemoved": "Two-step verification of {name} removed. Their sessions were closed."
+    },
+    "removeTwoStep": {
+      "title": "Remove the two-step verification of {name}",
+      "description": "For when they have lost their phone. They will sign in with their password alone and all their sessions will be closed. They can turn it on again from their settings.",
+      "confirm": "Remove two-step verification",
+      "confirming": "Removing…",
+      "cancel": "Cancel",
+      "close": "Close"
     },
     "resetPassword": {
       "title": "New password for {name}",
@@ -1098,6 +1198,7 @@
         "file_too_large": "An attachment is over the 4 MB limit.",
         "project_not_found": "Project not found.",
         "not_found": "The record wasn't found. Reload the page.",
+        "idempotency_key_reused": "This was already submitted with different details. Reload the page and check whether it was saved before sending it again.",
         "forbidden": "Only admins and managers can make changes."
       }
     },
@@ -2259,6 +2360,7 @@
       "document_expired": "“{document}” expired → company blocked; {count, plural, one {# worker} other {# workers}} without access",
       "assigned": "Assigned to {project}",
       "unassigned": "Removed from a site",
+      "assignment_restored": "Restored its assignment to {project}",
       "worker_created": "Registered worker {name}",
       "worker_updated": "Edited the worker: {fields}"
     },
@@ -2990,13 +3092,16 @@
       "creditCreated": "Credit note {number} recorded, {amount} €",
       "invoiceUpdated": "{number} changed",
       "invoiceDeleted": "{number} deleted",
+      "invoiceRestored": "{number} restored",
       "invoiceFileAdded": "New PDF version of {number} (v{version})",
       "paymentAdded": "Payment of {amount} € on {number}",
       "paymentDeleted": "Payment of {amount} € on {number} removed",
+      "paymentRestored": "Payment of {amount} € on {number} restored",
       "milestones": "{count, plural, =0 {Payment milestones removed} one {Payment milestones: # milestone} other {Payment milestones: # milestones}}",
       "documentAdded": "Document added: {title}",
       "documentVersionAdded": "New version of {title} (v{version})",
       "documentRemoved": "Document removed: {title}",
+      "documentRestored": "Document restored: {title}",
       "request": {
         "approved": "Approved",
         "rejected": "Rejected",
@@ -3164,6 +3269,7 @@
       "supplies_only": "A material supplier only takes material orders, not subcontracts.",
       "invalid_state": "The order is no longer in that status. Reload the page.",
       "not_found": "The order wasn't found.",
+      "idempotency_key_reused": "This was already submitted with different details. Reload the page and check whether it was saved before sending it again.",
       "forbidden": "Only admins and managers can make changes.",
       "project_not_found": "Project not found.",
       "no_budget": "There is no accepted budget yet.",
@@ -3667,6 +3773,7 @@
       "supplies_only": "A material supplier only takes material orders, not subcontracts.",
       "invalid_state": "The request is no longer in that state. Reload the page.",
       "not_found": "Request not found.",
+      "idempotency_key_reused": "This was already submitted with different details. Reload the page and check whether it was saved before sending it again.",
       "forbidden": "Not allowed: only an admin approves or rejects, and admins and managers make requests.",
       "project_not_found": "Project not found.",
       "no_budget": "There is no accepted budget yet.",
@@ -3817,6 +3924,92 @@
       "failed": "AI didn't finish"
     }
   },
+  "deletedPage": {
+    "eyebrow": "Administration",
+    "title": "Deleted items",
+    "intro": "Nothing a user deletes is erased: it is kept, with who deleted it and when. Here you can see it and bring it back.",
+    "listTitle": "Deleted",
+    "filters": {
+      "kind": "Type",
+      "allKinds": "All",
+      "project": "Site",
+      "allProjects": "All",
+      "deletedProject": "{ref} (deleted)"
+    },
+    "kinds": {
+      "project": "Project",
+      "document": "Document",
+      "photo": "Photo",
+      "issue_file": "Issue file",
+      "assignment": "Subcontractor on site",
+      "order_document": "Order document",
+      "invoice": "Invoice",
+      "payment": "Payment"
+    },
+    "cols": {
+      "kind": "Type",
+      "what": "Item",
+      "project": "Site",
+      "deleted": "Deleted",
+      "actions": "Actions"
+    },
+    "what": {
+      "photoOf": "Photo of {date}",
+      "issue": "Record {number}",
+      "assignment": "Assignment to the site",
+      "invoice": "Invoice {number}",
+      "creditNote": "Credit note {number}",
+      "payment": "Payment of {amount}",
+      "paymentOf": "Invoice {number}"
+    },
+    "deletedBy": "by {name}",
+    "deletedByUnknown": "by a user who no longer exists",
+    "restore": "Restore",
+    "restoreItem": "Restore {item}",
+    "blocked": {
+      "parent_project": "Its site {label} is deleted: restore that first.",
+      "parent_invoice": "Its invoice {label} is deleted: restore that first.",
+      "ref_taken": "Another project now uses the reference {label}. While it does, this one can't be restored.",
+      "duplicate_number": "That supplier now has another invoice numbered {label}. Change that one's number to restore this one."
+    },
+    "empty": "Nothing has been deleted.",
+    "noMatch": "Nothing deleted matches these filters.",
+    "loadMore": "Load more",
+    "loading": "Loading…",
+    "restored": "Restored: {item}.",
+    "confirm": {
+      "title": "Restore {item}?",
+      "description": {
+        "project": "The project returns to the list with everything it holds, and to its client's app.",
+        "document": "It returns to the site's documents. If the client could see it, they will see it again in their app; no notification is sent.",
+        "photo": "It returns to the site's photos. If the client could see it, they will see it again in their app; no notification is sent.",
+        "issue_file": "It returns to its issue or change, as it was.",
+        "assignment": "The company is assigned to the site again, with the chapters and dates it had.",
+        "order_document": "It returns to its order, with all its versions.",
+        "invoice": "It counts again in the amounts of its order, the site and the supplier.",
+        "payment": "It counts as paid on its invoice again."
+      },
+      "cancel": "Cancel",
+      "confirm": "Restore",
+      "restoring": "Restoring…",
+      "close": "Close"
+    },
+    "errors": {
+      "generic": "It could not be restored. Try again.",
+      "not_found": "It is no longer deleted: someone may have restored it.",
+      "forbidden": "Only an administrator can see and restore what was deleted.",
+      "invalid_input": "The list could not be loaded with those filters.",
+      "parent_deleted": "What holds it (its site or its invoice) is deleted: restore that first.",
+      "ref_taken": "Another project now uses its reference. While it does, this one can't be restored.",
+      "duplicate_number": "That supplier now has another invoice with the same number. Change that one's number to restore this one.",
+      "invalid_state": "Its order no longer takes this invoice: it is cancelled, not placed or belongs to another supplier.",
+      "unknown_line": "Its order no longer has the budget lines this invoice was split across.",
+      "missing_fields": "Its order now has a payment schedule and this invoice is on none of its milestones. Register it again on its own.",
+      "exceeds_amount": "It no longer fits: it exceeds what is left to pay on the invoice or, for a credit note, what is left of the invoice it rectifies.",
+      "invalid_date": "The payment is dated before its invoice's current date.",
+      "supplies_only": "The company is now a material supplier, and those are not assigned to sites."
+    }
+  },
   "errorPages": {
     "error": {
       "eyebrow": "Error",
@@ -3837,5 +4030,13 @@
     },
     "toProjects": "Back to Projects",
     "loading": "Loading…"
+  },
+  "pager": {
+    "label": "Pages",
+    "showing": "{from}–{to} of {total}",
+    "none": "None on this page · {total} in all",
+    "previous": "Previous",
+    "next": "Next",
+    "page": "Page {page} of {pages}"
   }
 }

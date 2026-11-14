@@ -11,7 +11,7 @@ import {
   type SQL,
   type UserRole,
 } from "@repo/db";
-import { countSignIn, hashPassword, normalizeEmail } from "@repo/core";
+import { countSignIn, hashPassword, mfaService, normalizeEmail } from "@repo/core";
 
 /** Staff sign in to the portal; clients sign in to the mobile app. */
 export type Audience = "portal" | "mobile";
@@ -145,21 +145,73 @@ export function clientIp(request: Request | undefined): string | undefined {
   return firstOf(headers.get("x-real-ip")) ?? lastOf(headers.get("x-forwarded-for"));
 }
 
+/** A portal sign-in that went through: the user, and whether it passed two-step verification. */
+export type PortalUser = AuthenticatedUser & { mfa: boolean };
+
+/**
+ * What a sign-in attempt came to, besides the user:
+ * - `too_many_attempts`: the caller's IP is over its limits (password not looked at);
+ * - `mfa_required`: the password is right and the account has two-step
+ *   verification, but no code came with it: ask for one and try again;
+ * - `invalid_code`: the password is right, the code is not (or was used already);
+ * - null: the email or the password is wrong.
+ */
+export type SignInRefusal = "too_many_attempts" | "mfa_required" | "invalid_code" | null;
+
 /**
  * `verifyCredentials` behind login throttling (the scheme is described in
  * @repo/core/throttle): an IP over its own limits gets "too_many_attempts"
  * whatever the password; failures from other IPs never refuse the right one.
  * A wrong password and an unknown email both answer null, and both count.
+ *
+ * The portal then asks staff with two-step verification for their code (the
+ * app's clients have none). Both steps are this one call: `code` comes with
+ * the email and the password, or not yet.
+ *
+ * What gives nothing away: the second step is only looked at once the
+ * password is right. With a wrong password the answer is null, the same
+ * whether the account has two-step verification or not, with or without a
+ * code: nobody learns that an account has it without knowing its password.
+ *
+ * What counts: `mfa_required` is no failure (taken back off the counters, but
+ * nothing is forgotten); a wrong code is one, on the very counters of a wrong
+ * password, so codes are guessed no faster than passwords.
  */
+export function attemptSignIn(
+  email: string,
+  password: string,
+  audience: "mobile",
+  ip: string | undefined,
+): Promise<AuthenticatedUser | "too_many_attempts" | null>;
+export function attemptSignIn(
+  email: string,
+  password: string,
+  audience: Audience,
+  ip: string | undefined,
+  code?: string,
+): Promise<AuthenticatedUser | PortalUser | SignInRefusal>;
 export async function attemptSignIn(
   email: string,
   password: string,
   audience: Audience,
   ip: string | undefined,
-): Promise<AuthenticatedUser | "too_many_attempts" | null> {
+  code?: string,
+): Promise<AuthenticatedUser | PortalUser | SignInRefusal> {
   const attempt = await countSignIn(audience, normalizeEmail(email), ip);
   if (attempt.blocked) return "too_many_attempts";
   const user = await verifyCredentials(email, password, audience);
-  if (user) await attempt.succeeded();
-  return user;
+  if (!user) return null;
+  if (audience === "mobile") {
+    await attempt.succeeded();
+    return user;
+  }
+
+  const second = await mfaService.checkSignInCode(user.id, code);
+  if (second === "required") {
+    await attempt.withdrawn();
+    return "mfa_required";
+  }
+  if (second === "failed") return "invalid_code";
+  await attempt.succeeded();
+  return { ...user, mfa: second === "passed" };
 }

@@ -18,6 +18,7 @@ import {
 } from "../../../../actions/purchase-invoices";
 import BackLink from "../../../components/BackLink";
 import FormError from "../../../components/FormError";
+import { useIdempotencyKey } from "../../../components/useIdempotencyKey";
 import { useObraAction } from "../../../projects/[id]/components/obra/useObraAction";
 import { usePurchaseFormat } from "../../../projects/[id]/components/purchasing/format";
 import { INVOICES_HREF, editInvoiceHref, invoiceHref, newInvoiceHref, orderHref } from "../../../projects/[id]/components/purchasing/links";
@@ -46,6 +47,8 @@ export default function InvoiceScreen({ invoice, canManage }: { invoice: Purchas
   const payment = useObraAction();
   const file = useObraAction();
   const review = useObraAction();
+  // A payment sent twice (a double click, a retry) is recorded once.
+  const paymentKey = useIdempotencyKey();
   // The AI reviews a new PDF or proof after its upload: the page re-reads until it is done.
   useRefreshWhile(reviewing(invoice.checks));
   const [paying, setPaying] = useState(false);
@@ -54,8 +57,12 @@ export default function InvoiceScreen({ invoice, canManage }: { invoice: Purchas
 
   function pay(values: PaymentValues) {
     const { file: proof, ...data } = values;
+    const input = { ...data, reference: data.reference.trim() || null };
     payment.run(
-      () => createPaymentAction(invoice.id, formWithFile({ ...data, reference: data.reference.trim() || null }, proof)),
+      () =>
+        paymentKey.submit({ input, proof }, (idempotencyKey) =>
+          createPaymentAction(invoice.id, formWithFile({ ...input, idempotencyKey }, proof)),
+        ),
       () => setPaying(false),
     );
   }

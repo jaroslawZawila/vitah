@@ -19,6 +19,8 @@ describe("proxy matcher", () => {
     "/api/auth/session",
     "/api/mobile/auth",
     "/api/mobile/project",
+    // The app reports its crashes signed out too (the route authenticates by itself).
+    "/api/mobile/client-error",
     // The uptime check has no session.
     "/api/health",
     "/_next/static/chunk.js",

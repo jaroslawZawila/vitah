@@ -47,13 +47,22 @@ const atCost = <L extends { unitPriceCents: number }>(line: L): L => ({
 
 const pdf = (text: string) => new File([`%PDF-1.4\n% ${text}\n`], `${text}.pdf`, { type: "application/pdf" });
 
-/** The Caviedes budget as an accepted Rev.0 (the pool offered, not chosen). */
-export async function seedBudget(ctx: Ctx, projectId: string, { accept = true } = {}) {
-  const { reference, builtAreaM2, usefulAreaM2, chapters, texts, conditions } = CAVIEDES_BUDGET;
+/**
+ * The Caviedes budget as an accepted Rev.0 (the pool offered, not chosen).
+ * The volume seed (./volume) makes many of it: `scale` sizes the home (its
+ * surfaces and every quantity), `reference` and `acceptedOn` tell them apart.
+ */
+export async function seedBudget(
+  ctx: Ctx,
+  projectId: string,
+  { accept = true, scale = 1, reference = CAVIEDES_BUDGET.reference, acceptedOn = "2026-01-15" } = {},
+) {
+  const { chapters, texts, conditions } = CAVIEDES_BUDGET;
+  const sized = (quantity: number) => (scale === 1 ? quantity : Math.round(quantity * scale * 100) / 100);
   const { revisionId } = await budget.createBudget(ctx, projectId, { reference });
   await budget.updateRevision(ctx, projectId, revisionId, {
-    builtAreaM2,
-    usefulAreaM2,
+    builtAreaM2: sized(CAVIEDES_BUDGET.builtAreaM2),
+    usefulAreaM2: sized(CAVIEDES_BUDGET.usefulAreaM2),
     texts: { ...texts, annex: texts.annex.map((item, i) => ({ ...item, id: `n${i + 1}` })) },
     conditions,
   });
@@ -73,7 +82,7 @@ export async function seedBudget(ctx: Ctx, projectId: string, { accept = true } 
           ...line,
           tenantId: ctx.tenantId,
           chapterId: chapterIds.get(chapter.code)!,
-          quantityMilli: Math.round(quantity * 1000),
+          quantityMilli: Math.round(sized(quantity) * 1000),
           source: "base" as const,
           position,
         })),
@@ -83,7 +92,9 @@ export async function seedBudget(ctx: Ctx, projectId: string, { accept = true } 
   for (const option of CAVIEDES_BUDGET.options) {
     const intro = [option.intro, option.footnote].filter(Boolean).join("\n\n");
     const { optionId } = await options.addOption(ctx, projectId, revisionId, { name: option.name, optionKind: option.optionKind, intro });
-    for (const { code: _, ...line } of option.lines) await budget.addLine(ctx, projectId, optionId, atCost(line));
+    for (const { code: _, ...line } of option.lines) {
+      await budget.addLine(ctx, projectId, optionId, atCost({ ...line, quantity: sized(line.quantity) }));
+    }
   }
   const plan = await hitos.listHitos(ctx, projectId);
   await hitos.updatePlan(ctx, projectId, {
@@ -91,7 +102,7 @@ export async function seedBudget(ctx: Ctx, projectId: string, { accept = true } 
   });
   // The contract was signed on paper before the platform: it was never issued from here.
   if (accept) {
-    await budget.acceptRevision(ctx, projectId, revisionId, { acceptedOn: "2026-01-15", acceptedBy: "D. Fernando Barcenilla" }, { unissued: true });
+    await budget.acceptRevision(ctx, projectId, revisionId, { acceptedOn, acceptedBy: "D. Fernando Barcenilla" }, { unissued: true });
   }
   return { revisionId };
 }

@@ -126,8 +126,11 @@ describe("PhotosScreen", () => {
     const hidden = screen.getByRole("button", { name: "Visible en la app del cliente: Tabiquería" });
     expect(hidden).toHaveAttribute("aria-pressed", "false");
     expect(screen.getAllByText("Solo equipo")).toHaveLength(1);
+    // Every photo's buttons are disabled while the first change runs.
+    await waitFor(() => expect(hidden).toBeEnabled());
     await userEvent.click(hidden);
-    await waitFor(() => expect(actions.setPhotoVisibilityAction).toHaveBeenCalledWith("p-1", "photo-2", true));
+    expect(actions.setPhotoVisibilityAction).toHaveBeenCalledWith("p-1", "photo-2", true);
+    await waitFor(() => expect(hidden).toBeEnabled());
   });
 
   it("explains when changing a photo fails", async () => {

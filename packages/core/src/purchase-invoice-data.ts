@@ -287,9 +287,27 @@ export async function invoicedByOrder(tenantId: string, orderIds: string[]) {
   return new Map(rows.map((r) => [r.orderId, Number(r.base)]));
 }
 
-/** Payments with their invoice, order, project and supplier, newest first. */
-export async function loadPayments(tenantId: string, where?: SQL): Promise<PurchasePayment[]> {
-  const rows = await db
+/** The payments that count: not deleted, of an invoice not deleted, of an obra not deleted. */
+const livePayments = (tenantId: string, where?: SQL) =>
+  and(eq(purchasePayments.tenantId, tenantId), isNull(purchasePayments.deletedAt), isNull(purchaseInvoices.deletedAt), projectNotDeleted(), where);
+
+/** How many payments `where` selects (by project or supplier), and those made from `monthStart` on. */
+export const paymentTotals = (tenantId: string, where: SQL | undefined, monthStart: string) =>
+  db
+    .select({
+      total: sql<number>`count(*)::int`,
+      monthCents: sql<number>`coalesce(sum(${purchasePayments.amountCents}) filter (where ${purchasePayments.paidOn} >= ${monthStart}::date), 0)::float8`,
+      monthPayments: sql<number>`(count(*) filter (where ${purchasePayments.paidOn} >= ${monthStart}::date))::int`,
+    })
+    .from(purchasePayments)
+    .innerJoin(purchaseInvoices, eq(purchaseInvoices.id, purchasePayments.invoiceId))
+    .innerJoin(purchaseOrders, eq(purchaseOrders.id, purchaseInvoices.orderId))
+    .innerJoin(projects, eq(projects.id, purchaseOrders.projectId))
+    .where(livePayments(tenantId, where));
+
+/** Payments with their invoice, order, project and supplier, newest first; `window` cuts a page of them. */
+export async function loadPayments(tenantId: string, where?: SQL, window?: { limit: number; offset: number }): Promise<PurchasePayment[]> {
+  const query = db
     .select({
       payment: purchasePayments,
       invoiceNumber: purchaseInvoices.number,
@@ -305,16 +323,9 @@ export async function loadPayments(tenantId: string, where?: SQL): Promise<Purch
     .innerJoin(projects, eq(projects.id, purchaseOrders.projectId))
     .innerJoin(subcontractors, eq(subcontractors.id, purchaseInvoices.subcontractorId))
     .leftJoin(users, eq(users.id, purchasePayments.createdById))
-    .where(
-      and(
-        eq(purchasePayments.tenantId, tenantId),
-        isNull(purchasePayments.deletedAt),
-        isNull(purchaseInvoices.deletedAt),
-        projectNotDeleted(),
-        where,
-      ),
-    )
-    .orderBy(desc(purchasePayments.paidOn), desc(purchasePayments.createdAt));
+    .where(livePayments(tenantId, where))
+    .orderBy(desc(purchasePayments.paidOn), desc(purchasePayments.createdAt), desc(purchasePayments.id));
+  const rows = await (window ? query.limit(window.limit).offset(window.offset) : query);
   return rows.map(({ payment, ...row }) => ({
     id: payment.id,
     invoiceId: payment.invoiceId,

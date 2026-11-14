@@ -1,37 +1,33 @@
 "use client";
 
-// Container for the company-wide Compras page (rail › Red › Compras): every
-// order of every obra, for Administration. Read-only: orders are created and
-// changed from their obra. It filters, and exports the filtered rows as CSV
-// in the browser. The views take props only.
+// Container for the company-wide Compras page (rail › Red › Compras): the
+// orders of every obra, for Administration. Read-only: orders are created and
+// changed from their obra. The list is paged and filtered on the server: the
+// filters live in the URL (./list-query), and changing one loads its first
+// page. The CSV export asks the server for every order the filters keep. The
+// views take props only.
 
-import { useDeferredValue, useMemo, useState } from "react";
+import { useTransition } from "react";
 import { useTranslations } from "next-intl";
 import { Download } from "lucide-react";
 import { orderLabel, type PurchaseOrderListItem, type TenantPurchases } from "@repo/core/contract";
 import { Button } from "@/components/ui/button";
 import { cardVariants } from "@/components/ui/card";
+import { Pager } from "@/components/ui/pager";
 import { cn } from "@/lib/utils";
+import { exportPurchases } from "../../actions/purchasing";
+import { useListQuery, useSearchText } from "../components/useListQuery";
 import { FilterSelect, PeriodFilter } from "../projects/[id]/components/construction/Filters";
 import Segmented from "../projects/[id]/components/construction/Segmented";
 import { CheckFilter, GroupFilter, SearchFilter } from "../projects/[id]/components/purchasing/Filters";
 import { orderHref, purchasesHref } from "../projects/[id]/components/purchasing/links";
 import OrderList from "../projects/[id]/components/purchasing/OrderList";
-import {
-  NO_ORDER_FILTER,
-  bySupplier,
-  filterOrders,
-  groupCounts,
-  suppliersOf,
-  toCsv,
-  type OrderFilter,
-} from "../projects/[id]/components/purchasing/orders";
+import { toCsv } from "../projects/[id]/components/purchasing/orders";
 import CompanyKpis from "./components/CompanyKpis";
 import SupplierTable from "./components/SupplierTable";
+import { hasOrdersFilter, ordersFilters, type OrdersQuery } from "./list-query";
 
 const GROUPS = ["all", "open", "pending", "done", "cancelled"] as const;
-
-type View = "orders" | "suppliers";
 
 /** Saves `text` as a file in the browser. */
 function download(name: string, text: string) {
@@ -45,51 +41,52 @@ function download(name: string, text: string) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-export default function ComprasScreen({ purchases }: { purchases: TenantPurchases }) {
+export default function ComprasScreen({
+  purchases,
+  query,
+}: {
+  /** The page of orders (or the suppliers' breakdown) the URL asks for. */
+  purchases: TenantPurchases;
+  /** The filters as the URL has them. */
+  query: OrdersQuery;
+}) {
   const t = useTranslations("purchasing.company");
   const tl = useTranslations("purchasing.list");
   const ts = useTranslations("purchasing.status");
   const tk = useTranslations("purchasing.kind");
-  const [view, setView] = useState<View>("orders");
-  const [filter, setFilter] = useState<OrderFilter>(NO_ORDER_FILTER);
-  const set = (patch: Partial<OrderFilter>) => setFilter((current) => ({ ...current, ...patch }));
-  // The search box apart, deferred: typing stays responsive however many orders there are.
-  const [query, setQuery] = useState("");
-  const searched = useDeferredValue(query);
-  const { orders, today } = purchases;
-
-  const { shown, counts } = useMemo(() => {
-    const applied = { ...filter, query: searched };
-    return { shown: filterOrders(orders, applied), counts: groupCounts(filterOrders(orders, applied, true)) };
-  }, [orders, filter, searched]);
-  const suppliers = useMemo(() => suppliersOf(orders), [orders]);
-  const groups = useMemo(() => (view === "suppliers" ? bySupplier(shown) : []), [view, shown]);
-  const lateRefs = useMemo(
-    () => [...new Set(orders.filter((o) => o.lateDays !== null).map((o) => o.projectRef))].sort(),
-    [orders],
-  );
-  const empty = orders.length === 0 ? t("none") : tl("noMatch");
+  const list = useListQuery();
+  const [text, setText] = useSearchText(query.query, (q) => list.set({ q }));
+  const [exporting, startExport] = useTransition();
+  const { orders, today, paging, groupCounts } = purchases;
+  const view = query.view;
+  const groups = purchases.bySupplier ?? [];
+  const empty = hasOrdersFilter(query) ? tl("noMatch") : t("none");
+  const nothing = view === "orders" ? paging.total === 0 : groups.length === 0;
 
   function exportCsv() {
-    const csv = toCsv(
-      t.raw("csv") as string[],
-      shown,
-      (o: PurchaseOrderListItem) => [
-        o.projectRef,
-        orderLabel(o.number),
-        tk(o.kind),
-        o.supplierName,
-        o.description,
-        o.chapterCodes.join(" "),
-        (o.amountCents / 100).toFixed(2).replace(".", ","),
-        o.orderedOn ?? "",
-        o.kind === "material" ? (o.expectedOn ?? "") : [o.workStart, o.workEnd].filter(Boolean).join(" – "),
-        o.completedOn ?? "",
-        ts(o.status),
-        o.lateDays ?? "",
-      ],
-    );
-    download(t("csvName", { date: today }), csv);
+    startExport(async () => {
+      // Every order the filters keep, not just this page.
+      const all = await exportPurchases(ordersFilters(query));
+      const csv = toCsv(
+        t.raw("csv") as string[],
+        all,
+        (o: PurchaseOrderListItem) => [
+          o.projectRef,
+          orderLabel(o.number),
+          tk(o.kind),
+          o.supplierName,
+          o.description,
+          o.chapterCodes.join(" "),
+          (o.amountCents / 100).toFixed(2).replace(".", ","),
+          o.orderedOn ?? "",
+          o.kind === "material" ? (o.expectedOn ?? "") : [o.workStart, o.workEnd].filter(Boolean).join(" – "),
+          o.completedOn ?? "",
+          ts(o.status),
+          o.lateDays ?? "",
+        ],
+      );
+      download(t("csvName", { date: today }), csv);
+    });
   }
 
   return (
@@ -100,31 +97,40 @@ export default function ComprasScreen({ purchases }: { purchases: TenantPurchase
           <h1 className="mt-1.5">{t("title")}</h1>
           <p className="mt-1 max-w-[640px] text-[14px] text-muted-foreground">{t("description")}</p>
         </div>
-        <Button type="button" variant="outline" onClick={exportCsv} disabled={shown.length === 0}>
+        <Button type="button" variant="outline" onClick={exportCsv} disabled={nothing || exporting}>
           <Download aria-hidden />
           {t("export")}
         </Button>
       </header>
 
-      <CompanyKpis summary={purchases.summary} today={today} lateRefs={lateRefs} />
+      <CompanyKpis summary={purchases.summary} today={today} lateRefs={purchases.summary.lateProjectRefs} />
 
-      <section className={cn(cardVariants({ size: "flush" }), "pt-4 pb-1.5")} aria-label={t("ordersLabel")}>
+      <section
+        className={cn(cardVariants({ size: "flush" }), "pt-4 pb-1.5", list.pending && "opacity-70")}
+        aria-label={t("ordersLabel")}
+        aria-busy={list.pending}
+      >
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2.5 px-[18px] pb-3">
           <Segmented
             label={t("view")}
             value={view}
-            onChange={setView}
+            onChange={(next) => list.set({ vista: next === "suppliers" ? "proveedores" : null })}
             options={(["orders", "suppliers"] as const).map((key) => ({ key, label: t(`views.${key}`) }))}
           />
-          <GroupFilter value={filter.group} onChange={(group) => set({ group })} groups={GROUPS} counts={counts} />
-          <SearchFilter label={t("search")} value={query} onChange={setQuery} className="max-w-[320px]" />
+          <GroupFilter
+            value={query.group}
+            onChange={(group) => list.set({ estado: group === "all" ? null : group })}
+            groups={GROUPS}
+            counts={groupCounts}
+          />
+          <SearchFilter label={t("search")} value={text} onChange={setText} className="max-w-[320px]" />
         </div>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2.5 px-[18px] pb-3.5">
           <FilterSelect
             id="company-project"
             label={t("project")}
-            value={filter.projectId}
-            onChange={(projectId) => set({ projectId })}
+            value={query.projectId}
+            onChange={(obra) => list.set({ obra })}
             options={[
               { value: "", label: t("allProjects") },
               ...purchases.projects.map((p) => ({ value: p.id, label: `${p.ref} ${p.address}` })),
@@ -133,33 +139,37 @@ export default function ComprasScreen({ purchases }: { purchases: TenantPurchase
           <FilterSelect
             id="company-supplier"
             label={tl("supplier")}
-            value={filter.supplierId}
-            onChange={(supplierId) => set({ supplierId })}
-            options={[{ value: "", label: tl("all") }, ...suppliers.map((s) => ({ value: s.id, label: s.name }))]}
+            value={query.supplierId}
+            onChange={(proveedor) => list.set({ proveedor })}
+            options={[{ value: "", label: tl("all") }, ...purchases.suppliers.map((s) => ({ value: s.id, label: s.name }))]}
           />
           <FilterSelect
             id="company-kind"
             label={t("kind")}
-            value={filter.kind}
-            onChange={(kind) => set({ kind: kind as OrderFilter["kind"] })}
+            value={query.kind}
+            onChange={(kind) => list.set({ tipo: kind === "all" ? null : kind })}
             options={[
               { value: "all", label: tl("all") },
               { value: "material", label: tk("material") },
               { value: "subcontract", label: tk("subcontract") },
             ]}
           />
-          <PeriodFilter label={t("orderedOn")} from={filter.from} to={filter.to} onChange={(period) => set(period)} />
-          <CheckFilter id="company-late" label={tl("lateOnly")} checked={filter.lateOnly} onChange={(lateOnly) => set({ lateOnly })} />
+          <PeriodFilter label={t("orderedOn")} from={query.from} to={query.to} onChange={({ from, to }) => list.set({ desde: from, hasta: to })} />
+          <CheckFilter id="company-late" label={tl("lateOnly")} checked={query.lateOnly} onChange={(late) => list.set({ retraso: late ? "1" : null })} />
         </div>
 
         {view === "orders" ? (
-          <OrderList
-            orders={shown}
-            variant="company"
-            orderHref={(o) => orderHref(o.projectId, o.id)}
-            projectHref={(o) => purchasesHref(o.projectId)}
-            empty={empty}
-          />
+          <>
+            <OrderList
+              orders={orders}
+              variant="company"
+              orderHref={(o) => orderHref(o.projectId, o.id)}
+              projectHref={(o) => purchasesHref(o.projectId)}
+              empty={empty}
+              totals={{ count: paging.total, contractedCents: purchases.shownContractedCents }}
+            />
+            <Pager paging={paging} hrefOf={list.pageHref} />
+          </>
         ) : (
           <SupplierTable groups={groups} empty={empty} />
         )}

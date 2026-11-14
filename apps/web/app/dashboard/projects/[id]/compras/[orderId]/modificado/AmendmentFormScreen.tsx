@@ -12,6 +12,7 @@ import { orderLabel, type PurchaseForm, type PurchaseOrderDetail } from "@repo/c
 import { buttonVariants } from "@/components/ui/button";
 import { amendPurchaseAction } from "../../../../../../actions/purchasing";
 import BackLink from "../../../../../components/BackLink";
+import { useIdempotencyKey } from "../../../../../components/useIdempotencyKey";
 import { formWithFile } from "../../../../../compras/components/invoice-draft";
 import { StageEyebrow } from "../../../components/construction/ObraFrame";
 import { useObraFormat } from "../../../components/obra/format";
@@ -40,6 +41,8 @@ export default function AmendmentFormScreen({
   const [error, setError] = useState<string | null>(null);
   const [documentFailed, setDocumentFailed] = useState(false);
   const [pending, startTransition] = useTransition();
+  // A modificado sent twice (a double click, a retry) is recorded once, with one number.
+  const createKey = useIdempotencyKey();
   const parse = f.hundredths;
   const back = orderHref(projectId, order.id);
 
@@ -54,7 +57,9 @@ export default function AmendmentFormScreen({
       lines: linesInput(draft, parse),
     };
     startTransition(async () => {
-      const state = await amendPurchaseAction(projectId, order.id, formWithFile(data, draft.file));
+      const state = await createKey.submit({ data, file: draft.file }, (idempotencyKey) =>
+        amendPurchaseAction(projectId, order.id, formWithFile({ ...data, idempotencyKey }, draft.file)),
+      );
       if (!state?.success) return setError(state?.error ?? "generic");
       if (state.documentFailed) return setDocumentFailed(true);
       router.push(back);

@@ -74,7 +74,7 @@ export async function reviewChangesAction(projectId: string): Promise<ObraState>
 
 // ─── Issues and changes ──────────────────────────────────────────────────────
 
-/** → the new record's id too, to attach its files to. */
+/** → the new record's id too, to attach its files to. With the form's `idempotencyKey` in `input`, sent twice it is one record. */
 export async function createIssueAction(
   projectId: string,
   input: Record<string, unknown>,

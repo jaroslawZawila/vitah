@@ -4,11 +4,11 @@ import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { usePurchaseFormat } from "../../projects/[id]/components/purchasing/format";
-import type { SupplierGroup } from "../../projects/[id]/components/purchasing/orders";
+import type { PurchaseSupplierGroup } from "@repo/core/contract";
 import { companyHref } from "../../subcontratas/components/display";
 
-/** Presentational: the filtered orders grouped by supplier, the most contracted first. */
-export default function SupplierTable({ groups, empty }: { groups: SupplierGroup[]; empty: string }) {
+/** Presentational: the filtered orders grouped by supplier (by the server), the most contracted first. */
+export default function SupplierTable({ groups, empty }: { groups: PurchaseSupplierGroup[]; empty: string }) {
   const t = useTranslations("purchasing.company.bySupplier");
   const tp = useTranslations("purchasing");
   const ty = useTranslations("subcontractors.fields.types");

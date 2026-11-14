@@ -1,7 +1,6 @@
 import {
   countsAsContracted,
   isCompletedOrder,
-  isOpenOrder,
   orderLabel,
   type PurchaseKind,
   type PurchaseOrderListItem,
@@ -86,40 +85,6 @@ export const contractedCents = (orders: PurchaseOrderListItem[]) =>
 export function suppliersOf(orders: { subcontractorId: string; supplierName: string }[]) {
   const names = new Map(orders.map((o) => [o.subcontractorId, o.supplierName]));
   return [...names].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
-}
-
-export type SupplierGroup = {
-  id: string;
-  name: string;
-  suppliesOnly: boolean;
-  orders: number;
-  projectRefs: string[];
-  contractedCents: number;
-  openCents: number;
-};
-
-/** The orders by supplier, the most contracted first. */
-export function bySupplier(orders: PurchaseOrderListItem[]): SupplierGroup[] {
-  const groups = new Map<string, SupplierGroup>();
-  for (const o of orders) {
-    const group = groups.get(o.subcontractorId) ?? {
-      id: o.subcontractorId,
-      name: o.supplierName,
-      suppliesOnly: o.suppliesOnly,
-      orders: 0,
-      projectRefs: [],
-      contractedCents: 0,
-      openCents: 0,
-    };
-    group.orders++;
-    if (!group.projectRefs.includes(o.projectRef)) group.projectRefs.push(o.projectRef);
-    if (countsAsContracted(o.status)) group.contractedCents += o.amountCents;
-    if (isOpenOrder(o.status)) group.openCents += o.amountCents;
-    groups.set(o.subcontractorId, group);
-  }
-  return [...groups.values()]
-    .map((g) => ({ ...g, projectRefs: g.projectRefs.sort() }))
-    .sort((a, b) => b.contractedCents - a.contractedCents || a.name.localeCompare(b.name));
 }
 
 /**

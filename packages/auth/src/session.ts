@@ -11,10 +11,24 @@ export const SESSION_RECHECK_MS = 60 * 1000;
 /**
  * The token of a session that has just signed in with its password, as `user`.
  * `authAt` is when: our own claim and not the JWT's `iat`, which NextAuth
- * renews every time it rewrites the cookie.
+ * renews every time it rewrites the cookie. `mfa` says it also passed two-step
+ * verification: set here only, from what `authorize` answered (never from
+ * the token coming in), and carried unchanged for the session's life.
  */
-export function signedInToken(token: JWT, user: Pick<JWT, "role" | "tenantId">, now = Date.now()): JWT {
-  return { ...token, role: user.role, tenantId: user.tenantId, checkedAt: now, authAt: now };
+export function signedInToken(
+  token: JWT,
+  user: Pick<JWT, "role" | "tenantId" | "mfa">,
+  now = Date.now(),
+): JWT {
+  const { mfa: _, ...rest } = token;
+  return {
+    ...rest,
+    role: user.role,
+    tenantId: user.tenantId,
+    ...(user.mfa === true ? { mfa: true } : {}),
+    checkedAt: now,
+    authAt: now,
+  };
 }
 
 /**

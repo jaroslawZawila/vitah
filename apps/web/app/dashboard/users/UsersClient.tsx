@@ -24,11 +24,13 @@ import {
 } from "@/components/ui/table";
 import {
   createUser,
+  removeUserMfaAction,
   resetUserPasswordAction,
   updateUserRole,
   toggleUserActive,
 } from "../../actions/users";
 import NewPasswordField from "../components/NewPasswordField";
+import RemoveMfaDialog from "./components/RemoveMfaDialog";
 import ResetPasswordDialog from "./components/ResetPasswordDialog";
 
 const ROLES = ["admin", "manager", "viewer"] as const;
@@ -40,6 +42,8 @@ type UserRow = {
   email: string;
   role: Role;
   active: boolean;
+  /** Signing in asks them for a two-step verification code. */
+  mfaEnabled: boolean;
   createdAt: string | Date;
 };
 
@@ -64,10 +68,19 @@ export function UsersClient({
   // Whose password the admin is setting, and whose was just set (their names only).
   const [resetFor, setResetFor] = useState<UserRow | null>(null);
   const [resetDone, setResetDone] = useState<string | null>(null);
+  // Whose two-step verification the admin is removing, and whose was just removed.
+  const [removeMfaFor, setRemoveMfaFor] = useState<UserRow | null>(null);
+  const [mfaRemoved, setMfaRemoved] = useState<string | null>(null);
   const label = (user: UserRow) => user.name || user.email;
 
-  async function runRowAction(action: Promise<{ error?: string }>) {
+  /** The last outcome's line goes when something else is started. */
+  function clearDone() {
     setResetDone(null);
+    setMfaRemoved(null);
+  }
+
+  async function runRowAction(action: Promise<{ error?: string }>) {
+    clearDone();
     const result = await action;
     setRowError(result.error ?? null);
   }
@@ -104,6 +117,11 @@ export function UsersClient({
           {t("success.passwordReset", { name: resetDone })}
         </FormMessage>
       )}
+      {mfaRemoved && (
+        <FormMessage tone="success" role="status">
+          {t("success.twoStepRemoved", { name: mfaRemoved })}
+        </FormMessage>
+      )}
 
       <ResetPasswordDialog
         key={resetFor?.id}
@@ -115,6 +133,17 @@ export function UsersClient({
           setResetFor(null);
         }}
         onClose={() => setResetFor(null)}
+      />
+      <RemoveMfaDialog
+        key={`mfa-${removeMfaFor?.id}`}
+        name={removeMfaFor ? label(removeMfaFor) : null}
+        onConfirm={() => removeUserMfaAction(removeMfaFor!.id)}
+        onDone={() => {
+          setRowError(null);
+          setMfaRemoved(removeMfaFor ? label(removeMfaFor) : null);
+          setRemoveMfaFor(null);
+        }}
+        onClose={() => setRemoveMfaFor(null)}
       />
 
       {showForm && (
@@ -192,6 +221,7 @@ export function UsersClient({
               <TableHead>{t("table.email")}</TableHead>
               <TableHead>{t("table.role")}</TableHead>
               <TableHead>{t("table.status")}</TableHead>
+              <TableHead>{t("table.twoStep")}</TableHead>
               <TableHead>{t("table.created")}</TableHead>
               <TableHead>{t("table.actions")}</TableHead>
             </TableRow>
@@ -214,6 +244,35 @@ export function UsersClient({
                       ? t("statuses.active")
                       : t("statuses.inactive")}
                   </Badge>
+                </TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-1.5">
+                    <Badge variant={user.mfaEnabled ? "good" : "outline"}>
+                      {user.mfaEnabled ? t("twoStep.on") : t("twoStep.off")}
+                    </Badge>
+                    {/* Beside what it removes: for a colleague who lost their phone. */}
+                    {user.mfaEnabled && (
+                      <Button
+                        type="button"
+                        variant="ghost-destructive"
+                        size="sm"
+                        className="disabled:pointer-events-auto disabled:cursor-not-allowed"
+                        disabled={user.id === currentUserId}
+                        title={
+                          user.id === currentUserId
+                            ? t("errors.cannot_remove_own_mfa")
+                            : undefined
+                        }
+                        aria-label={t("actions.removeTwoStepFor", { name: label(user) })}
+                        onClick={() => {
+                          clearDone();
+                          setRemoveMfaFor(user);
+                        }}
+                      >
+                        {t("actions.removeTwoStep")}
+                      </Button>
+                    )}
+                  </div>
                 </TableCell>
                 <TableCell className="num text-muted-foreground">
                   {format.dateTime(new Date(user.createdAt), {
@@ -290,7 +349,7 @@ export function UsersClient({
                       }
                       aria-label={t("actions.resetPasswordFor", { name: label(user) })}
                       onClick={() => {
-                        setResetDone(null);
+                        clearDone();
                         setResetFor(user);
                       }}
                     >

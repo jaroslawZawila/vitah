@@ -9,11 +9,16 @@ import PaymentsScreen from "./PaymentsScreen";
 
 vi.mock("../../../actions/purchase-invoices", () => ({ deletePaymentAction: vi.fn() }));
 const actions = await import("../../../actions/purchase-invoices");
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ replace: vi.fn() }),
+  usePathname: () => "/dashboard/compras/pagos",
+  useSearchParams: () => new URLSearchParams("page=2"),
+}));
 
-function renderScreen(canManage = true) {
+function renderScreen(canManage = true, list = payments) {
   return render(
     <NextIntlClientProvider locale="es" messages={messages} timeZone="Europe/Madrid">
-      <PaymentsScreen payments={payments} canManage={canManage} />
+      <PaymentsScreen payments={list} canManage={canManage} />
     </NextIntlClientProvider>,
   );
 }
@@ -40,6 +45,17 @@ describe("PaymentsScreen", () => {
     expect(list.getByText(/^Este mes: 15\.000,00\s€ en 1 pago$/)).toBeInTheDocument();
   });
 
+  it("pages through the payments made; the month's total is the whole month's", () => {
+    renderScreen(true, { ...payments, paging: { page: 2, limit: 50, total: 130, pages: 3 }, summary: { monthCents: 9_876_500, monthPayments: 42 } });
+
+    const list = within(screen.getByRole("region", { name: "Pagos registrados" }));
+    expect(list.getByText(/^Este mes: 98\.765,00\s€ en 42 pagos$/)).toBeInTheDocument();
+    const pager = within(list.getByRole("navigation", { name: "Páginas" }));
+    expect(pager.getByText("51–100 de 130")).toBeInTheDocument();
+    expect(pager.getByRole("link", { name: "Anterior" })).toHaveAttribute("href", "/dashboard/compras/pagos");
+    expect(pager.getByRole("link", { name: "Siguiente" })).toHaveAttribute("href", "/dashboard/compras/pagos?page=3");
+  });
+
   it("takes back a payment recorded by mistake", async () => {
     renderScreen();
     await userEvent.click(screen.getByRole("button", { name: "Quitar el pago del 15 oct" }));
@@ -52,5 +68,7 @@ describe("PaymentsScreen", () => {
   it("is read-only for viewers", () => {
     renderScreen(false);
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    // One page holds them all: no pager either.
+    expect(screen.queryByRole("navigation", { name: "Páginas" })).not.toBeInTheDocument();
   });
 });

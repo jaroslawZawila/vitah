@@ -1,5 +1,6 @@
 import {
   and,
+  asc,
   db,
   desc,
   eq,
@@ -26,6 +27,7 @@ import {
 } from "./contract";
 import { daysPast } from "./control-calc";
 import { forbidden } from "./errors";
+import { idempotent, type Once } from "./idempotency";
 import { todayInSpain } from "./obra-calc";
 import {
   calendarDate,
@@ -230,10 +232,16 @@ const FIELD_PARSERS = {
 
 /**
  * Body: { kind, description, lines: [{ lineageId, amountCents }], neededBy?,
- * subcontractorId? (a suggested supplier), notes? }. → { requestId, number }
+ * subcontractorId? (a suggested supplier), notes?, idempotencyKey? (sent
+ * again with the same key, it is one request with one number: ./idempotency) }.
+ * → { requestId, number }
  */
 export async function createRequest(ctx: Ctx, projectId: string, input: Record<string, unknown>) {
   requireEditor(ctx);
+  return idempotent<{ requestId: string; number: number }>(ctx, "purchase.request.create", { projectId }, input, (once) => makeRequest(ctx, projectId, input, once));
+}
+
+async function makeRequest(ctx: Ctx, projectId: string, input: Record<string, unknown>, once: Once<{ requestId: string; number: number }>) {
   const kind = pick(PURCHASE_KINDS)(input.kind);
   const [, contract, subcontractorId] = await Promise.all([
     requireProject(ctx.tenantId, projectId),
@@ -243,33 +251,36 @@ export async function createRequest(ctx: Ctx, projectId: string, input: Record<s
   const lines = parseRequestLines(input.lines, contract);
   const parsed = pickChanges(input, FIELD_PARSERS);
   if (parsed.description === undefined) fail("missing_fields");
+  const description = parsed.description;
   const sameProject = and(eq(purchaseRequests.projectId, projectId), eq(purchaseRequests.tenantId, ctx.tenantId));
-  // Two requests made at once may take the same number: the later one tries the next.
-  for (let attempt = 0; attempt < 5; attempt++) {
-    const made = await db.transaction(async (tx) => {
-      const [row] = await tx
-        .insert(purchaseRequests)
-        .values({
-          tenantId: ctx.tenantId,
-          projectId,
-          number: sql`(select coalesce(max(${purchaseRequests.number}), 0) + 1 from ${purchaseRequests} where ${sameProject})`,
-          kind,
-          description: parsed.description!,
-          neededBy: parsed.neededBy ?? null,
-          subcontractorId,
-          notes: parsed.notes ?? null,
-          createdById: ctx.userId,
-        })
-        .onConflictDoNothing()
-        .returning({ id: purchaseRequests.id, number: purchaseRequests.number });
-      if (!row) return null;
-      await tx.insert(purchaseRequestLines).values(lines.map((l) => ({ ...l, tenantId: ctx.tenantId, requestId: row.id })));
-      await logRequestEvent(tx, ctx, row.id, "created", { number: row.number, amountCents: sumCents(lines), lines: lines.length });
-      return { requestId: row.id, number: row.number };
-    });
-    if (made) return made;
-  }
-  throw new Error("Could not number the request");
+  return db.transaction((tx) =>
+    once(tx, async () => {
+      // Two requests made at once may take the same number: the later one waits
+      // for the first, then tries the next (each statement sees what is in by then).
+      for (let attempt = 0; attempt < 5; attempt++) {
+        const [row] = await tx
+          .insert(purchaseRequests)
+          .values({
+            tenantId: ctx.tenantId,
+            projectId,
+            number: sql`(select coalesce(max(${purchaseRequests.number}), 0) + 1 from ${purchaseRequests} where ${sameProject})`,
+            kind,
+            description,
+            neededBy: parsed.neededBy ?? null,
+            subcontractorId,
+            notes: parsed.notes ?? null,
+            createdById: ctx.userId,
+          })
+          .onConflictDoNothing()
+          .returning({ id: purchaseRequests.id, number: purchaseRequests.number });
+        if (!row) continue;
+        await tx.insert(purchaseRequestLines).values(lines.map((l) => ({ ...l, tenantId: ctx.tenantId, requestId: row.id })));
+        await logRequestEvent(tx, ctx, row.id, "created", { number: row.number, amountCents: sumCents(lines), lines: lines.length });
+        return { requestId: row.id, number: row.number };
+      }
+      throw new Error("Could not number the request");
+    }),
+  );
 }
 
 /**
@@ -310,7 +321,12 @@ export async function updateRequest(ctx: Ctx, requestId: string, input: Record<s
       await logRequestEvent(tx, ctx, requestId, "updated", { fields });
     }
     if (!lines || !contract) return;
-    const before = await tx.select().from(purchaseRequestLines).where(eq(purchaseRequestLines.requestId, requestId));
+    // In budget order: the log lists the changes the same way whatever order the rows are read in.
+    const before = await tx
+      .select()
+      .from(purchaseRequestLines)
+      .where(eq(purchaseRequestLines.requestId, requestId))
+      .orderBy(asc(purchaseRequestLines.chapterCode), asc(purchaseRequestLines.lineageId));
     const closing = (rows: { lineageId: string; chapterCode: string; amountCents: number }[]) =>
       rows.map((l) => ({ lineageId: l.lineageId, chapterCode: l.chapterCode, amountCents: l.amountCents, closesLine: true }));
     const changes = diffLines(closing(before), closing(lines), contract);

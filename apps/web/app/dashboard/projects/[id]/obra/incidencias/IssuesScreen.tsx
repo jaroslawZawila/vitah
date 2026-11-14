@@ -13,6 +13,7 @@ import {
   deleteIssueFileAction,
   updateIssueAction,
 } from "../../../../../actions/construction";
+import { useIdempotencyKey } from "../../../../components/useIdempotencyKey";
 import EmptyState from "../../components/EmptyState";
 import { SleepingCamera } from "../../components/illustrations";
 import { FilterSelect } from "../../components/construction/Filters";
@@ -56,6 +57,8 @@ export function IssueEditor({
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [pending, startTransition] = useTransition();
   const created = useRef<string | null>(null);
+  // A new record sent twice (a double click, a retry) is one record, with one number.
+  const createKey = useIdempotencyKey();
   // Attachments already up, not sent again when saving after a failed one.
   const uploaded = useRef(new Set<File>());
 
@@ -68,7 +71,7 @@ export function IssueEditor({
         const state = await updateIssueAction(projectId, id, input);
         if (!state?.success) return setError(state?.error);
       } else {
-        const state = await createIssueAction(projectId, input);
+        const state = await createKey.submit(input, (idempotencyKey) => createIssueAction(projectId, { ...input, idempotencyKey }));
         if (!state?.success || !state.issueId) return setError(state?.error);
         id = state.issueId;
       }

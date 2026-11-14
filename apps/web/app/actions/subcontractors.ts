@@ -9,6 +9,7 @@ import {
   subcontractorWorkersService as workers,
   type Ctx,
   type SubcontractorError,
+  type WorkerListQuery,
 } from "@repo/core";
 import { revalidatePath } from "next/cache";
 import { requireSession } from "../../lib/access";
@@ -60,6 +61,11 @@ export async function getCompanyOptions() {
 
 export async function getWorkers(projectId?: string | null) {
   return read((ctx) => workers.listWorkers(ctx, { projectId }));
+}
+
+/** One page of the workers, with the counts and KPIs of the whole list. */
+export async function getWorkersPage(query: WorkerListQuery = {}) {
+  return read((ctx) => workers.listWorkersPage(ctx, query));
 }
 
 export async function getWorker(workerId: string) {

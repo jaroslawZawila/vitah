@@ -16,6 +16,7 @@ const onPasswordChange = vi.fn(async (form: FormData) => {
   void form;
   return { success: true };
 });
+const onSignOut = vi.fn(async () => {});
 
 /** Next only sets `id` on `projects/[id]` routes. */
 function renderAt(
@@ -39,6 +40,7 @@ function renderAt(
         language="es"
         onLanguageChange={onLanguageChange}
         onPasswordChange={onPasswordChange}
+        onSignOut={onSignOut}
       />
     </NextIntlClientProvider>,
   );
@@ -186,6 +188,42 @@ describe("Sidebar", () => {
     fireEvent.click(settings!);
     fireEvent.click(await screen.findByRole("menuitemradio", { name: "Inglés" }));
     await waitFor(() => expect(onLanguageChange).toHaveBeenCalledWith("en"));
+  });
+
+  it("offers what users deleted in the settings menu, to admins only", async () => {
+    renderAt("/dashboard/projects");
+    fireEvent.click(screen.getAllByRole("button", { name: /Ajustes/ })[0]!);
+    expect(await screen.findByRole("menuitem", { name: "Elementos eliminados" })).toHaveAttribute("href", "/dashboard/eliminados");
+    // Not a section of the rail.
+    expect(within(screen.getByRole("navigation")).queryByText("Elementos eliminados")).not.toBeInTheDocument();
+  });
+
+  it("keeps what users deleted out of everyone else's settings menu", async () => {
+    renderAt("/dashboard/projects", false);
+    fireEvent.click(screen.getAllByRole("button", { name: /Ajustes/ })[0]!);
+    expect(await screen.findByRole("menuitem", { name: "Cambiar contraseña" })).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Elementos eliminados" })).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["an admin", true],
+    ["anyone else", false],
+  ])("signs out from the settings menu, its last item, apart from the rest: %s", async (_who, isAdmin) => {
+    onSignOut.mockClear();
+    renderAt("/dashboard/projects", isAdmin);
+    fireEvent.click(screen.getAllByRole("button", { name: /Ajustes/ })[0]!);
+
+    const signOut = await screen.findByRole("menuitem", { name: "Cerrar sesión" });
+    const items = screen.getAllByRole("menuitem");
+    expect(items.at(-1)).toBe(signOut);
+    // A rule of its own between it and the settings above.
+    expect(signOut.previousElementSibling).toHaveAttribute("role", "separator");
+    expect(onSignOut).not.toHaveBeenCalled();
+
+    fireEvent.click(signOut);
+
+    await waitFor(() => expect(onSignOut).toHaveBeenCalledTimes(1));
+    expect(onSignOut).toHaveBeenCalledWith();
   });
 
   it("changes the user's password from the settings menu", async () => {

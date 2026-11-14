@@ -83,27 +83,68 @@ describe("registerForPush", () => {
 });
 
 describe("unregisterPush", () => {
+  /** The removal sent in the background has had its (mocked, immediate) answer. */
+  const removalSettled = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
+
   it("removes the stored token from the server and the phone", async () => {
     await registerForPush("tok", "es", { ask: true });
 
     await unregisterPush("tok");
+    await removalSettled();
 
+    expect(api.removePushToken).toHaveBeenCalledTimes(1);
     expect(api.removePushToken).toHaveBeenCalledWith("tok", "ExponentPushToken[test]");
     expect(secureStore.has("vitah_push_registration")).toBe(false);
+    expect(secureStore.has("vitah_push_pending_removal")).toBe(false);
     // Signing in again registers again.
     await registerForPush("tok", "es", { ask: true });
     expect(api.registerPushToken).toHaveBeenCalledTimes(2);
   });
 
-  it("retries the removal when the app next opens if the server wasn't reached", async () => {
+  it("doesn't wait for the server: the removal is noted on the phone and sent in the background", async () => {
     await registerForPush("tok", "es", { ask: true });
-    jest.mocked(api.removePushToken).mockResolvedValueOnce({ ok: false, error: "network_error" });
+    let answer!: (result: { ok: true; data: { success: true } }) => void;
+    jest.mocked(api.removePushToken).mockReturnValueOnce(new Promise((resolve) => (answer = resolve)));
+
+    // Resolves although the server hasn't answered (it may never, offline).
+    await unregisterPush("tok");
+
+    expect(secureStore.has("vitah_push_registration")).toBe(false);
+    expect(JSON.parse(secureStore.get("vitah_push_pending_removal")!)).toEqual({
+      authToken: "tok",
+      pushToken: "ExponentPushToken[test]",
+    });
+
+    answer({ ok: true, data: { success: true } });
+    await removalSettled();
+    expect(secureStore.has("vitah_push_pending_removal")).toBe(false);
+  });
+
+  it.each(["network_error", "timeout", "server_error"] as const)(
+    "retries the removal when the app next opens after a %s",
+    async (error) => {
+      await registerForPush("tok", "es", { ask: true });
+      jest.mocked(api.removePushToken).mockResolvedValueOnce({ ok: false, error });
+
+      await unregisterPush("tok");
+      await removalSettled();
+      expect(secureStore.has("vitah_push_pending_removal")).toBe(true);
+
+      await retryPendingRemoval();
+      expect(api.removePushToken).toHaveBeenLastCalledWith("tok", "ExponentPushToken[test]");
+      expect(secureStore.has("vitah_push_pending_removal")).toBe(false);
+    },
+  );
+
+  it("keeps the removal for later when sending it throws", async () => {
+    await registerForPush("tok", "es", { ask: true });
+    jest.mocked(api.removePushToken).mockRejectedValueOnce(new Error("boom"));
 
     await unregisterPush("tok");
-    expect(secureStore.has("vitah_push_pending_removal")).toBe(true);
+    await removalSettled();
 
-    await retryPendingRemoval();
-    expect(api.removePushToken).toHaveBeenLastCalledWith("tok", "ExponentPushToken[test]");
+    expect(secureStore.has("vitah_push_pending_removal")).toBe(true);
+    await expect(retryPendingRemoval()).resolves.toBeUndefined();
     expect(secureStore.has("vitah_push_pending_removal")).toBe(false);
   });
 
@@ -112,8 +153,40 @@ describe("unregisterPush", () => {
     jest.mocked(api.removePushToken).mockResolvedValueOnce({ ok: false, error: "unauthorized" });
 
     await unregisterPush("tok");
+    await removalSettled();
 
     expect(secureStore.has("vitah_push_pending_removal")).toBe(false);
+  });
+
+  it("lets a removal on its way land before the phone registers again, so it can't undo it", async () => {
+    await registerForPush("tok", "es", { ask: true });
+    let answer!: (result: { ok: true; data: { success: true } }) => void;
+    jest.mocked(api.removePushToken).mockReturnValueOnce(new Promise((resolve) => (answer = resolve)));
+    await unregisterPush("tok");
+
+    // The same client signs straight back in.
+    const registered = registerForPush("tok-2", "es", { ask: true });
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(api.registerPushToken).toHaveBeenCalledTimes(1);
+
+    answer({ ok: true, data: { success: true } });
+    expect(await registered).toBe("registered");
+    expect(api.registerPushToken).toHaveBeenLastCalledWith("tok-2", "ExponentPushToken[test]", "es");
+  });
+
+  it("drops a removal that never got there once the phone is registered again", async () => {
+    await registerForPush("tok", "es", { ask: true });
+    jest.mocked(api.removePushToken).mockResolvedValueOnce({ ok: false, error: "network_error" });
+    await unregisterPush("tok");
+    await removalSettled();
+    jest.mocked(api.removePushToken).mockClear();
+
+    await registerForPush("tok-2", "es", { ask: true });
+
+    // Sent later, it would take the fresh registration away.
+    expect(secureStore.has("vitah_push_pending_removal")).toBe(false);
+    await retryPendingRemoval();
+    expect(api.removePushToken).not.toHaveBeenCalled();
   });
 
   it("does nothing when the phone never registered", async () => {

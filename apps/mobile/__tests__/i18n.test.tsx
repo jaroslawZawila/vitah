@@ -73,6 +73,65 @@ describe("useI18n", () => {
   });
 });
 
+describe("a key without a text", () => {
+  // Keys built from what the server sends, e.g. `hitoStatus.${status}`, may name a status this version doesn't know.
+  const unknown = (key: string) => key as Parameters<ReturnType<typeof useI18n>["t"]>[0];
+  let warn: jest.SpyInstance;
+
+  beforeEach(() => {
+    warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+  });
+  afterEach(() => warn.mockRestore());
+
+  it.each([
+    "hitoStatus.disputed", // a new status
+    "phase.status.paused",
+    "nothing.here.at.all", // a missing group (used to throw)
+    "hitoStatus", // a group, not a text
+    "hitoStatus.paid.more", // past a text
+    "hitoStatus.constructor", // on every object, but not a text
+    "hitoStatus.__proto__",
+    "hitoStatus.toString",
+    "",
+    ".",
+    "hitoStatus.",
+  ])("reads %j as the fallback, never as \"undefined\"", (key) => {
+    const { t } = renderHook(() => useI18n()).result.current;
+
+    expect(t(unknown(key))).toBe("—");
+    expect(t(unknown(key), undefined, "")).toBe("");
+    expect(t(unknown(key), { count: 2 }, "Otro")).toBe("Otro");
+  });
+
+  it.each([undefined, null, 42, {}, Symbol("key"), Object.create(null)])(
+    "doesn't throw for a key that isn't even text: %p",
+    (key) => {
+      const { t } = renderHook(() => useI18n()).result.current;
+
+      expect(t(key as never)).toBe("—");
+      expect(t(key as never, null as never, "?")).toBe("?");
+    },
+  );
+
+  it("still reads the texts that exist, with or without a fallback", () => {
+    const { t } = renderHook(() => useI18n()).result.current;
+
+    expect(t("hitoStatus.paid", undefined, "?")).toBe("Pagado");
+    expect(t("photos.count", { count: 1 }, "?")).toBe("1 foto");
+  });
+
+  it("says so once per key in development", () => {
+    const { t } = renderHook(() => useI18n()).result.current;
+
+    t(unknown("hitoStatus.onlyWarnedOnce"));
+    t(unknown("hitoStatus.onlyWarnedOnce"));
+    t(unknown("hitoStatus.onlyWarnedOnce"), undefined, "");
+
+    const warnings = warn.mock.calls.filter(([message]) => String(message).includes("hitoStatus.onlyWarnedOnce"));
+    expect(warnings).toEqual([['[i18n] No "es" text for "hitoStatus.onlyWarnedOnce"']]);
+  });
+});
+
 describe("deviceLanguage", () => {
   const resolved = Intl.DateTimeFormat.prototype.resolvedOptions;
   afterEach(() => {

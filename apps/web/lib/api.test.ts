@@ -5,7 +5,7 @@ vi.mock("@repo/auth/context", () => ({ getRequestContext: vi.fn() }));
 vi.mock("@repo/auth/mobile", () => ({ authenticateMobileRequest: vi.fn() }));
 const { getRequestContext } = await import("@repo/auth/context");
 const { authenticateMobileRequest } = await import("@repo/auth/mobile");
-const { isCrossSiteWrite, withContext, withMobileClient } = await import("./api");
+const { isCrossSiteWrite, readCreate, readWithFile, withContext, withMobileClient } = await import("./api");
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -127,5 +127,44 @@ describe("withMobileClient", () => {
     expect(log).toHaveBeenCalledTimes(1);
     expect(JSON.parse(log.mock.calls[0]![0] as string)).toMatchObject({ event: "api.internal_error", id: body.id, method: "GET", path: "/api/mobile/obra" });
     expect(log.mock.calls[0]![0]).not.toContain("cliente@vitah.es");
+  });
+});
+
+describe("readCreate", () => {
+  const post = (body: unknown, headers: Record<string, string> = {}) =>
+    new Request("http://portal.vitah.es/api/v1/purchases/o1/invoices", {
+      method: "POST",
+      headers: { "content-type": "application/json", ...headers },
+      body: JSON.stringify(body),
+    });
+
+  it("puts the Idempotency-Key header in the body for core, over the body's own field", async () => {
+    expect(await readCreate(post({ amountCents: 5 }, { "Idempotency-Key": "key-from-the-header" }))).toEqual({
+      amountCents: 5,
+      idempotencyKey: "key-from-the-header",
+    });
+    expect(await readCreate(post({ amountCents: 5, idempotencyKey: "key-from-the-body" }, { "idempotency-key": "key-from-the-header" }))).toEqual({
+      amountCents: 5,
+      idempotencyKey: "key-from-the-header",
+    });
+    // An empty header is a key that isn't one, for core to refuse: not "no key".
+    expect(await readCreate(post({ amountCents: 5 }, { "Idempotency-Key": "" }))).toEqual({ amountCents: 5, idempotencyKey: "" });
+  });
+
+  it("leaves the body as it came without the header: its own field, or no key", async () => {
+    expect(await readCreate(post({ amountCents: 5, idempotencyKey: "key-from-the-body" }))).toEqual({ amountCents: 5, idempotencyKey: "key-from-the-body" });
+    expect(await readCreate(post({ amountCents: 5 }))).toEqual({ amountCents: 5 });
+    await expect(readCreate(post([1, 2]))).rejects.toMatchObject({ code: "invalid_body", status: 400 });
+  });
+
+  it("reads a multipart body with its file", async () => {
+    const form = new FormData();
+    form.set("data", JSON.stringify({ amountCents: 5 }));
+    form.set("file", new File(["%PDF-1.7"], "proof.pdf", { type: "application/pdf" }));
+    const request = new Request("http://portal.vitah.es/api/v1/purchases/invoices/i1/payments", { method: "POST", headers: { "Idempotency-Key": "key-from-the-header" }, body: form });
+
+    const body = await readCreate(request, readWithFile);
+    expect(body).toMatchObject({ amountCents: 5, idempotencyKey: "key-from-the-header" });
+    expect(body.file).toBeInstanceOf(File);
   });
 });
