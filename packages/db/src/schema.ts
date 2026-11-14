@@ -257,12 +257,15 @@ export const projects = pgTable(
     documentsRev: integer("documents_rev").default(0).notNull(),
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+    // Soft delete: set when a user deletes it. The row and its files stay; every read leaves it out.
+    deletedAt: timestamp("deleted_at", { mode: "date" }),
+    deletedById: text("deleted_by_id").references(() => users.id, { onDelete: "set null" }),
   },
   (table) => ({
-    tenantRefUnique: unique("projects_tenant_ref_unique").on(
-      table.tenantId,
-      table.ref,
-    ),
+    // Among the projects not deleted: a deleted one doesn't keep its ref taken.
+    tenantRefUnique: uniqueIndex("projects_tenant_ref_unique")
+      .on(table.tenantId, table.ref)
+      .where(sql`${table.deletedAt} is null`),
     clientUserIdx: index("projects_client_user_idx").on(table.clientUserId),
   }),
 );
@@ -310,6 +313,9 @@ export const projectDocuments = pgTable(
     }),
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+    // Soft delete: set when a user deletes it. The row and its files stay; every read leaves it out.
+    deletedAt: timestamp("deleted_at", { mode: "date" }),
+    deletedById: text("deleted_by_id").references(() => users.id, { onDelete: "set null" }),
   },
   (table) => ({
     projectIdx: index("project_documents_project_idx").on(table.projectId),
@@ -354,6 +360,9 @@ export const projectPhotos = pgTable(
     }),
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+    // Soft delete: set when a user deletes it. The row and its files stay; every read leaves it out.
+    deletedAt: timestamp("deleted_at", { mode: "date" }),
+    deletedById: text("deleted_by_id").references(() => users.id, { onDelete: "set null" }),
   },
   (table) => ({
     projectIdx: index("project_photos_project_idx").on(table.projectId),
@@ -822,6 +831,9 @@ export const obraIssueFiles = pgTable(
     sizeBytes: integer("size_bytes").notNull(),
     uploadedById: text("uploaded_by_id").references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    // Soft delete: set when a user deletes it. The row and its files stay; every read leaves it out.
+    deletedAt: timestamp("deleted_at", { mode: "date" }),
+    deletedById: text("deleted_by_id").references(() => users.id, { onDelete: "set null" }),
   },
   (table) => ({
     issueIdx: index("obra_issue_files_issue_idx").on(table.issueId),
@@ -1125,6 +1137,9 @@ export const subcontractorAssignments = pgTable(
       .defaultNow()
       .notNull()
       .$onUpdate(() => new Date()),
+    // Soft delete: set when a user deletes it. The row and its files stay; every read leaves it out.
+    deletedAt: timestamp("deleted_at", { mode: "date" }),
+    deletedById: text("deleted_by_id").references(() => users.id, { onDelete: "set null" }),
   },
   (table) => ({
     subcontractorProjectUnique: unique("subcontractor_assignments_subcontractor_project_unique").on(
@@ -1310,6 +1325,9 @@ export const purchaseOrderDocuments = pgTable(
     title: text("title").notNull(),
     createdById: text("created_by_id").references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    // Soft delete: set when a user deletes it. The row and its files stay; every read leaves it out.
+    deletedAt: timestamp("deleted_at", { mode: "date" }),
+    deletedById: text("deleted_by_id").references(() => users.id, { onDelete: "set null" }),
   },
   (table) => ({
     orderIdx: index("purchase_order_documents_order_idx").on(table.orderId),
@@ -1537,13 +1555,15 @@ export const purchaseInvoices = pgTable(
       .defaultNow()
       .notNull()
       .$onUpdate(() => new Date()),
+    // Soft delete: set when a user deletes it. The row and its files stay; every read leaves it out.
+    deletedAt: timestamp("deleted_at", { mode: "date" }),
+    deletedById: text("deleted_by_id").references(() => users.id, { onDelete: "set null" }),
   },
   (table) => ({
-    supplierNumberUnique: unique("purchase_invoices_supplier_number_unique").on(
-      table.tenantId,
-      table.subcontractorId,
-      table.number,
-    ),
+    // Among the invoices not deleted: a deleted one doesn't keep its number taken.
+    supplierNumberUnique: uniqueIndex("purchase_invoices_supplier_number_unique")
+      .on(table.tenantId, table.subcontractorId, table.number)
+      .where(sql`${table.deletedAt} is null`),
     orderIdx: index("purchase_invoices_order_idx").on(table.orderId),
     tenantDueIdx: index("purchase_invoices_tenant_due_idx").on(table.tenantId, table.dueOn),
     // A credit note's invoice: settling an invoice reads its credit notes.
@@ -1625,6 +1645,9 @@ export const purchasePayments = pgTable(
     fileSizeBytes: integer("file_size_bytes"),
     createdById: text("created_by_id").references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    // Soft delete: set when a user deletes it. The row and its files stay; every read leaves it out.
+    deletedAt: timestamp("deleted_at", { mode: "date" }),
+    deletedById: text("deleted_by_id").references(() => users.id, { onDelete: "set null" }),
   },
   (table) => ({
     invoiceIdx: index("purchase_payments_invoice_idx").on(table.invoiceId),
