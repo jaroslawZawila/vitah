@@ -33,23 +33,23 @@
     "@anthropic-ai/sdk": "^0.133.0",
     "@react-pdf/renderer": "^4.9.0",
     "@repo/db": "workspace:*",
-    "@vercel/blob": "^2.8.0",
+    "@vercel/blob": "^2.9.0",
     "bcryptjs": "^2.4.3",
     "exceljs": "^4.4.0",
     "fflate": "^0.8.3",
     "qrcode-generator": "2.0.4",
     "react": "^19.2.3",
-    "sharp": "^0.35.4",
-    "zod": "^4.6.5"
+    "sharp": "^0.35.5",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@repo/typescript-config": "workspace:*",
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^22.15.3",
     "@types/react": "19.2.18",
-    "@vitest/coverage-v8": "^5.0.1",
-    "tsx": "^4.19.0",
+    "@vitest/coverage-v8": "^5.1.0",
+    "tsx": "^4.23.15",
     "typescript": "5.9.2",
-    "vitest": "^5.0.1"
+    "vitest": "^5.1.0"
   }
 }
