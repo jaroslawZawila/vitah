@@ -3,13 +3,14 @@
 // Container: the only file of the page that calls server actions.
 
 import { useState, useActionState } from "react";
-import { useFormatter, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Field, FormMessage } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useFormat } from "@/lib/format";
 import {
   NativeSelect,
   NativeSelectOption,
@@ -30,7 +31,7 @@ import {
   toggleUserActive,
 } from "../../actions/users";
 import NewPasswordField from "../components/NewPasswordField";
-import RemoveMfaDialog from "./components/RemoveMfaDialog";
+import { useConfirm } from "../components/useConfirm";
 import ResetPasswordDialog from "./components/ResetPasswordDialog";
 
 const ROLES = ["admin", "manager", "viewer"] as const;
@@ -61,16 +62,16 @@ export function UsersClient({
   currentUserId: string | null;
 }) {
   const t = useTranslations("usersPage");
-  const format = useFormatter();
+  const format = useFormat();
   const [showForm, setShowForm] = useState(false);
   const [formState, formAction, isPending] = useActionState(createUser, null);
   const [rowError, setRowError] = useState<string | null>(null);
   // Whose password the admin is setting, and whose was just set (their names only).
   const [resetFor, setResetFor] = useState<UserRow | null>(null);
   const [resetDone, setResetDone] = useState<string | null>(null);
-  // Whose two-step verification the admin is removing, and whose was just removed.
-  const [removeMfaFor, setRemoveMfaFor] = useState<UserRow | null>(null);
+  // Whose two-step verification was just removed.
   const [mfaRemoved, setMfaRemoved] = useState<string | null>(null);
+  const confirm = useConfirm("usersPage.errors");
   const label = (user: UserRow) => user.name || user.email;
 
   /** The last outcome's line goes when something else is started. */
@@ -83,6 +84,32 @@ export function UsersClient({
     clearDone();
     const result = await action;
     setRowError(result.error ?? null);
+  }
+
+  /** Asks first: their sessions end (and, deactivated, they can't sign in). */
+  function askToDeactivate(user: UserRow) {
+    clearDone();
+    setRowError(null);
+    confirm.ask({
+      t,
+      key: "deactivateDialog",
+      values: { name: label(user) },
+      destructive: true,
+      action: () => toggleUserActive(user.id, false),
+    });
+  }
+
+  function askToRemoveMfa(user: UserRow) {
+    clearDone();
+    setRowError(null);
+    confirm.ask({
+      t,
+      key: "removeTwoStep",
+      values: { name: label(user) },
+      destructive: true,
+      action: () => removeUserMfaAction(user.id),
+      onDone: () => setMfaRemoved(label(user)),
+    });
   }
 
   const roleOptions = ROLES.map((role) => (
@@ -134,17 +161,7 @@ export function UsersClient({
         }}
         onClose={() => setResetFor(null)}
       />
-      <RemoveMfaDialog
-        key={`mfa-${removeMfaFor?.id}`}
-        name={removeMfaFor ? label(removeMfaFor) : null}
-        onConfirm={() => removeUserMfaAction(removeMfaFor!.id)}
-        onDone={() => {
-          setRowError(null);
-          setMfaRemoved(removeMfaFor ? label(removeMfaFor) : null);
-          setRemoveMfaFor(null);
-        }}
-        onClose={() => setRemoveMfaFor(null)}
-      />
+      {confirm.dialog}
 
       {showForm && (
         <div>
@@ -264,10 +281,7 @@ export function UsersClient({
                             : undefined
                         }
                         aria-label={t("actions.removeTwoStepFor", { name: label(user) })}
-                        onClick={() => {
-                          clearDone();
-                          setRemoveMfaFor(user);
-                        }}
+                        onClick={() => askToRemoveMfa(user)}
                       >
                         {t("actions.removeTwoStep")}
                       </Button>
@@ -275,13 +289,7 @@ export function UsersClient({
                   </div>
                 </TableCell>
                 <TableCell className="num text-muted-foreground">
-                  {format.dateTime(new Date(user.createdAt), {
-                    day: "numeric",
-                    month: "numeric",
-                    year: "numeric",
-                    // Server and browser must render the same text.
-                    timeZone: "Europe/Madrid",
-                  })}
+                  {format.date(user.createdAt)}
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-1.5">
@@ -309,7 +317,7 @@ export function UsersClient({
                     {user.active ? (
                       <Button
                         type="button"
-                        variant="destructive"
+                        variant="ghost-destructive"
                         size="sm"
                         className="disabled:pointer-events-auto disabled:cursor-not-allowed"
                         disabled={user.id === currentUserId}
@@ -318,9 +326,7 @@ export function UsersClient({
                             ? t("errors.cannot_modify_self")
                             : undefined
                         }
-                        onClick={() =>
-                          runRowAction(toggleUserActive(user.id, false))
-                        }
+                        onClick={() => askToDeactivate(user)}
                       >
                         {t("actions.deactivate")}
                       </Button>

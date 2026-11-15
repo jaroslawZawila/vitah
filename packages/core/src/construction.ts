@@ -52,7 +52,7 @@ import {
   type ObraStage,
   type ProgressEvent,
 } from "./contract";
-import { chapterState, chapterTiming, contractSchedule, contractTotals, deviation, milestoneState } from "./control-calc";
+import { chapterState, chapterTiming, contractTotals, deviation, milestoneState } from "./control-calc";
 import { idempotent } from "./idempotency";
 import { MAX_TEXT } from "./input";
 import {
@@ -70,6 +70,7 @@ import {
 } from "./obra-data";
 import { todayInSpain } from "./obra-calc";
 import { listPhotos } from "./photos";
+import { obraContract, obraSchedule } from "./planning";
 import { contractingOf, loadProjectOrders } from "./purchasing";
 import { inLiveProject, projectInTenant, softDeleted, type Tx } from "./project-client";
 import { isPdf, openStoredFile, projectFolder, storeFiles, type StoredFile } from "./project-files";
@@ -177,12 +178,15 @@ async function loadControl(ctx: Ctx, projectId: string) {
   const today = todayInSpain();
   const works = { startDate: toCalendarDate(project.startDate), completionDate: toCalendarDate(project.completionDate) };
   // The main budget items: the contract's chapters at cost, but not the contingency.
-  const { items, dates, states, plan, planSource } = contractSchedule(costChapters, hitos, progressRows, works, obra.planDates);
+  const contract = obraContract(obra, works);
+  const { items, dates, states, plan, planSource } = contract;
   const hitoOf = new Map(hitos.flatMap((h) => h.chapters.map((c) => [c.code, h] as const)));
   const requestOf = new Map(requests.map((r) => [r.hitoId, toRequest(r, hitos)]));
 
   return {
     project,
+    obra,
+    contract,
     works,
     clientName: project.client ? (project.client.name ?? project.client.email) : null,
     revision,
@@ -442,6 +446,8 @@ export async function getControl(ctx: Ctx, projectId: string): Promise<Construct
     photos,
     photoCount,
     sources: control.sources,
+    // On time or late: the same rule and inputs as Planificación's.
+    schedule: obraSchedule(control.obra, works, control.today, control.contract),
   };
 }
 

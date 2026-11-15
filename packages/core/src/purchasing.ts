@@ -641,6 +641,7 @@ export async function getProjectPurchaseLines(ctx: Ctx, projectId: string): Prom
     return {
       code: chapter.code,
       name: chapter.name,
+      state: chapter.state,
       orderBy: chapter.orderBy,
       costCents: lines.reduce((sum, l) => sum + l.costCents, 0),
       contractedCents: lines.reduce((sum, l) => sum + l.contractedCents, 0),

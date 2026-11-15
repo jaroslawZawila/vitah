@@ -53,7 +53,7 @@ describe("NewProjectScreen", () => {
 
     expect(screen.getByText("Paso 2 de 2 · Revisión")).toBeInTheDocument();
     expect(screen.getByText("VTH-26-007")).toBeInTheDocument();
-    expect(screen.getByText("1 de octubre de 2026")).toBeInTheDocument();
+    expect(screen.getByText("1 oct 2026")).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: "Crear proyecto" }));
 

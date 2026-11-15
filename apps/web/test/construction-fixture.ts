@@ -7,6 +7,7 @@ import type {
   ObraIssue,
   ProjectPhoto,
 } from "@repo/core/contract";
+import { scheduleStatus } from "@repo/core/contract";
 import { orderItem } from "./purchasing-fixture";
 
 // Static data for the Obra tab's tests: VTH-26-001 on 17 Oct 2026, halfway
@@ -356,6 +357,7 @@ export const control: ConstructionControl = {
   photos,
   photoCount: 148,
   sources: { planning: "mock", purchasing: "live" },
+  schedule: scheduleStatus({ chapters, planning: "mock", forecast: null, today: TODAY }),
 };
 
 export const header = { ref: "VTH-26-001", stage: 6 as const, openIssues: 2 };

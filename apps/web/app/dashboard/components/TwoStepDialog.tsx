@@ -134,9 +134,9 @@ export default function TwoStepDialog({
           className="size-[184px] self-center rounded-lg border"
         />
         <div className="flex flex-col gap-1">
-          <p className="text-xs text-muted-foreground">{t("setup.manual")}</p>
+          <p className="text-meta text-muted-foreground">{t("setup.manual")}</p>
           {/* In groups of four that wrap: it must fit a phone's width (`num` would keep it on one line). */}
-          <p className="rounded-lg bg-raise px-3 py-2 font-mono text-[13px] select-all" aria-label={t("setup.secretLabel")}>
+          <p className="rounded-lg bg-raise px-3 py-2 font-mono text-sm select-all" aria-label={t("setup.secretLabel")}>
             {grouped(view.enrolment.secret)}
           </p>
         </div>
@@ -161,12 +161,12 @@ export default function TwoStepDialog({
         </FormMessage>
         <div className="flex flex-col gap-1.5">
           <p className="eyebrow">{t("codes.title")}</p>
-          <ul className="num grid grid-cols-2 gap-x-4 gap-y-1 rounded-lg bg-raise px-3 py-2.5 text-[13px]" aria-label={t("codes.title")}>
+          <ul className="num grid grid-cols-2 gap-x-4 gap-y-1 rounded-lg bg-raise px-3 py-2.5 text-sm" aria-label={t("codes.title")}>
             {view.codes.map((code) => (
               <li key={code}>{code}</li>
             ))}
           </ul>
-          <p className="text-xs text-muted-foreground">{t("codes.help")}</p>
+          <p className="text-meta text-muted-foreground">{t("codes.help")}</p>
         </div>
         <FormActions>
           <Button

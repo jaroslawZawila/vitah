@@ -83,7 +83,7 @@ export default function OptionsView({ revision, handlers }: { revision: BudgetRe
           </div>
           {handlers && (
             <div className="flex flex-wrap items-end gap-3">
-              <label className="flex flex-col gap-1 text-[12.5px] font-semibold text-muted-foreground">
+              <label className="flex flex-col gap-1 text-meta font-semibold text-muted-foreground">
                 {t("kind")}
                 <NativeSelect value={option.optionKind} onChange={(event) => handlers.onUpdateOption(option, { optionKind: event.target.value as OptionKind })}>
                   {OPTION_KINDS.map((kind) => (
@@ -93,7 +93,7 @@ export default function OptionsView({ revision, handlers }: { revision: BudgetRe
               </label>
             </div>
           )}
-          <label className="flex flex-col gap-1.5 text-[12.5px] font-semibold text-muted-foreground">
+          <label className="flex flex-col gap-1.5 text-meta font-semibold text-muted-foreground">
             <span>
               {t("introLabel")} <span className="font-normal">{t("introHint")}</span>
             </span>

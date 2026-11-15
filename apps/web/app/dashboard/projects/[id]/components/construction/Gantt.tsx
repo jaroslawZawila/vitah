@@ -67,7 +67,7 @@ const IN_PROGRESS =
 export function MonthAxis({ timeline, className }: { timeline: Timeline; className?: string }) {
   const f = useControlFormat();
   return (
-    <div aria-hidden className={cn("relative h-4 min-w-[340px] font-mono text-[10.5px] font-normal tracking-normal text-muted-foreground normal-case", className)}>
+    <div aria-hidden className={cn("relative h-4 min-w-[340px] font-mono text-xs font-normal tracking-normal text-muted-foreground normal-case", className)}>
       {timeline.months.map((month) => (
         <span key={month} className="absolute top-0" style={{ left: `${at(timeline, month)}%` }}>
           {f.month(month)}
@@ -97,12 +97,12 @@ export function GanttBar({
   const f = useControlFormat();
   const plan =
     chapter.plannedStart && chapter.plannedEnd
-      ? t("plan", { start: f.day(chapter.plannedStart), end: f.day(chapter.plannedEnd) })
+      ? t("plan", { start: f.date(chapter.plannedStart), end: f.date(chapter.plannedEnd) })
       : null;
   const actual = chapter.actualStart
     ? chapter.actualEnd
-      ? t("actual", { start: f.day(chapter.actualStart), end: f.day(chapter.actualEnd) })
-      : t("actualSince", { start: f.day(chapter.actualStart) })
+      ? t("actual", { start: f.date(chapter.actualStart), end: f.date(chapter.actualEnd) })
+      : t("actualSince", { start: f.date(chapter.actualStart) })
     : null;
   const actualEnd = chapter.actualEnd ?? (chapter.actualStart && today >= chapter.actualStart ? today : null);
 
@@ -141,7 +141,7 @@ export function GanttLegend({ today, planSource }: { today: string; planSource: 
   const t = useTranslations("construction.gantt");
   const f = useControlFormat();
   return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[12.5px] text-muted-foreground">
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-meta text-muted-foreground">
       <span className="inline-flex items-center gap-1.5">
         <span aria-hidden className="h-2 w-5 rounded-[4px] border-[1.5px] border-muted-foreground/70" />
         {t("legendPlan")} {planSource}
@@ -156,7 +156,7 @@ export function GanttLegend({ today, planSource }: { today: string; planSource: 
       </span>
       <span className="inline-flex items-center gap-1.5">
         <span aria-hidden className="h-3.5 border-l-2 border-dashed border-bad" />
-        {t("legendToday", { date: f.day(today) })}
+        {t("legendToday", { date: f.date(today) })}
       </span>
     </div>
   );

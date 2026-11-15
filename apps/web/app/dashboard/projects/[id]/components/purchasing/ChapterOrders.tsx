@@ -47,13 +47,13 @@ export default function ChapterOrders({
         </div>
       </div>
       {orders.length === 0 ? (
-        <p className="text-[13px] text-muted-foreground">{t("empty")}</p>
+        <p className="text-sm text-muted-foreground">{t("empty")}</p>
       ) : (
         <ul className="m-0 list-none p-0">
           {orders.map((order) => (
             <li
               key={order.id}
-              className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b py-2.5 text-[13.5px] last:border-b-0"
+              className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b py-2.5 text-sm last:border-b-0"
             >
               <Link
                 href={orderHref(order)}

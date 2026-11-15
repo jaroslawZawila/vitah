@@ -34,7 +34,7 @@ export default function InlineNumber({
     <Input
       type="text"
       inputMode="decimal"
-      className="h-8 border-transparent bg-transparent px-1.5 text-right font-mono text-[12.5px] hover:border-border hover:bg-raise focus-visible:bg-raise"
+      className="h-8 border-transparent bg-transparent px-1.5 text-right font-mono text-meta hover:border-border hover:bg-raise focus-visible:bg-raise"
       aria-label={label}
       value={text}
       onChange={(event) => setText(event.target.value)}

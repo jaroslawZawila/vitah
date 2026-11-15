@@ -61,7 +61,7 @@ export default function ObrasTab({
   return (
     <div className="flex flex-col gap-4">
       {assignments.length === 0 && editing !== "new" && (
-        <p className={cn(cardVariants(), "text-center text-[13.5px] text-muted-foreground")}>{t("empty")}</p>
+        <p className={cn(cardVariants(), "text-center text-sm text-muted-foreground")}>{t("empty")}</p>
       )}
       {assignments.map((a) =>
         editing === a.projectId ? (
@@ -93,7 +93,7 @@ export default function ObrasTab({
                 </div>
               )}
             </div>
-            <dl className="m-0 grid grid-cols-[minmax(120px,32%)_1fr] gap-x-3.5 gap-y-2.5 text-[13.5px]">
+            <dl className="m-0 grid grid-cols-[minmax(120px,32%)_1fr] gap-x-3.5 gap-y-2.5 text-sm">
               <dt className="text-muted-foreground">{t("chapters")}</dt>
               <dd className="m-0 flex flex-wrap gap-1.5">
                 {a.chapterCodes.length === 0
@@ -111,7 +111,7 @@ export default function ObrasTab({
               <dt className="text-muted-foreground">{t("pss")}</dt>
               <dd className="m-0 flex flex-wrap items-center gap-1.5">
                 <DocStateBadge state={a.pssAdhesion.state} daysLeft={a.pssAdhesion.daysLeft} />
-                <span className="text-[12.5px] text-muted-foreground">{name("adhesion_pss", kind)}</span>
+                <span className="text-meta text-muted-foreground">{name("adhesion_pss", kind)}</span>
               </dd>
               <dt className="text-muted-foreground">{t("book")}</dt>
               <dd className="m-0 flex flex-wrap items-center gap-1.5">

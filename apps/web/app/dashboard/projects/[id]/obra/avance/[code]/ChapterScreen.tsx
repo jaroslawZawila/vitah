@@ -131,7 +131,7 @@ export default function ChapterScreen({
             )}
           </div>
           {detail.issues.length === 0 ? (
-            <p className="text-[13px] text-muted-foreground">{t("noIssues")}</p>
+            <p className="text-sm text-muted-foreground">{t("noIssues")}</p>
           ) : (
             detail.issues.map((record) => (
               <IssueCard

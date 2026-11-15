@@ -23,7 +23,7 @@ export function CheckFilter({
   onChange: (checked: boolean) => void;
 }) {
   return (
-    <label htmlFor={id} className="inline-flex min-h-10 cursor-pointer items-center gap-2 text-[13px] pointer-coarse:min-h-11">
+    <label htmlFor={id} className="inline-flex min-h-10 cursor-pointer items-center gap-2 text-sm pointer-coarse:min-h-11">
       <input
         id={id}
         type="checkbox"

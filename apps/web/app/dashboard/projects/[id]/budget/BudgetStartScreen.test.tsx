@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -147,6 +147,11 @@ describe("BudgetStartScreen", () => {
   it("removes a document", async () => {
     renderScreen({ inputs: [plans] });
     await userEvent.click(screen.getByRole("button", { name: "Quitar" }));
+    // It says the document leaves the project's Documents too.
+    const dialog = within(await screen.findByRole("alertdialog", { name: /^¿Quitar «.+»\?$/ }));
+    expect(dialog.getByText(/sale también de Documentos del proyecto\. Un administrador puede restaurarlo desde Elementos eliminados\./)).toBeInTheDocument();
+    expect(documents.deleteProjectDocumentAction).not.toHaveBeenCalled();
+    await userEvent.click(dialog.getByRole("button", { name: "Quitar documento" }));
     expect(documents.deleteProjectDocumentAction).toHaveBeenCalledWith("p-1", "doc-1");
   });
 
@@ -155,8 +160,10 @@ describe("BudgetStartScreen", () => {
     renderScreen({ inputs: [plans] });
 
     await userEvent.click(screen.getByRole("button", { name: "Quitar" }));
+    const dialog = within(await screen.findByRole("alertdialog"));
+    await userEvent.click(dialog.getByRole("button", { name: "Quitar documento" }));
 
-    expect(await screen.findByText("Este documento es del presupuesto: no se puede quitar.")).toBeInTheDocument();
+    expect(await dialog.findByText("Este documento es del presupuesto: no se puede quitar.")).toBeInTheDocument();
   });
 
   it("explains a failed AI run", () => {
@@ -182,9 +189,20 @@ describe("BudgetStartScreen", () => {
   });
 
   it("cancels the AI run", async () => {
+    vi.mocked(actions.cancelGenerationAction).mockResolvedValue({ success: true });
     renderScreen({ inputs: [plans], generation: generation() });
     await userEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    // Says what is lost: no draft, and what was spent stays spent.
+    const dialog = within(await screen.findByRole("alertdialog", { name: "¿Detener la generación del borrador?" }));
+    expect(dialog.getByText(/no se guarda ningún borrador.*su coste no se recupera/)).toBeInTheDocument();
+    await userEvent.click(dialog.getByRole("button", { name: "Seguir generando" }));
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+    expect(actions.cancelGenerationAction).not.toHaveBeenCalled();
+
+    await userEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    await userEvent.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Detener generación" }));
     expect(actions.cancelGenerationAction).toHaveBeenCalledWith("p-1", "gen-1");
+    await waitFor(() => expect(refresh).toHaveBeenCalled());
   });
 
   it("is read-only for viewers", () => {

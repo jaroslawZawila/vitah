@@ -2,32 +2,20 @@
 
 import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
+import { placeOf } from "./place";
 
+/** Where the user is ("Compras — Facturas"), from the address; also the browser tab's title. */
 export default function Topbar() {
   const pathname = usePathname();
-  const t = useTranslations("topbar");
-
-  const titleKey = pathname.startsWith("/dashboard/subcontratas")
-    ? "subcontractors"
-    : pathname.startsWith("/dashboard/eliminados")
-    ? "deleted"
-    : pathname.startsWith("/dashboard/compras")
-    ? "purchases"
-    : pathname.startsWith("/dashboard/users")
-    ? "users"
-    : pathname.startsWith("/dashboard/clients")
-      ? "clients"
-      : pathname === "/dashboard/projects/new"
-        ? "newProject"
-        : /^\/dashboard\/projects\/(compras|presupuestos)(\/|$)/.test(pathname)
-        ? "projects"
-        : pathname.startsWith("/dashboard/projects/")
-      ? "projectDetail"
-      : "projects";
+  const t = useTranslations();
+  const { title, part } = placeOf(pathname);
+  const section = t(`topbar.titles.${title}`);
+  const label = part ? t("topbar.withPart", { section, part: t(`sidebar.${part}`) }) : section;
 
   return (
     <header className="flex min-h-12 items-center border-b px-4 sm:px-7">
-      <div className="eyebrow">{t(`titles.${titleKey}`)}</div>
+      <title>{t("topbar.documentTitle", { label })}</title>
+      <div className="eyebrow">{label}</div>
     </header>
   );
 }

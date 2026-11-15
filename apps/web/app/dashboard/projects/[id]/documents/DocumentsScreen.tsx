@@ -22,6 +22,7 @@ import EmptyState from "../components/EmptyState";
 import { EmptyFolder } from "../components/illustrations";
 import Modal from "../components/Modal";
 import TabHeader from "../components/TabHeader";
+import { useConfirm } from "../../../components/useConfirm";
 
 /** The project's documents; staff choose which ones the client sees in the app. */
 export default function DocumentsScreen({
@@ -39,6 +40,7 @@ export default function DocumentsScreen({
   const [uploadOpen, setUploadOpen] = useState(false);
   const [deleteState, setDeleteState] = useState<DocumentsState>(null);
   const [deleting, startDelete] = useTransition();
+  const confirm = useConfirm("projectDetailPage.documents.errors");
 
   function handleVisibility(document: ProjectDocument, visible: boolean) {
     startDelete(async () => {
@@ -54,9 +56,13 @@ export default function DocumentsScreen({
   const visible = documents.filter((d) => d.visibleToClient).length;
 
   function handleDelete(document: ProjectDocument) {
-    if (!confirm(t("confirmDelete", { title: document.title }))) return;
-    startDelete(async () => {
-      setDeleteState(await deleteProjectDocumentAction(projectId, document.id));
+    setDeleteState(null);
+    confirm.ask({
+      t,
+      key: "deleteDialog",
+      values: { title: document.title },
+      destructive: true,
+      action: () => deleteProjectDocumentAction(projectId, document.id),
     });
   }
 
@@ -97,13 +103,14 @@ export default function DocumentsScreen({
               fileUrl={(document) => `/api/v1/projects/${projectId}/documents/${document.id}`}
               onDelete={canManage ? handleDelete : undefined}
               onToggleVisibility={canManage ? handleVisibility : undefined}
-              deleting={deleting}
+              deleting={deleting || confirm.pending}
               error={deleteState?.error}
             />
           </section>
         ))
       )}
 
+      {confirm.dialog}
       {canManage && (
         <Modal open={uploadOpen} onOpenChange={setUploadOpen} title={t("upload")}>
           <UploadDocument projectId={projectId} onDone={() => setUploadOpen(false)} />

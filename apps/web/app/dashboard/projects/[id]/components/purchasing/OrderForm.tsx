@@ -35,7 +35,7 @@ import { usePurchaseFormat } from "./format";
 import { SupplierCaePill } from "./pills";
 
 const option =
-  "group flex min-h-11 w-full cursor-pointer items-start gap-3 rounded-[10px] border bg-card px-3.5 py-3 text-left text-[13.5px] transition-colors hover:border-primary/50 disabled:cursor-not-allowed disabled:opacity-50 aria-checked:border-primary aria-checked:bg-brand-soft aria-pressed:border-primary aria-pressed:bg-brand-soft";
+  "group flex min-h-11 w-full cursor-pointer items-start gap-3 rounded-[10px] border bg-card px-3.5 py-3 text-left text-sm transition-colors hover:border-primary/50 disabled:cursor-not-allowed disabled:opacity-50 aria-checked:border-primary aria-checked:bg-brand-soft aria-pressed:border-primary aria-pressed:bg-brand-soft";
 const dot =
   "mt-0.5 size-4 flex-none rounded-full border-2 border-border bg-card group-aria-checked:border-primary group-aria-checked:shadow-[inset_0_0_0_3px_var(--card)] group-aria-checked:bg-primary group-aria-pressed:border-primary group-aria-pressed:bg-primary group-aria-pressed:shadow-[inset_0_0_0_3px_var(--card)]";
 const section = cn(cardVariants(), "gap-3.5");
@@ -102,14 +102,14 @@ export function KindAndSupplier({
             <span>
               <b>{t(`kinds.${kind}`)}</b>
               <br />
-              <span className="text-[12.5px] text-muted-foreground">
+              <span className="text-meta text-muted-foreground">
                 {PURCHASE_FLOWS[kind].map((status) => ts(status)).join(" → ")}
               </span>
             </span>
           </button>
         ))}
       </div>
-      {kindLocked && <p className="text-[12.5px] text-muted-foreground">{t("kindLocked")}</p>}
+      {kindLocked && <p className="text-meta text-muted-foreground">{t("kindLocked")}</p>}
 
       <Field>
         <Label htmlFor="form-supplier-search">{t("supplier")}</Label>
@@ -124,7 +124,7 @@ export function KindAndSupplier({
       </Field>
       <div role="group" aria-label={t("suppliers")} className="flex max-h-[340px] flex-col gap-2 overflow-y-auto">
         {suppliers.length === 0 ? (
-          <p className="text-[13px] text-muted-foreground">{form.suppliers.length === 0 ? t("noSuppliers") : t("noSupplierMatch")}</p>
+          <p className="text-sm text-muted-foreground">{form.suppliers.length === 0 ? t("noSuppliers") : t("noSupplierMatch")}</p>
         ) : (
           suppliers.map((s) => (
             <button
@@ -140,9 +140,9 @@ export function KindAndSupplier({
             >
               <span aria-hidden className={dot} />
               <span className="min-w-0 flex-1">
-                <b>{s.legalName}</b> <span className="num text-[12px] text-muted-foreground">{s.taxIdMasked}</span>
+                <b>{s.legalName}</b> <span className="num text-meta text-muted-foreground">{s.taxIdMasked}</span>
                 <br />
-                <span className="text-[12.5px] text-muted-foreground">
+                <span className="text-meta text-muted-foreground">
                   {[ty(`${companyType(s)}.label`), ...s.trades.map((trade) => tt(trade))].join(" · ")}
                 </span>
               </span>
@@ -152,7 +152,7 @@ export function KindAndSupplier({
         )}
       </div>
       {chosen && !chosen.suppliesOnly && chosen.status !== "apta" && (
-        <div role="status" className="flex items-start gap-2.5 rounded-xl bg-yel-soft px-4 py-3 text-[13.5px] text-yel">
+        <div role="status" className="flex items-start gap-2.5 rounded-xl bg-yel-soft px-4 py-3 text-sm text-yel">
           <AlertTriangle aria-hidden className="mt-0.5 size-[18px] flex-none" />
           <p className="m-0">
             <b>{t("caeWarningTitle", { name: chosen.legalName })}</b>{" "}
@@ -218,11 +218,11 @@ function ConceptAndDates({
               </>
             )}
       </div>
-      <p className="flex flex-wrap items-center gap-1.5 text-[12.5px] text-muted-foreground">
+      <p className="flex flex-wrap items-center gap-1.5 text-meta text-muted-foreground">
         {chapter?.plannedStart && chapter.plannedEnd && (
           <>
-            {t("chapterPlanned", { code: chapter.code, range: f.range(chapter.plannedStart, chapter.plannedEnd) })}
-            {chapter.orderBy && <> · {tp("orderBy", { date: f.shortDay(chapter.orderBy) })}</>}
+            {t("chapterPlanned", { code: chapter.code, range: f.dateRange(chapter.plannedStart, chapter.plannedEnd) })}
+            {chapter.orderBy && <> · {tp("orderBy", { date: f.date(chapter.orderBy) })}</>}
             {form.sources.planning === "mock" && <MockBadge />}
           </>
         )}
@@ -263,7 +263,7 @@ function LineRow({
       </TableCell>
       <TableCell className="max-w-[360px] min-w-[240px] whitespace-normal">
         <span className="num font-semibold text-foreground">{line.code}</span> {line.description}{" "}
-        <span className="num text-[12px] text-muted-foreground">
+        <span className="num text-meta text-muted-foreground">
           {f.decimal(line.quantity)} {line.unit}
         </span>
       </TableCell>
@@ -289,7 +289,7 @@ function LineRow({
       {!estimate && (
         <>
           <TableCell>
-            <label className={cn("inline-flex min-h-10 items-center gap-2 text-[12.5px]", ticked ? "cursor-pointer" : "cursor-not-allowed")}>
+            <label className={cn("inline-flex min-h-10 items-center gap-2 text-meta", ticked ? "cursor-pointer" : "cursor-not-allowed")}>
               <input
                 type="checkbox"
                 className={check}
@@ -302,7 +302,7 @@ function LineRow({
             </label>
           </TableCell>
           <TableCell className={cn("num pr-[18px] text-right", deviationTone(deviationCents))}>
-            {ticked && (draft.closes ? (deviationCents === null ? "—" : f.signedDecimal(deviationCents)) : <span className="font-sans text-muted-foreground">{t("open")}</span>)}
+            {ticked && (draft.closes ? (deviationCents === null ? "—" : f.signedAmount(deviationCents)) : <span className="font-sans text-muted-foreground">{t("open")}</span>)}
           </TableCell>
         </>
       )}
@@ -359,7 +359,7 @@ export function Lines({
           <h2 id="form-lines" className="text-[22px]">
             {title ?? t("linesTitle")}
           </h2>
-          <p className="mt-1 text-[12.5px] text-muted-foreground">{estimate ? t("estimateHint") : t("linesHint")}</p>
+          <p className="mt-1 text-meta text-muted-foreground">{estimate ? t("estimateHint") : t("linesHint")}</p>
         </div>
         <Field className="w-full sm:w-[320px]">
           <Label htmlFor="form-chapter">{t("chapter")}</Label>
@@ -373,7 +373,7 @@ export function Lines({
         </Field>
       </div>
       {elsewhere.length > 0 && (
-        <p className="flex flex-wrap items-center gap-1.5 text-[12.5px] text-muted-foreground">
+        <p className="flex flex-wrap items-center gap-1.5 text-meta text-muted-foreground">
           {t("elsewhere")}
           {elsewhere.map((c) => (
             <Button key={c.code} type="button" variant="outline" size="sm" onClick={() => onChange({ chapter: c.code })}>
@@ -384,9 +384,9 @@ export function Lines({
       )}
       <div className="-mx-[18px]">
         {!chapter || chapter.lines.length === 0 ? (
-          <p className="px-[18px] py-4 text-[13px] text-muted-foreground">{t("noLines")}</p>
+          <p className="px-[18px] py-4 text-sm text-muted-foreground">{t("noLines")}</p>
         ) : (
-          <Table className={cn("text-[13px]", estimate ? "min-w-[640px]" : "min-w-[900px]")} aria-label={t("linesOf", { code: chapter.code })}>
+          <Table className={estimate ? "min-w-[640px]" : "min-w-[900px]"} aria-label={t("linesOf", { code: chapter.code })}>
             <TableHeader>
               <TableRow>
                 <TableHead className="pl-[18px]">
@@ -422,7 +422,7 @@ export function Lines({
           </Table>
         )}
       </div>
-      {!estimate && <p className="text-[12.5px] leading-normal text-muted-foreground">{t("closesNote")}</p>}
+      {!estimate && <p className="text-meta leading-normal text-muted-foreground">{t("closesNote")}</p>}
     </section>
   );
 }
@@ -437,7 +437,7 @@ function Terms({ draft, onChange }: { draft: OrderDraft; onChange: (patch: Parti
         <h2 id="form-terms" className="text-[22px]">
           {t("termsTitle")}
         </h2>
-        <p className="mt-1 text-[12.5px] text-muted-foreground">{t("termsHint")}</p>
+        <p className="mt-1 text-meta text-muted-foreground">{t("termsHint")}</p>
       </div>
       <div className="grid gap-3.5 sm:grid-cols-3">
         <Field>
@@ -491,9 +491,9 @@ function DocumentPicker({ file, onChange }: { file: File | null; onChange: (file
   return (
     <section className={section} aria-labelledby="form-document">
       <h2 id="form-document" className="text-[22px]">
-        {t("documentTitle")} <span className="font-sans text-[13px] font-normal tracking-normal text-muted-foreground">{t("optional")}</span>
+        {t("documentTitle")} <span className="font-sans text-sm font-normal tracking-normal text-muted-foreground">{t("optional")}</span>
       </h2>
-      <p className="text-[13px] text-muted-foreground">{t("documentHint")}</p>
+      <p className="text-sm text-muted-foreground">{t("documentHint")}</p>
       <FileSlot
         id="form-file"
         label={t("chooseFile")}

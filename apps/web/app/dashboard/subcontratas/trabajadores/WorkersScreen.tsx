@@ -62,7 +62,7 @@ export default function WorkersScreen({
         <div className="min-w-0">
           <p className="eyebrow">{t("eyebrow")}</p>
           <h1 className="mt-1">{t("title")}</h1>
-          <p className="mt-1.5 text-[13px] text-muted-foreground">{t("intro")}</p>
+          <p className="mt-1.5 text-sm text-muted-foreground">{t("intro")}</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button type="button" variant="outline" aria-expanded={checking} onClick={() => setChecking((open) => !open)}>

@@ -45,8 +45,11 @@ describe("ComprasScreen", () => {
 
     expect(screen.getByRole("heading", { level: 1, name: "Pedidos" })).toBeInTheDocument();
     const kpis = within(screen.getByRole("region", { name: "Resumen" }));
-    expect(kpis.getByText("Contratado en 2026")).toBeInTheDocument();
-    expect(kpis.getByText("486.910 €")).toBeInTheDocument();
+    // Orders are without VAT, as compared with the cost.
+    expect(kpis.getByText("Contratado en 2026 · sin IVA")).toBeInTheDocument();
+    expect(kpis.getByText("Abiertos · sin IVA")).toBeInTheDocument();
+    expect(kpis.getByText("Sin enviar · sin IVA")).toBeInTheDocument();
+    expect(kpis.getByText("486.910,00 €")).toBeInTheDocument();
     expect(kpis.getByText("41 pedidos en 3 obras")).toBeInTheDocument();
     expect(kpis.getByText("9 pedidos por entregar o terminar")).toBeInTheDocument();
     expect(kpis.getByText("4 pedidos pendientes")).toBeInTheDocument();
@@ -54,11 +57,12 @@ describe("ComprasScreen", () => {
 
     expect(numbers()).toEqual(["PED-056", "PED-049", "PED-047", "PED-040", "PED-038", "PED-014"]);
     const table = within(screen.getByRole("table", { name: "Pedidos" }));
+    expect(table.getByRole("columnheader", { name: "Importe · sin IVA" })).toBeInTheDocument();
     const row = table.getByRole("link", { name: "PED-014" }).closest("tr")!;
     expect(within(row).getByRole("link", { name: "VTH-26-003" })).toHaveAttribute("href", "/dashboard/projects/p-3/compras");
     expect(within(row).getByRole("link", { name: "PED-014" })).toHaveAttribute("href", "/dashboard/projects/p-3/compras/order-14");
     expect(within(row).getByText("7 d tarde")).toBeInTheDocument();
-    expect(within(row).getByText("30 sept")).toBeInTheDocument();
+    expect(within(row).getByText("30 sept 2026")).toBeInTheDocument();
     // One page holds them all: no pager.
     expect(screen.queryByRole("navigation", { name: "Páginas" })).not.toBeInTheDocument();
   });
@@ -70,7 +74,7 @@ describe("ComprasScreen", () => {
     );
 
     const table = within(screen.getByRole("table", { name: "Pedidos" }));
-    expect(table.getByText("141 pedidos · contratado").closest("tr")).toHaveTextContent("1.234.567,00");
+    expect(table.getByText("141 pedidos · contratado · sin IVA").closest("tr")).toHaveTextContent("1.234.567,00");
     const pager = within(screen.getByRole("navigation", { name: "Páginas" }));
     expect(pager.getByText("51–100 de 141")).toBeInTheDocument();
     expect(pager.getByText("Página 2 de 3")).toBeInTheDocument();
@@ -149,6 +153,8 @@ describe("ComprasScreen", () => {
     );
 
     const table = within(screen.getByRole("table", { name: "Pedidos por proveedor" }));
+    expect(table.getByRole("columnheader", { name: "Contratado · sin IVA" })).toBeInTheDocument();
+    expect(table.getByRole("columnheader", { name: "Abierto · sin IVA" })).toBeInTheDocument();
     const rows = table.getAllByRole("row").slice(1);
     expect(rows[0]).toHaveTextContent("Cubiertas Besaya");
     const stone = table.getByRole("link", { name: "Piedra de Liébana" });

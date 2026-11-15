@@ -78,7 +78,7 @@ function PriceBasePicker({ chapter, onSearch, onPick, onFree, freeLabel }: Props
       <div className="flex flex-col gap-2.5 p-3.5">
         <div className="flex items-baseline justify-between gap-2">
           <b className="text-sm">{t("title")}</b>
-          <span className="text-xs text-muted-foreground">{t("hint")}</span>
+          <span className="text-meta text-muted-foreground">{t("hint")}</span>
         </div>
         <Input autoFocus type="search" value={query} onChange={(event) => setQuery(event.target.value)} aria-label={t("search")} placeholder={t("search")} />
         {chapter && (
@@ -98,13 +98,13 @@ function PriceBasePicker({ chapter, onSearch, onPick, onFree, freeLabel }: Props
         )}
       </div>
       <ul className="max-h-[320px] overflow-y-auto">
-        {results.length === 0 && <li className="border-t px-3.5 py-3 text-[13px] text-muted-foreground">{t("noResults")}</li>}
+        {results.length === 0 && <li className="border-t px-3.5 py-3 text-sm text-muted-foreground">{t("noResults")}</li>}
         {results.map((item) => (
-          <li key={item.code} className="grid grid-cols-[52px_minmax(0,1fr)_auto] items-center gap-x-2.5 gap-y-0.5 border-t px-3.5 py-2.5 text-[13.5px] hover:bg-raise">
+          <li key={item.code} className="grid grid-cols-[52px_minmax(0,1fr)_auto] items-center gap-x-2.5 gap-y-0.5 border-t px-3.5 py-2.5 text-sm hover:bg-raise">
             <span className="num text-muted-foreground">{item.code}</span>
             <span>
               {item.description}
-              <span className="block text-xs text-muted-foreground">
+              <span className="block text-meta text-muted-foreground">
                 {item.unit} · <span className="num">{f.money(item.unitPriceCents)}</span>
               </span>
             </span>
@@ -118,7 +118,7 @@ function PriceBasePicker({ chapter, onSearch, onPick, onFree, freeLabel }: Props
         <Button type="button" variant="ghost" size="sm" onClick={onFree}>
           {freeLabel}
         </Button>
-        <span className="text-xs text-muted-foreground">{t("freeHint")}</span>
+        <span className="text-meta text-muted-foreground">{t("freeHint")}</span>
       </div>
     </div>
   );

@@ -22,13 +22,13 @@ const MARK: Record<Tone, string> = {
 function Item({ tone, title, detail }: { tone: Tone; title: string; detail: string }) {
   const Icon = tone === "good" ? Check : tone === "muted" ? Minus : TriangleAlert;
   return (
-    <li className="flex items-start gap-2.5 border-t py-2.5 text-[13.5px] first:border-t-0 first:pt-0">
+    <li className="flex items-start gap-2.5 border-t py-2.5 text-sm first:border-t-0 first:pt-0">
       <span className={cn("grid size-[22px] flex-none place-items-center rounded-full", MARK[tone])}>
         <Icon aria-hidden className="size-3" strokeWidth={2.4} />
       </span>
       <span className="min-w-0">
         <b className="font-semibold">{title}</b>
-        <span className="block text-xs text-muted-foreground">{detail}</span>
+        <span className="block text-meta text-muted-foreground">{detail}</span>
       </span>
     </li>
   );
@@ -105,7 +105,7 @@ export default function RegistrationStatus({ draft, projects }: { draft: Company
       </Card>
       <Card className="bg-raise shadow-none">
         <p className="eyebrow">{draft.suppliesOnly ? t("supplier") : t("whenApta")}</p>
-        <p className="m-0 text-[13px]">{draft.suppliesOnly ? t("supplierDetail") : t("whenAptaDetail", { total })}</p>
+        <p className="m-0 text-sm">{draft.suppliesOnly ? t("supplierDetail") : t("whenAptaDetail", { total })}</p>
       </Card>
     </aside>
   );

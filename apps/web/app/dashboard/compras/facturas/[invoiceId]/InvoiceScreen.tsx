@@ -14,13 +14,12 @@ import {
   addInvoiceFileAction,
   createPaymentAction,
   deleteInvoiceAction,
-  deletePaymentAction,
 } from "../../../../actions/purchase-invoices";
 import BackLink from "../../../components/BackLink";
 import FormError from "../../../components/FormError";
+import { useConfirm } from "../../../components/useConfirm";
 import { useIdempotencyKey } from "../../../components/useIdempotencyKey";
 import { useObraAction } from "../../../projects/[id]/components/obra/useObraAction";
-import { usePurchaseFormat } from "../../../projects/[id]/components/purchasing/format";
 import { INVOICES_HREF, editInvoiceHref, invoiceHref, newInvoiceHref, orderHref } from "../../../projects/[id]/components/purchasing/links";
 import { DocumentChecks, reviewing } from "../../../projects/[id]/components/purchasing/DocumentCheckViews";
 import { useRefreshWhile } from "../../../projects/[id]/components/purchasing/useRefreshWhile";
@@ -38,15 +37,17 @@ import {
 } from "../../components/InvoiceDetailViews";
 import { PaymentTable } from "../../components/InvoiceListViews";
 import { formWithFile } from "../../components/invoice-draft";
+import { useRemovePayment } from "../../pagos/useRemovePayment";
 
 export default function InvoiceScreen({ invoice, canManage }: { invoice: PurchaseInvoiceDetail; canManage: boolean }) {
   const t = useTranslations("purchasing.invoice");
-  const f = usePurchaseFormat();
   const router = useRouter();
   const action = useObraAction();
   const payment = useObraAction();
   const file = useObraAction();
   const review = useObraAction();
+  const confirm = useConfirm("purchasing.errors");
+  const removePayment = useRemovePayment();
   // A payment sent twice (a double click, a retry) is recorded once.
   const paymentKey = useIdempotencyKey();
   // The AI reviews a new PDF or proof after its upload: the page re-reads until it is done.
@@ -85,12 +86,19 @@ export default function InvoiceScreen({ invoice, canManage }: { invoice: Purchas
       <Button
         type="button"
         variant="ghost-destructive"
-        disabled={action.pending}
-        onClick={() =>
-          action.confirmThen(t("confirmDelete", { number: invoice.number }), () => deleteInvoiceAction(invoice.id), () =>
-            router.push(INVOICES_HREF),
-          )
-        }
+        disabled={action.pending || confirm.pending}
+        onClick={() => {
+          action.reset();
+          const values = { kind: invoice.kind, number: invoice.number, supplier: invoice.supplierName };
+          confirm.ask({
+            t,
+            key: "deleteDialog",
+            values,
+            destructive: true,
+            action: () => deleteInvoiceAction(invoice.id),
+            onDone: () => router.push(INVOICES_HREF),
+          });
+        }}
       >
         {t("delete")}
       </Button>
@@ -102,6 +110,7 @@ export default function InvoiceScreen({ invoice, canManage }: { invoice: Purchas
       <BackLink href={INVOICES_HREF} />
       <InvoiceHeading invoice={invoice} actions={actions || undefined} />
       <FormError namespace="purchasing.errors" error={action.state?.error} />
+      {confirm.dialog}
       <InvoiceBanner invoice={invoice} />
 
       {paying && (
@@ -132,13 +141,13 @@ export default function InvoiceScreen({ invoice, canManage }: { invoice: Purchas
           }
           empty={t("payments.none")}
           invoiceColumns={false}
-          pending={payment.pending}
+          pending={payment.pending || confirm.pending}
           onRemove={
             canManage
-              ? (removed) =>
-                  payment.confirmThen(t("payments.confirmRemove", { amount: f.money(removed.amountCents) }), () =>
-                    deletePaymentAction(removed.id),
-                  )
+              ? (removed) => {
+                  payment.reset();
+                  confirm.ask(removePayment(removed));
+                }
               : undefined
           }
         />

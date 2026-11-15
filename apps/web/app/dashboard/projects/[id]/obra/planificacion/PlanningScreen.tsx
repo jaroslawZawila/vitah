@@ -26,6 +26,7 @@ import {
   PlanCards,
   PlanKpis,
   PlanLegend,
+  PlanSchedule,
   PlanTable,
   useCalendarText,
 } from "../../components/planning/PlanViews";
@@ -82,6 +83,7 @@ export default function PlanningScreen({
       <>
         <BaselineBanner baseline={baseline} />
         {draft && <DraftNotice draft={draft} href={editHref} canManage={canManage} />}
+        <PlanSchedule schedule={planning.schedule} />
         <PlanKpis baseline={baseline} completionDate={planning.completionDate} />
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap gap-2">
@@ -102,11 +104,11 @@ export default function PlanningScreen({
   } else if (draft) {
     body = <DraftNotice draft={draft} href={editHref} canManage={canManage} />;
   } else if (planning.chapters.length === 0) {
-    body = <p className={cn(cardVariants(), "text-center text-[13.5px] text-muted-foreground")}>{t("generate.noBudget")}</p>;
+    body = <p className={cn(cardVariants(), "text-center text-sm text-muted-foreground")}>{t("generate.noBudget")}</p>;
   } else {
     body = (
       <>
-        <p className={cn(cardVariants(), "border-dashed text-[13.5px] leading-normal text-muted-foreground")}>
+        <p className={cn(cardVariants(), "border-dashed text-sm leading-normal text-muted-foreground")}>
           <b className="text-foreground">{t("generate.empty")}</b> {t("generate.emptyHint", { count: planning.chapters.length })}
         </p>
         {canManage ? (

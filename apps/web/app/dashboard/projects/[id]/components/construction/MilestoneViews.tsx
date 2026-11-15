@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { cardVariants } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import { useVatLabel } from "../../../../components/vat-basis";
 import { totalRow } from "./classes";
 import { useControlFormat } from "./format";
 import { MILESTONE_TONE, MilestoneStatePill } from "./pills";
@@ -31,7 +32,7 @@ export function MilestoneSteps() {
   return (
     <ol aria-label={t("stepsLabel")} className="m-0 grid list-none grid-cols-[repeat(auto-fit,minmax(min(180px,100%),1fr))] gap-2.5 p-0">
       {MILESTONE_STATES.map((state) => (
-        <li key={state} className="flex flex-col items-start gap-1.5 rounded-xl border bg-card px-3.5 py-3 text-[12.5px]">
+        <li key={state} className="flex flex-col items-start gap-1.5 rounded-xl border bg-card px-3.5 py-3 text-meta">
           <Badge variant={MILESTONE_TONE[state]}>{ts(state)}</Badge>
           <span className="text-muted-foreground">{t(`steps.${state}`)}</span>
         </li>
@@ -57,7 +58,7 @@ export function MilestoneTable({
 
   return (
     <section className={cn(cardVariants({ size: "flush" }), "py-1.5")} aria-label={t("tableLabel")}>
-      <Table className="min-w-[980px] text-[13px]">
+      <Table className="min-w-[980px]">
         <TableHeader>
           <TableRow>
             <TableHead className="pl-[18px]">{t("hito")}</TableHead>
@@ -79,7 +80,7 @@ export function MilestoneTable({
                 <TableCell className="pl-[18px] whitespace-normal">
                   <span className="num font-semibold">{m.code}</span> {m.name}
                   {m.state === "pending" && missing.length > 0 && missing.length < m.chapters.length && (
-                    <div className="text-[12px] text-muted-foreground">
+                    <div className="text-meta text-muted-foreground">
                       {t("missing", {
                         chapters: missing.map((c) => `${c.code} · ${tc(c.state).toLowerCase()}`).join(", "),
                       })}
@@ -95,7 +96,7 @@ export function MilestoneTable({
                         <li
                           key={c.code}
                           title={`${c.code} · ${c.name} · ${tc(c.state)}`}
-                          className="inline-flex items-center gap-1.5 rounded-full border bg-card px-2 py-0.5 font-mono text-[11.5px] font-semibold"
+                          className="inline-flex items-center gap-1.5 rounded-full border bg-card px-2 py-0.5 font-mono text-xs font-semibold"
                         >
                           <ChapterDot state={c.state} />
                           {c.code}
@@ -119,7 +120,7 @@ export function MilestoneTable({
                   {m.hasInvoice ? (
                     <Link href={invoiceHref(m)} className="font-semibold text-brand-ink hover:text-primary">
                       {t("seeInvoice")}
-                      {m.invoicedOn && <span className="num ml-1.5 font-normal text-muted-foreground">{f.day(m.invoicedOn)}</span>}
+                      {m.invoicedOn && <span className="num ml-1.5 font-normal text-muted-foreground">{f.date(m.invoicedOn)}</span>}
                     </Link>
                   ) : (
                     <Dash />
@@ -141,7 +142,7 @@ export function MilestoneTable({
           </TableRow>
         </TableBody>
       </Table>
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 px-[18px] pt-2.5 pb-3 text-[12px] text-muted-foreground">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 px-[18px] pt-2.5 pb-3 text-meta text-muted-foreground">
         {(["finished", "in_progress", "pending"] as const).map((state) => (
           <span key={state} className="inline-flex items-center gap-1.5">
             <ChapterDot state={state} />
@@ -158,13 +159,14 @@ export function MilestoneTable({
 export function InvoiceRequests({ milestones }: { milestones: ControlMilestone[] }) {
   const t = useTranslations("construction.milestones");
   const f = useControlFormat();
+  const vat = useVatLabel();
   const requests = milestones
     .filter((m) => m.request)
     .sort((a, b) => b.request!.requestedAt.localeCompare(a.request!.requestedAt));
 
   function status(m: ControlMilestone) {
-    if (m.state === "collected") return <Badge variant="good">{m.paidOn ? t("collectedOn", { date: f.day(m.paidOn) }) : t("collectedShort")}</Badge>;
-    if (m.state === "invoiced") return <Badge variant="info">{m.invoicedOn ? t("invoicedOn", { date: f.day(m.invoicedOn) }) : t("invoicedShort")}</Badge>;
+    if (m.state === "collected") return <Badge variant="good">{m.paidOn ? t("collectedOn", { date: f.date(m.paidOn) }) : t("collectedShort")}</Badge>;
+    if (m.state === "invoiced") return <Badge variant="info">{m.invoicedOn ? t("invoicedOn", { date: f.date(m.invoicedOn) }) : t("invoicedShort")}</Badge>;
     return <Badge variant="yel">{t("toInvoice")}</Badge>;
   }
 
@@ -172,17 +174,17 @@ export function InvoiceRequests({ milestones }: { milestones: ControlMilestone[]
     <section className={cn(cardVariants({ size: "flush" }), "pt-[18px] pb-1.5")} aria-labelledby="requests-title">
       <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 px-[18px] pb-3">
         <h2 id="requests-title">{t("requestsTitle")}</h2>
-        <span className="text-[12.5px] text-muted-foreground">{t("requestsHint")}</span>
+        <span className="text-meta text-muted-foreground">{t("requestsHint")}</span>
       </div>
       {requests.length === 0 ? (
-        <p className="px-[18px] pb-4 text-[13px] text-muted-foreground">{t("noRequests")}</p>
+        <p className="px-[18px] pb-4 text-sm text-muted-foreground">{t("noRequests")}</p>
       ) : (
-        <Table className="min-w-[760px] text-[13px]" aria-labelledby="requests-title">
+        <Table className="min-w-[760px]" aria-labelledby="requests-title">
           <TableHeader>
             <TableRow>
               <TableHead className="pl-[18px]">{t("hito")}</TableHead>
               <TableHead>{t("concept")}</TableHead>
-              <TableHead className="text-right">{t("amount")}</TableHead>
+              <TableHead className="text-right">{vat(t("amount"), "excl")}</TableHead>
               <TableHead>{t("created")}</TableHead>
               <TableHead className="pr-[18px]">{t("state")}</TableHead>
             </TableRow>
@@ -199,7 +201,7 @@ export function InvoiceRequests({ milestones }: { milestones: ControlMilestone[]
                   </TableCell>
                   <TableCell className="num text-right">{f.decimal(request.amountCents / 100)}</TableCell>
                   <TableCell className="whitespace-normal">
-                    <span className="num">{f.stampDay(request.requestedAt)}</span>{" "}
+                    <span className="num">{f.date(request.requestedAt)}</span>{" "}
                     <span className="text-muted-foreground">
                       {t("createdBy", { code: request.chapterCode, name: request.requestedBy ?? "—" })}
                     </span>

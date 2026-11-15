@@ -1,32 +1,24 @@
 "use client";
 
-import { useFormatter, useLocale } from "next-intl";
+import { useFormat } from "@/lib/format";
 
-/** Money, shares and calendar dates as the obra screens show them. */
-const MB = 1024 * 1024;
-
+/** Money, shares and calendar dates as the obra screens show them (all from `useFormat`). */
 export function useObraFormat() {
-  const format = useFormatter();
-  const locale = useLocale();
-  const money = (cents: number) => format.number(cents / 100, { style: "currency", currency: "EUR" });
-  const share = (bp: number) =>
-    format.number(bp / 10_000, { style: "percent", maximumFractionDigits: 2 });
-  const quantity = (value: number) => format.number(value, { maximumFractionDigits: 3 });
+  const f = useFormat();
+  const { locale, quantity } = f;
   return {
     /** Euro cents → "12.500,00 €". */
-    money,
+    money: f.money,
     /** "+2.570,00 €" / "−1.200,00 €". */
-    signedMoney: (cents: number) => `${cents > 0 ? "+" : cents < 0 ? "−" : ""}${money(Math.abs(cents))}`,
+    signedMoney: f.signedMoney,
     /** Basis points → "19,26 %". */
-    share,
+    share: (bp: number) => f.percent(bp),
     /** `part` of `whole` → "24 %". */
-    ratio: (part: number, whole: number) => share(whole ? (part * 10_000) / whole : 0),
+    ratio: (part: number, whole: number) => f.percent(whole ? (part * 10_000) / whole : 0),
     /** YYYY-MM-DD → "24 sept 2026". */
-    date: (day: string) =>
-      format.dateTime(new Date(`${day}T00:00:00Z`), { dateStyle: "medium", timeZone: "UTC" }),
+    date: f.date,
     /** A timestamp in Spain's time: "24 sept 2026, 12:05". */
-    dateTime: (iso: string) =>
-      format.dateTime(new Date(iso), { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Madrid" }),
+    dateTime: f.dateTime,
     /** A quantity with up to 3 decimals. */
     quantity,
     /** Basis points as a % to type in: 1300 → "13", 1250 → "12,5". */
@@ -41,14 +33,10 @@ export function useObraFormat() {
       const value = parseHundredths(text.replace(/^\s*[−-]/, ""), locale);
       return negative ? -value : value;
     },
-    /** A file's size: "340 KB", "3,1 MB". */
-    fileSize: (bytes: number) =>
-      bytes < MB
-        ? format.number(Math.max(1, Math.round(bytes / 1024)), { style: "unit", unit: "kilobyte" })
-        : format.number(bytes / MB, { style: "unit", unit: "megabyte", maximumFractionDigits: 1 }),
+    /** A file's size: "340 kB", "3,1 MB". */
+    fileSize: f.fileSize,
     /** A number with 2 decimals, e.g. "253,45" (amounts in forms). */
-    decimal: (value: number) =>
-      format.number(value, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+    decimal: (value: number) => f.decimal(value),
   };
 }
 

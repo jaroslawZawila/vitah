@@ -75,13 +75,13 @@ export default function WorkersTable({
     <Card aria-labelledby="workers-title">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 id="workers-title">{tw("listTitle")}</h2>
-        <span className="text-[12.5px] text-muted-foreground">{tw("showing", { shown, total })}</span>
+        <span className="text-meta text-muted-foreground">{tw("showing", { shown, total })}</span>
       </div>
       <div className="flex flex-wrap items-center gap-2.5">
         <div className="flex flex-wrap gap-1.5" role="group" aria-label={tw("filterLabel")}>
           {ACCESS_FILTERS.map((key) => (
             <ToggleChip key={key} tone="solid" on={filter === key} onToggle={() => onFilter(key)}>
-              {tw(`filters.${key}`)} <span className="num text-[11.5px] opacity-80">{counts[key]}</span>
+              {tw(`filters.${key}`)} <span className="num text-xs">{counts[key]}</span>
             </ToggleChip>
           ))}
         </div>
@@ -115,21 +115,22 @@ export default function WorkersTable({
       </div>
 
       {workers.length === 0 ? (
-        <p className="py-8 text-center text-[13.5px] text-muted-foreground">{tw("empty")}</p>
+        <p className="py-8 text-center text-sm text-muted-foreground">{tw("empty")}</p>
       ) : (
-        <Table className="min-w-[1180px]">
+        <Table className="min-w-[900px]">
           <TableHeader>
             <TableRow>
               <TableHead>{tw("table.worker")}</TableHead>
               <TableHead>{tw("table.company")}</TableHead>
-              <TableHead>{tw("table.trade")}</TableHead>
+              <TableHead className="whitespace-normal">{tw("table.trade")}</TableHead>
               <TableHead>{tw("table.ss")}</TableHead>
               <TableHead>{tw("table.tpc")}</TableHead>
-              <TableHead>{tw("table.training")}</TableHead>
-              <TableHead>{tw("table.medical")}</TableHead>
+              {/* Two-word headings wrap: the column is as wide as its pills, and the table fits the card. */}
+              <TableHead className="whitespace-normal">{tw("table.training")}</TableHead>
+              <TableHead className="whitespace-normal">{tw("table.medical")}</TableHead>
               <TableHead>{tw("table.ppe")}</TableHead>
               <TableHead>{tw("table.roles")}</TableHead>
-              <TableHead>{tw("table.access")}</TableHead>
+              <TableHead className="whitespace-normal">{tw("table.access")}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -139,16 +140,16 @@ export default function WorkersTable({
               const tpc = w.docs.tpc;
               return (
                 <TableRow key={w.id}>
-                  <TableCell>
+                  <TableCell className="min-w-32 whitespace-normal">
                     <Link href={workerHref(w.id)} className="font-semibold underline-offset-3 hover:underline">
                       {workerName(w)}
                     </Link>
-                    <div className="num text-[12.5px] text-muted-foreground">{w.idDocumentMasked}</div>
+                    <div className="num text-meta text-muted-foreground">{w.idDocumentMasked}</div>
                   </TableCell>
-                  <TableCell className="text-[12.5px]">{w.subcontractorName}</TableCell>
-                  <TableCell>
+                  <TableCell className="min-w-28 text-meta whitespace-normal">{w.subcontractorName}</TableCell>
+                  <TableCell className="min-w-28 whitespace-normal">
                     {w.trade ? t(`trades.${w.trade}`) : "—"}
-                    <div className="text-[12.5px] text-muted-foreground">{w.category ? t(`categories.${w.category}`) : "—"}</div>
+                    <div className="text-meta text-muted-foreground">{w.category ? t(`categories.${w.category}`) : "—"}</div>
                   </TableCell>
                   <TableCell>
                     <Cell badge={w.docs.alta_ss} />
@@ -173,13 +174,13 @@ export default function WorkersTable({
                   <TableCell>
                     <Cell badge={w.docs.entrega_epis} />
                   </TableCell>
-                  <TableCell className="text-[12.5px]">
+                  <TableCell className="min-w-24 text-meta whitespace-normal">
                     {w.roles.length > 0 ? w.roles.map((role) => t(`roles.${role}`)).join(", ") : "—"}
                   </TableCell>
                   <TableCell className="whitespace-normal">
                     <AccessBadge status={w.access.status} />
                     {firstReason && (
-                      <div className="mt-1 max-w-52 text-[12.5px] text-muted-foreground">
+                      <div className="mt-1 max-w-52 text-meta text-muted-foreground">
                         {reason(firstReason, w.subcontractorKind)}
                       </div>
                     )}

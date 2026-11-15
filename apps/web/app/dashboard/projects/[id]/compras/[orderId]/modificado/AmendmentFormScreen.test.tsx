@@ -36,8 +36,8 @@ describe("AmendmentFormScreen", () => {
     const amount = screen.getByRole("textbox", { name: "Importe de 06.05" });
     await userEvent.clear(amount);
     await userEvent.type(amount, "3300,00");
-    expect(total().getByText("3120,00 €")).toBeInTheDocument();
-    expect(total().getByText("3300,00 €")).toBeInTheDocument();
+    expect(total().getByText("3.120,00 €")).toBeInTheDocument();
+    expect(total().getByText("3.300,00 €")).toBeInTheDocument();
     expect(total().getByText("+180,00 €")).toHaveClass("text-bad");
 
     await userEvent.upload(screen.getByLabelText("Elegir PDF"), new File(["%PDF-1.7"], "mod.pdf", { type: "application/pdf" }));

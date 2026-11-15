@@ -37,6 +37,8 @@ describe("/api/v1/projects/:id/obra/control", () => {
     const control = await res.json();
     expect(control.chapters.map((c: { code: string }) => c.code)).not.toContain("20");
     expect(control.sources).toEqual({ planning: "mock", purchasing: "live" });
+    // No approved plan, and a project without dates to simulate them from: never called on time.
+    expect(control.schedule).toMatchObject({ status: "no_dates", planning: "mock", forecast: null });
 
     const header = await (await getHeader(apiRequest(token), routeParams({ id: project.id }))).json();
     expect(header).toMatchObject({ ref: project.ref, openIssues: 0, today: "2026-10-17" });

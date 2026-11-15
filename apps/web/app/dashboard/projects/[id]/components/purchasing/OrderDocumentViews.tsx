@@ -145,7 +145,7 @@ export function OrderDocuments({
         />
       )}
       {documents.length === 0 ? (
-        <p className="text-[13px] text-muted-foreground">{t("none")}</p>
+        <p className="text-sm text-muted-foreground">{t("none")}</p>
       ) : (
         <ul className="m-0 list-none p-0">
           {documents.map((document) => {
@@ -153,9 +153,9 @@ export function OrderDocuments({
             return (
               <li key={document.id} className="flex flex-col gap-1.5 border-b py-3 last:border-b-0">
                 <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
-                  <b className="min-w-0 text-[13.5px] [overflow-wrap:anywhere]">{document.title}</b>
+                  <b className="min-w-0 text-sm [overflow-wrap:anywhere]">{document.title}</b>
                   {current && (
-                    <span className="rounded-full bg-raise px-2 py-px text-[11.5px] font-semibold">{t("current", { version: current.version })}</span>
+                    <span className="rounded-full bg-raise px-2 py-px text-xs font-semibold">{t("current", { version: current.version })}</span>
                   )}
                   {canManage && (
                     <span className="ml-auto flex gap-1">
@@ -176,20 +176,20 @@ export function OrderDocuments({
                   )}
                 </div>
                 {current && (
-                  <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px]">
+                  <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
                     <a href={documentUrl(document.id)} download className="inline-flex items-center gap-1.5 font-medium text-brand-ink hover:text-primary">
                       <FileText aria-hidden className="size-4 flex-none" />
                       {current.filename}
                     </a>
-                    <span className="text-[12px] text-muted-foreground">
-                      {f.shortDay(day(current.at))} · {f.fileSize(current.sizeBytes)}
+                    <span className="text-meta text-muted-foreground">
+                      {f.date(day(current.at))} · {f.fileSize(current.sizeBytes)}
                       {current.by && ` · ${current.by}`}
                       {current.note && ` · «${current.note}»`}
                     </span>
                   </span>
                 )}
                 {older.length > 0 && (
-                  <ul className="m-0 flex list-none flex-col gap-1 p-0 pl-5 text-[12.5px] text-muted-foreground">
+                  <ul className="m-0 flex list-none flex-col gap-1 p-0 pl-5 text-meta text-muted-foreground">
                     {older.map((version) => (
                       <li key={version.id} className="flex flex-wrap items-center gap-x-2">
                         <a href={documentUrl(document.id, version.id)} download className="inline-flex items-center gap-1 hover:text-foreground">
@@ -197,7 +197,7 @@ export function OrderDocuments({
                           {t("version", { version: version.version })} · {version.filename}
                         </a>
                         <span>
-                          {f.shortDay(day(version.at))}
+                          {f.date(day(version.at))}
                           {version.note && ` · «${version.note}»`}
                         </span>
                       </li>
@@ -221,7 +221,7 @@ export function OrderDocuments({
       )}
       {/* An open form shows its own error; a removal's shows here. */}
       {!open && <FormError namespace="purchasing.errors" error={error} />}
-      <p className="m-0 text-[12.5px] text-muted-foreground">{t("hint")}</p>
+      <p className="m-0 text-meta text-muted-foreground">{t("hint")}</p>
     </section>
   );
 }

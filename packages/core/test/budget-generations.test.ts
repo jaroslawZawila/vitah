@@ -1,6 +1,6 @@
 import ExcelJS from "exceljs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { aiUsage, budgetGenerations, budgetRevisions, db, eq, projectDocuments, tenants } from "@repo/db";
+import { aiUsage, budgetGenerations, budgetRevisions, db, eq, projectDocuments, projects, tenants } from "@repo/db";
 import { createTestDocument, createTestProject, createTestTenant, createTestUser, resetDatabase } from "@repo/db/testing";
 import { budgetGenerationsService as svc, budgetService, obraService, projectsService, type Ctx } from "../src";
 import * as claude from "../src/budget-ai/claude";
@@ -66,7 +66,8 @@ function fakeClaude() {
 async function setup(role: Ctx["role"] = "admin") {
   const tenant = await createTestTenant();
   const user = await createTestUser(tenant.id, { role });
-  const project = await createTestProject(tenant.id);
+  // Where the documents say the house is; the AI's site says it with the province too.
+  const project = await createTestProject(tenant.id, { address: "C/ de la Arboleda 3, Zarzalejo" });
   const ctx: Ctx = { tenantId: tenant.id, userId: user.id, role };
   const plans = await createTestDocument(tenant.id, project.id, { title: "Planos", category: "budget", budgetInput: "plans", visibleToClient: false });
   files.set(plans.pathname, new Blob(["%PDF-1.7 planos"]));
@@ -182,6 +183,20 @@ describe("pipeline", () => {
     expect(revision!.checks.map((c) => c.key)).toEqual(expect.arrayContaining(["annex:i1", "annex:s1", `line:${estimated.lineageId}`]));
     expect(generation).toMatchObject({ status: "succeeded", step: 5, revisionId, facts: { builtAreaM2: 184.91, bathrooms: 3, inconsistencies: ["Carga de nieve"] } });
     expect(generation!.log.map((l) => l.code)).toEqual(["reading", "read", "analysing", "analysed", "group", "grouped", "group", "grouped", "group", "grouped", "group", "grouped", "saved"]);
+  });
+
+  it("names the project's client and address on the cover where the AI read others", async () => {
+    fakeClaude();
+    const { tenant, project, ctx, documentIds } = await setup();
+    const client = await createTestUser(tenant.id, { role: "client", name: "Ana Peña Ruiz" });
+    await db.update(projects).set({ clientUserId: client.id, address: "Barrio Caviedes 12, Valdáliga" }).where(eq(projects.id, project.id));
+    const { generationId } = await svc.startGeneration(ctx, project.id, { documentIds });
+
+    await run(generationId);
+
+    const { revision } = await budgetService.getBudget(ctx, project.id);
+    expect(revision!.texts.cover).toMatchObject({ promoter: "Ana Peña Ruiz", site: "Barrio Caviedes 12, Valdáliga", surfaces: "184,91 m² construidos · 139,7 m² útiles · terrazas 40,5 m²" });
+    expect(revision!.identity).toEqual({ client: "Ana Peña Ruiz", address: "Barrio Caviedes 12, Valdáliga", differs: [], projectLacks: [] });
   });
 
   it("sends the PDFs once through the Files API and the BC3 as text", async () => {

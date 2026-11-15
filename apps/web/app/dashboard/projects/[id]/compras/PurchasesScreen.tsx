@@ -114,7 +114,7 @@ export default function PurchasesScreen({
         newOrderHref={canManage ? (code) => newOrderHref(projectId, code) : undefined}
       />
 
-      <p className="max-w-[860px] text-[12.5px] leading-normal text-muted-foreground">
+      <p className="max-w-[860px] text-meta leading-normal text-muted-foreground">
         {t.rich("footnote", { b: (chunks) => <b className="text-foreground">{chunks}</b> })}
       </p>
     </div>

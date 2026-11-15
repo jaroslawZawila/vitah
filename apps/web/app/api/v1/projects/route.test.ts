@@ -2,11 +2,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createTestProject, createTestTenant, createTestUser, resetDatabase } from "@repo/db/testing";
 import { createMobileToken } from "@repo/auth/mobile";
 import type { UserRole } from "@repo/db";
+import { apiRequest, routeParams, seededObraProject, staffToken } from "../../../../test/api";
+import { GET as getControl } from "./[id]/obra/control/route";
 import { GET, POST } from "./route";
 
 // Bearer requests never read the NextAuth session, and next-auth itself
 // can't load outside Next.js.
 vi.mock("@repo/auth", () => ({ auth: vi.fn() }));
+vi.mock("@repo/core/storage", () => import("@repo/core/testing"));
 
 async function tokenFor(tenantId: string, role: UserRole) {
   const user = await createTestUser(tenantId, { role });
@@ -19,9 +22,9 @@ async function tokenFor(tenantId: string, role: UserRole) {
   });
 }
 
-function get(token: string) {
+function get(token: string, query = "") {
   return GET(
-    new Request("http://localhost/api/v1/projects", {
+    new Request(`http://localhost/api/v1/projects${query}`, {
       headers: { Authorization: `Bearer ${token}` },
     }),
   );
@@ -81,6 +84,33 @@ describe("GET /api/v1/projects", () => {
         budget: { revision: null, generation: null },
       },
     ]);
+  });
+
+  it("adds each obra's signals only when asked for, with ?signals=1", async () => {
+    const tenant = await createTestTenant();
+    await createTestProject(tenant.id);
+    const token = await tokenFor(tenant.id, "viewer");
+
+    const [plain] = await (await get(token)).json();
+    expect(plain).not.toHaveProperty("schedule");
+    expect(plain).not.toHaveProperty("progressPct");
+    expect(plain).not.toHaveProperty("attention");
+    const [withSignals] = await (await get(token, "?signals=1")).json();
+    expect(withSignals).toEqual({ ...plain, schedule: null, progressPct: null, attention: [] });
+  });
+
+  it("gives an obra with a contract its schedule and built %, as its Obra tab", async () => {
+    const { tenant, project } = await seededObraProject();
+    const { token } = await staffToken(tenant.id, "viewer");
+
+    const [listed] = await (await get(token, "?signals=1")).json();
+    const control = await (await getControl(apiRequest(token), routeParams({ id: project.id }))).json();
+    // No approved plan and no project dates: nothing to measure against.
+    expect(listed.schedule).toEqual({ status: control.schedule.status, worst: control.schedule.worst, days: null });
+    expect(listed.schedule.status).toBe("no_dates");
+    expect(listed.progressPct).toEqual(expect.any(Number));
+    // The seed's H3 was invoiced on 24/09 and is still unpaid, past its due day.
+    expect(listed.attention).toEqual([{ kind: "collection_overdue", count: 1 }]);
   });
 });
 

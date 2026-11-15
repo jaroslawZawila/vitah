@@ -1,9 +1,10 @@
 "use client";
 
-import { useFormatter, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useFormat } from "@/lib/format";
 import { fieldStyles as f } from "../../../components/wizard/fields";
 import SummaryList from "../../../components/wizard/SummaryList";
 import type { ProjectDraft, ProjectStepProps } from "../draft";
@@ -60,14 +61,8 @@ export function DetailsStep({ draft, onChange }: ProjectStepProps) {
 
 export function DetailsSummary({ draft }: { draft: ProjectDraft }) {
   const t = useTranslations("newProjectPage.details");
-  const format = useFormatter();
-  const date = (value: string) =>
-    value
-      ? format.dateTime(new Date(`${value}T00:00:00Z`), {
-          dateStyle: "long",
-          timeZone: "UTC",
-        })
-      : null;
+  const format = useFormat();
+  const date = (value: string) => (value ? format.date(value) : null);
 
   return (
     <SummaryList

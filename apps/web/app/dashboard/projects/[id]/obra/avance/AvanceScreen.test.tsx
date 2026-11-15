@@ -48,11 +48,11 @@ describe("AvanceScreen", () => {
     const row = table().getByRole("link", { name: "Envolvente térmica Thermochip" }).closest("tr")!;
     expect(within(row).getByText("Fin previsto superado · +8 d")).toBeInTheDocument();
     expect(within(row).getByText("1 incidencia")).toBeInTheDocument();
-    expect(within(row).getByRole("img", { name: "Plan 14/09 a 09/10, real desde 21/09" })).toBeInTheDocument();
+    expect(within(row).getByRole("img", { name: "Plan 14 sept 2026 a 9 oct 2026, real desde 21 sept 2026" })).toBeInTheDocument();
     const done = table().getByRole("link", { name: "Carpintería exterior e interior" }).closest("tr")!;
     expect(within(done).getByText("23 d · plan 19 d")).toBeInTheDocument();
-    expect(within(done).getByRole("img", { name: "Plan 21/09 a 09/10, real 22/09 a 14/10" })).toBeInTheDocument();
-    expect(table().getByText("empieza el 19/10 según plan")).toBeInTheDocument();
+    expect(within(done).getByRole("img", { name: "Plan 21 sept 2026 a 9 oct 2026, real 22 sept 2026 a 14 oct 2026" })).toBeInTheDocument();
+    expect(table().getByText("empieza el 19 oct 2026 según plan")).toBeInTheDocument();
     // Planning's dates are simulated.
     expect(screen.getAllByText("Simulado").length).toBeGreaterThan(0);
 
@@ -110,7 +110,7 @@ describe("AvanceScreen", () => {
     const done = within(await screen.findByRole("status"));
     expect(done.getByText("Capítulo 06 finalizado")).toBeInTheDocument();
     expect(done.getByText("Factura solicitada")).toBeInTheDocument();
-    expect(done.getByText("17/10/2026 · 27 d")).toBeInTheDocument();
+    expect(done.getByText("17 oct 2026 · 27 d")).toBeInTheDocument();
   });
 
   it("finishes a chapter that completes no hito with a plain dialog, and Cancel saves nothing", async () => {

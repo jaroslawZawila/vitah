@@ -29,7 +29,7 @@ export default function ReviewStep<D, O>({
 
   return (
     <div className="flex flex-col gap-3.5">
-      <p className="text-[13px] text-muted-foreground">{intro ?? t("reviewIntro")}</p>
+      <p className="text-sm text-muted-foreground">{intro ?? t("reviewIntro")}</p>
       {sections.map(({ id, title, Summary }, index) => (
         <section
           key={id}

@@ -94,7 +94,7 @@ export default function AcceptDialog({
 
       {revision.options.length > 0 && (
         <fieldset className="flex flex-col gap-2">
-          <legend className="pb-2 text-[13px] font-semibold">{t("options")}</legend>
+          <legend className="pb-2 text-sm font-semibold">{t("options")}</legend>
           {revision.options.map((option) => {
             const on = chosen.has(option.id);
             return (
@@ -137,7 +137,7 @@ export default function AcceptDialog({
         <Input id={`${id}-signed`} type="file" accept="application/pdf" onChange={(event) => setSigned(event.target.files?.[0] ?? null)} />
       </Field>
 
-      <p className="rounded-[10px] bg-brand-soft px-3.5 py-3 text-[13.5px]">
+      <p className="rounded-[10px] bg-brand-soft px-3.5 py-3 text-sm">
         <b>{t("effect", { number: revision.number })}</b>{" "}
         <span className={muted}>{t("effectHint", { first: f.money(ofBp(contract, firstHitoBp)) })}</span>
       </p>

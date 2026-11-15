@@ -32,6 +32,7 @@ import {
   optionFromLineAction,
   rejectRevisionAction,
   searchPriceBaseAction,
+  takeProjectDataAction,
   updateChapterAction,
   updateLineAction,
   updateOptionAction,
@@ -39,12 +40,14 @@ import {
 } from "../../../../actions/budget";
 import { savePlanAction } from "../../../../actions/obra";
 import FormError from "../../../components/FormError";
+import { useConfirm, type ConfirmRequest } from "../../../components/useConfirm";
 import AcceptDialog, { type AcceptInput } from "../components/budget/AcceptDialog";
 import AcceptedBanner from "../components/budget/AcceptedBanner";
 import BudgetFrame from "../components/budget/BudgetFrame";
 import { budgetHref, type BudgetTab } from "../components/budget/links";
 import ChapterSummary from "../components/budget/ChapterSummary";
 import ConditionsView from "../components/budget/ConditionsView";
+import IdentityNotice from "../components/budget/IdentityNotice";
 import IssueDialog, { type IssueInput } from "../components/budget/IssueDialog";
 import type { LineOps, LineParent } from "../components/budget/LineTable";
 import LinesView, { type LineHandlers } from "../components/budget/LinesView";
@@ -92,7 +95,19 @@ export default function BudgetScreen({ projectId, projectRef, site, clientName, 
     current.map((c) => (c.key === tick.key ? { ...c, done: tick.done } : c)),
   );
   const revision = { ...budget.revision, checks };
-  const { state, pending, run, confirmThen, reset } = useObraAction();
+  const { state, pending, run, reset } = useObraAction();
+  const confirm = useConfirm("obra.errors");
+  /** Asks first; the dialog runs `action` and shows its error. */
+  const ask = (key: string, values: Record<string, string | number>, action: ConfirmRequest["action"]) => {
+    reset();
+    confirm.ask({
+      t,
+      key,
+      values,
+      destructive: true,
+      action,
+    });
+  };
   const [dialog, setDialog] = useState<Dialog | null>(null);
   const editable = canManage && revision.status === "draft";
   const isNewest = revisions[0]?.id === revision.id;
@@ -118,7 +133,7 @@ export default function BudgetScreen({ projectId, projectRef, site, clientName, 
           <Button
             type="button"
             variant="ghost-destructive"
-            onClick={() => confirmThen(t("confirmDeleteDraft", { number: revision.number }), () => deleteRevisionAction(projectId, revision.id))}
+            onClick={() => ask("deleteDraftDialog", { number: revision.number }, () => deleteRevisionAction(projectId, revision.id))}
           >
             {t("deleteDraft")}
           </Button>
@@ -131,11 +146,11 @@ export default function BudgetScreen({ projectId, projectRef, site, clientName, 
       banner = (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-[14px] border border-info/30 bg-info-soft px-4 py-3.5 text-sm">
           <span>
-            <b>{t("issuedBanner", { issued: f.date(revision.issuedOn!), valid: revision.validUntil ? f.date(revision.validUntil) : "—" })}</b>{" "}
+            <b>{t("issuedBanner", { issued: f.date(revision.issuedOn!), valid: f.date(revision.validUntil) })}</b>{" "}
             <span className="text-muted-foreground">{revision.pdfs.general ? t("issuedBannerPdfs") : ""}</span>
           </span>
           <span className="flex flex-wrap gap-2">
-            <Button type="button" variant="ghost" size="sm" onClick={() => confirmThen(t("confirmReject", { number: revision.number }), () => rejectRevisionAction(projectId, revision.id))}>
+            <Button type="button" variant="ghost" size="sm" onClick={() => ask("rejectDialog", { number: revision.number }, () => rejectRevisionAction(projectId, revision.id))}>
               {t("reject")}
             </Button>
             <Button type="button" variant="outline" size="sm" disabled={pending} onClick={() => run(() => createRevisionAction(projectId))}>
@@ -164,7 +179,7 @@ export default function BudgetScreen({ projectId, projectRef, site, clientName, 
     );
   } else if (revision.status === "rejected") {
     banner = (
-      <p className="rounded-[14px] border border-bad/30 bg-bad-soft px-4 py-3 text-sm">{t("rejectedBanner", { date: revision.rejectedOn ? f.date(revision.rejectedOn) : "—" })}</p>
+      <p className="rounded-[14px] border border-bad/30 bg-bad-soft px-4 py-3 text-sm">{t("rejectedBanner", { date: f.date(revision.rejectedOn) })}</p>
     );
   }
 
@@ -185,7 +200,7 @@ export default function BudgetScreen({ projectId, projectRef, site, clientName, 
     onAddFree: (parent) => open({ kind: "newLine", parent }),
     onUpdate: (line, changes) => run(() => updateLineAction(projectId, line.id, changes)),
     onEdit: (parent, line) => open({ kind: "editLine", parent, line }),
-    onDelete: (line) => confirmThen(t("lines.confirmDelete", { code: line.code }), () => deleteLineAction(projectId, line.id)),
+    onDelete: (line) => ask("lines.deleteDialog", { code: line.code, description: line.description }, () => deleteLineAction(projectId, line.id)),
     onSearch,
   };
   const lineHandlers: LineHandlers = {
@@ -213,7 +228,7 @@ export default function BudgetScreen({ projectId, projectRef, site, clientName, 
     onAddOption: (item) => run(() => addOptionAction(projectId, revision.id, { baseCode: item.code })),
     onAddEmptyOption: () => open({ kind: "newOption" }),
     onUpdateOption: (option, changes) => run(() => updateOptionAction(projectId, option.id, changes)),
-    onDeleteOption: (option) => confirmThen(t("options.confirmDelete", { name: option.name }), () => deleteOptionAction(projectId, option.id)),
+    onDeleteOption: (option) => ask("options.deleteDialog", { name: option.name }, () => deleteOptionAction(projectId, option.id)),
   };
   const saveTexts = (texts: Partial<BudgetTexts>) => saveRevision({ texts });
   const saveConditions = (conditions: Partial<BudgetConditions>) => saveRevision({ conditions });
@@ -237,6 +252,7 @@ export default function BudgetScreen({ projectId, projectRef, site, clientName, 
     case "summary":
       body = (
         <>
+          <IdentityNotice revision={revision} textsHref={href("/texts")} />
           <SummaryKpis revision={revision} onMargins={editable ? saveRevision : undefined} />
           <ChapterSummary revision={revision} hrefOf={chapterHref} onContingency={editable ? (contingencyPct) => saveRevision({ contingencyPct }) : undefined} />
           {revision.model && <OptionSummary options={revision.options} href={href("/options")} />}
@@ -255,6 +271,12 @@ export default function BudgetScreen({ projectId, projectRef, site, clientName, 
     case "texts":
       body = (
         <>
+          <IdentityNotice
+            revision={revision}
+            generalHref={editable ? `/dashboard/projects/${projectId}` : undefined}
+            pending={pending}
+            onUse={editable ? () => run(() => takeProjectDataAction(projectId, revision.id)) : undefined}
+          />
           {revision.model && <ReviewChecklist checks={revision.checks} hrefOf={checkHref} onToggle={editable ? toggleCheck : undefined} />}
           <TextsView revision={revision} inputs={inputs} fileUrl={(doc) => `/api/v1/projects/${projectId}/documents/${doc.id}`} onSave={editable ? saveTexts : undefined} />
         </>
@@ -283,12 +305,13 @@ export default function BudgetScreen({ projectId, projectRef, site, clientName, 
       tab={tab}
       chapterCode={chapterCode}
       inputCount={inputs.length}
-      saving={pending}
+      saving={pending || confirm.pending}
       actions={actions}
       banner={banner}
     >
       {!dialog && <FormError namespace="obra.errors" error={state?.error} />}
       {body}
+      {confirm.dialog}
       {dialog && (
         <Modal open onOpenChange={(isOpen) => !isOpen && close()} title={dialogTitle(dialog, t, revision)}>
           {dialog.kind === "issue" ? (

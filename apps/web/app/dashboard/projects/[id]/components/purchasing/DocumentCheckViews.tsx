@@ -39,16 +39,16 @@ function Finding({ finding, duplicateHref }: { finding: DocumentFinding; duplica
   const locale = useLocale();
   return (
     <li className="flex flex-col gap-0.5">
-      <b className="text-[13px]">{t(finding.kind)}</b>
+      <b className="text-sm">{t(finding.kind)}</b>
       {finding.duplicate ? (
-        <span className="text-[12.5px] text-muted-foreground">
+        <span className="text-meta text-muted-foreground">
           {t("duplicateOf")}{" "}
           <Link href={duplicateHref(finding)} className="font-medium text-brand-ink hover:text-primary">
             {finding.duplicate.label}
           </Link>
         </span>
       ) : (
-        finding.detail && <span className="text-[12.5px] text-muted-foreground">{locale === "en" ? finding.detail.en : finding.detail.es}</span>
+        finding.detail && <span className="text-meta text-muted-foreground">{locale === "en" ? finding.detail.en : finding.detail.es}</span>
       )}
     </li>
   );
@@ -82,7 +82,7 @@ export function DocumentChecks({
           <Sparkles aria-hidden className="size-5 text-primary" />
           {t("title")}
         </h2>
-        <p className="mt-1 text-[12.5px] text-muted-foreground">{t("intro")}</p>
+        <p className="mt-1 text-meta text-muted-foreground">{t("intro")}</p>
       </div>
       <ul className="m-0 flex list-none flex-col p-0" aria-label={t("title")}>
         {checks.map((check) => {
@@ -91,8 +91,8 @@ export function DocumentChecks({
           return (
             <li key={check.id} className="flex flex-col gap-2 border-t py-3 first:border-t-0">
               <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
-                <b className="min-w-0 text-[13.5px] [overflow-wrap:anywhere]">{check.label}</b>
-                <span className="text-[12px] text-muted-foreground">{t(`subject.${check.subject}`)}</span>
+                <b className="min-w-0 text-sm [overflow-wrap:anywhere]">{check.label}</b>
+                <span className="text-meta text-muted-foreground">{t(`subject.${check.subject}`)}</span>
                 <CheckState check={check} />
                 {canManage && settled && (
                   <span className="ml-auto flex gap-1">
@@ -115,12 +115,12 @@ export function DocumentChecks({
                 </ul>
               )}
               {(seen || check.checkedAt || check.status === "skipped") && (
-                <p className="m-0 text-[12px] text-muted-foreground">
+                <p className="m-0 text-meta text-muted-foreground">
                   {seen
-                    ? t("seen", { by: check.dismissedBy ?? "—", date: f.shortDay(day(check.dismissedAt!)) })
+                    ? t("seen", { by: check.dismissedBy ?? "—", date: f.date(day(check.dismissedAt!)) })
                     : check.status === "skipped"
                       ? t("skippedHint")
-                      : t("checked", { date: f.shortDay(day(check.checkedAt!)) })}
+                      : t("checked", { date: f.date(day(check.checkedAt!)) })}
                 </p>
               )}
             </li>

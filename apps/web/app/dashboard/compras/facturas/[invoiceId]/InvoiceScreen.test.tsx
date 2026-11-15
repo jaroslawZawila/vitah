@@ -38,7 +38,6 @@ const sent = (call: unknown[] | undefined) => {
 beforeEach(() => {
   for (const action of Object.values(actions)) vi.mocked(action as () => Promise<unknown>).mockReset().mockResolvedValue({ success: true });
   router.push.mockReset();
-  vi.spyOn(window, "confirm").mockReturnValue(true);
 });
 
 describe("InvoiceScreen", () => {
@@ -48,13 +47,13 @@ describe("InvoiceScreen", () => {
     expect(screen.getByRole("heading", { level: 1, name: "MSN-2026/148" })).toBeInTheDocument();
     expect(screen.getByText("Factura recibida · VTH-26-001")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "PED-004" })).toHaveAttribute("href", "/dashboard/projects/p-1/compras/order-4");
-    expect(screen.getByRole("status")).toHaveTextContent("Vence el 22 oct, en 3 días.");
+    expect(screen.getByRole("status")).toHaveTextContent("Vence el 22 oct 2026, en 3 días.");
     expect(screen.getByRole("status")).toHaveTextContent(/Quedan 13\.500,00\s€ por pagar de 28\.500,00\s€\./);
 
     const amounts = within(screen.getByRole("region", { name: "Importes" }));
     expect(amounts.getByText("IVA (Inversión del sujeto pasivo)")).toBeInTheDocument();
     expect(amounts.getByText("Retención de garantía 5 %")).toBeInTheDocument();
-    expect(amounts.getByText("−1500,00")).toBeInTheDocument();
+    expect(amounts.getByText("−1.500,00")).toBeInTheDocument();
     expect(amounts.getByText("28.500,00")).toBeInTheDocument();
 
     const data = within(screen.getByRole("region", { name: "Datos" }));
@@ -124,14 +123,17 @@ describe("InvoiceScreen", () => {
 
   it("takes a payment back, adds a version of the PDF and deletes the invoice", async () => {
     renderScreen();
-    await userEvent.click(screen.getByRole("button", { name: "Quitar el pago del 15 oct" }));
-    // Each confirmation says what happens: it leaves the lists and totals, and nothing is erased.
-    expect(window.confirm).toHaveBeenLastCalledWith(
-      expect.stringMatching(/^¿Quitar el pago de 15\.000,00\s€\? Sale de las listas y de los totales; sus datos y su justificante se conservan\.$/),
-    );
+    await userEvent.click(screen.getByRole("button", { name: "Quitar el pago del 15 oct 2026" }));
+    // Each confirmation names the record and says what happens: it leaves the lists and totals, an admin can restore it.
+    let dialog = within(await screen.findByRole("alertdialog", { name: /^¿Quitar el pago de 15\.000,00\s€ del 15 oct 2026\?$/ }));
+    expect(
+      dialog.getByText(/^Es un pago de la factura MSN-2026\/148 de Montajes Steel Norte S\.L\.\. .*la factura vuelve a deber ese importe\. Un administrador puede restaurarlo desde Elementos eliminados\.$/),
+    ).toBeInTheDocument();
+    expect(actions.deletePaymentAction).not.toHaveBeenCalled();
+    await userEvent.click(dialog.getByRole("button", { name: "Quitar pago" }));
     expect(actions.deletePaymentAction).toHaveBeenCalledWith("pay-1");
     // Its button is disabled while the action runs.
-    await waitFor(() => expect(screen.getByRole("button", { name: "Quitar el pago del 15 oct" })).toBeEnabled());
+    await waitFor(() => expect(screen.getByRole("button", { name: "Quitar el pago del 15 oct 2026" })).toBeEnabled());
 
     await userEvent.click(screen.getByRole("button", { name: "+ Nueva versión" }));
     const upload = within(screen.getByRole("form", { name: "+ Nueva versión" }));
@@ -145,7 +147,9 @@ describe("InvoiceScreen", () => {
     await waitFor(() => expect(screen.queryByRole("form", { name: "+ Nueva versión" })).not.toBeInTheDocument());
 
     await userEvent.click(screen.getByRole("button", { name: "Eliminar" }));
-    expect(window.confirm).toHaveBeenLastCalledWith("¿Eliminar MSN-2026/148? Sale de las listas y de los totales; sus datos y sus PDF se conservan.");
+    dialog = within(await screen.findByRole("alertdialog", { name: "¿Eliminar la factura MSN-2026/148 de Montajes Steel Norte S.L.?" }));
+    expect(dialog.getByText("Sale de las listas y de los totales, con sus PDF. Un administrador puede restaurarla desde Elementos eliminados.")).toBeInTheDocument();
+    await userEvent.click(dialog.getByRole("button", { name: "Eliminar factura" }));
     expect(actions.deleteInvoiceAction).toHaveBeenCalledWith("inv-148");
     await waitFor(() => expect(router.push).toHaveBeenCalledWith("/dashboard/compras/facturas"));
   });
@@ -159,7 +163,7 @@ describe("InvoiceScreen", () => {
       canManage: false,
       invoice: { ...invoiceDetail, ...invoiceItem({ state: "paid", paidCents: 2_850_000, outstandingCents: 0 }), payableLeftCents: 150_000 },
     });
-    expect(screen.getByRole("status")).toHaveTextContent(/Factura pagada\. .*Siguen retenidos 1500,00\s€ hasta el fin de la garantía\./);
+    expect(screen.getByRole("status")).toHaveTextContent(/Factura pagada\. .*Siguen retenidos 1.500,00\s€ hasta el fin de la garantía\./);
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Editar" })).not.toBeInTheDocument();
   });

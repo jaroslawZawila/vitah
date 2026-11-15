@@ -9,6 +9,7 @@ import { DELETE as deleteRevision, PATCH as patchRevision } from "./revisions/[r
 import { POST as accept } from "./revisions/[revisionId]/accept/route";
 import { POST as issue } from "./revisions/[revisionId]/issue/route";
 import { POST as reject } from "./revisions/[revisionId]/reject/route";
+import { POST as projectData } from "./revisions/[revisionId]/project-data/route";
 import { GET as pdf } from "./revisions/[revisionId]/pdf/route";
 import { POST as addChapter } from "./revisions/[revisionId]/chapters/route";
 import { POST as addOption } from "./revisions/[revisionId]/options/route";
@@ -173,6 +174,33 @@ describe("/api/v1/projects/:id/budget", () => {
     await issue(post({ shareWithClient: false }), routeParams({ id, revisionId }));
     expect((await reject(post({ rejectedOn: "2026-10-03" }), routeParams({ id, revisionId }))).status).toBe(200);
     expect((await read()).revision).toMatchObject({ status: "rejected", rejectedOn: "2026-10-03" });
+  }, 60_000);
+
+  it("names the project's address on a draft's cover, takes it again after an edit, and never once issued", async () => {
+    const { ctx, id, read, post, patch } = await setup();
+    const { revisionId } = await (await POST(post({}), routeParams({ id }))).json();
+    expect((await read()).revision).toMatchObject({
+      texts: { cover: { site: "Calle Mayor 1, Santander" } },
+      identity: { client: null, address: "Calle Mayor 1, Santander", differs: [], projectLacks: [] },
+    });
+    await patchRevision(patch({ texts: { cover: { site: "Calle Castelar 12" } } }), routeParams({ id, revisionId }));
+    expect((await read()).revision.identity.differs).toEqual(["site"]);
+
+    const res = await projectData(post(), routeParams({ id, revisionId }));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ revisionId, changed: ["site"] });
+    expect((await read()).revision.texts.cover.site).toBe("Calle Mayor 1, Santander");
+
+    await issue(post({ shareWithClient: false }), routeParams({ id, revisionId }));
+    const frozen = await projectData(post(), routeParams({ id, revisionId }));
+    expect(frozen.status).toBe(409);
+    expect(await frozen.json()).toEqual({ error: "not_draft" });
+
+    const { token: viewer } = await staffToken(ctx.tenantId, "viewer");
+    expect((await projectData(apiRequest(viewer, { method: "POST" }), routeParams({ id, revisionId }))).status).toBe(403);
+    const { token: outsider } = await staffToken((await createTestTenant()).id);
+    expect((await projectData(apiRequest(outsider, { method: "POST" }), routeParams({ id, revisionId }))).status).toBe(404);
+    expect((await projectData(apiRequest(null, { method: "POST" }), routeParams({ id, revisionId }))).status).toBe(401);
   }, 60_000);
 
   it("searches the price base", async () => {

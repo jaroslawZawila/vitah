@@ -15,7 +15,7 @@ import { daysBetween, useControlFormat } from "./format";
 import { GanttBar, MonthAxis, type Timeline } from "./Gantt";
 import { ChapterStatePill, SCHEDULE_TONE } from "./pills";
 import { groupByState, scheduleOf } from "./schedule";
-import { Dash, dateSpan } from "./SummaryTable";
+import { DateSpan, dateSpan } from "./SummaryTable";
 
 // Presentational: Obra › Avance, the chapters with their plan against what
 // happened: a table with a mini Gantt from 768px, cards on phones.
@@ -61,7 +61,7 @@ function ChapterNotes({ chapter, today }: { chapter: ControlChapter; today: stri
 
   let note: string | null = null;
   if (chapter.state === "pending" && chapter.plannedStart && chapter.plannedStart >= today) {
-    note = t("startsOn", { date: f.day(chapter.plannedStart) });
+    note = t("startsOn", { date: f.date(chapter.plannedStart) });
   }
   if (chapter.state === "finished" && chapter.actualDays !== null) {
     note =
@@ -74,7 +74,7 @@ function ChapterNotes({ chapter, today }: { chapter: ControlChapter; today: stri
   return (
     <div className="mt-1 flex flex-wrap items-center gap-1.5">
       {pills}
-      {note && <span className={cn("text-[12px] text-muted-foreground", chapter.state === "finished" && "num")}>{note}</span>}
+      {note && <span className={cn("text-meta text-muted-foreground", chapter.state === "finished" && "num")}>{note}</span>}
     </div>
   );
 }
@@ -139,21 +139,21 @@ export function ProgressTable({
   const t = useTranslations("construction.progress");
   const tg = useTranslations("construction.groups");
   const f = useControlFormat();
-  const columns = 5 + (timeline ? 1 : 0) + (actions ? 1 : 0);
+  const columns = 4 + (timeline ? 1 : 0) + (actions ? 1 : 0);
 
   return (
     <section className={cn(cardVariants({ size: "flush" }), "hidden py-1.5 md:flex")} aria-label={t("tableLabel")}>
-      <Table className="text-[13px]">
+      <Table>
         <TableHeader>
           <TableRow>
-            <TableHead className="pl-[18px]">{t("code")}</TableHead>
-            <TableHead>{t("chapter")}</TableHead>
+            <TableHead className="pl-[18px]">{t("chapter")}</TableHead>
             <TableHead>{t("state")}</TableHead>
             <TableHead>{t("plan")}</TableHead>
             <TableHead>{t("actual")}</TableHead>
+            {/* The bars from xl: below, the table fits the card with its actions by leaving them out (the dates stay). */}
             {timeline && (
-              <TableHead className="w-[40%]">
-                <MonthAxis timeline={timeline} />
+              <TableHead className="hidden w-[40%] xl:table-cell">
+                <MonthAxis timeline={timeline} className="min-w-[240px]" />
               </TableHead>
             )}
             {actions && (
@@ -173,8 +173,9 @@ export function ProgressTable({
               </TableRow>
               {group.chapters.map((chapter) => (
                 <TableRow key={chapter.code}>
-                  <TableCell className="num pl-[18px]">{chapter.code}</TableCell>
-                  <TableCell className="min-w-[200px] whitespace-normal">
+                  {/* The code beside the name, not a column of its own: the table fits the card. */}
+                  <TableCell className="min-w-[200px] pl-[18px] whitespace-normal">
+                    <span className="num mr-2 text-muted-foreground">{chapter.code}</span>
                     <Link href={chapterHref(chapter.code)} className="font-semibold transition-colors hover:text-primary">
                       {chapter.name}
                     </Link>
@@ -183,11 +184,11 @@ export function ProgressTable({
                   <TableCell>
                     <ChapterStatePill state={chapter.state} />
                   </TableCell>
-                  <TableCell className="num">{dateSpan(f, chapter.plannedStart, chapter.plannedEnd) ?? <Dash />}</TableCell>
-                  <TableCell className="num">{dateSpan(f, chapter.actualStart, chapter.actualEnd) ?? <Dash />}</TableCell>
+                  <TableCell><DateSpan f={f} start={chapter.plannedStart} end={chapter.plannedEnd} /></TableCell>
+                  <TableCell><DateSpan f={f} start={chapter.actualStart} end={chapter.actualEnd} /></TableCell>
                   {timeline && (
-                    <TableCell>
-                      <GanttBar chapter={chapter} timeline={timeline} today={today} />
+                    <TableCell className="hidden xl:table-cell">
+                      <GanttBar chapter={chapter} timeline={timeline} today={today} className="min-w-[240px]" />
                     </TableCell>
                   )}
                   {actions && (
@@ -267,7 +268,7 @@ export function ProgressCards({
                     <ChapterStatePill state={chapter.state} />
                   </div>
                   <ChapterNotes chapter={chapter} today={today} />
-                  <dl className="m-0 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-0.5 text-[13px]">
+                  <dl className="m-0 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-0.5 text-sm">
                     <dt className="text-muted-foreground">{t("plan")}</dt>
                     <dd className="num m-0">
                       {plan ?? "—"}

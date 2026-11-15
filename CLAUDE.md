@@ -307,6 +307,11 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
   pending → in progress → finished **only** by the actual dates staff record (`obra_chapter_progress`; start/finish
   dates may be before today, never after); every record and correction is kept in `obra_progress_events`. Passing a
   planned date never changes anything
+- Whether an obra is on time has **one definition**: `scheduleStatus` in `packages/core/src/schedule-status.ts` (pure,
+  in `@repo/core/contract`): with the approved baseline, `late` when a pending chapter is past its planned start, a chapter in progress past
+  its planned end, or the forecast ends after the contract date, else `on_time`; `simulated` without a baseline (never
+  on time or late); `no_dates`. Resumen, Planificación (`ScheduleStatusView`) and the project list all read it; never
+  compute it apart
 - Finishing the last chapter of a hito creates one `obra_invoice_requests` row for Administration (unique per hito:
   never a second one, whatever is corrected); hito states pending → reached → requested → invoiced → collected follow
   the Pagos tab's invoice and payment. `Hito.invoiceRequestedAt` shows it on Pagos. A finished chapter counts as 100 %
@@ -480,6 +485,12 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
   caps spend (null = no limit). Tests mock `budget-ai/claude` — never call the real API in tests
 - Review checks (`budget-review.ts`): the AI's inconsistencies and assumptions, estimated lines and chapters off the
   tenant's own €/m² averages; staff tick them off before issuing
+- Client and address (`budget-identity.ts`): the project is the source of truth. A new draft (by hand, AI, copied
+  revision) names the project's address and its client (profile's first name + surnames) on the cover's promoter and
+  site, keeping a text that already names them and says more (accents, case, punctuation aside); the AI's or old text
+  only where the project has none. `revision.identity` shows a draft's differences (notice on Texts, one line on the
+  summary; `takeProjectData`, `POST …/revisions/:revisionId/project-data`); issued revisions only get a note. Never
+  writes to the project
 - Portal: Budget tab pages under `dashboard/projects/[id]/budget/` (summary, lines, options, texts, conditions,
   pdf; `?revision=` shows an older one, picked from the menu on the revision pill); `BudgetScreen` / `BudgetStartScreen` are the containers, views in
   `components/budget/`. Web-only: the app only sees the general PDF (Documentos) and the contract via the obra
@@ -493,16 +504,25 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
 ### Project list (Proyectos)
 
 - `dashboard/projects` (`ProjectsListClient` container, views `components/ProjectFilterBar` + `ProjectsTable`, pure
-  `project-list.ts`): every project with two filters, kept in the URL (`?presupuesto=&obra=&q=`, replaced, not pushed;
+  `project-list.ts`): every project with three filters, kept in the URL (`?presupuesto=&obra=&atencion=&q=`, replaced, not pushed;
   read with `useSearchParams`, so the browser's back and the rail's Proyectos win; the project layout's "Volver a
   proyectos", `ProjectsBackLink`, returns to the list as last filtered in the tab):
   **Presupuesto** by the newest revision's state (`BUDGET_FILTERS`/`budgetFilterOf`; the AI drafting counts as a draft)
   and **Obra** by the project's stage (`OBRA_FILTERS`/`obraFilterOf` in core `project-filters.ts`: stages 1–5 not
-  started, 6 under construction, 7–8 finished). Each option counts given the other filter and the search. The data is
+  started, 6 under construction, 7–8 finished) and **Atención** (`ATTENTION_FILTERS`: all, needs attention = late or a
+  reason, late; with it on, most urgent first, `byUrgency`). Each option counts given the other filters and the search. The data is
   core `listProjectsWithBudget` (`budget-overview.ts`: each project with its `BudgetState`, the newest revision and AI
-  run, none of the overview's figures), also `GET /api/v1/projects` (the `budget` field). Rows add the budget pill
-  (opens the budget; a failed AI run says so, filed under no budget) and the stage pill (`StagePill`, opens Obra); a
-  table from 768 px, cards and a `FilterSelect` per filter below 640 px. The rail's Proyectos has no sections of its
+  run, none of the overview's figures, and with `{ signals: true }` its signals from `project-signals.ts`), also
+  `GET /api/v1/projects` (the `budget` field; `schedule`, `progressPct` and `attention` only with `?signals=1`). The
+  signals, for every project in a fixed 15 queries sent at once (`loadObraSummaries`: each chapter's line totals summed
+  in SQL, no lines; `countProjectsAttention`; never a query per project, never a list of document ids): with a contract, the
+  schedule (`scheduleStatus` as Obra › Resumen, via `projectSchedule`) and the built %; and the reasons: hitos to
+  invoice (reached/requested), hito payments past due, supplier invoices overdue (with what they owe), purchase
+  requests to approve, late material deliveries, CAE document warnings. Rows add the budget pill
+  (opens the budget; a failed AI run says so, filed under no budget, not an attention reason), the stage pill
+  (`StagePill`, opens Obra), the schedule pill (opens Planificación), the built % and the attention count (a popover
+  whose reasons link to where each is handled; `components/ProjectSignals.tsx`); a table from 768 px (the dates from
+  1280 px), cards (the reasons as text) and a `FilterSelect` per filter below 640 px. The rail's Proyectos has no sections of its
   own. Web-only: the client's app has no project list
 
 ### Subcontratas (CAE)
@@ -591,6 +611,15 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
     action errors go through `app/dashboard/components/FormError.tsx`
   - The shadcn CLI needs `pnpm` on PATH and may write `import { cn } from "cn"` and add a `cn` npm package —
     fix the import to `@/lib/utils` and drop the dependency
+- **Numbers and dates** are written by one module: `@repo/core/format` (`formatMoney`, `formatAmount`,
+  `formatQuantity`, `formatPercent`, `formatDate`, `formatDateTime`, `formatDateRange`…; thousands separator always,
+  cents always, one date style, `Europe/Madrid`, a missing date is "—"), in the portal through `useFormat()`
+  (`apps/web/lib/format.ts`). Never `Intl.*`, `toLocale*String` or next-intl's formatter in a view (ESLint fails). A
+  money total says its VAT basis with `useVatLabel()` (`dashboard/components/vat-basis.ts`: "sin IVA" / "IVA incl.")
+- **Shared portal behaviour** (`app/dashboard/components/`): `useConfirm` (the confirmation dialog for anything that
+  deletes, cancels or cannot be undone; never the browser's `confirm`), `useUrlState` (a view's filters and open
+  groups kept in the URL, replaced not pushed; long tables fold by chapter with `FoldRow`), and `place.ts`
+  (`placeOf(pathname)`: the page's header and browser title; a new section or project tab gets a row there)
 - **No CSS Modules, no hex colours or inline colour styles in components.** Style with Tailwind classes and
   the theme tokens in `globals.css`, so dark mode keeps working. Inline `style` only for computed values
   (a progress width, a grid template)
@@ -599,6 +628,9 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
   uppercase `eyebrow` labels; `num` (mono, tabular) for money, quantities and %; tables with uppercase muted
   headings and a heavy rule over totals; status shown as soft pills. Light by default, dark when the system is
   (`prefers-color-scheme`); `.dark` forces dark on a subtree (the login page is always grafito)
+- **Type scale** (`globals.css`): reading text is `text-sm` (14px: table cells and their `num` figures, fields, labels,
+  buttons, paragraphs); `text-meta` (13px) only for secondary text (hints, captions, metadata); `text-xs` (12px) the
+  floor (eyebrows, pills, table headings). Never an arbitrary `text-[Npx]` under 14px (`app/type-scale.test.ts` fails)
 - **Tokens** (Tailwind names): shadcn's `background`, `foreground`, `card`, `primary` (verde oliva), `muted-foreground`,
   `border`, `destructive` (= `bad`), plus `raise` (inset surfaces, inputs, row hover), `brand-soft`/`brand-ink`,
   status pairs `good`/`good-soft`, `yel`, `warn`, `bad`, `info` (each with `-soft`), `rail`/`rail-foreground`/

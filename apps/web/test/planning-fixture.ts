@@ -1,4 +1,5 @@
 import type { PlanningDraft, PlanningRow, PlanningVersions, ProjectPlanning } from "@repo/core/contract";
+import { scheduleStatus } from "@repo/core/contract";
 
 // What the Planificación screens get from core, for their tests: VTH-26-001
 // mid-works on Monday 19 October 2026 with baseline v2, 01 finished, 02 and
@@ -91,6 +92,8 @@ export const planningRows: PlanningRow[] = [
 
 const calendar = { region: "as" as const, augustClosure: true, christmasClosure: true };
 
+const forecast = { endDate: "2026-12-17", contractEnd: "2026-12-11", delayDays: 6, penaltyCents: 0 };
+
 export const planning: ProjectPlanning = {
   ref: "VTH-26-001",
   stage: 6,
@@ -110,12 +113,14 @@ export const planning: ProjectPlanning = {
     calendar,
     rows: planningRows,
     planned: { endDate: "2026-12-10", contractEnd: "2026-12-11", delayDays: -1, penaltyCents: 0 },
-    forecast: { endDate: "2026-12-17", contractEnd: "2026-12-11", delayDays: 6, penaltyCents: 0 },
+    forecast,
   },
   draft: null,
   chapters: planningRows.map(({ code, name }) => ({ code, name })),
   copyFrom: [{ projectId: "p-2", ref: "VTH-26-002" }],
   today: TODAY,
+  // As core builds it: the baseline's chapters and forecast.
+  schedule: scheduleStatus({ chapters: planningRows, planning: "live", forecast, today: TODAY }),
 };
 
 /** No plan yet: what the first visit to Planificación gets. */

@@ -202,8 +202,9 @@ async function run() {
   await add(all, "getPurchasingCounts", "dashboard layout (rail badges)", () => purchaseInvoicesService.getPurchasingCounts(ctx));
   await add(all, "subcontractors getCounts", "dashboard layout (rail badges)", () => subcontractorsService.getCounts(ctx));
 
-  await add(company_, "listProjectsWithBudget", "/dashboard/projects", () => budgetOverviewService.listProjectsWithBudget(ctx), list((r) => r));
-  await add(company_, "listProjects", "GET /api/v1/projects, obra pickers", () => projectsService.listProjects(ctx), list((r) => r));
+  await add(company_, "listProjectsWithBudget (signals)", "/dashboard/projects", () => budgetOverviewService.listProjectsWithBudget(ctx, { signals: true }), list((r) => r));
+  await add(company_, "listProjectsWithBudget", "GET /api/v1/projects", () => budgetOverviewService.listProjectsWithBudget(ctx), list((r) => r));
+  await add(company_, "listProjects", "obra pickers", () => projectsService.listProjects(ctx), list((r) => r));
   await add(company_, "listBudgets", "GET /api/v1/budgets", () => budgetOverviewService.listBudgets(ctx), list((r) => r.items));
   // The portal's lists ask for their first page; an API client that asks for none still gets everything.
   const first = { page: 1 };

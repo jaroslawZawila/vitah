@@ -29,6 +29,10 @@
     "signOut": "Sign out",
     "greeting": "Hello, {email}"
   },
+  "confirmDialog": {
+    "cancel": "Cancel",
+    "working": "One moment…"
+  },
   "sidebar": {
     "projects": "Projects",
     "clients": "Clients",
@@ -166,13 +170,17 @@
     "titles": {
       "projects": "Projects — Full Pipeline",
       "users": "User Management",
-      "projectDetail": "Project Detail",
+      "project": "Project",
       "clients": "App Clients",
       "newProject": "New project",
       "subcontractors": "Subcontractors",
       "purchases": "Purchasing",
-      "deleted": "Deleted items"
-    }
+      "deleted": "Deleted items",
+      "forbidden": "No permission",
+      "portal": "Portal"
+    },
+    "withPart": "{section} — {part}",
+    "documentTitle": "{label} · ViTAH"
   },
   "navigation": {
     "back": "Back"
@@ -182,15 +190,13 @@
     "newProject": "New Project",
     "empty": "No projects yet.",
     "table": {
-      "ref": "Reference",
-      "address": "Address",
-      "client": "Client",
+      "project": "Project",
       "noClient": "No app access",
       "startDate": "Start",
       "completionDate": "Completion",
-      "view": "View",
-      "budget": "Budget",
-      "obra": "Works"
+      "budgetObra": "Budget · Works",
+      "scheduleProgress": "Schedule · Progress",
+      "attention": "Attention"
     },
     "countFiltered": "{shown} of {total, plural, one {# project} other {# projects}}",
     "listLabel": "Projects",
@@ -200,6 +206,7 @@
       "clear": "Clear filters",
       "budget": "Budget",
       "obra": "Works",
+      "attention": "Attention",
       "optionCount": "{label} ({count})",
       "budgetOptions": {
         "all": "All",
@@ -214,6 +221,25 @@
         "not_started": "Not started",
         "execution": "Under construction",
         "finished": "Finished"
+      },
+      "attentionOptions": {
+        "all": "All",
+        "attention": "Need attention",
+        "late": "Late"
+      }
+    },
+    "signals": {
+      "late": "Late · {days}",
+      "attention": "{count, plural, one {# alert} other {# alerts}}",
+      "attentionLabel": "What needs attention on {ref}: {reasons}",
+      "attentionTitle": "Pending on {ref}",
+      "reasons": {
+        "to_invoice": "{count, plural, one {# milestone to invoice} other {# milestones to invoice}}",
+        "collection_overdue": "{count, plural, one {# milestone payment overdue} other {# milestone payments overdue}}",
+        "supplier_overdue": "{count, plural, one {# supplier invoice overdue} other {# supplier invoices overdue}} ({amount})",
+        "requests": "{count, plural, one {# purchase request to approve} other {# purchase requests to approve}}",
+        "late_deliveries": "{count, plural, one {# material delivery late} other {# material deliveries late}}",
+        "documents": "{count, plural, one {# CAE document alert} other {# CAE document alerts}}"
       }
     }
   },
@@ -224,7 +250,11 @@
       "save": "Save",
       "cancel": "Cancel",
       "delete": "Delete project",
-      "confirmDelete": "Delete this project? It will no longer show in the portal or in the client's app. Nothing is erased: its data and documents are kept.",
+      "deleteDialog": {
+        "title": "Delete project {ref}?",
+        "description": "The project and everything in it (budget, works, purchasing, documents and photos) leave the portal and the client's app. An administrator can restore it from Deleted items.",
+        "confirm": "Delete project"
+      },
       "address": "Address",
       "startDate": "Start date",
       "completionDate": "Completion date",
@@ -249,7 +279,11 @@
       "assigning": "Assigning…",
       "active": "Access active",
       "remove": "Remove from project",
-      "confirmRemove": "Remove {email} from this project? Their account stays, but they will no longer see the project in the app.",
+      "removeDialog": {
+        "title": "Remove {name} from this project?",
+        "description": "Their account stays, but this home no longer shows in their app; their other homes, if any, stay. You can assign the project to them again at any time.",
+        "confirm": "Remove from project"
+      },
       "errors": {
         "missing_fields": "Select a client.",
         "project_not_found": "Project not found.",
@@ -266,7 +300,11 @@
       "emptyText": "Only a spider lives here. Upload the first PDF and the client will see it in the app.",
       "delete": "Delete",
       "deleteLabel": "Delete {title}",
-      "confirmDelete": "Delete “{title}”? It will no longer be shown in the portal or in the client's app; the file is kept.",
+      "deleteDialog": {
+        "title": "Delete the document “{title}”?",
+        "description": "It leaves the portal and the client's app. An administrator can restore it from Deleted items.",
+        "confirm": "Delete document"
+      },
       "upload": "Upload document",
       "file": "PDF file",
       "fileHint": "PDF only, up to 4 MB.",
@@ -377,13 +415,15 @@
       "passwordReset": "Password of {name} reset. Their sessions were closed.",
       "twoStepRemoved": "Two-step verification of {name} removed. Their sessions were closed."
     },
+    "deactivateDialog": {
+      "title": "Deactivate {name}?",
+      "description": "They can no longer sign in to the portal and all their sessions end. You can activate them again at any time, but they will have to sign in again.",
+      "confirm": "Deactivate user"
+    },
     "removeTwoStep": {
-      "title": "Remove the two-step verification of {name}",
+      "title": "Remove the two-step verification of {name}?",
       "description": "For when they have lost their phone. They will sign in with their password alone and all their sessions will be closed. They can turn it on again from their settings.",
-      "confirm": "Remove two-step verification",
-      "confirming": "Removing…",
-      "cancel": "Cancel",
-      "close": "Close"
+      "confirm": "Remove two-step verification"
     },
     "resetPassword": {
       "title": "New password for {name}",
@@ -627,13 +667,28 @@
       "upload": "Upload",
       "uploading": "Uploading…",
       "cancel": "Cancel",
-      "confirmRemove": "Remove this file?",
+      "removeDialog": {
+        "acta": {
+          "title": "Remove the signed acta of {code}?",
+          "description": "The milestone is left without a signed acta, in the portal and in the client's app. The PDF is kept and the removal is recorded in the milestone's history.",
+          "confirm": "Remove acta"
+        },
+        "invoice": {
+          "title": "Remove the invoice of {code}?",
+          "description": "The milestone no longer shows as invoiced, in the portal and in the client's app. The PDF is kept and the removal is recorded in the milestone's history.",
+          "confirm": "Remove invoice"
+        }
+      },
       "paymentTitle": "Record payment",
       "paidOn": "Date paid",
       "paidAmount": "Amount paid (€)",
       "paid": "Paid {date} · {amount}",
       "cancelPayment": "Undo payment",
-      "confirmCancelPayment": "Undo the recorded payment?",
+      "cancelPaymentDialog": {
+        "title": "Undo the payment of {code}?",
+        "description": "The {amount} collected on {date} is undone: the milestone shows as unpaid again, in the portal and in the client's app. The payment stays in the milestone's history.",
+        "confirm": "Undo payment"
+      },
       "appTitle": "In the client's app",
       "appText": "They see it as “{status}”: amount with VAT, due date, the acta's photos, the signed acta and the invoice.",
       "contractTitle": "Contract",
@@ -773,7 +828,38 @@
       "overdueLong": "Planned end passed · {days}",
       "startLate": "Start {days}",
       "notStarted": "Planned start passed · {days}",
+      "notStartedShort": "Start passed {days}",
       "startsIn": "{count, plural, =0 {starts today} other {starts in # d}}"
+    },
+    "scheduleStatus": {
+      "title": "Schedule",
+      "headline": {
+        "on_time": "On time",
+        "simulated": "No plan",
+        "no_dates": "No dates"
+      },
+      "caption": {
+        "on_time": "no chapter is late",
+        "simulated": "the dates are simulated",
+        "no_dates": "nothing to compare with"
+      },
+      "worst": {
+        "forecast": "past the contract",
+        "finish": "planned end passed",
+        "start": "planned start passed"
+      },
+      "text": {
+        "simulated": "There is no approved plan, so whether the works are on time can't be said. Approve one in Planning.",
+        "no_dates": "The project has no start and end dates and no approved plan."
+      },
+      "forecastLate": "Forecast end {date}: {count, plural, one {# day} other {# days}} after the contract ({contract}).",
+      "forecastWithin": "Forecast end {date}, within the contract ({contract}).",
+      "forecastNoContract": "Forecast end {date}. The project has no end date: it isn't compared with the contract.",
+      "penalty": "Expected penalty: {amount}.",
+      "noPenalty": "No penalty yet: it starts on the 15th day of delay.",
+      "bySimulated": "By the simulated dates:",
+      "lateToFinish": "{count, plural, one {# chapter in progress is past its planned end} other {# chapters in progress are past their planned end}}: {count, plural, one {} other {the furthest behind, }}{code} {name}, planned end {date}.",
+      "lateToStart": "{count, plural, one {# chapter not started is past its planned start} other {# chapters not started are past their planned start}}: {count, plural, one {} other {the furthest behind, }}{code} {name}, planned start {date}."
     },
     "gantt": {
       "plan": "Plan {start} to {end}",
@@ -799,7 +885,9 @@
       "period": "Period",
       "from": "From",
       "to": "To",
-      "readOnly": "Read-only · updates itself"
+      "readOnly": "Read-only · updates itself",
+      "expandAll": "Expand all",
+      "collapseAll": "Collapse all"
     },
     "summary": {
       "title": "Construction",
@@ -822,6 +910,7 @@
         "pendingCount": "{count} pending",
         "cost": "Cost",
         "budgeted": "Budgeted",
+        "contingencyNote": "Excludes chapter 20 (contingency, {amount}): held as the reserve.",
         "contracted": "Contracted",
         "deviation": "Deviation",
         "savingNote": "Saving on the closed lines ({amount} budgeted). Open or uncontracted lines don't count.",
@@ -835,10 +924,6 @@
         "outstanding": "Outstanding",
         "toInvoice": "To invoice",
         "schedule": "Schedule",
-        "onTime": "On time",
-        "worstDelay": "worst delay in progress",
-        "noDelay": "no chapter in progress is late",
-        "overdueText": "{code} {name}: planned end {date}, still in progress",
         "worksStart": "Works start",
         "actualShort": "actual {date}",
         "finishedLate": "Finished late",
@@ -864,7 +949,7 @@
         "deviation": "Deviation",
         "contractedLines": "{contracted} of {total} lines closed",
         "total": "Total · {count, plural, one {# chapter} other {# chapters}} at cost",
-        "footnote": "Amounts in euros, at cost. Contingencies (ch. 20, {contingency} €) are kept as a reserve. Deviation = contracted − budgeted cost, only on closed lines: positive is an overrun, negative a saving."
+        "footnote": "Amounts in euros, at cost, excl. VAT. Contingencies (ch. 20, {contingency} €) are kept as a reserve, outside the total. Deviation = contracted − budgeted cost, only on closed lines: positive is an overrun, negative a saving."
       },
       "milestones": {
         "title": "Payment milestones",
@@ -1077,7 +1162,7 @@
       "description": "What we expected to pay for each budget line against what has been contracted. Read-only.",
       "costFrom": "Budgeted cost:",
       "budgetRevision": "Budget Rev.{number}",
-      "atCost": "(at cost, never the sale price)",
+      "atCost": "(at cost, excl. VAT, never the sale price; without chapter 20, the contingency reserve)",
       "contractedFrom": "Contracted:",
       "contracting": "Contracting",
       "filter": {
@@ -1104,7 +1189,11 @@
       "closedOf": "{closed} of {total} closed",
       "openCount": "{count, plural, one {# open} other {# open}}",
       "order": "Order",
-      "noDeviationYet": "no deviation until closed"
+      "noDeviationYet": "no deviation until closed",
+      "lineCount": "{count, plural, one {# line} other {# lines}}",
+      "overruns": "{count} over budget",
+      "lateOrders": "{count, plural, one {# late delivery} other {# late deliveries}}",
+      "total": "Total · {count, plural, one {# line} other {# lines}}"
     },
     "milestones": {
       "title": "Payment milestones",
@@ -1180,7 +1269,11 @@
       "files": "Attachments: photos, emails or documents",
       "currentFiles": "Current attachments",
       "deleteFile": "Remove {name}",
-      "confirmDeleteFile": "Remove the attachment {name}? It will no longer be shown in the portal; the file is kept.",
+      "deleteFileDialog": {
+        "title": "Remove the attachment {name}?",
+        "description": "It leaves the record. An administrator can restore it from Deleted items.",
+        "confirm": "Remove attachment"
+      },
       "filesHint": "PDF, image, email (EML, MSG), TXT, DOCX or XLSX, up to 4 MB each.",
       "note": "It's a record: it doesn't move dates or amounts. Extra costs only count once they are formalised in Purchasing, Sales or the Budget.",
       "uploading": "Uploading attachments: {done} of {total}…",
@@ -1218,7 +1311,11 @@
       "visible": "In the app",
       "hidden": "Staff only",
       "visibleLabel": "Visible in the client's app: {name}",
-      "confirmDelete": "Delete this photo? It will no longer be shown in the portal or in the client's app; the file is kept.",
+      "deleteDialog": {
+        "title": "Delete the photo “{name}”?",
+        "description": "It leaves the portal and the client's app. An administrator can restore it from Deleted items.",
+        "confirm": "Delete photo"
+      },
       "emptyTitle": "No photos yet",
       "emptyText": "The camera is taking a nap. Upload the first site photo and the client will see it in the app.",
       "uploadTitle": "Upload photos",
@@ -1419,7 +1516,11 @@
         "save": "Save draft",
         "who": "Once approved, Progress, Purchasing and the works summary use this version; the previous one stays in Versions.",
         "discard": "Discard draft",
-        "confirmDiscard": "Discard draft v{number}? Its changes will be lost."
+        "discardDialog": {
+          "title": "Discard draft v{number}?",
+          "description": "It is deleted with all its changes and this cannot be undone. The approved baseline, if there is one, does not change.",
+          "confirm": "Discard draft"
+        }
       },
       "lead": "Order",
       "leadLabel": "Days ahead to order chapter {code}",
@@ -1513,13 +1614,21 @@
       "conditions": "Terms"
     },
     "deleteDraft": "Delete draft",
-    "confirmDeleteDraft": "Delete draft Rev.{number}? Its changes will be lost.",
+    "deleteDraftDialog": {
+      "title": "Delete draft Rev.{number}?",
+      "description": "It is deleted with all its line items, options and texts, and this cannot be undone. Earlier revisions do not change.",
+      "confirm": "Delete draft"
+    },
     "issueButton": "Issue to client",
     "issueRevision": "Issue Rev.{number}",
     "issuedBanner": "Issued on {issued} · valid until {valid}.",
     "issuedBannerPdfs": "Its PDFs are in Documents.",
     "reject": "Rejected",
-    "confirmReject": "Mark Rev.{number} as rejected by the client?",
+    "rejectDialog": {
+      "title": "Mark Rev.{number} as rejected by the client?",
+      "description": "It is rejected as of today and can no longer be accepted. To go on, create a new revision with their changes.",
+      "confirm": "Mark as rejected"
+    },
     "newRevision": "Create Rev.{number}",
     "newRevisionChanges": "Create Rev.{number} with changes",
     "acceptButton": "Record acceptance",
@@ -1608,6 +1717,7 @@
       "total": "TOTAL PEC (ex VAT) · Rev.{number}",
       "vatNote": "Each chapter's amount includes its share of the associated costs and industrial profit, as in the PDF. VAT {rate}: {vat} · Total with VAT: {total}.",
       "costTotal": "Construction cost (chapters 01–20)",
+      "costTotalNote": "Construction measures cost without chapter 20 ({amount}): it is the contingency reserve.",
       "overhead": "Associated costs · {pct} of cost",
       "profit": "Industrial profit · {pct} of the selling price"
     },
@@ -1644,7 +1754,11 @@
       "pecHint": "options do not change it",
       "withAdding": "With all the ones that add",
       "withSubtracting": "With all the ones that subtract",
-      "confirmDelete": "Delete the option “{name}” and its line items?",
+      "deleteDialog": {
+        "title": "Delete the option “{name}”?",
+        "description": "It is deleted from the draft with all its line items, and this cannot be undone.",
+        "confirm": "Delete option"
+      },
       "price": "price with margins"
     },
     "picker": {
@@ -1676,7 +1790,11 @@
       "alternative": "Create an alternative (OP option)",
       "move": "Move to another chapter",
       "delete": "Delete line item",
-      "confirmDelete": "Delete line item {code}?",
+      "deleteDialog": {
+        "title": "Delete line item {code}?",
+        "description": "“{description}” is deleted from the draft, and this cannot be undone.",
+        "confirm": "Delete line item"
+      },
       "chapters": "20 chapters",
       "options": "Options · outside the PEC",
       "name": "Chapter name",
@@ -1717,6 +1835,20 @@
         "system": "Construction system"
       },
       "missing": "Not found in the documentation",
+      "identity": {
+        "title": "The budget doesn't name the project's client or address",
+        "inBudget": "In the budget",
+        "inProject": "In the project",
+        "empty": "(empty)",
+        "use": "Use the project's details",
+        "correctProject": "Correct the project",
+        "projectLacks": "The project has no {field, select, promoter {client} other {address}} yet; the budget says “{value}”. If that is right, add it to the project.",
+        "openGeneral": "Go to the General tab",
+        "summary": "The budget's client or address don't match the project's.",
+        "review": "Review in Texts",
+        "frozen": "The project's details don't match this revision's: {list}. It was already given to the client and doesn't change; a new revision will take the project's.",
+        "field": "{field, select, promoter {client} other {address}} “{value}”"
+      },
       "justification": "Technical justification for adapting to the Steel Frame system",
       "justificationIntro": "Justification introduction",
       "blockTitle": "Section title",
@@ -1879,6 +2011,11 @@
       "ready": "Ready",
       "optional": "Optional",
       "remove": "Remove",
+      "removeDialog": {
+        "title": "Remove “{name}”?",
+        "description": "It is no longer a document for the budget, and it also leaves the project's Documents. An administrator can restore it from Deleted items.",
+        "confirm": "Remove document"
+      },
       "uploading": "Uploading… {pct} %",
       "drop": "Drag the file here · {types}",
       "upload": "Upload file",
@@ -1970,6 +2107,12 @@
       },
       "leave": "You can close this page. The draft will appear here when it finishes.",
       "cancel": "Cancel",
+      "cancelDialog": {
+        "title": "Stop generating the draft?",
+        "description": "The AI stops and no draft is saved; what it has read so far is not used and its cost is not recovered. The uploaded documents stay, to generate it again.",
+        "confirm": "Stop generating",
+        "keep": "Keep generating"
+      },
       "facts": "What the AI has already read",
       "factsPending": "It will appear once it has finished reading the project.",
       "factLabels": {
@@ -2362,7 +2505,8 @@
       "unassigned": "Removed from a site",
       "assignment_restored": "Restored its assignment to {project}",
       "worker_created": "Registered worker {name}",
-      "worker_updated": "Edited the worker: {fields}"
+      "worker_updated": "Edited the worker: {fields}",
+      "other": "Recorded a change"
     },
     "fieldNames": {
       "kind": "type",
@@ -2400,7 +2544,9 @@
       "startDate": "start date",
       "tpcNumber": "TPC number",
       "roles": "roles",
-      "ppeItems": "PPE"
+      "ppeItems": "PPE",
+      "suppliesOnly": "material supplier",
+      "other": "another field"
     },
     "companies": {
       "eyebrow": "Network · Subcontractors",
@@ -2570,7 +2716,11 @@
         "workersLabel": "Workers",
         "edit": "Edit",
         "remove": "Remove from site",
-        "confirmRemove": "Remove the company from {ref}? It will no longer appear on that site; the record of its assignment is kept.",
+        "removeDialog": {
+          "title": "Remove {company} from site {ref}?",
+          "description": "It no longer appears on that site and its documents for that site stop counting. Assigning it again brings the assignment back; an administrator can also restore it from Deleted items.",
+          "confirm": "Remove from site"
+        },
         "save": "Save",
         "saving": "Saving…",
         "cancel": "Cancel"
@@ -2953,7 +3103,12 @@
       "cancelledOn": "Cancelled on {date}: it no longer counts as contracted.",
       "edit": "Edit",
       "cancelOrder": "Cancel order",
-      "confirmCancel": "Cancel {number}? It will no longer count as contracted.",
+      "cancelDialog": {
+        "title": "Cancel order {number}?",
+        "description": "It stops counting towards what is contracted and stays only as history: it can no longer be edited or moved on from the portal. If it came from a request, that request is approved again, to be ordered anew.",
+        "confirm": "Cancel order",
+        "keep": "Keep order"
+      },
       "advance": {
         "ordered": "Mark as ordered",
         "confirmed": "Mark as confirmed",
@@ -3046,7 +3201,11 @@
         "versionOf": "New version of {title}",
         "remove": "Remove",
         "removeOf": "Remove {title}",
-        "confirmRemove": "Remove “{title}” with all its versions? It leaves the order; the document and its files are kept.",
+        "removeDialog": {
+          "title": "Remove the document “{title}” from the order?",
+          "description": "It goes with all its versions and no longer shows on the order. An administrator can restore it from Deleted items.",
+          "confirm": "Remove document"
+        },
         "hint": "Each document keeps its versions; invoices and their proofs of payment are on each invoice."
       },
       "fromRequest": "from <link>{number}</link>"
@@ -3073,7 +3232,8 @@
         "dueOn": "Due date",
         "baseCents": "Base",
         "irpfBp": "IRPF",
-        "neededBy": "Needed by"
+        "neededBy": "Needed by",
+        "other": "Another field"
       },
       "changed": {
         "subcontractorId": "Supplier changed",
@@ -3109,7 +3269,8 @@
         "ordered": "Order {number} created",
         "reopened": "{number} cancelled: approved again, it can be ordered again"
       },
-      "amended": "Change order {number}: {amount} €"
+      "amended": "Change order {number}: {amount} €",
+      "other": "Change recorded"
     },
     "form": {
       "numbered": "{ref} · will be numbered {number}",
@@ -3329,18 +3490,31 @@
     "lines": {
       "description": "What is contracted, invoiced and paid of each line item, against the accepted budget's cost. Amounts without VAT.",
       "tableTitle": "Budget line items",
-      "tableHint": "Open a line item to see its orders, milestones, invoices and payments",
+      "tableHint": "Open a chapter to see its line items, and a line item to see its orders, milestones, invoices and payments",
       "filter": "Status",
       "all": "All",
       "chapter": "Chapter",
       "allChapters": "All",
+      "search": "Search line items",
       "line": "Line item",
       "cost": "Budgeted cost",
       "contracted": "Contracted",
       "deviation": "Deviation",
+      "invoiced": "Invoiced",
+      "paid": "Paid",
       "state": "Status",
       "toContract": "To contract {amount}",
-      "chapterSummary": "{contracted} of {total} contracted",
+      "lineCount": "{count, plural, one {# line item} other {# line items}}",
+      "stateCount": {
+        "to_contract": "{count} to contract",
+        "contracted": "{count} contracted",
+        "invoiced": "{count} invoiced",
+        "paid": "{count} paid"
+      },
+      "overdueLines": "{count, plural, one {# with an overdue invoice} other {# with overdue invoices}}",
+      "lateOrders": "{count, plural, one {# late delivery} other {# late deliveries}}",
+      "orderSoon": "Order before {date}",
+      "orderLate": "Order now: {days, plural, one {# day late} other {# days late}}",
       "noOrders": "No orders.",
       "orderBy": "By the plan, it must be ordered before {date}.",
       "createOrder": "Create order",
@@ -3352,6 +3526,7 @@
       "payOverdue": "Overdue since {date}",
       "milestonePaid": "Paid",
       "foot": {
+        "label": "Invoicing",
         "invoiced": "Invoiced",
         "paid": "Paid",
         "outstanding": "To pay",
@@ -3386,7 +3561,7 @@
     },
     "milestones": {
       "title": "Contract payment milestones",
-      "hint": "The invoicing schedule agreed with the supplier. It splits the order's amount; it adds nothing to the budget. Each invoice goes to one milestone.",
+      "hint": "The invoicing schedule agreed with the supplier. It splits the order's amount; it adds nothing to the budget. Each invoice goes to one milestone. Amounts excl. VAT.",
       "none": "No milestones: invoices are recorded freely against the order.",
       "define": "Set milestones",
       "edit": "Edit milestones",
@@ -3423,7 +3598,7 @@
       "payable": "To pay",
       "paid": "Paid",
       "state": "Status",
-      "note": "Each invoice's amounts; \"To pay\" takes off the guarantee retention. The summary is without VAT."
+      "note": "Each invoice's amounts; \"To pay\" takes off the guarantee retention."
     },
     "invoices": {
       "eyebrow": "Purchasing · all projects",
@@ -3498,7 +3673,11 @@
       "credit": "Record credit note",
       "edit": "Edit",
       "delete": "Delete",
-      "confirmDelete": "Delete {number}? It leaves the lists and totals; its data and PDFs are kept.",
+      "deleteDialog": {
+        "title": "Delete {kind, select, credit {credit note} other {invoice}} {number} from {supplier}?",
+        "description": "It leaves the lists and totals, with its PDFs. An administrator can restore it from Deleted items.",
+        "confirm": "{kind, select, credit {Delete credit note} other {Delete invoice}}"
+      },
       "banner": {
         "dueIn": "Due on {date}, {in}.",
         "overdue": "Was due on {date}, {ago}.",
@@ -3541,7 +3720,11 @@
         "none": "No payments yet.",
         "remove": "Remove",
         "removeOf": "Remove the payment of {date}",
-        "confirmRemove": "Remove the payment of {amount}? It leaves the lists and totals; its data and proof are kept."
+        "removeDialog": {
+          "title": "Remove the payment of {amount} on {date}?",
+          "description": "It is a payment of invoice {invoice} from {supplier}. It leaves the lists and totals, and the invoice owes that amount again. An administrator can restore it from Deleted items.",
+          "confirm": "Remove payment"
+        }
       },
       "payForm": {
         "title": "Record payment",
@@ -3743,7 +3926,12 @@
         "createOrder": "Create order",
         "edit": "Edit",
         "cancel": "Cancel request",
-        "confirmCancel": "Cancel request {number}? It can no longer be ordered."
+        "cancelDialog": {
+          "title": "Cancel request {number}?",
+          "description": "It is cancelled, with its history, and can no longer be turned into an order or reopened.",
+          "confirm": "Cancel request",
+          "keep": "Keep request"
+        }
       },
       "decision": {
         "title": "Approval",
@@ -3796,17 +3984,19 @@
       },
       "kpis": {
         "label": "Summary",
+        "againstCost": "Against cost",
+        "toPay": "What Administration pays",
         "contracted": "Contracted",
         "active": "{count, plural, one {# supplier with orders} other {# suppliers with orders}}",
         "outstanding": "Owed",
-        "outstandingHint": "Invoiced and not paid yet, VAT included",
+        "outstandingHint": "Invoiced and not paid yet",
         "overdue": "Past due",
         "overdueSuppliers": "{count, plural, one {# supplier with invoices past due} other {# suppliers with invoices past due}}",
         "noneOverdue": "No invoice past due",
         "retained": "Retentions",
         "retainedHint": "Guarantees held back until they end",
-        "invoiced": "Invoiced (excl. VAT)",
-        "paid": "Paid {amount} excl. VAT",
+        "invoiced": "Invoiced",
+        "paid": "Paid",
         "orders": "{count, plural, one {# order} other {# orders}} on {projects, plural, one {# site} other {# sites}}",
         "overdueOf": "{amount} past due"
       },
@@ -3908,6 +4098,10 @@
       "skippedHint": "The company has reached its monthly AI limit. Ask again once there is room."
     }
   },
+  "vatBasis": {
+    "excl": "{label} · excl. VAT",
+    "incl": "{label} · incl. VAT"
+  },
   "obraPicker": {
     "label": "Site",
     "search": "Find a site by code, client or address",
@@ -3989,10 +4183,8 @@
         "invoice": "It counts again in the amounts of its order, the site and the supplier.",
         "payment": "It counts as paid on its invoice again."
       },
-      "cancel": "Cancel",
       "confirm": "Restore",
-      "restoring": "Restoring…",
-      "close": "Close"
+      "restoring": "Restoring…"
     },
     "errors": {
       "generic": "It could not be restored. Try again.",

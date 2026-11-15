@@ -101,7 +101,7 @@ export default function ReviewChecklist({
         <div className="flex flex-wrap items-center gap-2.5">
           <div className="flex min-w-[220px] items-center gap-2.5">
             <ProgressBar pct={(done * 100) / checks.length} className="flex-1" />
-            <span className="font-mono text-[12.5px]">{t("progress", { done, total: checks.length })}</span>
+            <span className="font-mono text-meta">{t("progress", { done, total: checks.length })}</span>
           </div>
           {open === 0 && (
             <Button ref={toggleRef} type="button" variant="outline" size="sm" aria-expanded onClick={() => fold(false)}>
@@ -120,7 +120,7 @@ export default function ReviewChecklist({
         {shown.map((check) => {
           const href = hrefOf(check);
           return (
-            <li key={check.key} className="flex flex-wrap items-start gap-3 border-t py-3 text-[13.5px] md:flex-nowrap">
+            <li key={check.key} className="flex flex-wrap items-start gap-3 border-t py-3 text-sm md:flex-nowrap">
               <Badge variant={KIND_VARIANT[check.kind]} className="min-w-[104px]">
                 {t(`kinds.${check.kind}`)}
               </Badge>
@@ -134,7 +134,7 @@ export default function ReviewChecklist({
               </div>
               <span className="flex flex-none gap-1.5">
                 {href && (
-                  <Link href={href} className="inline-flex min-h-8 items-center px-2 text-[12.5px] font-semibold text-brand-ink hover:underline pointer-coarse:min-h-11">
+                  <Link href={href} className="inline-flex min-h-8 items-center px-2 text-meta font-semibold text-brand-ink hover:underline pointer-coarse:min-h-11">
                     {t("go", { ref: check.ref ?? "" })}
                   </Link>
                 )}
@@ -143,7 +143,7 @@ export default function ReviewChecklist({
                     {check.done ? <><Check aria-hidden /> {t("done")}</> : t("mark")}
                   </Button>
                 ) : (
-                  check.done && <span className="inline-flex items-center gap-1 text-[12.5px] font-semibold text-good"><Check size={14} aria-hidden /> {t("done")}</span>
+                  check.done && <span className="inline-flex items-center gap-1 text-meta font-semibold text-good"><Check size={14} aria-hidden /> {t("done")}</span>
                 )}
               </span>
             </li>

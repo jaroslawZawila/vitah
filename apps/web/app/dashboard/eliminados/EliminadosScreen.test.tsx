@@ -171,14 +171,14 @@ describe("EliminadosScreen", () => {
   it("asks before restoring, in a dialog; cancelling restores nothing", async () => {
     renderScreen(page([invoice, photo]));
 
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
     await userEvent.click(within(screen.getByRole("table")).getByRole("button", { name: "Restaurar Factura MSN-2026/112" }));
-    const dialog = await screen.findByRole("dialog");
+    const dialog = await screen.findByRole("alertdialog");
     expect(within(dialog).getByRole("heading", { name: "¿Restaurar Factura MSN-2026/112?" })).toBeInTheDocument();
     expect(within(dialog).getByText("Vuelve a contar en los importes de su pedido, de la obra y del proveedor.")).toBeInTheDocument();
 
     await userEvent.click(within(dialog).getByRole("button", { name: "Cancelar" }));
-    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
     expect(restoreDeletedAction).not.toHaveBeenCalled();
     expect(rows()).toHaveLength(2);
   });
@@ -190,10 +190,10 @@ describe("EliminadosScreen", () => {
     listDeletedAction.mockResolvedValue({ data: page([{ ...payment, restorable: true, parent: null }, photo], "c-9") });
 
     await userEvent.click(within(screen.getByRole("table")).getByRole("button", { name: "Restaurar Factura MSN-2026/112" }));
-    await userEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Restaurar" }));
+    await userEvent.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Restaurar" }));
 
     expect(restoreDeletedAction).toHaveBeenCalledWith("invoice", "inv-1");
-    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
     expect(await screen.findByRole("status")).toHaveTextContent("Restaurado: Factura MSN-2026/112.");
     await waitFor(() => expect(rows()).toHaveLength(2));
     expect(within(screen.getByRole("table")).queryByText("Factura MSN-2026/112")).not.toBeInTheDocument();
@@ -207,7 +207,7 @@ describe("EliminadosScreen", () => {
     restoreDeletedAction.mockResolvedValueOnce({ error: "exceeds_amount" });
 
     await userEvent.click(within(screen.getByRole("table")).getByRole("button", { name: "Restaurar Factura MSN-2026/112" }));
-    const dialog = await screen.findByRole("dialog");
+    const dialog = await screen.findByRole("alertdialog");
     await userEvent.click(within(dialog).getByRole("button", { name: "Restaurar" }));
 
     expect(await within(dialog).findByRole("alert")).toHaveTextContent(/Ya no cabe: supera lo que queda por pagar/);
@@ -220,10 +220,10 @@ describe("EliminadosScreen", () => {
     expect(await within(dialog).findByText("No se ha podido restaurar. Inténtalo de nuevo.")).toBeInTheDocument();
     await waitFor(() => expect(within(dialog).getByRole("button", { name: "Cancelar" })).toBeEnabled());
     await userEvent.click(within(dialog).getByRole("button", { name: "Cancelar" }));
-    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
     expect(rows()).toHaveLength(2);
     await userEvent.click(within(screen.getByRole("table")).getByRole("button", { name: "Restaurar Foto del 9 oct 2026" }));
-    expect(within(await screen.findByRole("dialog")).queryByRole("alert")).not.toBeInTheDocument();
+    expect(within(await screen.findByRole("alertdialog")).queryByRole("alert")).not.toBeInTheDocument();
   });
 
   it("reads in English too", () => {

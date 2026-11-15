@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { auth } from "../../auth";
 import { redirect, unstable_rethrow } from "next/navigation";
 import { getLocale } from "next-intl/server";
@@ -18,6 +19,9 @@ import {
   getMfaStatus,
   regenerateRecoveryCodesAction,
 } from "../actions/mfa";
+
+// No title of the root's: the top bar names the page in the browser tab (`<title>` in Topbar, from the address).
+export const metadata: Metadata = { title: null };
 
 export default async function DashboardLayout({
   children,

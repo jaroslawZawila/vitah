@@ -67,14 +67,14 @@ export default function CompaniesTable({
     <section className={cardVariants()} aria-labelledby="companies-title">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 id="companies-title">{t("table.title")}</h2>
-        <span className="text-[12.5px] text-muted-foreground">{t("table.hint")}</span>
+        <span className="text-meta text-muted-foreground">{t("table.hint")}</span>
       </div>
       <div className="flex flex-wrap items-center gap-2.5">
         <div className="flex flex-wrap gap-1.5" role="group" aria-label={t("filters.status")}>
           {STATUSES.map((status) => (
             <ToggleChip key={status} tone="solid" on={filter.status === status} onToggle={() => set({ status })}>
               {t(`filters.${status}`)}
-              <span className="num text-[11.5px] opacity-80">
+              <span className="num text-xs">
                 {status === "all" ? counted.length : counted.filter((c) => !c.suppliesOnly && c.status === status).length}
               </span>
             </ToggleChip>
@@ -120,11 +120,11 @@ export default function CompaniesTable({
       </div>
 
       {rows.length === 0 ? (
-        <p className="py-8 text-center text-[13.5px] text-muted-foreground">
+        <p className="py-8 text-center text-sm text-muted-foreground">
           {companies.length === 0 ? t("table.none") : t("table.empty")}
         </p>
       ) : (
-        <Table className="min-w-[1040px]">
+        <Table className="min-w-[900px]">
           <TableHeader>
             <TableRow>
               <TableHead>{t("table.company")}</TableHead>
@@ -149,18 +149,18 @@ export default function CompaniesTable({
                   <Link href={companyHref(c.id)} className="font-semibold hover:underline hover:underline-offset-3">
                     {c.legalName}
                   </Link>
-                  <div className="text-[12.5px] text-muted-foreground">
+                  <div className="text-meta text-muted-foreground">
                     <span className="num">{c.taxIdMasked}</span> · {t("table.reaIn", { region: ts(`regions.${c.reaRegion}`) })}
                   </div>
                 </TableCell>
-                <TableCell className="min-w-40 whitespace-normal">
+                <TableCell className="min-w-28 whitespace-normal">
                   {c.trades.map((trade) => ts(`trades.${trade}`)).join(" · ") || "—"}
-                  <div className="text-[12.5px] text-muted-foreground">
+                  <div className="text-meta text-muted-foreground">
                     {ts(`fields.types.${companyType(c)}.label`)}
                   </div>
                 </TableCell>
                 {c.suppliesOnly ? (
-                  <TableCell colSpan={DOC_PILLARS.length + 2} className="text-center text-[12.5px] text-muted-foreground">
+                  <TableCell colSpan={DOC_PILLARS.length + 2} className="text-center text-meta text-muted-foreground">
                     {t("table.noCae")}
                   </TableCell>
                 ) : (
@@ -177,7 +177,12 @@ export default function CompaniesTable({
                   </>
                 )}
                 <TableCell>
-                  {c.suppliesOnly ? <Badge>{ts("fields.types.supplier.label")}</Badge> : <CompanyStatusBadge status={c.status} />}
+                  {/* Wraps (as Oficio's "Proveedor de material" does) rather than widen the table past the card. */}
+                  {c.suppliesOnly ? (
+                    <Badge className="rounded-[9px] whitespace-normal">{ts("fields.types.supplier.label")}</Badge>
+                  ) : (
+                    <CompanyStatusBadge status={c.status} />
+                  )}
                 </TableCell>
                 <TableCell>
                   <Link

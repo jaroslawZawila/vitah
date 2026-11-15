@@ -79,19 +79,22 @@ export default function AvanceScreen({
           counts={{ all: chapters.length, in_progress: count("in_progress"), pending: count("pending"), finished: count("finished") }}
         />
         {timeline && (
-          <GanttLegend
-            today={today}
-            planSource={
-              <span className="inline-flex items-center gap-1.5 text-[11.5px]">
-                (<Source name={ts("planning")} mock={control.sources.planning === "mock"} />)
-              </span>
-            }
-          />
+          // The table shows its bars from xl only (the phone cards always do).
+          <div className="md:max-xl:hidden">
+            <GanttLegend
+              today={today}
+              planSource={
+                <span className="inline-flex items-center gap-1.5 text-xs">
+                  (<Source name={ts("planning")} mock={control.sources.planning === "mock"} />)
+                </span>
+              }
+            />
+          </div>
         )}
       </div>
 
       {chapters.length === 0 ? (
-        <p className={cn(cardVariants(), "text-center text-[13.5px] text-muted-foreground")}>{t("noChapters")}</p>
+        <p className={cn(cardVariants(), "text-center text-sm text-muted-foreground")}>{t("noChapters")}</p>
       ) : (
         <>
           <ProgressTable
@@ -117,7 +120,7 @@ export default function AvanceScreen({
         <RecentEvents events={control.events} />
         <section className={cn(cardVariants(), "gap-2.5")} aria-labelledby="how-it-works">
           <h2 id="how-it-works">{t("howTitle")}</h2>
-          <ul className="m-0 flex list-disc flex-col gap-1.5 pl-5 text-[13px] leading-snug">
+          <ul className="m-0 flex list-disc flex-col gap-1.5 pl-5 text-sm leading-snug">
             {(["start", "finish", "cancel", "planning"] as const).map((key) => (
               <li key={key}>{t.rich(`how.${key}`, { b: (chunks) => <b>{chunks}</b> })}</li>
             ))}

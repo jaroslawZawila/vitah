@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import type { PlanningCalendar, PlanningRow, PlanningRule, ProjectPlanning } from "@repo/core/contract";
+import type { PlanningCalendar, PlanningRow, PlanningRule, ProjectPlanning, ScheduleStatus } from "@repo/core/contract";
 import { orderByDate } from "@repo/core/planning-calc";
 import { Badge } from "@/components/ui/badge";
 import { cardVariants } from "@/components/ui/card";
@@ -13,6 +13,7 @@ import { muted } from "../obra/classes";
 import { daysBetween, useControlFormat } from "../construction/format";
 import { at, bar, MonthAxis, type Timeline } from "../construction/Gantt";
 import { ChapterStatePill } from "../construction/pills";
+import ScheduleStatusView from "../construction/ScheduleStatusView";
 
 // Presentational: Obra › Planificación, the approved baseline: its key
 // figures, and each chapter's rule and dates on a timeline (a table from
@@ -27,7 +28,7 @@ export function useRuleText() {
   return (rule: PlanningRule) => {
     if (rule.spansWorks) return t("spans");
     if (rule.after) return rule.lagDays === 0 ? t("after", { code: rule.after }) : t("afterLag", { code: rule.after, lag: f.signedDays(rule.lagDays) });
-    return rule.fixedStart ? t("fixed", { date: f.day(rule.fixedStart) }) : t("fromStart");
+    return rule.fixedStart ? t("fixed", { date: f.date(rule.fixedStart) }) : t("fromStart");
   };
 }
 
@@ -55,11 +56,22 @@ export function BaselineBanner({ baseline }: { baseline: Baseline }) {
       <span className={muted}>
         {baseline.approvedAt &&
           (baseline.approvedBy
-            ? t("approvedBy", { date: f.stampDay(baseline.approvedAt), name: baseline.approvedBy })
-            : t("approvedOn", { date: f.stampDay(baseline.approvedAt) }))}
+            ? t("approvedBy", { date: f.date(baseline.approvedAt), name: baseline.approvedBy })
+            : t("approvedOn", { date: f.date(baseline.approvedAt) }))}
         {baseline.reason && <> · {t("reason", { reason: baseline.reason })}</>}
       </span>
     </div>
+  );
+}
+
+/** On time or late, with the worst fact: the same status as Obra › Resumen's. */
+export function PlanSchedule({ schedule }: { schedule: ScheduleStatus }) {
+  const t = useTranslations("construction.scheduleStatus");
+  return (
+    <section aria-label={t("title")} className={cn(cardVariants(), "gap-1.5")}>
+      <span className="eyebrow">{t("title")}</span>
+      <ScheduleStatusView schedule={schedule} />
+    </section>
   );
 }
 
@@ -74,22 +86,22 @@ export function PlanKpis({ baseline, completionDate }: { baseline: Baseline; com
   const late = delay !== null && delay > 0;
   return (
     <section aria-label={t("label")} className="grid grid-cols-[repeat(auto-fit,minmax(min(190px,100%),1fr))] gap-3">
-      <Kpi label={t("start")} value={f.fullDay(baseline.startDate)} hints={[t("startHint")]} />
+      <Kpi label={t("start")} value={f.date(baseline.startDate)} hints={[t("startHint")]} />
       <Kpi
         label={t("contract")}
-        value={completionDate ? f.fullDay(completionDate) : "—"}
+        value={f.date(completionDate)}
         hints={[completionDate ? t("contractHint") : t("noContract")]}
       />
       <Kpi
         label={t("forecast")}
-        value={<span className={cn(late && "text-warn")}>{f.fullDay(forecast.endDate)}</span>}
+        value={<span className={cn(late && "text-warn")}>{f.date(forecast.endDate)}</span>}
         hints={[
-          delay === null ? t("baselineEnd", { date: f.fullDay(baseline.planned.endDate) }) : late ? t("late", { count: delay }) : tp("margin", { count: -delay }),
+          delay === null ? t("baselineEnd", { date: f.date(baseline.planned.endDate) }) : late ? t("late", { count: delay }) : tp("margin", { count: -delay }),
         ]}
       />
       <Kpi
         label={t("penalty")}
-        value={<span className={cn(forecast.penaltyCents > 0 && "text-bad")}>{f.moneyRound(forecast.penaltyCents)}</span>}
+        value={<span className={cn(forecast.penaltyCents > 0 && "text-bad")}>{f.money(forecast.penaltyCents)}</span>}
         hints={[late && delay <= 14 ? t("penaltyFrom", { count: 15 - delay }) : t("penaltyHint")]}
       />
       <Kpi
@@ -126,7 +138,7 @@ export function PlanBar({
   return (
     <div
       role="img"
-      aria-label={t("barLabel", { forecast: f.range(row.forecastStart, row.forecastEnd), baseline: f.range(row.plannedStart, row.plannedEnd) })}
+      aria-label={t("barLabel", { forecast: f.dateRange(row.forecastStart, row.forecastEnd), baseline: f.dateRange(row.plannedStart, row.plannedEnd) })}
       className={cn("relative h-[30px] min-w-[300px]", className)}
     >
       {timeline.months.slice(1).map((month) => (
@@ -167,7 +179,7 @@ function RowNotes({ row }: { row: PlanningRow }) {
       </span>
       {row.state === "pending" && row.leadDays > 0 && (
         // From the baseline's start, as Compras does: the date orders were planned to go out by.
-        <span className={muted}>· {tp("orderBy", { date: f.day(orderByDate(row.plannedStart, row.leadDays)) })}</span>
+        <span className={muted}>· {tp("orderBy", { date: f.date(orderByDate(row.plannedStart, row.leadDays)) })}</span>
       )}
       {row.critical && <Badge variant="warn">{t("critical")}</Badge>}
       {slip > 0 && <Badge variant="yel">{t("late", { days: f.signedDays(slip) })}</Badge>}
@@ -181,7 +193,7 @@ export function PlanLegend({ today, showBaseline }: { today: string; showBaselin
   const f = useControlFormat();
   const item = "inline-flex items-center gap-1.5";
   return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[12.5px] text-muted-foreground">
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-meta text-muted-foreground">
       <span className={item}>
         <span aria-hidden className="h-2.5 w-5 rounded-[3px] bg-good" />
         {t("finished")}
@@ -208,7 +220,7 @@ export function PlanLegend({ today, showBaseline }: { today: string; showBaselin
       )}
       <span className={item}>
         <span aria-hidden className="h-3.5 border-l-2 border-dashed border-bad" />
-        {t("today", { date: f.day(today) })}
+        {t("today", { date: f.date(today) })}
       </span>
     </div>
   );
@@ -232,7 +244,7 @@ export function PlanTable({
   const f = useControlFormat();
   return (
     <section className={cn(cardVariants({ size: "flush" }), "hidden py-1.5 md:flex")} aria-label={t("label")}>
-      <Table className="text-[13px]">
+      <Table>
         <TableHeader>
           <TableRow>
             <TableHead className="pl-[18px]">{t("code")}</TableHead>
@@ -255,7 +267,7 @@ export function PlanTable({
                 <RowNotes row={row} />
               </TableCell>
               <TableCell className="num whitespace-nowrap">
-                {f.day(row.forecastStart)} – {f.day(row.forecastEnd)}
+                {f.date(row.forecastStart)} – {f.date(row.forecastEnd)}
               </TableCell>
               <TableCell className="num text-right">{row.spansWorks ? "—" : row.durationDays}</TableCell>
               <TableCell className="pr-[18px]">
@@ -299,9 +311,9 @@ export function PlanCards({
               <ChapterStatePill state={row.state} />
             </div>
             <PlanBar row={row} timeline={timeline} today={today} showBaseline={showBaseline} className="min-w-0" />
-            <div className="flex flex-wrap justify-between gap-2 text-[12.5px]">
+            <div className="flex flex-wrap justify-between gap-2 text-meta">
               <span className="num">
-                {f.day(row.forecastStart)} – {f.day(row.forecastEnd)}
+                {f.date(row.forecastStart)} – {f.date(row.forecastEnd)}
               </span>
               {slip > 0 ? (
                 <span className="text-warn">{t("lateLong", { days: f.signedDays(slip) })}</span>
@@ -332,9 +344,9 @@ export function DraftNotice({
     <div className={cn(cardVariants(), "flex-row flex-wrap items-center justify-between gap-3 border-yel/40 bg-yel-soft/40 py-3")}>
       <span className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
         <Badge variant="yel">{t("badge", { number: draft.number })}</Badge>
-        <span className={muted}>{t("text", { name: draft.createdBy ?? "—", date: f.stampDay(draft.createdAt) })}</span>
+        <span className={muted}>{t("text", { name: draft.createdBy ?? "—", date: f.date(draft.createdAt) })}</span>
       </span>
-      <Link href={href} className="text-[13.5px] font-semibold text-brand-ink hover:underline">
+      <Link href={href} className="text-sm font-semibold text-brand-ink hover:underline">
         {canManage ? t("edit") : t("view")}
       </Link>
     </div>

@@ -49,7 +49,7 @@ export default function PlanForm({
     >
       <p className={muted}>{t("planHint")}</p>
       {hitos.map((hito) => (
-        <div key={hito.id} className="flex flex-wrap items-center gap-2.5 border-b py-2 text-[13.5px]">
+        <div key={hito.id} className="flex flex-wrap items-center gap-2.5 border-b py-2 text-sm">
           <span className={codeChip}>{hito.code}</span>
           <span className="min-w-0 flex-1 font-medium">{hito.name}</span>
           <span className={pctInput.root}>

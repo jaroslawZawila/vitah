@@ -34,8 +34,8 @@ describe("VersionsScreen", () => {
     expect(screen.getByRole("heading", { name: "v2 frente a v1" })).toBeInTheDocument();
     expect(screen.getByText("1 capítulo cambia de fechas")).toBeInTheDocument();
     const painting = within(screen.getByRole("row", { name: /Pinturas y varios/ }));
-    expect(painting.getByText("16/11 – 03/12")).toBeInTheDocument();
-    expect(painting.getByText("23/11 – 10/12")).toBeInTheDocument();
+    expect(painting.getByText("16 nov 2026 – 3 dic 2026")).toBeInTheDocument();
+    expect(painting.getByText("23 nov 2026 – 10 dic 2026")).toBeInTheDocument();
     expect(painting.getByText("+7 d")).toBeInTheDocument();
   });
 

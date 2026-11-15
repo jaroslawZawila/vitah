@@ -38,7 +38,6 @@ beforeEach(() => {
   vi.mocked(actions.addOrderDocumentVersionAction).mockReset().mockResolvedValue({ success: true });
   vi.mocked(actions.deleteOrderDocumentAction).mockReset().mockResolvedValue({ success: true });
   vi.mocked(invoiceActions.setOrderMilestonesAction).mockReset().mockResolvedValue({ success: true });
-  vi.spyOn(window, "confirm").mockReturnValue(true);
 });
 
 describe("OrderScreen", () => {
@@ -50,23 +49,23 @@ describe("OrderScreen", () => {
     expect(screen.getByRole("link", { name: "Piedra de Liébana" })).toHaveAttribute("href", "/dashboard/subcontratas/empresas/sup-liebana");
 
     const late = screen.getByRole("status");
-    expect(late).toHaveTextContent("Entrega con 3 días de retraso. Estaba prevista el 14 oct. El capítulo 06 sigue en curso.");
+    expect(late).toHaveTextContent("Entrega con 3 días de retraso. Estaba prevista el 14 oct 2026. El capítulo 06 sigue en curso.");
     expect(within(late).getByRole("link", { name: "Registrar incidencia" })).toHaveAttribute("href", "/dashboard/projects/p-1/obra/incidencias");
 
     const steps = within(screen.getByRole("region", { name: "Estado del pedido" }));
     expect(steps.getAllByRole("listitem").map((li) => li.textContent)).toEqual([
-      "Pendiente2 oct",
-      "Pedido3 oct",
+      "Pendiente2 oct 2026",
+      "Pedido3 oct 2026",
       "Confirmado",
-      "En tránsito13 oct",
-      "Entregadoprevisto 14 oct",
+      "En tránsito13 oct 2026",
+      "Entregadoprevisto 14 oct 2026",
     ]);
     expect(steps.getByRole("listitem", { current: "step" })).toHaveTextContent("En tránsito");
 
     const lines = within(screen.getByRole("region", { name: "Partidas del pedido" }));
     expect(lines.getByText("Coste del presupuesto Rev.1 aceptado, sin margen")).toBeInTheDocument();
     const row = lines.getByText("06.05").closest("tr")!;
-    expect(within(row).getByText("3324,00")).toBeInTheDocument();
+    expect(within(row).getByText("3.324,00")).toBeInTheDocument();
     expect(within(row).getByText("400,00")).toBeInTheDocument();
     expect(within(row).getByText("Sí")).toBeInTheDocument();
     expect(within(row).getByText(/\+196,00/)).toHaveClass("text-bad");
@@ -74,13 +73,13 @@ describe("OrderScreen", () => {
     const data = within(screen.getByRole("region", { name: "Datos" }));
     expect(data.getByText("3 oct 2026")).toBeInTheDocument();
     expect(data.getByRole("link", { name: "Cambiar" })).toHaveAttribute("href", "/dashboard/projects/p-1/compras/order-49/editar");
-    expect(data.getByText("Laura Pérez · 2 oct")).toBeInTheDocument();
+    expect(data.getByText("Laura Pérez · 2 oct 2026")).toBeInTheDocument();
 
     const history = within(screen.getByRole("region", { name: "Historial" }));
     expect(history.getByText("Confirmado → En tránsito")).toBeInTheDocument();
-    expect(history.getByText("Importe de 06.05: 3050,00 → 3120,00")).toBeInTheDocument();
+    expect(history.getByText("Importe de 06.05: 3.050,00 → 3.120,00")).toBeInTheDocument();
     expect(history.getByText(/Portes incluidos/)).toBeInTheDocument();
-    expect(history.getByText("Creado con 1 partida, 3050,00 €")).toBeInTheDocument();
+    expect(history.getByText("Creado con 1 partida, 3.050,00 €")).toBeInTheDocument();
   });
 
   it("tells in the history when an edit took the payment schedule with it", () => {
@@ -88,7 +87,7 @@ describe("OrderScreen", () => {
     const edited = (id: string, scheduleDeltaCents: number) => ({ ...lines!, id, detail: { ...lines!.detail, scheduleDeltaCents } });
     renderScreen({ order: { ...orderDetail, events: [edited("ev-8", -4_000), edited("ev-7", 7_000)] } });
     const history = within(screen.getByRole("region", { name: "Historial" }));
-    expect(history.getAllByText("Importe de 06.05: 3050,00 → 3120,00")).toHaveLength(2);
+    expect(history.getAllByText("Importe de 06.05: 3.050,00 → 3.120,00")).toHaveLength(2);
     expect(history.getByText(/Calendario de pagos: nuevo hito de 70,00 €/)).toBeInTheDocument();
     expect(history.getByText(/Calendario de pagos: 40,00 € menos en los últimos hitos sin facturar/)).toBeInTheDocument();
     expect(english.purchasing.history).toMatchObject({ scheduleRaised: expect.any(String), scheduleCut: expect.any(String) });
@@ -126,7 +125,10 @@ describe("OrderScreen", () => {
   it("cancels the order once confirmed", async () => {
     renderScreen();
     await userEvent.click(screen.getByRole("button", { name: "Cancelar pedido" }));
-    expect(window.confirm).toHaveBeenCalledWith("¿Cancelar PED-049? Dejará de sumar a lo contratado.");
+    const dialog = within(await screen.findByRole("alertdialog", { name: "¿Cancelar el pedido PED-049?" }));
+    expect(dialog.getByText(/Deja de sumar a lo contratado y queda solo como historial/)).toBeInTheDocument();
+    expect(actions.setPurchaseStatusAction).not.toHaveBeenCalled();
+    await userEvent.click(dialog.getByRole("button", { name: "Cancelar pedido" }));
     expect(actions.setPurchaseStatusAction).toHaveBeenCalledWith("p-1", "order-49", { status: "cancelled" });
     // The buttons come back once the action answers.
     await waitFor(() => expect(screen.getByRole("button", { name: "Cancelar pedido" })).toBeEnabled());
@@ -170,10 +172,13 @@ describe("OrderScreen", () => {
     await waitFor(() => expect(remove).toBeEnabled());
 
     await userEvent.click(remove);
-    // It says what happens: it leaves the order, and nothing is erased.
-    expect(window.confirm).toHaveBeenCalledWith(
-      "¿Quitar «Pedido PED-049» con todas sus versiones? Deja de verse en el pedido; el documento y sus archivos se conservan.",
-    );
+    // It says what happens: it leaves the order, and an admin can restore it.
+    const dialog = within(await screen.findByRole("alertdialog", { name: "¿Quitar el documento «Pedido PED-049» del pedido?" }));
+    expect(
+      dialog.getByText("Se quita con todas sus versiones y deja de verse en el pedido. Un administrador puede restaurarlo desde Elementos eliminados."),
+    ).toBeInTheDocument();
+    expect(actions.deleteOrderDocumentAction).not.toHaveBeenCalled();
+    await userEvent.click(dialog.getByRole("button", { name: "Quitar documento" }));
     expect(actions.deleteOrderDocumentAction).toHaveBeenCalledWith("p-1", "order-49", "doc-1");
     await waitFor(() => expect(remove).toBeEnabled());
   });
@@ -182,11 +187,15 @@ describe("OrderScreen", () => {
     vi.mocked(actions.deleteOrderDocumentAction).mockResolvedValue({ error: "not_found" });
     renderScreen();
     await userEvent.click(screen.getByRole("button", { name: "Quitar Pedido PED-049" }));
-    const documents = within(screen.getByRole("region", { name: /Documentos/ }));
-    expect(await documents.findByRole("alert")).toHaveTextContent("No se ha encontrado el pedido.");
-    // Opening a form starts clean.
-    await userEvent.click(documents.getByRole("button", { name: "+ Añadir documento" }));
-    expect(documents.queryByRole("alert")).not.toBeInTheDocument();
+    const dialog = within(await screen.findByRole("alertdialog"));
+    await userEvent.click(dialog.getByRole("button", { name: "Quitar documento" }));
+    // In the dialog, which stays open; closing it leaves the card clean.
+    expect(await dialog.findByRole("alert")).toHaveTextContent("No se ha encontrado el pedido.");
+    // Cancel waits until the action has finished.
+    await waitFor(() => expect(dialog.getByRole("button", { name: "Cancelar" })).toBeEnabled());
+    await userEvent.click(dialog.getByRole("button", { name: "Cancelar" }));
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+    expect(within(screen.getByRole("region", { name: /Documentos/ })).queryByRole("alert")).not.toBeInTheDocument();
   });
 
   it("refuses a PDF over 4 MB before sending it", async () => {
@@ -209,7 +218,7 @@ describe("OrderScreen", () => {
 
     renderScreen({ order: { ...orderDetail, status: "cancelled", lateDays: null, reached: { ...orderDetail.reached, cancelled: "2026-10-15" } } });
     expect(screen.queryByRole("link", { name: "Editar" })).not.toBeInTheDocument();
-    expect(screen.getByText("Cancelado el 15 oct: no suma a lo contratado.")).toBeInTheDocument();
+    expect(screen.getByText("Cancelado el 15 oct 2026: no suma a lo contratado.")).toBeInTheDocument();
   });
 
   it("is read-only for viewers", () => {
@@ -248,11 +257,16 @@ describe("OrderScreen", () => {
       expect(within(second).getByRole("link", { name: "MSN-2026/148" })).toHaveAttribute("href", "/dashboard/compras/facturas/inv-148");
       expect(schedule.getByText("✓ Cuadra con el pedido")).toBeInTheDocument();
       expect(schedule.getByText("28.200,00")).toBeInTheDocument();
+      // The schedule's invoicing is without VAT; each invoice's "A pagar" and "Pagado" with it.
+      expect(schedule.getByText("Facturación · sin IVA")).toBeInTheDocument();
 
       const invoices = within(screen.getByRole("region", { name: /Facturas del pedido/ }));
       const row = invoices.getByRole("link", { name: "MSN-2026/148" }).closest("tr")!;
       expect(within(row).getByText("Pago parcial")).toBeInTheDocument();
       expect(within(row).getByText("28.500,00")).toBeInTheDocument();
+      for (const name of ["Base", "A pagar · IVA incl.", "Pagado · IVA incl."]) {
+        expect(invoices.getByRole("columnheader", { name })).toBeInTheDocument();
+      }
 
       const data = within(screen.getByRole("region", { name: "Datos" }));
       expect(data.getByText("30 días desde la factura")).toBeInTheDocument();
@@ -274,7 +288,7 @@ describe("OrderScreen", () => {
 
       await userEvent.click(schedule.getByRole("button", { name: "+ Añadir hito" }));
       await userEvent.type(schedule.getByRole("textbox", { name: "Concepto del hito 4" }), "Recepción");
-      expect(schedule.getByRole("textbox", { name: "Importe del hito 4" })).toHaveValue("9000,00");
+      expect(schedule.getByRole("textbox", { name: "Importe del hito 4" })).toHaveValue("9.000,00");
       await userEvent.click(schedule.getByRole("button", { name: "Guardar hitos" }));
 
       expect(invoiceActions.setOrderMilestonesAction).toHaveBeenCalledWith("order-4", [
@@ -325,11 +339,11 @@ describe("OrderScreen with modificados", () => {
       },
     });
     const card = within(screen.getByRole("region", { name: /Modificados/ }));
-    expect(card.getByText("3000,00 €")).toBeInTheDocument();
+    expect(card.getByText("3.000,00 €")).toBeInTheDocument();
     expect(card.getByText("(+120,00 €)")).toHaveClass("text-bad");
     const item = within(card.getByRole("listitem"));
     expect(item.getByText("Modificado nº 1", { selector: "b" })).toBeInTheDocument();
-    expect(item.getByText("Importe de 06.05: 3000,00 → 3120,00")).toBeInTheDocument();
+    expect(item.getByText("Importe de 06.05: 3.000,00 → 3.120,00")).toBeInTheDocument();
     expect(item.getByRole("link", { name: "Modificado nº 1" })).toHaveAttribute("href", "/api/v1/purchases/order-49/documents/doc-1");
     expect(card.getByRole("link", { name: "Registrar modificado" })).toHaveAttribute("href", "/dashboard/projects/p-1/compras/order-49/modificado");
     renderScreen({
@@ -410,6 +424,6 @@ describe("OrderScreen with the AI's review of its documents", () => {
     });
     expect(screen.getByText("Sin revisar")).toBeInTheDocument();
     expect(screen.getByText(/límite mensual de IA/)).toBeInTheDocument();
-    expect(screen.getByText("Visto por Laura Pérez el 7 oct")).toBeInTheDocument();
+    expect(screen.getByText("Visto por Laura Pérez el 7 oct 2026")).toBeInTheDocument();
   });
 });

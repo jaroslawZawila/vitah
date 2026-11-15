@@ -46,7 +46,7 @@ export default function SupplierScreen({ purchasing }: { purchasing: SupplierPur
       </section>
 
       <PaymentTable payments={payments} title={t("payments")} empty={t("noPayments")} pending={false} />
-      <p className="max-w-[860px] text-[12.5px] leading-normal text-muted-foreground">{ts("footnote")}</p>
+      <p className="max-w-[860px] text-meta leading-normal text-muted-foreground">{ts("footnote")}</p>
     </div>
   );
 }

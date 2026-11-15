@@ -128,7 +128,6 @@ describe("EditPlanScreen", () => {
   });
 
   it("changes the calendar and discards the draft once confirmed", async () => {
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     renderScreen();
     await userEvent.selectOptions(screen.getByLabelText("Festivos autonómicos"), "md");
     await userEvent.click(screen.getByRole("button", { name: "Guardar borrador" }));
@@ -139,7 +138,11 @@ describe("EditPlanScreen", () => {
     await waitFor(() => expect(discard).toBeEnabled());
 
     await userEvent.click(discard);
-    expect(window.confirm).toHaveBeenCalledWith("¿Descartar el borrador v3? Se pierden sus cambios.");
+    const dialog = within(await screen.findByRole("alertdialog", { name: "¿Descartar el borrador v3?" }));
+    // A draft is deleted for real: it says so.
+    expect(dialog.getByText(/no se puede deshacer/)).toBeInTheDocument();
+    expect(actions.discardPlanningDraftAction).not.toHaveBeenCalled();
+    await userEvent.click(dialog.getByRole("button", { name: "Descartar borrador" }));
     expect(actions.discardPlanningDraftAction).toHaveBeenCalledWith("p-1");
     await waitFor(() => expect(router.push).toHaveBeenCalledWith(PLAN));
   });

@@ -111,14 +111,14 @@ export default function IssueDialog({
       </Field>
 
       <div className="flex flex-col gap-2">
-        <span className="text-[13px] font-semibold">{t("pdfs")}</span>
+        <span className="text-sm font-semibold">{t("pdfs")}</span>
         {(["general", "detailed"] as const).map((kind) => (
           <div key={kind} className="flex flex-wrap items-center gap-3 rounded-[11px] border px-3 py-2.5 text-sm">
             <span className="min-w-0 flex-1">
               <b>{t(`${kind}.title`)}</b> <span className="text-muted-foreground">· {t(`${kind}.hint`)}</span>
             </span>
             <Badge variant={kind === "general" && share ? "good" : "outline"}>{t(kind === "general" && share ? "inApp" : "staffOnly")}</Badge>
-            <Link href={pdfHref(kind)} target="_blank" className="text-[13px] font-semibold text-brand-ink hover:underline">
+            <Link href={pdfHref(kind)} target="_blank" className="text-sm font-semibold text-brand-ink hover:underline">
               {t("preview")}
             </Link>
           </div>

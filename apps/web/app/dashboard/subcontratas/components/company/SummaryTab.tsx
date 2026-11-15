@@ -9,7 +9,7 @@ import { NoCaeCard } from "./OrdersTab";
 
 function Rows({ rows }: { rows: [string, React.ReactNode][] }) {
   return (
-    <dl className="m-0 grid grid-cols-[minmax(110px,40%)_1fr] gap-x-3.5 gap-y-2.5 text-[13.5px]">
+    <dl className="m-0 grid grid-cols-[minmax(110px,40%)_1fr] gap-x-3.5 gap-y-2.5 text-sm">
       {rows.map(([label, value]) => (
         <div key={label} className="contents">
           <dt className="text-muted-foreground">{label}</dt>
@@ -91,7 +91,7 @@ export default function SummaryTab({ company }: { company: SubcontractorDetail }
                     <Badge variant={company.lowPermanentShare ? "warn" : "good"}>{t("share", { share })}</Badge>
                   )}
                   {company.lowPermanentShare && (
-                    <span className="text-[12.5px] text-warn">{t("lowShare")}</span>
+                    <span className="text-meta text-warn">{t("lowShare")}</span>
                   )}
                 </span>
               ),
@@ -107,7 +107,7 @@ export default function SummaryTab({ company }: { company: SubcontractorDetail }
                   {ts(`preventionModes.${company.preventionMode}.label`)}
                   {company.preventionEntity && ` · ${company.preventionEntity}`}
                   {company.preventionValidUntil && (
-                    <div className="text-[12.5px] text-muted-foreground">
+                    <div className="text-meta text-muted-foreground">
                       {t("preventionUntil", { date: date(company.preventionValidUntil) })}
                     </div>
                   )}
@@ -124,13 +124,13 @@ export default function SummaryTab({ company }: { company: SubcontractorDetail }
         <section className={cardVariants()}>
           <div className="flex items-center justify-between gap-2">
             <h2>{t("docs")}</h2>
-            <span className="text-[12.5px] text-muted-foreground">{t("mandatory")}</span>
+            <span className="text-meta text-muted-foreground">{t("mandatory")}</span>
           </div>
           <div className="flex items-baseline gap-2">
             <span className="font-heading text-[38px] leading-none font-bold tabular-nums">
               {valid} <span className="text-[22px] text-muted-foreground">/ {total}</span>
             </span>
-            <span className="text-[12.5px] text-muted-foreground">{t("validCount")}</span>
+            <span className="text-meta text-muted-foreground">{t("validCount")}</span>
           </div>
           <div
             className="flex h-2 overflow-hidden rounded-full bg-raise"

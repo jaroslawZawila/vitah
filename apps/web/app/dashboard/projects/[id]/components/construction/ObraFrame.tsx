@@ -115,7 +115,7 @@ export default function ObraFrame({
             >
               {t(tab)}
               {tab === "issues" && header.openIssues > 0 && (
-                <span className="rounded-full bg-border px-[7px] py-px font-mono text-[11px] text-foreground/80">
+                <span className="rounded-full bg-border px-[7px] py-px font-mono text-xs text-foreground/80">
                   {header.openIssues}
                   <span className="sr-only"> {t("openIssues", { count: header.openIssues })}</span>
                 </span>

@@ -13,8 +13,8 @@ export function NoCaeCard() {
   return (
     <section className={cardVariants()} aria-labelledby="no-cae-title">
       <h2 id="no-cae-title">{t("title")}</h2>
-      <p className="m-0 text-[13.5px] leading-normal">{t("text")}</p>
-      <p className="m-0 text-[12.5px] leading-normal text-muted-foreground">{t("change")}</p>
+      <p className="m-0 text-sm leading-normal">{t("text")}</p>
+      <p className="m-0 text-meta leading-normal text-muted-foreground">{t("change")}</p>
     </section>
   );
 }
@@ -31,7 +31,7 @@ export function ContactCard({ company }: { company: SubcontractorDetail }) {
   return (
     <section className={cardVariants()} aria-labelledby="contact-title">
       <h2 id="contact-title">{t("contact")}</h2>
-      <dl className="m-0 grid grid-cols-[minmax(90px,35%)_1fr] gap-x-3.5 gap-y-2.5 text-[13.5px]">
+      <dl className="m-0 grid grid-cols-[minmax(90px,35%)_1fr] gap-x-3.5 gap-y-2.5 text-sm">
         {rows.map(([label, value]) => (
           <div key={label} className="contents">
             <dt className="text-muted-foreground">{label}</dt>

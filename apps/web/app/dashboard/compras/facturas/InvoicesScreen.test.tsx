@@ -41,9 +41,17 @@ describe("InvoicesScreen", () => {
     expect(screen.getByRole("heading", { level: 1, name: "Facturas" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Registrar factura" })).toHaveAttribute("href", "/dashboard/compras/facturas/nueva");
     const kpis = within(screen.getByRole("region", { name: "Resumen de facturas" }));
-    expect(kpis.getByText("17.348 €")).toBeInTheDocument();
+    expect(kpis.getByText("17.347,80 €")).toBeInTheDocument();
     expect(kpis.getByText("2 facturas de 2 proveedores")).toBeInTheDocument();
-    expect(kpis.getByText("3848 €")).toHaveClass("text-bad");
+    expect(kpis.getByText("3.847,80 €")).toHaveClass("text-bad");
+    // All of it is what Administration pays: with VAT.
+    expect(kpis.getByText("Por pagar · IVA incl.").parentElement).toHaveTextContent("17.347,80 €");
+    expect(kpis.getByText("Vencido · IVA incl.")).toBeInTheDocument();
+    expect(kpis.getByText("Vence en 7 días · IVA incl.")).toBeInTheDocument();
+    expect(kpis.getByText("Pagado este mes · IVA incl.")).toBeInTheDocument();
+    for (const name of ["Base", "A pagar · IVA incl.", "Pendiente · IVA incl."]) {
+      expect(screen.getByRole("columnheader", { name })).toBeInTheDocument();
+    }
 
     expect(numbers()).toEqual(["SOC-2026/0912", "MSN-2026/148", "MSN-2026/112", "MSN-2026/R07"]);
     const overdue = screen.getByRole("link", { name: "SOC-2026/0912" }).closest("tr")!;
@@ -89,7 +97,7 @@ describe("InvoicesScreen", () => {
     renderScreen({ search: "estado=paid&page=2", list: { ...invoices, paging: { page: 2, limit: 50, total: 1204, pages: 25 } } });
 
     const pager = within(screen.getByRole("navigation", { name: "Páginas" }));
-    expect(pager.getByText("51–100 de 1204")).toBeInTheDocument();
+    expect(pager.getByText("51–100 de 1.204")).toBeInTheDocument();
     expect(pager.getByRole("link", { name: "Anterior" })).toHaveAttribute("href", "/dashboard/compras/facturas?estado=paid");
     expect(pager.getByRole("link", { name: "Siguiente" })).toHaveAttribute("href", "/dashboard/compras/facturas?estado=paid&page=3");
   });

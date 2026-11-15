@@ -40,7 +40,7 @@ describe("PhotosScreen", () => {
     renderScreen();
 
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Fotos de obra 3");
-    expect(groups()).toEqual(["Esta semana · 16–17 oct", "8 oct"]);
+    expect(groups()).toEqual(["Esta semana · 16 oct 2026 – 17 oct 2026", "8 oct 2026"]);
     const photo = screen.getByRole("img", { name: "Fachada norte" });
     expect(photo).toHaveAttribute("src", "/api/v1/projects/p-1/photos/photo-1?size=thumb");
     expect(screen.getByRole("link", { name: "Descargar Fachada norte" })).toHaveAttribute("href", "/api/v1/projects/p-1/photos/photo-1");
@@ -105,13 +105,13 @@ describe("PhotosScreen", () => {
   });
 
   it("deletes a photo once confirmed", async () => {
-    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
     renderScreen();
     await userEvent.click(screen.getByRole("button", { name: "Eliminar Fachada norte" }));
-    // Says what happens: it stops being shown, and the file is kept.
-    expect(confirm).toHaveBeenCalledWith(
-      "¿Eliminar esta foto? Dejará de verse en el portal y en la app del cliente; el archivo se conserva.",
-    );
+    const dialog = within(await screen.findByRole("alertdialog", { name: "¿Eliminar la foto «Fachada norte»?" }));
+    // Says what happens: it leaves the portal and the app, and an admin can restore it.
+    expect(dialog.getByText("Deja de verse en el portal y en la app del cliente. Un administrador puede restaurarla desde Elementos eliminados.")).toBeInTheDocument();
+    expect(actions.deleteProjectPhotoAction).not.toHaveBeenCalled();
+    await userEvent.click(dialog.getByRole("button", { name: "Eliminar foto" }));
     expect(actions.deleteProjectPhotoAction).toHaveBeenCalledWith("p-1", "photo-1");
   });
 

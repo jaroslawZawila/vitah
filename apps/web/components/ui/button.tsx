@@ -4,7 +4,7 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
 const buttonVariants = cva(
-  "group/button inline-flex shrink-0 items-center justify-center rounded-[9px] border border-transparent bg-clip-padding text-sm font-semibold whitespace-nowrap transition-[color,background-color,border-color,filter] outline-none select-none focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive pointer-coarse:min-h-11 pointer-coarse:min-w-11 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "group/button inline-flex shrink-0 items-center justify-center rounded-[9px] border border-transparent bg-clip-padding font-semibold whitespace-nowrap transition-[color,background-color,border-color,filter] outline-none select-none focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive pointer-coarse:min-h-11 pointer-coarse:min-w-11 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {
@@ -23,14 +23,14 @@ const buttonVariants = cva(
       },
       size: {
         default:
-          "h-9 gap-1.5 px-[15px] has-data-[icon=inline-end]:pr-3 has-data-[icon=inline-start]:pl-3",
+          "h-9 gap-1.5 px-[15px] text-sm has-data-[icon=inline-end]:pr-3 has-data-[icon=inline-start]:pl-3",
         xs: "h-6 gap-1 rounded-sm px-2 text-xs [&_svg:not([class*='size-'])]:size-3",
-        sm: "h-7 gap-1 rounded-[7px] px-2.5 text-[12.5px] [&_svg:not([class*='size-'])]:size-3.5",
+        sm: "h-7 gap-1 rounded-[7px] px-2.5 text-meta [&_svg:not([class*='size-'])]:size-3.5",
         lg: "h-11 gap-1.5 px-5 text-[15px]",
-        icon: "size-9",
-        "icon-xs": "size-6 rounded-sm [&_svg:not([class*='size-'])]:size-3",
-        "icon-sm": "size-7 rounded-[7px]",
-        "icon-lg": "size-11",
+        icon: "size-9 text-sm",
+        "icon-xs": "size-6 rounded-sm text-xs [&_svg:not([class*='size-'])]:size-3",
+        "icon-sm": "size-7 rounded-[7px] text-meta",
+        "icon-lg": "size-11 text-sm",
       },
     },
     compoundVariants: [{ variant: "link", className: "h-auto px-0" }],

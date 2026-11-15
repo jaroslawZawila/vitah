@@ -22,7 +22,7 @@ import { MockBadge } from "./pills";
 /** A key–value row of a dialog's summary. */
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5 border-t py-2 text-[13.5px] first:border-t-0">
+    <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5 border-t py-2 text-sm first:border-t-0">
       <span className="text-muted-foreground">{label}</span>
       <span className="text-right">{children}</span>
     </div>
@@ -43,7 +43,7 @@ function Footer({
   const t = useTranslations("construction.dialogs");
   return (
     <div className="flex flex-col gap-3 border-t pt-3.5 md:flex-row md:items-center md:justify-between">
-      <span className="text-[12.5px] text-muted-foreground">{t("cancelHint")}</span>
+      <span className="text-meta text-muted-foreground">{t("cancelHint")}</span>
       <FormActions>
         <Button type="button" variant="outline" onClick={onCancel}>
           {t("cancel")}
@@ -125,8 +125,8 @@ export function StartDialog({
       <p className="eyebrow">{t("chapterLabel", { code: chapter.code })}</p>
       <DateField id="start-date" label={t("actualStart")} value={date} max={today} onChange={setDate} hint={t("dateHint")} />
       {chapter.plannedStart && chapter.plannedEnd && (
-        <div className="rounded-lg bg-raise px-3.5 py-2.5 text-[13px] text-muted-foreground">
-          {t("planned", { start: f.day(chapter.plannedStart), end: f.day(chapter.plannedEnd) })}
+        <div className="rounded-lg bg-raise px-3.5 py-2.5 text-sm text-muted-foreground">
+          {t("planned", { start: f.date(chapter.plannedStart), end: f.date(chapter.plannedEnd) })}
           {date && chapter.plannedStart && daysBetween(chapter.plannedStart, date) !== 0 && (
             <span className="num ml-1.5">· {f.signedDays(daysBetween(chapter.plannedStart, date))}</span>
           )}
@@ -137,7 +137,7 @@ export function StartDialog({
           )}
         </div>
       )}
-      <p className="text-[13px] text-muted-foreground">{t("startEffect")}</p>
+      <p className="text-sm text-muted-foreground">{t("startEffect")}</p>
       <FormError namespace="obra.errors" error={error} />
       <Footer pending={pending} submitLabel={t("start")} disabled={!date} onCancel={onCancel} />
     </form>
@@ -193,15 +193,15 @@ export function FinishDialog({
       <div className={cn("grid gap-4", completes && "md:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]")}>
         <div className="flex flex-col gap-4">
           <DateField id="finish-date" label={t("actualEnd")} value={date} max={today} onChange={setDate} hint={t("dateHint")} />
-          <div className="flex flex-col gap-1 text-[13px]">
+          <div className="flex flex-col gap-1 text-sm">
             <span className="font-semibold">{t("result")}</span>
             <span className="text-muted-foreground">
-              {chapter.actualStart && t("resultStart", { date: f.day(chapter.actualStart) })}
+              {chapter.actualStart && t("resultStart", { date: f.date(chapter.actualStart) })}
               {duration !== null && duration > 0 && <> · {t("duration", { days: duration })}</>}
             </span>
             {chapter.plannedStart && chapter.plannedEnd && (
               <span className="inline-flex flex-wrap items-center gap-1.5 text-muted-foreground">
-                {t("planned", { start: f.day(chapter.plannedStart), end: f.day(chapter.plannedEnd) })}
+                {t("planned", { start: f.date(chapter.plannedStart), end: f.date(chapter.plannedEnd) })}
                 {delay !== null && (
                   <span className={cn("num font-semibold", delay > 0 ? "text-warn" : "text-good")}>
                     · {delay > 0 ? f.signedDays(delay) : t("onTime")}
@@ -219,7 +219,7 @@ export function FinishDialog({
               <Flag aria-hidden className="mt-0.5 size-4 flex-none" />
               <b className="text-[14px]">{t("completes", { code: milestone.code, name: milestone.name })}</b>
             </div>
-            <ul aria-label={t("milestoneChapters")} className="m-0 flex list-none flex-wrap gap-x-4 gap-y-1 p-0 text-[13px]">
+            <ul aria-label={t("milestoneChapters")} className="m-0 flex list-none flex-wrap gap-x-4 gap-y-1 p-0 text-sm">
               {milestone.chapters.map((c) => (
                 <li key={c.code} className="inline-flex items-center gap-1.5">
                   <CircleCheck aria-hidden className="size-4 text-good" />
@@ -246,7 +246,7 @@ export function FinishDialog({
                 <span className="text-muted-foreground">· {f.share(milestone.pctBp)}</span>
               </Row>
             </div>
-            <span className="text-[12.5px] text-muted-foreground">{t("onlyOnce")}</span>
+            <span className="text-meta text-muted-foreground">{t("onlyOnce")}</span>
           </div>
         )}
       </div>
@@ -286,7 +286,7 @@ export function FinishedNotice({
       <div className="rounded-lg bg-raise px-3.5 py-1">
         <Row label={t("actualEnd")}>
           <span className="num">
-            {f.fullDay(date)}
+            {f.date(date)}
             {duration !== null && ` · ${t("duration", { days: duration })}`}
           </span>
         </Row>
@@ -374,7 +374,7 @@ export function CorrectDialog({
         {clearable("correct-start", t("actualStart"), start, setStart)}
         {clearable("correct-end", t("actualEnd"), end, setEnd)}
       </div>
-      <p className="flex items-start gap-2 text-[12.5px] text-muted-foreground">
+      <p className="flex items-start gap-2 text-meta text-muted-foreground">
         <Circle aria-hidden className="mt-0.5 size-3 flex-none" />
         {t("clearHint")}
       </p>

@@ -5,28 +5,25 @@ import type { ConstructionControl } from "@repo/core/contract";
 import { Badge } from "@/components/ui/badge";
 import { cardVariants } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { kv } from "./classes";
+import { useVatLabel } from "../../../../components/vat-basis";
+import { kpiFigure, kv } from "./classes";
 import { deviationTone, useControlFormat } from "./format";
 import { Source, SourceLabel } from "./pills";
-
-const figure = "font-heading text-[40px] leading-none font-semibold tabular-nums";
+import ScheduleStatusView from "./ScheduleStatusView";
 
 /** Presentational: the Resumen's four key figures: chapters, cost, sales and schedule. */
 export default function SummaryKpis({ control }: { control: ConstructionControl }) {
   const t = useTranslations("construction.summary.kpis");
   const ts = useTranslations("construction.sources");
   const f = useControlFormat();
-  const { chapters, cost, sales, sources, budget, project } = control;
+  const vat = useVatLabel();
+  const { chapters, cost, sales, sources, budget, project, schedule } = control;
   const count = (state: string) => chapters.filter((c) => c.state === state).length;
   const finished = count("finished");
   const inProgress = count("in_progress");
   const pending = count("pending");
   const share = (n: number) => `${chapters.length ? (n / chapters.length) * 100 : 0}%`;
 
-  // The worst delay of what is in progress now.
-  const overdue = chapters
-    .filter((c) => c.state === "in_progress" && (c.overdueDays ?? 0) > 0)
-    .sort((a, b) => (b.overdueDays ?? 0) - (a.overdueDays ?? 0))[0];
   const late = chapters.filter((c) => c.state === "finished" && (c.endDelayDays ?? 0) > 0);
   const averageLate = late.length ? Math.round(late.reduce((sum, c) => sum + c.endDelayDays!, 0) / late.length) : 0;
   const firstStart = chapters
@@ -40,7 +37,7 @@ export default function SummaryKpis({ control }: { control: ConstructionControl 
       <div className={cn(cardVariants(), "gap-2.5")}>
         <span className="eyebrow">{t("chapters")}</span>
         <div className="flex items-baseline gap-2">
-          <span className={figure}>{finished}</span>
+          <span className={kpiFigure}>{finished}</span>
           <span className="text-muted-foreground">{t("finishedOf", { total: chapters.length })}</span>
         </div>
         <div
@@ -59,26 +56,38 @@ export default function SummaryKpis({ control }: { control: ConstructionControl 
       </div>
 
       <div className={cn(cardVariants(), "gap-1.5")}>
-        <span className="eyebrow">{t("cost")}</span>
+        <span className="eyebrow">{vat(t("cost"), "excl")}</span>
         <div className={kv}>
           <span className="text-muted-foreground">{t("budgeted")}</span>
-          <span className="num">{f.moneyRound(cost.budgetedCents)}</span>
+          <span className="num">{f.money(cost.budgetedCents)}</span>
         </div>
+        {/* Reconciles with the budget's cost, which counts chapter 20 too. */}
+        {cost.contingencyCents > 0 && (
+          <p className="-mt-1 text-meta leading-snug text-muted-foreground">
+            {t("contingencyNote", { amount: f.money(cost.contingencyCents) })}
+          </p>
+        )}
         <div className={kv}>
           <span className="text-muted-foreground">{t("contracted")}</span>
-          <span className="num">{f.moneyRound(cost.contractedCents)}</span>
+          <span className="num">{f.money(cost.contractedCents)}</span>
         </div>
         <div className={kv}>
           <span className="font-semibold">{t("deviation")}</span>
-          <span className={cn("num font-semibold", deviationTone(cost.deviationCents))}>
-            {cost.contractedCostCents
-              ? `${f.signedEuros(cost.deviationCents)} € · ${f.signedPct(cost.deviationBp, 2)}`
-              : "—"}
+          {/* The % goes under the amount when the card is narrow. */}
+          <span className={cn("text-right font-semibold", deviationTone(cost.deviationCents))}>
+            {cost.contractedCostCents ? (
+              <>
+                <span className="num">{f.signedMoney(cost.deviationCents)}</span>{" "}
+                <span className="num">· {f.signedPercent(cost.deviationBp, 2)}</span>
+              </>
+            ) : (
+              "—"
+            )}
           </span>
         </div>
-        <p className="mt-0.5 text-[12px] leading-snug text-muted-foreground">
+        <p className="mt-0.5 text-meta leading-snug text-muted-foreground">
           {cost.contractedCostCents
-            ? t(cost.deviationCents > 0 ? "overrunNote" : "savingNote", { amount: f.moneyRound(cost.contractedCostCents) })
+            ? t(cost.deviationCents > 0 ? "overrunNote" : "savingNote", { amount: f.money(cost.contractedCostCents) })
             : t("nothingContracted")}
         </p>
         <SourceLabel>
@@ -87,7 +96,7 @@ export default function SummaryKpis({ control }: { control: ConstructionControl 
       </div>
 
       <div className={cn(cardVariants(), "gap-1.5")}>
-        <span className="eyebrow">{t("sales")}</span>
+        <span className="eyebrow">{vat(t("sales"), "excl")}</span>
         <div className={kv}>
           <span className="text-muted-foreground">{t("contract")}</span>
           <span className="num">{f.money(sales.contractCents)}</span>
@@ -115,22 +124,18 @@ export default function SummaryKpis({ control }: { control: ConstructionControl 
 
       <div className={cn(cardVariants(), "gap-1.5")}>
         <span className="eyebrow">{t("schedule")}</span>
-        <div className="flex items-baseline gap-2">
-          <span className={cn(figure, overdue ? "text-warn" : "text-good")}>
-            {overdue ? f.signedDays(overdue.overdueDays!) : t("onTime")}
-          </span>
-          <span className="text-muted-foreground">{overdue ? t("worstDelay") : t("noDelay")}</span>
-        </div>
-        {overdue?.plannedEnd && (
-          <p className="text-[13px]">
-            {t("overdueText", { code: overdue.code, name: overdue.name, date: f.day(overdue.plannedEnd) })}
-          </p>
-        )}
+        <ScheduleStatusView schedule={schedule} />
         <div className={kv}>
           <span className="text-muted-foreground">{t("worksStart")}</span>
-          <span className="num">
-            {project.startDate ? f.day(project.startDate) : "—"}
-            {firstStart && ` · ${t("actualShort", { date: f.day(firstStart) })}`}
+          {/* The real start goes under the planned one when the card is narrow. */}
+          <span className="text-right">
+            <span className="num">{f.date(project.startDate)}</span>
+            {firstStart && (
+              <>
+                {" "}
+                <span className="num">· {t("actualShort", { date: f.date(firstStart) })}</span>
+              </>
+            )}
           </span>
         </div>
         <div className={kv}>

@@ -95,7 +95,7 @@ export default function NewCompanyScreen({ options }: { options: CompanyFlowOpti
           }}
         >
           {created && (
-            <div role="alert" className="flex flex-col gap-2 rounded-[10px] bg-warn-soft px-3.5 py-3 text-[13.5px] text-warn">
+            <div role="alert" className="flex flex-col gap-2 rounded-[10px] bg-warn-soft px-3.5 py-3 text-sm text-warn">
               <p className="m-0 font-semibold">{t("partial")}</p>
               <p className="m-0">{created.failed.join(", ")}</p>
               <Link className={buttonVariants({ variant: "outline", size: "sm", className: "w-fit" })} href={companyHref(created.id)}>

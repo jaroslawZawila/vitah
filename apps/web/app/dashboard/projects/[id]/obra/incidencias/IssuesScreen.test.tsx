@@ -44,7 +44,7 @@ describe("IssuesScreen", () => {
     expect(record.getByText("+3 d est.")).toBeInTheDocument();
     expect(record.getByText("En revisión")).toBeInTheDocument();
     expect(record.getByRole("link", { name: "albaran.pdf" })).toHaveAttribute("href", "/api/v1/projects/p-1/obra/issues/issue-7/files/file-1");
-    expect(within(screen.getByRole("article", { name: "CAM-004" })).getByText("+2350 € est.")).toBeInTheDocument();
+    expect(within(screen.getByRole("article", { name: "CAM-004" })).getByText("+2.350,00 € est.")).toBeInTheDocument();
   });
 
   it("filters by kind, chapter and status", async () => {
@@ -144,7 +144,7 @@ describe("IssuesScreen", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Editar CAM-004" }));
     const form = within(screen.getByRole("form", { name: "Editar CAM-004" }));
-    expect(form.getByLabelText(/Impacto en coste/)).toHaveValue("2350,00");
+    expect(form.getByLabelText(/Impacto en coste/)).toHaveValue("2.350,00");
     await userEvent.selectOptions(form.getByLabelText("Estado"), "review");
     await userEvent.click(form.getByRole("button", { name: "Guardar registro" }));
 

@@ -25,7 +25,7 @@ export default function ClientPicker({
 
   if (clients.length === 0) {
     return (
-      <p className="text-[13px] text-muted-foreground">
+      <p className="text-sm text-muted-foreground">
         {t.rich("noClients", {
           link: (chunks) => (
             <Link href="/dashboard/clients" className="font-medium text-info hover:underline">
@@ -39,7 +39,7 @@ export default function ClientPicker({
 
   return (
     <form action={action} className="flex flex-col gap-3">
-      <p className="text-[13px] text-muted-foreground">{t("intro")}</p>
+      <p className="text-sm text-muted-foreground">{t("intro")}</p>
       <Field>
         <Label htmlFor="client-id">{t("client")}</Label>
         <NativeSelect id="client-id" name="clientId" required defaultValue="">

@@ -38,13 +38,13 @@ export default function BlockingBanner({
       <Ban aria-hidden className="size-5.5 flex-none" />
       <div className="min-w-0 flex-[1_1_380px]">
         <p className="font-semibold">{first ? t("title", { date: date(addDays(first, 1)) }) : t("title", { date: "—" })}</p>
-        <p className="text-[13.5px] text-foreground">
+        <p className="text-sm text-foreground">
           {t("reason", { documents: expired.map((d) => name(d.requirementId, kind)).join(", ") })}{" "}
           {t("workers", { count: workerNames.length, names: workerNames.join(", ") })}
         </p>
       </div>
       {canManage && (
-        <Button type="button" className="bg-bad text-white hover:brightness-110" disabled={busy} onClick={onRequest}>
+        <Button type="button" className="bg-bad text-destructive-foreground hover:brightness-110" disabled={busy} onClick={onRequest}>
           <Send aria-hidden />
           {t("request")}
         </Button>

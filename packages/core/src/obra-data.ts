@@ -31,9 +31,23 @@ import {
   type ObraStage,
 } from "./contract";
 import { CoreError } from "./errors";
-import { hitoStatus, ofBp, paymentDueOn, priceLines, progressOf, todayInSpain, type Margins, type Progress } from "./obra-calc";
+import {
+  addTotals,
+  allDone,
+  hitoStatus,
+  NO_LINES,
+  ofBp,
+  paymentDueOn,
+  priceLines,
+  progressOf,
+  progressOfTotals,
+  todayInSpain,
+  type LineTotals,
+  type Margins,
+  type Progress,
+} from "./obra-calc";
 import { requireProject as requireProjectRow } from "./project-files";
-import { approvedPlanDates } from "./planning-data";
+import { approvedPlansOf, planDatesOf } from "./planning-data";
 
 // ─── Obra: shared loading and checks ─────────────────────────────────────────
 // What the budget, hitos and obra services share: errors, input parsing, and
@@ -191,12 +205,17 @@ export const linesTotalSql = () =>
   sql<string>`coalesce(sum(round(${budgetLines.quantityMilli}::numeric * ${budgetLines.unitPriceCents} / 1000)), 0)`;
 
 /**
- * The same at the client's price, as `priceLines` (obra-calc.ts): each unit
- * price with its revision's margins in, to the cent. Lines joined to their
- * revision; chapters only.
+ * One line's amount at the client's price, as `priceLines` (obra-calc.ts): its
+ * unit price with its revision's margins in, to the cent (`roundHalfAway`, as
+ * SQL's `round`), times its quantity, rounded as `amountCents` (`Math.round`:
+ * floor(x + 0.5), which differs from `round` only on a negative .5, an
+ * option's deduction). Lines joined to their revision.
  */
-export const linesPriceSql = () =>
-  sql<string>`coalesce(sum(round(${budgetLines.quantityMilli}::numeric * round(${budgetLines.unitPriceCents}::numeric * (10000 + ${budgetRevisions.overheadBp}) / (10000 - ${budgetRevisions.profitBp})) / 1000)), 0)`;
+export const linePriceSql = () =>
+  sql<string>`floor(${budgetLines.quantityMilli}::numeric * round(${budgetLines.unitPriceCents}::numeric * (10000 + ${budgetRevisions.overheadBp}) / (10000 - ${budgetRevisions.profitBp})) / 1000 + 0.5)`;
+
+/** The sum of the selected lines' `linePriceSql`. */
+export const linesPriceSql = () => sql<string>`coalesce(sum(${linePriceSql()}), 0)`;
 
 export function nextPosition(table: PgTable, position: AnyColumn, where: SQL | undefined) {
   return sql<number>`(select coalesce(max(${position}), -1) + 1 from ${table} where ${where})`;
@@ -243,11 +262,17 @@ export const inContract = (c: LoadedChapter) => c.kind === "chapter" || c.chosen
 
 /** A revision's chapters, then its options, in order, each with its lines and progress. */
 export async function loadChapters(revisionId: string): Promise<LoadedChapter[]> {
+  return (await loadChaptersOf([revisionId])).get(revisionId) ?? [];
+}
+
+/** `loadChapters` for several revisions at once, by revision id. */
+async function loadChaptersOf(revisionIds: string[]): Promise<Map<string, LoadedChapter[]>> {
+  if (revisionIds.length === 0) return new Map();
   const rows = await db
     .select({ chapter: budgetChapters, line: budgetLines })
     .from(budgetChapters)
     .leftJoin(budgetLines, eq(budgetLines.chapterId, budgetChapters.id))
-    .where(eq(budgetChapters.revisionId, revisionId))
+    .where(inArray(budgetChapters.revisionId, revisionIds))
     .orderBy(asc(budgetChapters.kind), asc(budgetChapters.position), asc(budgetLines.position));
 
   const chapters = new Map<string, { row: typeof budgetChapters.$inferSelect; lines: BudgetLine[] }>();
@@ -256,7 +281,12 @@ export async function loadChapters(revisionId: string): Promise<LoadedChapter[]>
     if (line) entry.lines.push(toBudgetLine(line));
     chapters.set(chapter.id, entry);
   }
-  return [...chapters.values()].map(({ row, lines }) => ({
+  const byRevision = groupBy([...chapters.values()], (c) => c.row.revisionId);
+  return new Map([...byRevision].map(([id, list]) => [id, list.map(toLoadedChapter)]));
+}
+
+function toLoadedChapter({ row, lines }: { row: typeof budgetChapters.$inferSelect; lines: BudgetLine[] }): LoadedChapter {
+  return {
     id: row.id,
     code: row.code,
     name: row.name,
@@ -268,7 +298,7 @@ export async function loadChapters(revisionId: string): Promise<LoadedChapter[]>
     chosen: row.chosen,
     lines,
     ...progressOf(lines),
-  }));
+  };
 }
 
 /** Chapters and options at the client's price: their lines priced, progress with them. */
@@ -285,19 +315,33 @@ function priceChapters(loaded: LoadedChapter[], margins: Margins): LoadedChapter
  * Drafts only show on the Budget.
  */
 export async function loadBudget(tenantId: string, projectId: string) {
-  const revision =
-    (await db.query.budgetRevisions.findFirst({
-      where: and(
-        eq(budgetRevisions.projectId, projectId),
+  return (await loadBudgets(tenantId, [projectId])).get(projectId)!;
+}
+
+/** `loadBudget` for several projects at once, by project id. */
+async function loadBudgets(tenantId: string, projectIds: string[]) {
+  const revisions = await db
+    .select()
+    .from(budgetRevisions)
+    .where(
+      and(
+        inArray(budgetRevisions.projectId, projectIds),
         eq(budgetRevisions.tenantId, tenantId),
         eq(budgetRevisions.status, "accepted"),
       ),
-    })) ?? null;
-  // The works follow the contract: chapters plus the options the client chose.
-  // A FRAMER budget has all twenty chapters; those without lines aren't built.
-  const costChapters = revision ? (await loadChapters(revision.id)).filter((c) => inContract(c) && c.lines.length > 0) : [];
-  const chapters = revision ? priceChapters(costChapters, revision) : [];
-  return { revision, chapters, costChapters, progress: progressOf(chapters.flatMap((c) => c.lines)) };
+    );
+  const revisionOf = new Map(revisions.map((r) => [r.projectId, r]));
+  const loaded = await loadChaptersOf(revisions.map((r) => r.id));
+  return new Map(
+    projectIds.map((projectId) => {
+      const revision = revisionOf.get(projectId) ?? null;
+      // The works follow the contract: chapters plus the options the client chose.
+      // A FRAMER budget has all twenty chapters; those without lines aren't built.
+      const costChapters = revision ? (loaded.get(revision.id) ?? []).filter((c) => inContract(c) && c.lines.length > 0) : [];
+      const chapters = revision ? priceChapters(costChapters, revision) : [];
+      return [projectId, { revision, chapters, costChapters, progress: progressOf(chapters.flatMap((c) => c.lines)) }] as const;
+    }),
+  );
 }
 
 // ─── Hitos ───────────────────────────────────────────────────────────────────
@@ -314,39 +358,50 @@ export function groupBy<T>(rows: T[], key: (row: T) => string): Map<string, T[]>
   return groups;
 }
 
-/** The project's hito rows and everything hanging off them, grouped by hito. */
-async function loadHitoRows(tenantId: string, projectId: string) {
-  const inProject = and(eq(obraHitos.projectId, projectId), eq(obraHitos.tenantId, tenantId));
+/**
+ * The projects' hito rows and everything hanging off them, grouped by hito
+ * (hitos and requests by project). Without `acta`, no checks nor photos: the
+ * project list reads neither.
+ */
+async function loadHitoRows(tenantId: string, projectIds: string[], { acta = true } = {}) {
+  const inProject = and(inArray(obraHitos.projectId, projectIds), eq(obraHitos.tenantId, tenantId));
   const [rows, codes, checks, photos, requests] = await Promise.all([
     db.select().from(obraHitos).where(inProject).orderBy(asc(obraHitos.position)),
     db
       .select()
       .from(obraHitoChapters)
       .where(
-        and(eq(obraHitoChapters.projectId, projectId), eq(obraHitoChapters.tenantId, tenantId)),
+        and(inArray(obraHitoChapters.projectId, projectIds), eq(obraHitoChapters.tenantId, tenantId)),
       ),
-    db
-      .select({ check: obraHitoChecks })
-      .from(obraHitoChecks)
-      .innerJoin(obraHitos, eq(obraHitos.id, obraHitoChecks.hitoId))
-      .where(inProject)
-      .orderBy(asc(obraHitoChecks.position)),
+    acta
+      ? db
+          .select({ check: obraHitoChecks })
+          .from(obraHitoChecks)
+          .innerJoin(obraHitos, eq(obraHitos.id, obraHitoChecks.hitoId))
+          .where(inProject)
+          .orderBy(asc(obraHitoChecks.position))
+      : [],
     // A deleted photo is out of the acta too.
-    db
-      .select({ hitoId: obraHitoPhotos.hitoId, photoId: obraHitoPhotos.photoId })
-      .from(obraHitoPhotos)
-      .innerJoin(obraHitos, eq(obraHitos.id, obraHitoPhotos.hitoId))
-      .innerJoin(projectPhotos, and(eq(projectPhotos.id, obraHitoPhotos.photoId), isNull(projectPhotos.deletedAt)))
-      .where(inProject),
+    acta
+      ? db
+          .select({ hitoId: obraHitoPhotos.hitoId, photoId: obraHitoPhotos.photoId })
+          .from(obraHitoPhotos)
+          .innerJoin(obraHitos, eq(obraHitos.id, obraHitoPhotos.hitoId))
+          .innerJoin(projectPhotos, and(eq(projectPhotos.id, obraHitoPhotos.photoId), isNull(projectPhotos.deletedAt)))
+          .where(inProject)
+      : [],
     db
       .select({ request: obraInvoiceRequests, by: users.name, byEmail: users.email })
       .from(obraInvoiceRequests)
       .leftJoin(users, eq(users.id, obraInvoiceRequests.requestedById))
-      .where(and(eq(obraInvoiceRequests.projectId, projectId), eq(obraInvoiceRequests.tenantId, tenantId))),
+      .where(and(inArray(obraInvoiceRequests.projectId, projectIds), eq(obraInvoiceRequests.tenantId, tenantId))),
   ]);
   return {
-    requests: requests.map(({ request, by, byEmail }) => ({ ...request, requestedBy: by ?? byEmail })),
-    rows,
+    requestsOf: groupBy(
+      requests.map(({ request, by, byEmail }) => ({ ...request, requestedBy: by ?? byEmail })),
+      (r) => r.projectId,
+    ),
+    rowsOf: groupBy(rows, (r) => r.projectId),
     codes: groupBy(codes, (c) => c.hitoId),
     checks: groupBy(
       checks.map((c) => c.check),
@@ -356,7 +411,16 @@ async function loadHitoRows(tenantId: string, projectId: string) {
   };
 }
 
-type HitoRows = Awaited<ReturnType<typeof loadHitoRows>>;
+type AllHitoRows = Awaited<ReturnType<typeof loadHitoRows>>;
+
+/** One project's share of `loadHitoRows`: its hitos and requests (the rest is keyed by hito). */
+const hitoRowsOf = ({ rowsOf, requestsOf, ...byHito }: AllHitoRows, projectId: string) => ({
+  ...byHito,
+  rows: rowsOf.get(projectId) ?? [],
+  requests: requestsOf.get(projectId) ?? [],
+});
+
+type HitoRows = ReturnType<typeof hitoRowsOf>;
 
 /** Hitos priced from `totalCents`, following their chapters' progress. */
 function toHitos(
@@ -405,11 +469,11 @@ function toHitos(
 }
 
 /** The chapters' actual dates recorded on the Obra tab (construction control). */
-export async function loadProgressRows(tenantId: string, projectId: string) {
+export async function loadProgressRows(tenantId: string, projectId: string | string[]) {
   return db
     .select()
     .from(obraChapterProgress)
-    .where(and(eq(obraChapterProgress.projectId, projectId), eq(obraChapterProgress.tenantId, tenantId)));
+    .where(and(inArray(obraChapterProgress.projectId, [projectId].flat()), eq(obraChapterProgress.tenantId, tenantId)));
 }
 
 /**
@@ -419,24 +483,170 @@ export async function loadProgressRows(tenantId: string, projectId: string) {
  * the hitos and the client's app follow it.
  */
 export async function loadObra(tenantId: string, projectId: string) {
-  const [budget, hitoRows, progressRows, planDates] = await Promise.all([
-    loadBudget(tenantId, projectId),
-    loadHitoRows(tenantId, projectId),
-    loadProgressRows(tenantId, projectId),
-    approvedPlanDates(tenantId, projectId),
-  ]);
-  const { revision, costChapters } = budget;
-  let { chapters, progress } = budget;
-  const finished = new Set(progressRows.filter((r) => r.actualEnd).map((r) => r.chapterCode));
-  if (finished.size > 0) {
-    chapters = chapters.map((c) => {
-      if (!finished.has(c.code)) return c;
-      const lines = c.lines.map((line) => ({ ...line, executedPct: 100 }));
-      return { ...c, lines, ...progressOf(lines) };
-    });
-    progress = progressOf(chapters.flatMap((c) => c.lines));
-  }
-  const vatRateBp = revision?.vatRateBp ?? 1000;
-  const hitos = toHitos(hitoRows, chapters, progress.totalCents, vatRateBp);
-  return { revision, chapters, costChapters, progress, vatRateBp, hitos, progressRows, planDates, requests: hitoRows.requests };
+  return (await loadObras(tenantId, [projectId])).get(projectId)!;
 }
+
+export type LoadedObra = Awaited<ReturnType<typeof loadObra>>;
+
+/** `loadObra` for several projects at once, in the same few queries as one. */
+async function loadObras(tenantId: string, projectIds: string[]) {
+  const [budgets, allHitoRows, allProgressRows, plans] = await Promise.all([
+    loadBudgets(tenantId, projectIds),
+    loadHitoRows(tenantId, projectIds),
+    loadProgressRows(tenantId, projectIds),
+    approvedPlansOf(tenantId, projectIds),
+  ]);
+  const progressOfProject = groupBy(allProgressRows, (r) => r.projectId);
+  return new Map(
+    projectIds.map((projectId) => {
+      const budget = budgets.get(projectId)!;
+      const hitoRows = hitoRowsOf(allHitoRows, projectId);
+      const progressRows = progressOfProject.get(projectId) ?? [];
+      // The approved baseline, read once: its dates here, its rules for the schedule's forecast (./planning).
+      const plan = plans.get(projectId) ?? null;
+      const planDates = planDatesOf(plan);
+      const { revision, costChapters } = budget;
+      let { chapters, progress } = budget;
+      const finished = new Set(progressRows.filter((r) => r.actualEnd).map((r) => r.chapterCode));
+      if (finished.size > 0) {
+        chapters = chapters.map((c) => {
+          if (!finished.has(c.code)) return c;
+          const lines = c.lines.map((line) => ({ ...line, executedPct: 100 }));
+          return { ...c, lines, ...progressOf(lines) };
+        });
+        progress = progressOf(chapters.flatMap((c) => c.lines));
+      }
+      const vatRateBp = revision?.vatRateBp ?? 1000;
+      const hitos = toHitos(hitoRows, chapters, progress.totalCents, vatRateBp);
+      const obra = { revision, chapters, costChapters, progress, vatRateBp, hitos, progressRows, plan, planDates, requests: hitoRows.requests };
+      return [projectId, obra] as const;
+    }),
+  );
+}
+
+// ─── The project list's obras ────────────────────────────────────────────────
+// What the Proyectos list reads of every obra (./project-signals): the built
+// %, the hitos' states and the schedule. Not the lines: each chapter's
+// `LineTotals` summed in SQL, priced as `priceChapters` prices them, so the
+// same `progressOfTotals` gives the figure `loadObra`'s lines give.
+
+/** A hito as the list reads it: its share, its chapters in the contract (in budget order) and its invoice. */
+export type HitoSummary = Pick<Hito, "id" | "pctBp" | "invoicedOn" | "paidOn" | "dueOn"> & { chapters: { code: string }[] };
+
+/** Each accepted budget's contract chapters (with lines) and their lines' totals at the client's price. */
+async function contractTotalsOf(tenantId: string, projectIds: string[]) {
+  const l = budgetLines;
+  const rows = await db.execute<{
+    project_id: string;
+    revision_id: string;
+    code: string | null;
+    name: string | null;
+    lines: number;
+    works_lines: number;
+    works_done: number;
+    works_started: number;
+    works_cents: string;
+    works_executed_cents: string;
+    deducted_cents: string;
+  }>(sql`
+    with priced as materialized (
+      select ${budgetRevisions.projectId} as project_id, ${budgetRevisions.id} as revision_id,
+        ${budgetChapters.id} as chapter_id, ${budgetChapters.code} as code, ${budgetChapters.name} as name,
+        ${budgetChapters.kind} as kind, ${budgetChapters.position} as position,
+        ${l.id} as line_id, ${l.executedPct} as executed_pct, ${linePriceSql()}::bigint as amount
+      from ${budgetRevisions}
+      left join (${budgetChapters} join ${budgetLines} on ${l.chapterId} = ${budgetChapters.id})
+        on ${budgetChapters.revisionId} = ${budgetRevisions.id}
+        and (${budgetChapters.kind} = 'chapter' or ${budgetChapters.chosen} = true)
+      where ${budgetRevisions.tenantId} = ${tenantId}
+        and ${inArray(budgetRevisions.projectId, projectIds)}
+        and ${budgetRevisions.status} = 'accepted'
+    )
+    select project_id, revision_id, code, name,
+      count(line_id)::int as lines,
+      (count(*) filter (where amount >= 0))::int as works_lines,
+      (count(*) filter (where amount >= 0 and executed_pct = 100))::int as works_done,
+      (count(*) filter (where amount >= 0 and executed_pct > 0))::int as works_started,
+      coalesce(sum(amount) filter (where amount >= 0), 0)::bigint as works_cents,
+      -- Math.round(amount × % / 100), on amounts ≥ 0.
+      coalesce(sum((amount * executed_pct + 50) / 100) filter (where amount >= 0), 0)::bigint as works_executed_cents,
+      coalesce(sum(amount) filter (where amount < 0), 0)::bigint as deducted_cents
+    from priced
+    group by project_id, revision_id, chapter_id, code, name, kind, position
+    order by kind, position`);
+  const byProject = new Map<string, { revisionId: string; chapters: { code: string; name: string; totals: LineTotals }[] }>();
+  for (const row of rows) {
+    const contract = byProject.get(row.project_id) ?? { revisionId: row.revision_id, chapters: [] };
+    byProject.set(row.project_id, contract);
+    // One accepted revision at most; a revision whose contract has no lines yet has a row with no chapter.
+    if (contract.revisionId !== row.revision_id || row.code === null) continue;
+    contract.chapters.push({
+      code: row.code,
+      name: row.name!,
+      totals: {
+        lines: row.lines,
+        worksLines: row.works_lines,
+        worksDone: row.works_done,
+        worksStarted: row.works_started,
+        worksCents: Number(row.works_cents),
+        worksExecutedCents: Number(row.works_executed_cents),
+        deductedCents: Number(row.deducted_cents),
+      },
+    });
+  }
+  return byProject;
+}
+
+/**
+ * `loadObras` for the project list: whether there is a contract, its chapters
+ * (code and name), the built %, the hitos, Avance's rows and the approved
+ * baseline, with what `loadObra` gives for each; no lines, no hito checks or
+ * photos, no figure per chapter.
+ */
+export async function loadObraSummaries(tenantId: string, projectIds: string[]) {
+  const [contracts, allHitoRows, allProgressRows, plans] = await Promise.all([
+    contractTotalsOf(tenantId, projectIds),
+    loadHitoRows(tenantId, projectIds, { acta: false }),
+    loadProgressRows(tenantId, projectIds),
+    approvedPlansOf(tenantId, projectIds),
+  ]);
+  const progressOfProject = groupBy(allProgressRows, (r) => r.projectId);
+  return new Map(
+    projectIds.map((projectId) => {
+      const contract = contracts.get(projectId);
+      const { rows, codes, requests } = hitoRowsOf(allHitoRows, projectId);
+      const progressRows = progressOfProject.get(projectId) ?? [];
+      const plan = plans.get(projectId) ?? null;
+      const costChapters = contract?.chapters ?? [];
+      // As `loadObra`: a chapter recorded as finished counts as built in full.
+      const finished = new Set(progressRows.filter((r) => r.actualEnd).map((r) => r.chapterCode));
+      const totals = costChapters.reduce((sum, c) => addTotals(sum, finished.has(c.code) ? allDone(c.totals) : c.totals), NO_LINES);
+      // As `toHitos`: its chapters in the contract, in budget order.
+      const hitos: HitoSummary[] = rows.map((row) => {
+        const mapped = new Set((codes.get(row.id) ?? []).map((c) => c.chapterCode));
+        const dueFrom = row.actaSignedOn ?? row.invoicedOn;
+        return {
+          id: row.id,
+          pctBp: row.pctBp,
+          chapters: costChapters.filter((c) => mapped.has(c.code)).map(({ code }) => ({ code })),
+          invoicedOn: row.invoicedOn,
+          paidOn: row.paidOn,
+          dueOn: dueFrom ? paymentDueOn(dueFrom) : null,
+        };
+      });
+      const obra = {
+        contracted: contract !== undefined,
+        costChapters: costChapters.map(({ code, name }) => ({ code, name })),
+        progress: progressOfTotals(totals),
+        hitos,
+        progressRows,
+        plan,
+        planDates: planDatesOf(plan),
+        requests,
+      };
+      return [projectId, obra] as const;
+    }),
+  );
+}
+
+export type ObraSummary = NonNullable<ReturnType<Awaited<ReturnType<typeof loadObraSummaries>>["get"]>>;

@@ -2,6 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import type { BudgetRevision } from "@repo/core/contract";
+import { useVatLabel } from "../../../../components/vat-basis";
 import { useObraFormat } from "../obra/format";
 import Kpi from "../obra/Kpi";
 import InlinePct from "./InlinePct";
@@ -21,6 +22,7 @@ export default function SummaryKpis({
 }) {
   const t = useTranslations("budget.kpis");
   const f = useObraFormat();
+  const vat = useVatLabel();
   const { perM2Cents: perBuilt, builtAreaM2 } = revision;
   // The sum of the chapters' averages: what the tenant's budgets cost per m² built.
   const averages = Object.values(revision.ratios);
@@ -53,7 +55,7 @@ export default function SummaryKpis({
     <section className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 xl:grid-cols-4">
       <Kpi
         highlight
-        label={t("work")}
+        label={vat(t("work"), "excl")}
         value={f.money(revision.totalCents)}
         hints={[
           t("workHint", { cost: f.money(revision.costCents), count: revision.lineCount }),
@@ -65,7 +67,7 @@ export default function SummaryKpis({
       {margin("profit")}
       {margin("overhead")}
       <Kpi
-        label={t("perBuilt")}
+        label={vat(t("perBuilt"), "excl")}
         value={perBuilt ? f.money(perBuilt) : <small>{t("noArea")}</small>}
         hints={[
           ...(builtAreaM2 ? [t("area", { area: f.decimal(builtAreaM2) })] : []),

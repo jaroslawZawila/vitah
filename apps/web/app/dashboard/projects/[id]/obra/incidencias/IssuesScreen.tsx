@@ -13,6 +13,7 @@ import {
   deleteIssueFileAction,
   updateIssueAction,
 } from "../../../../../actions/construction";
+import { useConfirm } from "../../../../components/useConfirm";
 import { useIdempotencyKey } from "../../../../components/useIdempotencyKey";
 import EmptyState from "../../components/EmptyState";
 import { SleepingCamera } from "../../components/illustrations";
@@ -61,6 +62,7 @@ export function IssueEditor({
   const createKey = useIdempotencyKey();
   // Attachments already up, not sent again when saving after a failed one.
   const uploaded = useRef(new Set<File>());
+  const confirm = useConfirm("construction.issues.errors");
 
   function save(values: IssueValues, files: File[]) {
     startTransition(async () => {
@@ -95,29 +97,37 @@ export function IssueEditor({
   }
 
   function deleteFile(file: IssueFile) {
-    if (!issue || !confirm(t("confirmDeleteFile", { name: file.filename }))) return;
-    startTransition(async () => {
-      const state = await deleteIssueFileAction(projectId, issue.id, file.id);
-      setError(state?.success ? undefined : state?.error);
+    if (!issue) return;
+    setError(undefined);
+    confirm.ask({
+      t,
+      key: "deleteFileDialog",
+      values: { name: file.filename },
+      destructive: true,
+      action: () => deleteIssueFileAction(projectId, issue.id, file.id),
     });
   }
 
   return (
-    <IssueForm
-      issue={issue}
-      chapters={chapters}
-      today={today}
-      chapterCode={chapterCode}
-      pending={pending}
-      progress={progress}
-      error={error}
-      onSubmit={save}
-      onCancel={onDone}
-      onDeleteFile={issue ? deleteFile : undefined}
-      fileUrl={issue ? (file) => issueFileUrl(projectId, issue.id, file.id) : undefined}
-      bare={bare}
-      className={className}
-    />
+    <>
+      <IssueForm
+        issue={issue}
+        chapters={chapters}
+        today={today}
+        chapterCode={chapterCode}
+        pending={pending || confirm.pending}
+        progress={progress}
+        error={error}
+        onSubmit={save}
+        onCancel={onDone}
+        onDeleteFile={issue ? deleteFile : undefined}
+        fileUrl={issue ? (file) => issueFileUrl(projectId, issue.id, file.id) : undefined}
+        bare={bare}
+        className={className}
+      />
+      {/* Here, so it opens over the dialog the editor may be in. */}
+      {confirm.dialog}
+    </>
   );
 }
 
@@ -206,7 +216,7 @@ export default function IssuesScreen({
           {issues.length === 0 ? (
             <EmptyState illustration={<SleepingCamera />} title={t("emptyTitle")} text={t("emptyText")} />
           ) : shown.length === 0 ? (
-            <p className="py-6 text-center text-[13.5px] text-muted-foreground">{t("noMatch")}</p>
+            <p className="py-6 text-center text-sm text-muted-foreground">{t("noMatch")}</p>
           ) : (
             shown.map((issue) => (
               <IssueCard

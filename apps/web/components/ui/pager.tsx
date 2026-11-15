@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useFormatter, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import type { Paging } from "@repo/core/contract";
 import { buttonVariants } from "@/components/ui/button";
+import { useFormat } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 /**
@@ -13,7 +14,7 @@ import { cn } from "@/lib/utils";
  */
 export function Pager({ paging, hrefOf, className }: { paging: Paging; hrefOf: (page: number) => string; className?: string }) {
   const t = useTranslations("pager");
-  const format = useFormatter();
+  const format = useFormat();
   const { page, limit, total, pages } = paging;
   if (total === 0 || (pages === 1 && page === 1)) return null;
   const past = page > pages;
@@ -28,7 +29,7 @@ export function Pager({ paging, hrefOf, className }: { paging: Paging; hrefOf: (
       </span>
     );
   return (
-    <nav aria-label={t("label")} className={cn("flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-[18px] py-3 text-[13px]", className)}>
+    <nav aria-label={t("label")} className={cn("flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-[18px] py-3 text-meta", className)}>
       <span className="num text-muted-foreground">
         {past
           ? t("none", { total: format.number(total) })

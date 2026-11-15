@@ -12,7 +12,8 @@ import { useObraFormat } from "../obra/format";
 import InlineNumber from "../obra/InlineNumber";
 import Popover from "./Popover";
 
-const COLUMNS = "64px minmax(200px, 1fr) 44px 104px 112px 112px 44px";
+// Tight enough to fit the lines card beside the chapter list at 1280 px (and on its own at 1024).
+const COLUMNS = "56px minmax(150px, 1fr) 44px 96px 104px 104px 44px";
 
 export type MenuItem = { label: string; onSelect: () => void; destructive?: boolean };
 
@@ -71,7 +72,7 @@ export default function LineTable({
             <span role="cell" className="num text-muted-foreground md:self-start md:pt-1.5">{line.code}</span>
             <span role="cell" className={cn(table.name, "flex flex-col gap-1")}>
               <span>{line.description}</span>
-              {line.note && <span className="rounded-md bg-raise px-2 py-1 text-[12.5px] font-normal text-muted-foreground">{line.note}</span>}
+              {line.note && <span className="rounded-md bg-raise px-2 py-1 text-meta font-normal text-muted-foreground">{line.note}</span>}
               {line.source === "estimated" && <Badge variant="yel">{t("estimated")}</Badge>}
             </span>
             <span role="cell" className="text-muted-foreground">{line.unit}</span>

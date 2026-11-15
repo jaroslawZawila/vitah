@@ -59,7 +59,7 @@ export function DraftTable({
 
   return (
     <section className={cn(cardVariants({ size: "flush" }), "min-w-0 py-1.5")} aria-label={t("tableLabel")}>
-      <Table className="min-w-[860px] text-[13px]">
+      <Table className="min-w-[860px]">
         <TableHeader>
           <TableRow>
             <TableHead className="pl-[18px]">{t("code")}</TableHead>
@@ -90,7 +90,7 @@ export function DraftTable({
                     {finished
                       ? t("finished")
                       : started && row?.actualStart
-                        ? t("inProgress", { date: f.day(row.actualStart) })
+                        ? t("inProgress", { date: f.date(row.actualStart) })
                         : row?.hitoCode}
                     {critical.has(rule.code) && <Badge variant="warn">{t("critical")}</Badge>}
                   </div>
@@ -153,7 +153,7 @@ export function DraftTable({
                     onChange={(e) => onChange(rule.code, { durationDays: Math.trunc(Number(e.target.value)) })}
                   />
                 </TableCell>
-                <TableCell className="num whitespace-nowrap">{d ? `${f.day(d.start)} – ${f.day(d.end)}` : "—"}</TableCell>
+                <TableCell className="num whitespace-nowrap">{d ? `${f.date(d.start)} – ${f.date(d.end)}` : "—"}</TableCell>
                 <TableCell>
                   <div className="flex items-center gap-2">
                     <Input
@@ -166,8 +166,8 @@ export function DraftTable({
                       onChange={(e) => onChange(rule.code, { leadDays: Math.trunc(Number(e.target.value)) })}
                     />
                     {d && !finished && !started && (
-                      <span className="num text-[12px] whitespace-nowrap text-muted-foreground">
-                        {t("orderBy", { date: f.day(orderByDate(d.start, rule.leadDays)) })}
+                      <span className="num text-meta whitespace-nowrap text-muted-foreground">
+                        {t("orderBy", { date: f.date(orderByDate(d.start, rule.leadDays)) })}
                       </span>
                     )}
                   </div>
@@ -190,7 +190,7 @@ export function DraftTable({
               <TableCell colSpan={baseline ? 8 : 7} className={cn(muted, "pl-[18px] whitespace-normal")}>
                 {t("spans", {
                   codes: spanning.map((r) => `${r.code} ${rowOf.get(r.code)?.name ?? ""}`.trim()).join(" · "),
-                  date: end ? f.day(end) : "—",
+                  date: f.date(end),
                 })}
               </TableCell>
             </TableRow>
@@ -224,11 +224,11 @@ export function DraftCheck({ check, problem }: { check: PlanningCheck | null; pr
           <dl className="m-0 grid grid-cols-2 gap-3">
             <div>
               <dt className={muted}>{t("end")}</dt>
-              <dd className={cn("m-0 font-heading text-[26px] font-semibold", tone)}>{check ? f.fullDay(check.endDate) : "—"}</dd>
+              <dd className={cn("m-0 font-heading text-[26px] font-semibold", tone)}>{check ? f.date(check.endDate) : "—"}</dd>
             </div>
             <div>
               <dt className={muted}>{t("contract")}</dt>
-              <dd className="m-0 font-heading text-[26px] font-semibold">{check?.contractEnd ? f.fullDay(check.contractEnd) : "—"}</dd>
+              <dd className="m-0 font-heading text-[26px] font-semibold">{f.date(check?.contractEnd)}</dd>
             </div>
             <div>
               <dt className={muted}>{t("delay")}</dt>
@@ -239,7 +239,7 @@ export function DraftCheck({ check, problem }: { check: PlanningCheck | null; pr
             <div>
               <dt className={muted}>{t("penalty")}</dt>
               <dd className={cn("num m-0 font-semibold", check && check.penaltyCents > 0 && "text-bad")}>
-                {f.moneyRound(check?.penaltyCents ?? 0)}
+                {f.money(check?.penaltyCents ?? 0)}
               </dd>
             </div>
           </dl>
@@ -323,7 +323,7 @@ export function ApproveCard({
         />
       </div>
       {error}
-      {saved && <p className="text-[13px] text-good" role="status">{t("saved")}</p>}
+      {saved && <p className="text-sm text-good" role="status">{t("saved")}</p>}
       <div className="flex flex-wrap gap-2">
         <Button type="button" className="flex-auto" disabled={pending || !canApprove || (!first && !reason.trim())} onClick={onApprove}>
           {t("submit", { number })}

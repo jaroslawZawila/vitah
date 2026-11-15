@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useFormatter, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import type { ProjectDetail } from "../../../../actions/projects";
 import { updateProject, deleteProject } from "../../../../actions/projects";
@@ -10,6 +10,8 @@ import { Card } from "@/components/ui/card";
 import { Field, FormMessage } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useFormat } from "@/lib/format";
+import { useConfirm } from "../../../components/useConfirm";
 
 /** Dates are calendar dates stored at UTC midnight. */
 function toInputDate(date: Date | null): string {
@@ -27,11 +29,12 @@ export default function ProjectHeader({
   canDelete: boolean;
 }) {
   const t = useTranslations("projectDetailPage.header");
-  const format = useFormatter();
+  const format = useFormat();
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const confirm = useConfirm("projectDetailPage.header.errors");
   const [form, setForm] = useState({
     address: project.address,
     startDate: toInputDate(project.startDate),
@@ -39,7 +42,7 @@ export default function ProjectHeader({
   });
 
   function formatDate(date: Date | null) {
-    return date ? format.dateTime(date, { dateStyle: "long", timeZone: "UTC" }) : t("notSet");
+    return date ? format.date(date) : t("notSet");
   }
 
   function handleSave() {
@@ -56,14 +59,13 @@ export default function ProjectHeader({
   }
 
   function handleDelete() {
-    if (!confirm(t("confirmDelete"))) return;
-    startTransition(async () => {
-      const result = await deleteProject(project.id);
-      if (result?.error) {
-        setError(result.error);
-        return;
-      }
-      router.push("/dashboard/projects");
+    confirm.ask({
+      t,
+      key: "deleteDialog",
+      values: { ref: project.ref },
+      destructive: true,
+      action: () => deleteProject(project.id),
+      onDone: () => router.push("/dashboard/projects"),
     });
   }
 
@@ -105,10 +107,10 @@ export default function ProjectHeader({
           {canDelete && (
             <Button
               type="button"
-              variant="destructive"
+              variant="ghost-destructive"
               className="mr-auto"
               onClick={handleDelete}
-              disabled={isPending}
+              disabled={isPending || confirm.pending}
             >
               {t("delete")}
             </Button>
@@ -127,6 +129,7 @@ export default function ProjectHeader({
             {t("save")}
           </Button>
         </div>
+        {confirm.dialog}
       </Card>
     );
   }
@@ -138,7 +141,7 @@ export default function ProjectHeader({
           <div className="font-heading text-[26px] leading-[1.05] font-bold tracking-[0.01em] text-brand-ink">
             {project.ref}
           </div>
-          <div className="mt-1 text-[13.5px] wrap-anywhere text-muted-foreground">
+          <div className="mt-1 text-sm wrap-anywhere text-muted-foreground">
             {project.address}
           </div>
         </div>

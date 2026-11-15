@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
 import type { HitoEvent } from "@repo/core/contract";
@@ -38,7 +38,6 @@ function renderScreen(props: Partial<Parameters<typeof HitoScreen>[0]> = {}) {
 beforeEach(() => {
   vi.clearAllMocks();
   for (const fn of Object.values(actions)) (fn as ReturnType<typeof vi.fn>).mockResolvedValue({ success: true });
-  vi.spyOn(window, "confirm").mockReturnValue(true);
 });
 
 describe("HitoScreen", () => {
@@ -105,7 +104,29 @@ describe("HitoScreen", () => {
     renderScreen({ hito: { ...h3, status: "paid", paidOn: "2026-09-30", paidAmountCents: 7_395_383 } });
     expect(screen.getByText("Pagado el 30 sept 2026 · 73.953,83 €")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Anular pago" }));
+    // Names the payment and says it stays in the history.
+    const dialog = within(await screen.findByRole("alertdialog", { name: "¿Anular el pago del H3?" }));
+    expect(
+      dialog.getByText(/Se anula el cobro de 73\.953,83 € del 30 sept 2026: el hito vuelve a constar como no pagado.*El pago queda en el historial del hito\./),
+    ).toBeInTheDocument();
+    expect(actions.cancelPaymentAction).not.toHaveBeenCalled();
+    await userEvent.click(dialog.getByRole("button", { name: "Anular pago" }));
     expect(actions.cancelPaymentAction).toHaveBeenCalledWith("p-1", "hito-h3");
+  });
+
+  it("takes the signed acta off only once confirmed", async () => {
+    renderScreen({ hito: h3 });
+
+    await userEvent.click(screen.getAllByRole("button", { name: "Quitar" })[0]!);
+    const dialog = within(await screen.findByRole("alertdialog", { name: "¿Quitar el acta firmada del H3?" }));
+    expect(dialog.getByText(/El PDF se conserva y la retirada queda en el historial del hito\./)).toBeInTheDocument();
+    await userEvent.click(dialog.getByRole("button", { name: "Cancelar" }));
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+    expect(actions.removeHitoFileAction).not.toHaveBeenCalled();
+
+    await userEvent.click(screen.getAllByRole("button", { name: "Quitar" })[0]!);
+    await userEvent.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Quitar acta" }));
+    expect(actions.removeHitoFileAction).toHaveBeenCalledWith("p-1", "hito-h3", "acta");
   });
 
   it("takes no payment dated after today", () => {
@@ -135,7 +156,7 @@ describe("HitoScreen", () => {
       "30 sept 2026, 12:05Pago registrado: 73.953,83 €, cobrado el 30 sept 2026 · Laura Gestora",
       "25 sept 2026, 12:00Factura subida: emitida el 24 sept 2026 (2 MB) · Laura Gestora",
       // 22:30 UTC is already the 25th in Spain.
-      "25 sept 2026, 0:30Acta firmada sustituida: firmada el 24 sept 2026 (350 kB). Antes: firmada el 23 sept 2026 (340 kB) · Laura Gestora",
+      "25 sept 2026, 00:30Acta firmada sustituida: firmada el 24 sept 2026 (350 kB). Antes: firmada el 23 sept 2026 (340 kB) · Laura Gestora",
       "23 sept 2026, 14:00Acta firmada subida: firmada el 23 sept 2026 (340 kB) · Laura Gestora",
     ]);
   });

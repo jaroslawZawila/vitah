@@ -105,7 +105,7 @@ export function InvoiceStatePill({ state, className }: { state: PurchaseInvoiceS
   );
 }
 
-const PROGRESS_TONE: Record<PurchaseProgress, Variant> = {
+export const PROGRESS_TONE: Record<PurchaseProgress, Variant> = {
   to_contract: "outline",
   contracted: "info",
   invoiced: "yel",

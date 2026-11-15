@@ -50,7 +50,7 @@ export function usePhotoGroups(
   }
   const thisWeek = weekOf(today);
   return [...byWeek.entries()].map(([week, list]) => {
-    const range = f.range(list.at(-1)!.takenOn, list[0]!.takenOn);
+    const range = f.dateRange(list.at(-1)!.takenOn, list[0]!.takenOn);
     return { key: week, title: week === thisWeek ? t("thisWeek", { range }) : range, photos: list };
   });
 }
@@ -89,7 +89,7 @@ export function PhotoGroups({
           <ul className="m-0 grid list-none grid-cols-[repeat(auto-fill,minmax(min(150px,100%),1fr))] gap-3 p-0">
             {group.photos.map((photo) => {
               const name = photoName(photo);
-              const meta = [f.day(photo.takenOn), grouping === "date" && photo.chapterCode].filter(Boolean).join(" · ");
+              const meta = [f.date(photo.takenOn), grouping === "date" && photo.chapterCode].filter(Boolean).join(" · ");
               return (
                 <li key={photo.id}>
                   <figure className="m-0 flex flex-col gap-1.5">
@@ -109,7 +109,7 @@ export function PhotoGroups({
                         </Badge>
                       )}
                     </a>
-                    <figcaption className="flex flex-col gap-0.5 text-[13px]">
+                    <figcaption className="flex flex-col gap-0.5 text-sm">
                       <span className="font-semibold wrap-anywhere">{name}</span>
                       <span className="flex items-center justify-between gap-1 text-muted-foreground">
                         <span className="num">{meta}</span>
@@ -244,7 +244,7 @@ export function PhotoUploadForm({
           pick(Array.from(event.dataTransfer.files));
         }}
         className={cn(
-          "flex min-h-[120px] cursor-pointer flex-col items-center justify-center gap-1.5 rounded-xl border-[1.5px] border-dashed bg-raise px-4 py-5 text-center text-[13px] text-muted-foreground transition-colors hover:border-primary",
+          "flex min-h-[120px] cursor-pointer flex-col items-center justify-center gap-1.5 rounded-xl border-[1.5px] border-dashed bg-raise px-4 py-5 text-center text-sm text-muted-foreground transition-colors hover:border-primary",
           dragging && "border-primary bg-brand-soft",
         )}
       >
@@ -271,7 +271,7 @@ export function PhotoUploadForm({
       </Field>
       <Field>
         <Label htmlFor="photo-caption">
-          {t("caption")} <span className="text-[12px] font-normal text-muted-foreground">{t("optional")}</span>
+          {t("caption")} <span className="text-meta font-normal text-muted-foreground">{t("optional")}</span>
         </Label>
         <Input
           id="photo-caption"
@@ -283,7 +283,7 @@ export function PhotoUploadForm({
       </Field>
       <Field>
         <Label htmlFor="photo-chapter">
-          {t("chapter")} <span className="text-[12px] font-normal text-muted-foreground">{t("optional")}</span>
+          {t("chapter")} <span className="text-meta font-normal text-muted-foreground">{t("optional")}</span>
         </Label>
         <NativeSelect id="photo-chapter" value={chapter} onChange={(event) => setChapter(event.target.value)}>
           <NativeSelectOption value="">{t("noChapter")}</NativeSelectOption>
@@ -300,7 +300,7 @@ export function PhotoUploadForm({
         error={wrongType ? "invalid_file_type" : tooLarge ? "file_too_large" : error}
       />
       {progress && (
-        <p role="status" className="text-[13px] text-muted-foreground">
+        <p role="status" className="text-sm text-muted-foreground">
           {t("uploading", { done: progress.done, total: progress.total })}
         </p>
       )}

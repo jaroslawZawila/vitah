@@ -12,11 +12,13 @@ import {
   type BudgetOverviewItem,
   type BudgetOverviewRevision,
   type BudgetState,
+  type ProjectSignals,
 } from "./contract";
 import { perM2Cents, priceLines, shareBp, todayInSpain } from "./obra-calc";
 import type { RevisionRow } from "./obra-data";
 import { projectIdsInTenant } from "./project-client";
 import { listProjects } from "./projects";
+import { projectSignals } from "./project-signals";
 import { daysBetween } from "./subcontractor-rules";
 
 // ─── Budget overview ─────────────────────────────────────────────────────────
@@ -52,20 +54,30 @@ function newestGenerations(tenantId: string) {
     .orderBy(budgetGenerations.projectId, desc(budgetGenerations.createdAt));
 }
 
+type ProjectWithBudget = Awaited<ReturnType<typeof listProjects>>[number] & { budget: BudgetState };
+
 /**
  * Every project (as `listProjects`) with its budget's state: the newest revision's number and status, else
  * the AI's newest run drafting the first. The project list's Presupuesto filter and pill: the overview's own
- * newest revision and AI run, none of its figures (lines, checks, ratios).
+ * newest revision and AI run, none of its figures (lines, checks, ratios). With `signals`, each obra's
+ * signals too (./project-signals: schedule, built %, what needs attention) for its Atención filter; without
+ * it they are absent, and cost nothing.
  */
-export async function listProjectsWithBudget(ctx: Ctx) {
+export async function listProjectsWithBudget(ctx: Ctx, options: { signals: true }): Promise<(ProjectWithBudget & ProjectSignals)[]>;
+export async function listProjectsWithBudget(
+  ctx: Ctx,
+  options?: { signals?: boolean },
+): Promise<(ProjectWithBudget & Partial<ProjectSignals>)[]>;
+export async function listProjectsWithBudget(ctx: Ctx, { signals = false }: { signals?: boolean } = {}) {
   const [projects, revisions, generations] = await Promise.all([
     listProjects(ctx),
     newestRevisions(ctx.tenantId),
     newestGenerations(ctx.tenantId),
   ]);
+  const signalsOf = signals ? await projectSignals(ctx, projects) : null;
   const revisionOf = new Map(revisions.map((r) => [r.projectId, r]));
   const generationOf = new Map(generations.map((g) => [g.projectId, g]));
-  return projects.map((project) => {
+  return projects.map((project): ProjectWithBudget & Partial<ProjectSignals> => {
     const revision = revisionOf.get(project.id);
     // As `listBudgets`: the AI's run only before the first revision.
     const generation = revision ? undefined : generationOf.get(project.id);
@@ -73,7 +85,7 @@ export async function listProjectsWithBudget(ctx: Ctx) {
       revision: revision ? { number: revision.number, status: revision.status } : null,
       generation: generation ? { status: generation.status, step: generation.step } : null,
     };
-    return { ...project, budget };
+    return { ...project, budget, ...signalsOf?.get(project.id) };
   });
 }
 

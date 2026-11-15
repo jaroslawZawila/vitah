@@ -33,7 +33,7 @@ export default function AssignmentFields({
       <fieldset className="m-0 flex flex-col gap-2 border-0 p-0">
         <legend className="mb-1 flex flex-wrap items-baseline gap-x-2.5 text-sm font-semibold">
           {t("chapters")}
-          <span className="text-xs font-normal text-muted-foreground">{t("chaptersHint")}</span>
+          <span className="text-meta font-normal text-muted-foreground">{t("chaptersHint")}</span>
         </legend>
         <div className="flex flex-wrap gap-1.5">
           {chapters.map((chapter) => (
@@ -67,7 +67,7 @@ export default function AssignmentFields({
       <fieldset className="m-0 flex flex-col gap-2 border-0 p-0">
         <legend className="mb-1 flex flex-wrap items-baseline gap-x-2.5 text-sm font-semibold">
           {t("book")}
-          <span className="text-xs font-normal text-muted-foreground">
+          <span className="text-meta font-normal text-muted-foreground">
             {t("bookHint")} · <span className="num">libro_subcontratacion</span>
           </span>
         </legend>

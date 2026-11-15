@@ -16,6 +16,7 @@ import HitoTable from "../components/obra/HitoTable";
 import Kpi from "../components/obra/Kpi";
 import PlanForm from "../components/obra/PlanForm";
 import { useObraAction } from "../components/obra/useObraAction";
+import { useVatLabel } from "../../../components/vat-basis";
 import TabHeader from "../components/TabHeader";
 
 /** The payment plan H0–H9: what is collected, due and still to invoice. */
@@ -32,6 +33,7 @@ export default function HitosScreen({
 }) {
   const t = useTranslations("obra.payments");
   const f = useObraFormat();
+  const vat = useVatLabel();
   const [planOpen, setPlanOpen] = useState(false);
   const { state, pending, run, reset } = useObraAction();
   const total = obra.budget?.totalCents ?? 0;
@@ -63,12 +65,12 @@ export default function HitosScreen({
       <section className="grid gap-3.5 md:grid-cols-3">
         <Kpi
           highlight
-          label={t("collected")}
+          label={vat(t("collected"), "excl")}
           value={f.money(obra.paidCents)}
           hints={[t("collectedHint", { count: count("paid"), pct: f.ratio(obra.paidCents, total) })]}
         />
         <Kpi
-          label={t("invoiced")}
+          label={vat(t("invoiced"), "excl")}
           value={f.money(obra.invoicedUnpaidCents)}
           hints={[
             invoiced?.dueOn
@@ -77,7 +79,7 @@ export default function HitosScreen({
           ]}
         />
         <Kpi
-          label={t("toInvoice")}
+          label={vat(t("toInvoice"), "excl")}
           value={f.money(obra.toInvoiceCents)}
           hints={[
             t("toInvoiceHint", {
@@ -88,7 +90,7 @@ export default function HitosScreen({
         />
       </section>
       {obra.planPctBp !== 10_000 && hitos.length > 0 && (
-        <p role="status" className="rounded-lg bg-warn-soft px-3.5 py-[11px] text-[13.5px] text-warn">
+        <p role="status" className="rounded-lg bg-warn-soft px-3.5 py-[11px] text-sm text-warn">
           {t("pctWarning", { pct: f.share(obra.planPctBp) })}
         </p>
       )}

@@ -70,7 +70,7 @@ function RestoreCell({ item, onRestore, className }: { item: DeletedItem; onRest
   const t = useTranslations("deletedPage");
   const text = useDeletedText();
   const blocked = text.blocked(item);
-  if (blocked) return <p className={className ?? "ml-auto max-w-[260px] text-left text-[12.5px] whitespace-normal text-muted-foreground"}>{blocked}</p>;
+  if (blocked) return <p className={className ?? "ml-auto max-w-[260px] text-left text-meta whitespace-normal text-muted-foreground"}>{blocked}</p>;
   return (
     <Button type="button" variant="outline" size="sm" onClick={() => onRestore(item)} aria-label={t("restoreItem", { item: text.title(item) })}>
       <ArchiveRestore aria-hidden />
@@ -86,7 +86,7 @@ function RestoreCell({ item, onRestore, className }: { item: DeletedItem; onRest
 export function DeletedTable({ items, empty, onRestore }: { items: DeletedItem[]; empty: string; onRestore: (item: DeletedItem) => void }) {
   const t = useTranslations("deletedPage");
   const text = useDeletedText();
-  if (items.length === 0) return <p className="px-[18px] py-10 text-center text-[13.5px] text-muted-foreground">{empty}</p>;
+  if (items.length === 0) return <p className="px-[18px] py-10 text-center text-sm text-muted-foreground">{empty}</p>;
   const key = (item: DeletedItem) => `${item.kind}:${item.id}`;
 
   return (
@@ -114,14 +114,14 @@ export function DeletedTable({ items, empty, onRestore }: { items: DeletedItem[]
                   </TableCell>
                   <TableCell className="max-w-[340px] whitespace-normal">
                     <span className="font-medium break-words">{text.title(item)}</span>
-                    {detail && <span className="block text-[12.5px] break-words text-muted-foreground">{detail}</span>}
+                    {detail && <span className="block text-meta break-words text-muted-foreground">{detail}</span>}
                   </TableCell>
                   <TableCell className="num font-semibold">{item.projectRef}</TableCell>
                   <TableCell>
                     <time dateTime={item.deletedAt} className="num">
                       {text.when(item)}
                     </time>
-                    <span className="block text-[12.5px] text-muted-foreground">{text.by(item)}</span>
+                    <span className="block text-meta text-muted-foreground">{text.by(item)}</span>
                   </TableCell>
                   <TableCell className="text-right">
                     <RestoreCell item={item} onRestore={onRestore} />
@@ -140,19 +140,19 @@ export function DeletedTable({ items, empty, onRestore }: { items: DeletedItem[]
             <li key={key(item)} className="flex flex-col gap-2 border-b px-[18px] py-3.5 last:border-b-0">
               <span className="flex flex-wrap items-center justify-between gap-2">
                 <KindPill item={item} />
-                <span className="num text-[12.5px] font-semibold">{item.projectRef}</span>
+                <span className="num text-meta font-semibold">{item.projectRef}</span>
               </span>
               <span className="min-w-0">
                 <span className="block text-[14px] font-medium break-words">{text.title(item)}</span>
-                {detail && <span className="block text-[13px] break-words text-muted-foreground">{detail}</span>}
+                {detail && <span className="block text-sm break-words text-muted-foreground">{detail}</span>}
               </span>
-              <span className="text-[12.5px] text-muted-foreground">
+              <span className="text-meta text-muted-foreground">
                 <time dateTime={item.deletedAt} className="num">
                   {text.when(item)}
                 </time>{" "}
                 · {text.by(item)}
               </span>
-              <RestoreCell item={item} onRestore={onRestore} className="text-[12.5px] text-muted-foreground" />
+              <RestoreCell item={item} onRestore={onRestore} className="text-meta text-muted-foreground" />
             </li>
           );
         })}

@@ -18,6 +18,7 @@ import {
 } from "../../../../../../actions/planning";
 import BackLink from "../../../../../components/BackLink";
 import FormError from "../../../../../components/FormError";
+import { useConfirm } from "../../../../../components/useConfirm";
 import { useObraAction } from "../../../components/obra/useObraAction";
 import { ApproveCard, CalendarCard, DraftCheck, DraftTable, type RuleChange } from "../../../components/planning/DraftViews";
 import { planningHref } from "../../../components/planning/links";
@@ -45,6 +46,7 @@ export default function EditPlanScreen({
   const t = useTranslations("planning.edit");
   const router = useRouter();
   const action = useObraAction();
+  const confirm = useConfirm("planning.errors");
   const [rules, setRules] = useState(() => draft.rows.map(toRule));
   const [startDate, setStartDate] = useState(draft.version.startDate);
   const [calendar, setCalendar] = useState<PlanningCalendar>(draft.calendar);
@@ -111,7 +113,7 @@ export default function EditPlanScreen({
               number={draft.version.number}
               first={draft.baseline === null}
               reason={reason}
-              pending={action.pending}
+              pending={action.pending || confirm.pending}
               canApprove={problem === null}
               saved={saved}
               error={<FormError namespace="planning.errors" error={action.state?.error} />}
@@ -119,12 +121,18 @@ export default function EditPlanScreen({
               onApprove={() => action.run(() => approvePlanningDraftAction(projectId, input, reason), () => router.push(back))}
               onSave={() => action.run(() => updatePlanningDraftAction(projectId, input), () => setSaved(true))}
               onDiscard={() =>
-                action.confirmThen(t("approve.confirmDiscard", { number: draft.version.number }), () => discardPlanningDraftAction(projectId), () =>
-                  router.push(back),
-                )
+                confirm.ask({
+                  t,
+                  key: "approve.discardDialog",
+                  values: { number: draft.version.number },
+                  destructive: true,
+                  action: () => discardPlanningDraftAction(projectId),
+                  onDone: () => router.push(back),
+                })
               }
             />
           )}
+          {confirm.dialog}
           <CalendarCard
             startDate={startDate}
             calendar={calendar}

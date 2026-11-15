@@ -1,4 +1,4 @@
-import { useFormatter, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import {
   requirement,
   type AccessReason,
@@ -8,6 +8,7 @@ import {
   type WorkerAccessStatus,
 } from "@repo/core/contract";
 import type { badgeVariants } from "@/components/ui/badge";
+import { useFormat } from "@/lib/format";
 import type { VariantProps } from "class-variance-authority";
 
 // Pure helpers shared by the Subcontratas views: badge tones, names, dates, URLs.
@@ -37,33 +38,10 @@ export const ACCESS_VARIANT: Record<WorkerAccessStatus, BadgeVariant> = {
   blocked: "destructive",
 };
 
-/** Calendar date (YYYY-MM-DD) → Date at UTC midnight, for formatting. */
-export function calendarDate(value: string): Date {
-  return new Date(`${value}T00:00:00Z`);
-}
-
-/** Formats calendar dates (YYYY-MM-DD) and timestamps as dd/mm/yyyy. */
+/** Calendar dates (YYYY-MM-DD) and timestamps as the portal writes them ("10 mar 2026"), "—" for none. */
 export function useDates() {
-  const format = useFormatter();
-  const date = (value: string | null | undefined) =>
-    value
-      ? format.dateTime(value.length === 10 ? calendarDate(value) : new Date(value), {
-          day: "2-digit",
-          month: "2-digit",
-          year: "numeric",
-          timeZone: value.length === 10 ? "UTC" : "Europe/Madrid",
-        })
-      : "—";
-  const dateTime = (value: string) =>
-    format.dateTime(new Date(value), {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      timeZone: "Europe/Madrid",
-    });
-  return { date, dateTime };
+  const format = useFormat();
+  return { date: format.date, dateTime: format.dateTime };
 }
 
 /** A requirement's name; the self-employed have RETA documents instead of the company ones. */

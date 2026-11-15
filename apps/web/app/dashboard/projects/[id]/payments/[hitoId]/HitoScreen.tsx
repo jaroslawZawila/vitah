@@ -20,6 +20,7 @@ import {
 import { Button } from "@/components/ui/button";
 import type { ObraState } from "../../../../../actions/run";
 import FormError from "../../../../components/FormError";
+import { useConfirm, type ConfirmRequest } from "../../../../components/useConfirm";
 import Modal from "../../components/Modal";
 import { muted } from "../../components/obra/classes";
 import FieldsForm from "../../components/obra/FieldsForm";
@@ -65,7 +66,8 @@ export default function HitoScreen({
 }) {
   const t = useTranslations("obra.hito");
   const f = useObraFormat();
-  const { state, pending, run, confirmThen, reset } = useObraAction();
+  const { state, pending, run, reset } = useObraAction();
+  const confirm = useConfirm("obra.errors");
   const [dialog, setDialogState] = useState<Dialog | null>(null);
   const close = () => setDialogState(null);
   /** Opens a dialog on a clean slate: no error from an earlier action. */
@@ -78,8 +80,19 @@ export default function HitoScreen({
   const actaPhotos = photos.filter((p) => hito.photoIds.includes(p.id));
   /** Staff-only callbacks: undefined for viewers, so the views stay read-only. */
   const editor = <T,>(fn: T) => (canManage ? fn : undefined);
+  /** Asks first; the dialog runs `action` and shows its error. */
+  const ask = (key: string, values: Record<string, string>, action: ConfirmRequest["action"]) => {
+    reset();
+    confirm.ask({
+      t,
+      key,
+      values,
+      destructive: true,
+      action,
+    });
+  };
   const removeFile = (kind: HitoFileKind) =>
-    editor(() => confirmThen(t("confirmRemove"), () => removeHitoFileAction(projectId, hito.id, kind)));
+    editor(() => ask(`removeDialog.${kind}`, { code: hito.code }, () => removeHitoFileAction(projectId, hito.id, kind)));
 
   const titles: Record<Dialog, string> = {
     photos: t("pickerTitle"),
@@ -159,7 +172,7 @@ export default function HitoScreen({
           <PaymentCard
             hito={hito}
             today={today}
-            pending={pending}
+            pending={pending || confirm.pending}
             onPay={editor((paidOn: string, amount: string) =>
               run(() =>
                 registerPaymentAction(projectId, hito.id, {
@@ -169,11 +182,18 @@ export default function HitoScreen({
                 }),
               ),
             )}
-            onCancel={editor(() => confirmThen(t("confirmCancelPayment"), () => cancelPaymentAction(projectId, hito.id)))}
+            onCancel={editor(() =>
+              ask(
+                "cancelPaymentDialog",
+                { code: hito.code, amount: f.money(hito.paidAmountCents ?? 0), date: f.date(hito.paidOn) },
+                () => cancelPaymentAction(projectId, hito.id),
+              ),
+            )}
           />
           <HitoNotes hito={hito} />
         </aside>
       </div>
+      {confirm.dialog}
 
       {dialog && (
         <Modal open onOpenChange={(isOpen) => !isOpen && close()} title={titles[dialog]}>

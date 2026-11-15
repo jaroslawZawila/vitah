@@ -103,7 +103,7 @@ export default function OrderFormScreen({
       </header>
 
       {request && (
-        <p role="status" className="m-0 rounded-xl bg-brand-soft px-4 py-3 text-[13.5px] text-brand-ink">
+        <p role="status" className="m-0 rounded-xl bg-brand-soft px-4 py-3 text-sm text-brand-ink">
           {t.rich("fromRequest", {
             number: requestLabel(request.number),
             by: request.createdBy ?? "—",
@@ -113,7 +113,7 @@ export default function OrderFormScreen({
       )}
 
       {created?.error && (
-        <div role="alert" className="flex flex-col gap-2 rounded-xl bg-warn-soft px-4 py-3 text-[13.5px] text-warn">
+        <div role="alert" className="flex flex-col gap-2 rounded-xl bg-warn-soft px-4 py-3 text-sm text-warn">
           <p className="m-0 font-semibold">{t("uploadFailed", { number: orderLabel(created.number) })}</p>
           <FormError namespace="purchasing.errors" error={created.error} />
           <Link className={buttonVariants({ variant: "outline", size: "sm", className: "w-fit" })} href={orderHref(projectId, created.id)}>
@@ -123,7 +123,7 @@ export default function OrderFormScreen({
       )}
 
       {form.chapters.length === 0 ? (
-        <p className="rounded-xl border bg-card px-4 py-6 text-center text-[13.5px] text-muted-foreground">{t("noBudget")}</p>
+        <p className="rounded-xl border bg-card px-4 py-6 text-center text-sm text-muted-foreground">{t("noBudget")}</p>
       ) : (
         <OrderForm
           form={form}

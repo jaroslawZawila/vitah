@@ -39,13 +39,13 @@ export function VersionList({ versions, picked, onPick }: { versions: Version[];
               </span>
               <Badge variant={STATUS_TONE[v.status]}>{t(`status.${v.status}`)}</Badge>
             </span>
-            {v.reason && <span className="text-[13px] leading-snug">«{v.reason}»</span>}
+            {v.reason && <span className="text-sm leading-snug">«{v.reason}»</span>}
             <span className={muted}>
               {v.approvedAt
-                ? t("approvedBy", { name: v.approvedBy ?? "—", date: f.stampDay(v.approvedAt) })
-                : t("createdBy", { name: v.createdBy ?? "—", date: f.stampDay(v.createdAt) })}
+                ? t("approvedBy", { name: v.approvedBy ?? "—", date: f.date(v.approvedAt) })
+                : t("createdBy", { name: v.createdBy ?? "—", date: f.date(v.createdAt) })}
               {" · "}
-              {t("end", { date: f.fullDay(v.endDate) })}
+              {t("end", { date: f.date(v.endDate) })}
             </span>
           </button>
         </li>
@@ -78,15 +78,15 @@ export function VersionCompare({ version, previous }: { version: Version; previo
         </div>
         {previous && (
           <p className="num m-0 flex items-baseline gap-2">
-            <span className="text-muted-foreground">{f.fullDay(previous.endDate)}</span>
+            <span className="text-muted-foreground">{f.date(previous.endDate)}</span>
             <span aria-hidden className="text-muted-foreground">→</span>
-            <span className="text-[17px] font-semibold">{f.fullDay(version.endDate)}</span>
+            <span className="text-[17px] font-semibold">{f.date(version.endDate)}</span>
             {endDelta !== 0 && <span className={cn("font-semibold", endDelta > 0 ? "text-warn" : "text-good")}>{f.signedDays(endDelta)}</span>}
           </p>
         )}
       </div>
       {previous && changes.length > 0 && (
-        <Table className="min-w-[560px] text-[13px]">
+        <Table className="min-w-[560px]">
           <TableHeader>
             <TableRow>
               <TableHead className="pl-[18px]">{t("code")}</TableHead>
@@ -104,9 +104,9 @@ export function VersionCompare({ version, previous }: { version: Version; previo
                 <TableRow key={row.code}>
                   <TableCell className="num pl-[18px]">{row.code}</TableCell>
                   <TableCell className="whitespace-normal">{row.name}</TableCell>
-                  <TableCell className="num text-muted-foreground">{old ? `${f.day(old.plannedStart)} – ${f.day(old.plannedEnd)}` : "—"}</TableCell>
+                  <TableCell className="num text-muted-foreground">{old ? `${f.date(old.plannedStart)} – ${f.date(old.plannedEnd)}` : "—"}</TableCell>
                   <TableCell className="num">
-                    {f.day(row.plannedStart)} – {f.day(row.plannedEnd)}
+                    {f.date(row.plannedStart)} – {f.date(row.plannedEnd)}
                   </TableCell>
                   <TableCell
                     className={cn(

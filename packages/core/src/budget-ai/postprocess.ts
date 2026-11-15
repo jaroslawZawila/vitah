@@ -1,5 +1,6 @@
 import { defaultTexts } from "../budget-template";
 import type { BudgetTexts } from "../contract";
+import { formatNumber } from "../format";
 import { priceBaseItem } from "../price-base";
 import type { ChapterLines, ProjectExtraction } from "./schemas";
 
@@ -55,7 +56,7 @@ export function toDraftLines(result: ChapterLines, group: readonly string[]) {
   return lines;
 }
 
-const m2 = (value: number) => value.toLocaleString("es-ES", { maximumFractionDigits: 2 });
+const m2 = (value: number) => formatNumber(value, "es", { maxDecimals: 2 });
 
 /** The PDF's texts from step 1, over the defaults (kept where the AI gave nothing). */
 export function toTexts(e: ProjectExtraction): BudgetTexts {

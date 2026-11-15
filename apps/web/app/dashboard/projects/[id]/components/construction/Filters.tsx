@@ -1,8 +1,9 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { Lock } from "lucide-react";
+import { ChevronsDownUp, ChevronsUpDown, Lock } from "lucide-react";
 import type { ChapterState } from "@repo/core/contract";
+import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { filterBox } from "./classes";
 import Segmented from "./Segmented";
@@ -110,11 +111,41 @@ export function PeriodFilter({
   );
 }
 
+/** "Desplegar todo" | "Plegar todo" over a list of folding groups; each is off when it would change nothing. */
+export function FoldAllButtons({
+  allOpen,
+  noneOpen,
+  onExpand,
+  onCollapse,
+  className,
+}: {
+  allOpen: boolean;
+  noneOpen: boolean;
+  onExpand: () => void;
+  onCollapse: () => void;
+  className?: string;
+}) {
+  const t = useTranslations("construction.filters");
+  const button = buttonVariants({ variant: "outline", size: "sm" });
+  return (
+    <div className={cn("flex items-center gap-1.5", className)}>
+      <button type="button" disabled={allOpen} onClick={onExpand} className={button}>
+        <ChevronsUpDown aria-hidden />
+        {t("expandAll")}
+      </button>
+      <button type="button" disabled={noneOpen} onClick={onCollapse} className={button}>
+        <ChevronsDownUp aria-hidden />
+        {t("collapseAll")}
+      </button>
+    </div>
+  );
+}
+
 /** "Solo lectura · se actualiza solo". */
 export function ReadOnlyNote({ className }: { className?: string }) {
   const t = useTranslations("construction.filters");
   return (
-    <span className={cn("inline-flex items-center gap-1.5 text-[12.5px] text-muted-foreground", className)}>
+    <span className={cn("inline-flex items-center gap-1.5 text-meta text-muted-foreground", className)}>
       <Lock aria-hidden className="size-3.5" />
       {t("readOnly")}
     </span>

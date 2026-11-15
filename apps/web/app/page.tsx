@@ -9,7 +9,7 @@ export default function LoginPage() {
     <main className="dark relative flex min-h-svh flex-col items-center justify-center bg-grafito px-6 py-10 text-blanco-calido">
       <div className="flex flex-col items-center text-center">
         <h1 className="font-sans text-[40px] leading-none font-light tracking-[0.15em] sm:text-[56px]">ViTAH</h1>
-        <p className="mt-3 text-[10px] tracking-[0.25em] text-verde-oliva-light uppercase sm:text-[11px]">{t("descriptor")}</p>
+        <p className="mt-3 text-xs tracking-[0.25em] text-verde-oliva-light uppercase">{t("descriptor")}</p>
       </div>
 
       <LoginForm />

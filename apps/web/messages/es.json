@@ -29,6 +29,10 @@
     "signOut": "Cerrar sesión",
     "greeting": "Hola, {email}"
   },
+  "confirmDialog": {
+    "cancel": "Cancelar",
+    "working": "Un momento…"
+  },
   "sidebar": {
     "projects": "Proyectos",
     "clients": "Clientes",
@@ -166,13 +170,17 @@
     "titles": {
       "projects": "Proyectos — Pipeline Completo",
       "users": "Gestión de Usuarios",
-      "projectDetail": "Detalle de Proyecto",
+      "project": "Proyecto",
       "clients": "Clientes de la app",
       "newProject": "Nuevo proyecto",
       "subcontractors": "Subcontratas",
       "purchases": "Compras",
-      "deleted": "Elementos eliminados"
-    }
+      "deleted": "Elementos eliminados",
+      "forbidden": "No tienes permiso",
+      "portal": "Portal"
+    },
+    "withPart": "{section} — {part}",
+    "documentTitle": "{label} · ViTAH"
   },
   "navigation": {
     "back": "Volver"
@@ -182,15 +190,13 @@
     "newProject": "Nuevo Proyecto",
     "empty": "Todavía no hay proyectos.",
     "table": {
-      "ref": "Referencia",
-      "address": "Dirección",
-      "client": "Cliente",
+      "project": "Proyecto",
       "noClient": "Sin acceso a la app",
       "startDate": "Inicio",
       "completionDate": "Finalización",
-      "view": "Ver",
-      "budget": "Presupuesto",
-      "obra": "Obra"
+      "budgetObra": "Presupuesto · Obra",
+      "scheduleProgress": "Plazo · Avance",
+      "attention": "Atención"
     },
     "countFiltered": "{shown} de {total, plural, one {# proyecto} other {# proyectos}}",
     "listLabel": "Proyectos",
@@ -200,6 +206,7 @@
       "clear": "Quitar filtros",
       "budget": "Presupuesto",
       "obra": "Obra",
+      "attention": "Atención",
       "optionCount": "{label} ({count})",
       "budgetOptions": {
         "all": "Todos",
@@ -214,6 +221,25 @@
         "not_started": "Sin empezar",
         "execution": "En obra",
         "finished": "Terminadas"
+      },
+      "attentionOptions": {
+        "all": "Todas",
+        "attention": "Necesitan atención",
+        "late": "Con retraso"
+      }
+    },
+    "signals": {
+      "late": "Con retraso · {days}",
+      "attention": "{count, plural, one {# aviso} other {# avisos}}",
+      "attentionLabel": "Qué necesita atención en {ref}: {reasons}",
+      "attentionTitle": "Pendiente en {ref}",
+      "reasons": {
+        "to_invoice": "{count, plural, one {# hito por facturar} other {# hitos por facturar}}",
+        "collection_overdue": "{count, plural, one {# cobro de hito vencido} other {# cobros de hito vencidos}}",
+        "supplier_overdue": "{count, plural, one {# factura de proveedor vencida} other {# facturas de proveedor vencidas}} ({amount})",
+        "requests": "{count, plural, one {# solicitud de compra por aprobar} other {# solicitudes de compra por aprobar}}",
+        "late_deliveries": "{count, plural, one {# entrega de material con retraso} other {# entregas de material con retraso}}",
+        "documents": "{count, plural, one {# aviso de documentación CAE} other {# avisos de documentación CAE}}"
       }
     }
   },
@@ -224,7 +250,11 @@
       "save": "Guardar",
       "cancel": "Cancelar",
       "delete": "Eliminar proyecto",
-      "confirmDelete": "¿Eliminar este proyecto? Dejará de verse en el portal y en la app del cliente. No se borra nada: sus datos y documentos se conservan.",
+      "deleteDialog": {
+        "title": "¿Eliminar el proyecto {ref}?",
+        "description": "El proyecto y todo lo que contiene (presupuesto, obra, compras, documentos y fotos) dejan de verse en el portal y en la app del cliente. Un administrador puede restaurarlo desde Elementos eliminados.",
+        "confirm": "Eliminar proyecto"
+      },
       "address": "Dirección",
       "startDate": "Fecha de inicio",
       "completionDate": "Fecha de finalización",
@@ -249,7 +279,11 @@
       "assigning": "Asignando…",
       "active": "Acceso activo",
       "remove": "Quitar del proyecto",
-      "confirmRemove": "¿Quitar a {email} de este proyecto? Su cuenta se mantiene, pero dejará de ver el proyecto en la app.",
+      "removeDialog": {
+        "title": "¿Quitar a {name} de este proyecto?",
+        "description": "Su cuenta se mantiene, pero esta vivienda deja de aparecerle en la app; sus otras viviendas, si tiene, siguen ahí. Puedes volver a asignarle el proyecto cuando quieras.",
+        "confirm": "Quitar del proyecto"
+      },
       "errors": {
         "missing_fields": "Selecciona un cliente.",
         "project_not_found": "Proyecto no encontrado.",
@@ -266,7 +300,11 @@
       "emptyText": "Aquí solo vive una araña. Sube el primer PDF y el cliente lo verá en la app.",
       "delete": "Eliminar",
       "deleteLabel": "Eliminar {title}",
-      "confirmDelete": "¿Eliminar «{title}»? Dejará de verse en el portal y en la app del cliente; el archivo se conserva.",
+      "deleteDialog": {
+        "title": "¿Eliminar el documento «{title}»?",
+        "description": "Deja de verse en el portal y en la app del cliente. Un administrador puede restaurarlo desde Elementos eliminados.",
+        "confirm": "Eliminar documento"
+      },
       "upload": "Subir documento",
       "file": "Archivo PDF",
       "fileHint": "Solo PDF, hasta 4 MB.",
@@ -377,13 +415,15 @@
       "passwordReset": "Contraseña de {name} restablecida. Sus sesiones se han cerrado.",
       "twoStepRemoved": "Verificación en dos pasos de {name} quitada. Sus sesiones se han cerrado."
     },
+    "deactivateDialog": {
+      "title": "¿Desactivar a {name}?",
+      "description": "No podrá entrar en el portal y se cierran todas sus sesiones. Puedes volver a activarlo cuando quieras, pero tendrá que iniciar sesión de nuevo.",
+      "confirm": "Desactivar usuario"
+    },
     "removeTwoStep": {
-      "title": "Quitar verificación en dos pasos de {name}",
+      "title": "¿Quitar la verificación en dos pasos de {name}?",
       "description": "Para cuando ha perdido el móvil. Podrá entrar solo con su contraseña y se cerrarán todas sus sesiones. Después puede volver a activarla desde sus ajustes.",
-      "confirm": "Quitar verificación en dos pasos",
-      "confirming": "Quitando…",
-      "cancel": "Cancelar",
-      "close": "Cerrar"
+      "confirm": "Quitar verificación en dos pasos"
     },
     "resetPassword": {
       "title": "Nueva contraseña para {name}",
@@ -627,13 +667,28 @@
       "upload": "Subir",
       "uploading": "Subiendo…",
       "cancel": "Cancelar",
-      "confirmRemove": "¿Quitar este archivo?",
+      "removeDialog": {
+        "acta": {
+          "title": "¿Quitar el acta firmada del {code}?",
+          "description": "El hito se queda sin acta firmada, en el portal y en la app del cliente. El PDF se conserva y la retirada queda en el historial del hito.",
+          "confirm": "Quitar acta"
+        },
+        "invoice": {
+          "title": "¿Quitar la factura del {code}?",
+          "description": "El hito deja de constar como facturado, en el portal y en la app del cliente. El PDF se conserva y la retirada queda en el historial del hito.",
+          "confirm": "Quitar factura"
+        }
+      },
       "paymentTitle": "Registrar pago",
       "paidOn": "Fecha de cobro",
       "paidAmount": "Importe cobrado (€)",
       "paid": "Pagado el {date} · {amount}",
       "cancelPayment": "Anular pago",
-      "confirmCancelPayment": "¿Anular el pago registrado?",
+      "cancelPaymentDialog": {
+        "title": "¿Anular el pago del {code}?",
+        "description": "Se anula el cobro de {amount} del {date}: el hito vuelve a constar como no pagado, en el portal y en la app del cliente. El pago queda en el historial del hito.",
+        "confirm": "Anular pago"
+      },
       "appTitle": "En la app del cliente",
       "appText": "Lo ve como «{status}»: importe con IVA, vencimiento, las fotos del acta, el acta firmada y la factura.",
       "contractTitle": "Contrato",
@@ -773,7 +828,38 @@
       "overdueLong": "Fin previsto superado · {days}",
       "startLate": "Inicio {days}",
       "notStarted": "Inicio previsto superado · {days}",
+      "notStartedShort": "Inicio superado {days}",
       "startsIn": "{count, plural, =0 {empieza hoy} other {empieza en # d}}"
+    },
+    "scheduleStatus": {
+      "title": "Plazo",
+      "headline": {
+        "on_time": "En plazo",
+        "simulated": "Sin plan",
+        "no_dates": "Sin fechas"
+      },
+      "caption": {
+        "on_time": "ningún capítulo va tarde",
+        "simulated": "las fechas son simuladas",
+        "no_dates": "nada con qué comparar"
+      },
+      "worst": {
+        "forecast": "sobre el contrato",
+        "finish": "fin previsto superado",
+        "start": "inicio previsto superado"
+      },
+      "text": {
+        "simulated": "No hay plan aprobado, así que no se puede decir si la obra va en plazo. Apruébalo en Planificación.",
+        "no_dates": "El proyecto no tiene fechas de inicio y fin ni un plan aprobado."
+      },
+      "forecastLate": "Fin previsto {date}: {count, plural, one {# día} other {# días}} después del contrato ({contract}).",
+      "forecastWithin": "Fin previsto {date}, dentro del contrato ({contract}).",
+      "forecastNoContract": "Fin previsto {date}. El proyecto no tiene fecha de fin: no se compara con el contrato.",
+      "penalty": "Penalización prevista: {amount}.",
+      "noPenalty": "Todavía sin penalización: empieza el día 15 de retraso.",
+      "bySimulated": "Según las fechas simuladas:",
+      "lateToFinish": "{count, plural, one {# capítulo en curso ha pasado su fin previsto} other {# capítulos en curso han pasado su fin previsto}}: {count, plural, one {} other {el que más, }}{code} {name}, fin previsto {date}.",
+      "lateToStart": "{count, plural, one {# capítulo sin empezar ha pasado su inicio previsto} other {# capítulos sin empezar han pasado su inicio previsto}}: {count, plural, one {} other {el que más, }}{code} {name}, inicio previsto {date}."
     },
     "gantt": {
       "plan": "Plan {start} a {end}",
@@ -799,7 +885,9 @@
       "period": "Periodo",
       "from": "Desde",
       "to": "Hasta",
-      "readOnly": "Solo lectura · se actualiza solo"
+      "readOnly": "Solo lectura · se actualiza solo",
+      "expandAll": "Desplegar todo",
+      "collapseAll": "Plegar todo"
     },
     "summary": {
       "title": "Obra",
@@ -822,6 +910,7 @@
         "pendingCount": "{count, plural, one {# pendiente} other {# pendientes}}",
         "cost": "Coste",
         "budgeted": "Presupuestado",
+        "contingencyNote": "Sin el cap. 20 (imprevistos, {amount}): queda como reserva.",
         "contracted": "Contratado",
         "deviation": "Desviación",
         "savingNote": "Ahorro sobre las partidas cerradas ({amount} presupuestados). Lo abierto o sin contratar no cuenta.",
@@ -835,10 +924,6 @@
         "outstanding": "Pendiente de cobro",
         "toInvoice": "Por facturar",
         "schedule": "Plazo",
-        "onTime": "En plazo",
-        "worstDelay": "mayor retraso en curso",
-        "noDelay": "ningún capítulo en curso va con retraso",
-        "overdueText": "{code} {name}: fin previsto {date}, sigue en curso",
         "worksStart": "Inicio obra",
         "actualShort": "real {date}",
         "finishedLate": "Finalizados con retraso",
@@ -864,7 +949,7 @@
         "deviation": "Desviación",
         "contractedLines": "{contracted} de {total} partidas cerradas",
         "total": "Total · {count, plural, one {# capítulo} other {# capítulos}} a coste",
-        "footnote": "Importes en euros, a coste. Imprevistos (cap. 20, {contingency} €) quedan como reserva. Desviación = contratado − coste presupuestado, solo sobre partidas cerradas: positivo es sobrecoste, negativo ahorro."
+        "footnote": "Importes en euros, a coste y sin IVA. Imprevistos (cap. 20, {contingency} €) quedan como reserva, fuera del total. Desviación = contratado − coste presupuestado, solo sobre partidas cerradas: positivo es sobrecoste, negativo ahorro."
       },
       "milestones": {
         "title": "Hitos de pago",
@@ -1077,7 +1162,7 @@
       "description": "Lo que esperábamos pagar por cada partida frente a lo que se ha contratado. Solo lectura.",
       "costFrom": "Coste presupuestado:",
       "budgetRevision": "Presupuesto Rev.{number}",
-      "atCost": "(a coste, nunca precio de venta)",
+      "atCost": "(a coste y sin IVA, nunca precio de venta; sin el cap. 20, la reserva de imprevistos)",
       "contractedFrom": "Contratado:",
       "contracting": "Contratación",
       "filter": {
@@ -1104,7 +1189,11 @@
       "closedOf": "{closed} de {total} cerradas",
       "openCount": "{count, plural, one {# abierta} other {# abiertas}}",
       "order": "Pedir",
-      "noDeviationYet": "sin desviación hasta cerrarla"
+      "noDeviationYet": "sin desviación hasta cerrarla",
+      "lineCount": "{count, plural, one {# partida} other {# partidas}}",
+      "overruns": "{count} con sobrecoste",
+      "lateOrders": "{count, plural, one {# entrega con retraso} other {# entregas con retraso}}",
+      "total": "Total · {count, plural, one {# partida} other {# partidas}}"
     },
     "milestones": {
       "title": "Hitos de pago",
@@ -1180,7 +1269,11 @@
       "files": "Adjuntos: fotos, correos o documentos",
       "currentFiles": "Adjuntos actuales",
       "deleteFile": "Quitar {name}",
-      "confirmDeleteFile": "¿Quitar el adjunto {name}? Dejará de verse en el portal; el archivo se conserva.",
+      "deleteFileDialog": {
+        "title": "¿Quitar el adjunto {name}?",
+        "description": "Deja de verse en el registro. Un administrador puede restaurarlo desde Elementos eliminados.",
+        "confirm": "Quitar adjunto"
+      },
       "filesHint": "PDF, imagen, correo (EML, MSG), TXT, DOCX o XLSX, hasta 4 MB cada uno.",
       "note": "Es historia: no mueve fechas ni importes. Los costes extra solo cuentan cuando se formalizan en Compras, Ventas o Presupuesto.",
       "uploading": "Subiendo adjuntos: {done} de {total}…",
@@ -1218,7 +1311,11 @@
       "visible": "En la app",
       "hidden": "Solo equipo",
       "visibleLabel": "Visible en la app del cliente: {name}",
-      "confirmDelete": "¿Eliminar esta foto? Dejará de verse en el portal y en la app del cliente; el archivo se conserva.",
+      "deleteDialog": {
+        "title": "¿Eliminar la foto «{name}»?",
+        "description": "Deja de verse en el portal y en la app del cliente. Un administrador puede restaurarla desde Elementos eliminados.",
+        "confirm": "Eliminar foto"
+      },
       "emptyTitle": "Todavía no hay fotos",
       "emptyText": "La cámara se ha echado la siesta. Sube la primera foto de la obra y el cliente la verá en la app.",
       "uploadTitle": "Subir fotos",
@@ -1419,7 +1516,11 @@
         "save": "Guardar borrador",
         "who": "Al aprobar, Avance, Compras y el resumen de la obra pasan a esta versión; la anterior queda en Versiones.",
         "discard": "Descartar borrador",
-        "confirmDiscard": "¿Descartar el borrador v{number}? Se pierden sus cambios."
+        "discardDialog": {
+          "title": "¿Descartar el borrador v{number}?",
+          "description": "Se borra con todos sus cambios y no se puede deshacer. La línea base aprobada, si la hay, no cambia.",
+          "confirm": "Descartar borrador"
+        }
       },
       "lead": "Pedido",
       "leadLabel": "Días de antelación del pedido del capítulo {code}",
@@ -1513,13 +1614,21 @@
       "conditions": "Condiciones"
     },
     "deleteDraft": "Eliminar borrador",
-    "confirmDeleteDraft": "¿Eliminar el borrador Rev.{number}? Se pierden sus cambios.",
+    "deleteDraftDialog": {
+      "title": "¿Eliminar el borrador Rev.{number}?",
+      "description": "Se borra con todas sus partidas, opciones y textos, y no se puede deshacer. Las revisiones anteriores no cambian.",
+      "confirm": "Eliminar borrador"
+    },
     "issueButton": "Emitir al cliente",
     "issueRevision": "Emitir Rev.{number}",
     "issuedBanner": "Emitida el {issued} · válida hasta el {valid}.",
     "issuedBannerPdfs": "Sus PDF están en Documentos.",
     "reject": "Rechazado",
-    "confirmReject": "¿Marcar la Rev.{number} como rechazada por el cliente?",
+    "rejectDialog": {
+      "title": "¿Marcar la Rev.{number} como rechazada por el cliente?",
+      "description": "Queda rechazada con fecha de hoy y ya no se podrá aceptar. Para seguir, crea una revisión nueva con sus cambios.",
+      "confirm": "Marcar como rechazada"
+    },
     "newRevision": "Crear Rev.{number}",
     "newRevisionChanges": "Crear Rev.{number} con cambios",
     "acceptButton": "Registrar aceptación",
@@ -1608,6 +1717,7 @@
       "total": "TOTAL PEC (sin IVA) · Rev.{number}",
       "vatNote": "El importe de cada capítulo incluye su parte de los gastos asociados y del beneficio industrial, como en el PDF. IVA {rate}: {vat} · Total con IVA: {total}.",
       "costTotal": "Coste de ejecución (capítulos 01–20)",
+      "costTotalNote": "La Obra mide el coste sin el cap. 20 ({amount}): es la reserva de imprevistos.",
       "overhead": "Gastos asociados · {pct} del coste",
       "profit": "Beneficio industrial · {pct} de la venta"
     },
@@ -1644,7 +1754,11 @@
       "pecHint": "las opciones no lo cambian",
       "withAdding": "Con todas las que suman",
       "withSubtracting": "Con todas las que restan",
-      "confirmDelete": "¿Borrar la opción «{name}» y sus partidas?",
+      "deleteDialog": {
+        "title": "¿Borrar la opción «{name}»?",
+        "description": "Se borra del borrador con todas sus partidas, y no se puede deshacer.",
+        "confirm": "Borrar opción"
+      },
       "price": "precio con márgenes"
     },
     "picker": {
@@ -1676,7 +1790,11 @@
       "alternative": "Crear una alternativa (opción OP)",
       "move": "Mover a otro capítulo",
       "delete": "Borrar partida",
-      "confirmDelete": "¿Borrar la partida {code}?",
+      "deleteDialog": {
+        "title": "¿Borrar la partida {code}?",
+        "description": "«{description}» se borra del borrador, y no se puede deshacer.",
+        "confirm": "Borrar partida"
+      },
       "chapters": "20 capítulos",
       "options": "Opciones · fuera del PEC",
       "name": "Nombre del capítulo",
@@ -1717,6 +1835,20 @@
         "system": "Sistema constructivo"
       },
       "missing": "No aparece en la documentación",
+      "identity": {
+        "title": "El presupuesto no nombra al cliente o la dirección del proyecto",
+        "inBudget": "En el presupuesto",
+        "inProject": "En el proyecto",
+        "empty": "(vacío)",
+        "use": "Usar los datos del proyecto",
+        "correctProject": "Corregir el proyecto",
+        "projectLacks": "El proyecto aún no tiene {field, select, promoter {cliente} other {dirección}}; el presupuesto dice «{value}». Si es correcto, añádelo al proyecto.",
+        "openGeneral": "Ir a la pestaña General",
+        "summary": "El cliente o la dirección del presupuesto no coinciden con los del proyecto.",
+        "review": "Revisar en Textos",
+        "frozen": "Los datos del proyecto no coinciden con los de esta revisión: {list}. Ya se entregó al cliente y no cambia; una nueva revisión tomará los del proyecto.",
+        "field": "{field, select, promoter {cliente} other {dirección}} «{value}»"
+      },
       "justification": "Justificación técnica de la adaptación al sistema Steel Frame",
       "justificationIntro": "Introducción de la justificación",
       "blockTitle": "Título del apartado",
@@ -1879,6 +2011,11 @@
       "ready": "Listo",
       "optional": "Opcional",
       "remove": "Quitar",
+      "removeDialog": {
+        "title": "¿Quitar «{name}»?",
+        "description": "Deja de ser un documento para el presupuesto y sale también de Documentos del proyecto. Un administrador puede restaurarlo desde Elementos eliminados.",
+        "confirm": "Quitar documento"
+      },
       "uploading": "Subiendo… {pct} %",
       "drop": "Arrastra el archivo aquí · {types}",
       "upload": "Subir archivo",
@@ -1970,6 +2107,12 @@
       },
       "leave": "Puedes cerrar esta página. El borrador aparecerá aquí cuando termine.",
       "cancel": "Cancelar",
+      "cancelDialog": {
+        "title": "¿Detener la generación del borrador?",
+        "description": "La IA deja de trabajar y no se guarda ningún borrador; lo que ya ha leído no se aprovecha y su coste no se recupera. Los documentos subidos se quedan para generarlo de nuevo.",
+        "confirm": "Detener generación",
+        "keep": "Seguir generando"
+      },
       "facts": "Lo que la IA ya ha leído",
       "factsPending": "Aparecerá cuando termine de leer el proyecto.",
       "factLabels": {
@@ -2362,7 +2505,8 @@
       "unassigned": "Quitó de una obra",
       "assignment_restored": "Restauró su asignación a {project}",
       "worker_created": "Registró al trabajador {name}",
-      "worker_updated": "Editó al trabajador: {fields}"
+      "worker_updated": "Editó al trabajador: {fields}",
+      "other": "Registró un cambio"
     },
     "fieldNames": {
       "kind": "tipo",
@@ -2400,7 +2544,9 @@
       "startDate": "fecha de alta",
       "tpcNumber": "nº TPC",
       "roles": "funciones",
-      "ppeItems": "EPIs"
+      "ppeItems": "EPIs",
+      "suppliesOnly": "proveedor de material",
+      "other": "otro dato"
     },
     "companies": {
       "eyebrow": "Red · Subcontratas",
@@ -2570,7 +2716,11 @@
         "workersLabel": "Trabajadores",
         "edit": "Editar",
         "remove": "Quitar de la obra",
-        "confirmRemove": "¿Quitar a la empresa de {ref}? Dejará de aparecer en esa obra; el registro de su asignación se conserva.",
+        "removeDialog": {
+          "title": "¿Quitar a {company} de la obra {ref}?",
+          "description": "Deja de aparecer en esa obra y su documentación de esa obra deja de contar. Asignarla de nuevo recupera la asignación; un administrador también puede restaurarla desde Elementos eliminados.",
+          "confirm": "Quitar de la obra"
+        },
         "save": "Guardar",
         "saving": "Guardando…",
         "cancel": "Cancelar"
@@ -2953,7 +3103,12 @@
       "cancelledOn": "Cancelado el {date}: no suma a lo contratado.",
       "edit": "Editar",
       "cancelOrder": "Cancelar pedido",
-      "confirmCancel": "¿Cancelar {number}? Dejará de sumar a lo contratado.",
+      "cancelDialog": {
+        "title": "¿Cancelar el pedido {number}?",
+        "description": "Deja de sumar a lo contratado y queda solo como historial: desde el portal ya no se podrá editar ni avanzar. Si salió de una solicitud, esta vuelve a quedar aprobada para pedirla de nuevo.",
+        "confirm": "Cancelar pedido",
+        "keep": "Mantener pedido"
+      },
       "advance": {
         "ordered": "Marcar pedido",
         "confirmed": "Marcar confirmado",
@@ -3046,7 +3201,11 @@
         "versionOf": "Nueva versión de {title}",
         "remove": "Quitar",
         "removeOf": "Quitar {title}",
-        "confirmRemove": "¿Quitar «{title}» con todas sus versiones? Deja de verse en el pedido; el documento y sus archivos se conservan.",
+        "removeDialog": {
+          "title": "¿Quitar el documento «{title}» del pedido?",
+          "description": "Se quita con todas sus versiones y deja de verse en el pedido. Un administrador puede restaurarlo desde Elementos eliminados.",
+          "confirm": "Quitar documento"
+        },
         "hint": "Cada documento guarda sus versiones; las facturas y sus justificantes están en cada factura."
       },
       "fromRequest": "desde <link>{number}</link>"
@@ -3073,7 +3232,8 @@
         "dueOn": "Vencimiento",
         "baseCents": "Base",
         "irpfBp": "IRPF",
-        "neededBy": "Para el"
+        "neededBy": "Para el",
+        "other": "Otro dato"
       },
       "changed": {
         "subcontractorId": "Proveedor cambiado",
@@ -3109,7 +3269,8 @@
         "ordered": "Pedido {number} creado",
         "reopened": "{number} cancelado: aprobada de nuevo, se puede volver a pedir"
       },
-      "amended": "Modificado nº {number}: {amount} €"
+      "amended": "Modificado nº {number}: {amount} €",
+      "other": "Cambio registrado"
     },
     "form": {
       "numbered": "{ref} · se numerará {number}",
@@ -3329,18 +3490,31 @@
     "lines": {
       "description": "Qué está contratado, facturado y pagado de cada partida, contra el coste del presupuesto aceptado. Importes sin IVA.",
       "tableTitle": "Partidas del presupuesto",
-      "tableHint": "Pulsa una partida para ver sus pedidos, hitos, facturas y pagos",
+      "tableHint": "Abre un capítulo para ver sus partidas, y una partida para ver sus pedidos, hitos, facturas y pagos",
       "filter": "Estado",
       "all": "Todas",
       "chapter": "Capítulo",
       "allChapters": "Todos",
+      "search": "Buscar partida",
       "line": "Partida",
       "cost": "Coste presup.",
       "contracted": "Contratado",
       "deviation": "Desviación",
+      "invoiced": "Facturado",
+      "paid": "Pagado",
       "state": "Estado",
       "toContract": "Por contratar {amount}",
-      "chapterSummary": "{contracted} de {total} contratadas",
+      "lineCount": "{count, plural, one {# partida} other {# partidas}}",
+      "stateCount": {
+        "to_contract": "{count} por contratar",
+        "contracted": "{count, plural, one {# contratada} other {# contratadas}}",
+        "invoiced": "{count} con factura",
+        "paid": "{count, plural, one {# pagada} other {# pagadas}}"
+      },
+      "overdueLines": "{count, plural, one {# con factura vencida} other {# con factura vencida}}",
+      "lateOrders": "{count, plural, one {# entrega con retraso} other {# entregas con retraso}}",
+      "orderSoon": "Pedir antes del {date}",
+      "orderLate": "Pedir ya: {days, plural, one {# día tarde} other {# días tarde}}",
       "noOrders": "Sin pedidos.",
       "orderBy": "Según la planificación, debe pedirse antes del {date}.",
       "createOrder": "Crear pedido",
@@ -3352,6 +3526,7 @@
       "payOverdue": "Vencida el {date}",
       "milestonePaid": "Pagado",
       "foot": {
+        "label": "Facturación",
         "invoiced": "Facturado",
         "paid": "Pagado",
         "outstanding": "Por pagar",
@@ -3386,7 +3561,7 @@
     },
     "milestones": {
       "title": "Hitos de pago del contrato",
-      "hint": "El calendario de facturación pactado con el proveedor. Reparte el importe del pedido; no suma nada al presupuesto. Cada factura se asigna a un hito.",
+      "hint": "El calendario de facturación pactado con el proveedor. Reparte el importe del pedido; no suma nada al presupuesto. Cada factura se asigna a un hito. Importes sin IVA.",
       "none": "Sin hitos: las facturas se registran libremente contra el pedido.",
       "define": "Definir hitos",
       "edit": "Editar hitos",
@@ -3423,7 +3598,7 @@
       "payable": "A pagar",
       "paid": "Pagado",
       "state": "Estado",
-      "note": "Importes de cada factura; «A pagar» descuenta la retención de garantía. El resumen, sin IVA."
+      "note": "Importes de cada factura; «A pagar» descuenta la retención de garantía."
     },
     "invoices": {
       "eyebrow": "Compras · todas las obras",
@@ -3498,7 +3673,11 @@
       "credit": "Registrar abono",
       "edit": "Editar",
       "delete": "Eliminar",
-      "confirmDelete": "¿Eliminar {number}? Sale de las listas y de los totales; sus datos y sus PDF se conservan.",
+      "deleteDialog": {
+        "title": "¿Eliminar {kind, select, credit {el abono} other {la factura}} {number} de {supplier}?",
+        "description": "Sale de las listas y de los totales, con sus PDF. Un administrador puede restaurar{kind, select, credit {lo} other {la}} desde Elementos eliminados.",
+        "confirm": "{kind, select, credit {Eliminar abono} other {Eliminar factura}}"
+      },
       "banner": {
         "dueIn": "Vence el {date}, {in}.",
         "overdue": "Vencida el {date}, {ago}.",
@@ -3541,7 +3720,11 @@
         "none": "Ningún pago todavía.",
         "remove": "Quitar",
         "removeOf": "Quitar el pago del {date}",
-        "confirmRemove": "¿Quitar el pago de {amount}? Sale de las listas y de los totales; sus datos y su justificante se conservan."
+        "removeDialog": {
+          "title": "¿Quitar el pago de {amount} del {date}?",
+          "description": "Es un pago de la factura {invoice} de {supplier}. Sale de las listas y de los totales, y la factura vuelve a deber ese importe. Un administrador puede restaurarlo desde Elementos eliminados.",
+          "confirm": "Quitar pago"
+        }
       },
       "payForm": {
         "title": "Registrar pago",
@@ -3743,7 +3926,12 @@
         "createOrder": "Crear pedido",
         "edit": "Editar",
         "cancel": "Cancelar solicitud",
-        "confirmCancel": "¿Cancelar la solicitud {number}? No se podrá pedir."
+        "cancelDialog": {
+          "title": "¿Cancelar la solicitud {number}?",
+          "description": "Queda cancelada, con su historial, y ya no se podrá convertir en pedido ni reabrir.",
+          "confirm": "Cancelar solicitud",
+          "keep": "Mantener solicitud"
+        }
       },
       "decision": {
         "title": "Aprobación",
@@ -3796,17 +3984,19 @@
       },
       "kpis": {
         "label": "Resumen",
+        "againstCost": "Frente al coste",
+        "toPay": "Lo que paga Administración",
         "contracted": "Contratado",
         "active": "{count, plural, one {# proveedor con pedidos} other {# proveedores con pedidos}}",
         "outstanding": "Pendiente de pago",
-        "outstandingHint": "Facturado y aún no pagado, con IVA",
+        "outstandingHint": "Facturado y aún no pagado",
         "overdue": "Vencido",
         "overdueSuppliers": "{count, plural, one {# proveedor con facturas vencidas} other {# proveedores con facturas vencidas}}",
         "noneOverdue": "Ninguna factura vencida",
         "retained": "Retenciones",
         "retainedHint": "Garantías retenidas hasta su fin",
-        "invoiced": "Facturado (sin IVA)",
-        "paid": "Pagado {amount} sin IVA",
+        "invoiced": "Facturado",
+        "paid": "Pagado",
         "orders": "{count, plural, one {# pedido} other {# pedidos}} en {projects, plural, one {# obra} other {# obras}}",
         "overdueOf": "{amount} vencido"
       },
@@ -3908,6 +4098,10 @@
       "skippedHint": "La empresa ha llegado a su límite mensual de IA. Pide revisarlo cuando haya margen."
     }
   },
+  "vatBasis": {
+    "excl": "{label} · sin IVA",
+    "incl": "{label} · IVA incl."
+  },
   "obraPicker": {
     "label": "Obra",
     "search": "Buscar obra por código, cliente o dirección",
@@ -3989,10 +4183,8 @@
         "invoice": "Vuelve a contar en los importes de su pedido, de la obra y del proveedor.",
         "payment": "Vuelve a contar como pagado en su factura."
       },
-      "cancel": "Cancelar",
       "confirm": "Restaurar",
-      "restoring": "Restaurando…",
-      "close": "Cerrar"
+      "restoring": "Restaurando…"
     },
     "errors": {
       "generic": "No se ha podido restaurar. Inténtalo de nuevo.",

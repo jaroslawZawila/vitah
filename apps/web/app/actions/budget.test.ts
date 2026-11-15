@@ -25,6 +25,7 @@ import {
   rejectRevisionAction,
   searchPriceBaseAction,
   startGenerationAction,
+  takeProjectDataAction,
   updateChapterAction,
   updateLineAction,
   updateOptionAction,
@@ -165,6 +166,24 @@ describe("budget actions", () => {
     expect((await revision(project.id)).number).toBe(1);
     // A revision that isn't there is for the page to handle (it shows the newest): null, not "No encontrado".
     expect(await getProjectBudget(project.id, "nope")).toBeNull();
+  }, 60_000);
+
+  it("gives a draft's cover the project's address, and refuses once it is issued", async () => {
+    const { project, ctx } = await setup();
+    await budgetService.createBudget(ctx, project.id, {});
+    const draft = await revision(project.id);
+    await updateRevisionAction(project.id, draft.id, { texts: { cover: { site: "Calle Castelar 12" } } });
+    expect((await revision(project.id)).identity?.differs).toEqual(["site"]);
+    vi.mocked(revalidatePath).mockClear();
+
+    expect(await takeProjectDataAction(project.id, draft.id)).toEqual({ success: true });
+    expect((await revision(project.id)).texts.cover.site).toBe("Calle Mayor 1, Santander");
+    expect(revalidatePath).toHaveBeenCalledWith(`/dashboard/projects/${project.id}`, "layout");
+
+    await issueRevisionAction(project.id, draft.id, { issuedOn: "2026-10-01", shareWithClient: false });
+    expect(await takeProjectDataAction(project.id, draft.id)).toEqual({ error: "not_draft" });
+    signInAs({ ...ctx, role: "viewer" });
+    expect(await takeProjectDataAction(project.id, draft.id)).toEqual({ error: "forbidden" });
   }, 60_000);
 
   it("returns core errors as state", async () => {

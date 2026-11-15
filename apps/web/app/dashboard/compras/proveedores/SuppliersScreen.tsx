@@ -54,7 +54,7 @@ export default function SuppliersScreen({ suppliers }: { suppliers: TenantSuppli
         </div>
         <SupplierList suppliers={shown} empty={all.length === 0 ? t("none") : t("noMatch")} />
       </section>
-      <p className="max-w-[860px] text-[12.5px] leading-normal text-muted-foreground">{t("footnote")}</p>
+      <p className="max-w-[860px] text-meta leading-normal text-muted-foreground">{t("footnote")}</p>
     </div>
   );
 }

@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { cardVariants } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import { DateRange } from "../../../../components/DateRange";
 import { cardTop, footnote, groupRow, moreLink, totalRow } from "./classes";
 import { deviationTone, useControlFormat, type ControlFormat } from "./format";
 import { ChapterStatePill, SCHEDULE_TONE, Source, SourceLabel } from "./pills";
@@ -16,7 +17,13 @@ import { groupByState, scheduleOf } from "./schedule";
 /** "14/09 – 09/10", "21/09 – …" or "—". */
 export function dateSpan(f: ControlFormat, start: string | null, end: string | null) {
   if (!start && !end) return null;
-  return `${start ? f.day(start) : "…"} – ${end ? f.day(end) : "…"}`;
+  return `${start ? f.date(start) : "…"} – ${end ? f.date(end) : "…"}`;
+}
+
+/** Presentational: `dateSpan` in a table cell, breaking after the dash when the column is narrow. */
+export function DateSpan({ f, start, end }: { f: ControlFormat; start: string | null; end: string | null }) {
+  const text = dateSpan(f, start, end);
+  return text ? <DateRange text={text} /> : <Dash />;
 }
 
 /** Presentational: a chapter's schedule against its plan, as a pill (or a muted note). */
@@ -25,22 +32,24 @@ export function SchedulePill({ chapter, today, long = false }: { chapter: Contro
   const f = useControlFormat();
   const schedule = scheduleOf(chapter, today);
   if (!schedule) return null;
-  const label = t(long && schedule.key === "overdue" ? "overdueLong" : schedule.key, {
+  // In the table, a start passed says it short: the pill would widen the Plazo column past the card.
+  const key = long ? (schedule.key === "overdue" ? "overdueLong" : schedule.key) : schedule.key === "notStarted" ? "notStartedShort" : schedule.key;
+  const label = t(key, {
     days: f.signedDays(schedule.days),
     count: schedule.days,
   });
-  if (schedule.key === "startsIn") return <span className="text-[12.5px] text-muted-foreground">{label}</span>;
+  if (schedule.key === "startsIn") return <span className="text-meta text-muted-foreground">{label}</span>;
   return <Badge variant={SCHEDULE_TONE[schedule.tone]}>{label}</Badge>;
 }
 
-/** Presentational: the deviation of what was contracted, "+440 · +1,4 %", or "—". */
+/** Presentational: the deviation of what was contracted, "+440" over "+1,4 %" (stacked, to keep the column narrow), or "—". */
 export function Deviation({ cents, bp }: { cents: number | null; bp: number | null }) {
   const f = useControlFormat();
   if (cents === null) return <span className="text-muted-foreground">—</span>;
   return (
     <span className={cn("num", deviationTone(cents))}>
-      {f.signedEuros(cents)}
-      {bp !== null && ` · ${f.signedPct(bp)}`}
+      {f.signedAmount(cents)}
+      {bp !== null && <span className="block">{f.signedPercent(bp)}</span>}
     </span>
   );
 }
@@ -99,19 +108,18 @@ export default function SummaryTable({
         </div>
       </div>
       {chapters.length === 0 ? (
-        <p className="px-[18px] py-6 text-center text-[13.5px] text-muted-foreground">{t("empty")}</p>
+        <p className="px-[18px] py-6 text-center text-sm text-muted-foreground">{t("empty")}</p>
       ) : (
-        <Table className="min-w-[1080px] text-[13px]" aria-labelledby="chapters-title">
+        <Table className="min-w-[900px]" aria-labelledby="chapters-title">
           <TableHeader>
             <TableRow>
-              <TableHead className="pl-[18px]">{t("code")}</TableHead>
-              <TableHead>{t("chapter")}</TableHead>
+              <TableHead className="pl-[18px]">{t("chapter")}</TableHead>
               <TableHead>{t("state")}</TableHead>
               <TableHead>{t("plan")}</TableHead>
               <TableHead>{t("actual")}</TableHead>
               <TableHead>{t("schedule")}</TableHead>
               <TableHead>{t("hito")}</TableHead>
-              <TableHead className="text-right">{t("cost")}</TableHead>
+              <TableHead className="text-right whitespace-normal">{t("cost")}</TableHead>
               <TableHead className="text-right">{t("contracted")}</TableHead>
               <TableHead className="pr-[18px] text-right">{t("deviation")}</TableHead>
             </TableRow>
@@ -120,14 +128,15 @@ export default function SummaryTable({
             {groupByState(chapters).map((group) => (
               <Fragment key={group.state}>
                 <TableRow className={groupRow}>
-                  <TableCell colSpan={10} className="pl-[18px]">
+                  <TableCell colSpan={9} className="pl-[18px]">
                     {tg(group.state, { count: group.chapters.length })}
                   </TableCell>
                 </TableRow>
                 {group.chapters.map((chapter) => (
                   <TableRow key={chapter.code}>
-                    <TableCell className="num pl-[18px]">{chapter.code}</TableCell>
-                    <TableCell className="min-w-[220px] whitespace-normal">
+                    {/* The code beside the name, not a column of its own: the table fits the card. */}
+                    <TableCell className="min-w-[200px] pl-[18px] whitespace-normal">
+                      <span className="num mr-2 text-muted-foreground">{chapter.code}</span>
                       <Link href={chapterHref(chapter.code)} className="font-semibold transition-colors hover:text-primary">
                         {chapter.name}
                       </Link>
@@ -135,19 +144,19 @@ export default function SummaryTable({
                     <TableCell>
                       <ChapterStatePill state={chapter.state} />
                     </TableCell>
-                    <TableCell className="num">{dateSpan(f, chapter.plannedStart, chapter.plannedEnd) ?? <Dash />}</TableCell>
-                    <TableCell className="num">{dateSpan(f, chapter.actualStart, chapter.actualEnd) ?? <Dash />}</TableCell>
+                    <TableCell><DateSpan f={f} start={chapter.plannedStart} end={chapter.plannedEnd} /></TableCell>
+                    <TableCell><DateSpan f={f} start={chapter.actualStart} end={chapter.actualEnd} /></TableCell>
                     <TableCell>
                       <SchedulePill chapter={chapter} today={today} />
                     </TableCell>
                     <TableCell className="num">{chapter.hitoCode ?? <Dash />}</TableCell>
-                    <TableCell className="num text-right">{f.euros(chapter.costCents)}</TableCell>
+                    <TableCell className="num text-right">{f.amount(chapter.costCents)}</TableCell>
                     <TableCell className="text-right">
                       {chapter.contractedCents === null ? (
                         <Dash />
                       ) : (
                         <span className="num">
-                          {f.euros(chapter.contractedCents)}
+                          {f.amount(chapter.contractedCents)}
                           {chapter.contractedLines < chapter.lineCount && (
                             <span className="text-muted-foreground" title={t("contractedLines", { contracted: chapter.contractedLines, total: chapter.lineCount })}>
                               {" "}
@@ -165,10 +174,9 @@ export default function SummaryTable({
               </Fragment>
             ))}
             <TableRow className={totalRow}>
-              <TableCell className="pl-[18px]" />
-              <TableCell colSpan={6}>{t("total", { count: chapters.length })}</TableCell>
-              <TableCell className="num text-right">{f.euros(totals.cost)}</TableCell>
-              <TableCell className="num text-right">{f.euros(totals.contracted)}</TableCell>
+              <TableCell colSpan={6} className="pl-[18px]">{t("total", { count: chapters.length })}</TableCell>
+              <TableCell className="num text-right">{f.amount(totals.cost)}</TableCell>
+              <TableCell className="num text-right">{f.amount(totals.contracted)}</TableCell>
               <TableCell className="pr-[18px] text-right">
                 {totals.contractedCost ? (
                   <Deviation cents={totals.deviation} bp={Math.round((totals.deviation * 10_000) / totals.contractedCost)} />
@@ -181,7 +189,7 @@ export default function SummaryTable({
         </Table>
       )}
       <p className={cn(footnote, "px-[18px] pt-2.5 pb-3")}>
-        {t("footnote", { contingency: f.euros(cost.contingencyCents) })}
+        {t("footnote", { contingency: f.amount(cost.contingencyCents) })}
       </p>
     </section>
   );

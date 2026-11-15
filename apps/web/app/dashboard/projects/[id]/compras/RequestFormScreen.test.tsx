@@ -54,7 +54,7 @@ describe("RequestFormScreen", () => {
     const amount = screen.getByRole("textbox", { name: "Importe de 07.01" });
     await userEvent.clear(amount);
     await userEvent.type(amount, "6250,00");
-    expect(total().getByText("6250,00 €")).toBeInTheDocument();
+    expect(total().getByText("6.250,00 €")).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: "Enviar para aprobar" }));
     expect(actions.createRequestAction).toHaveBeenCalledWith("p-1", {
@@ -89,7 +89,7 @@ describe("RequestFormScreen", () => {
     renderScreen({ request: requestDetail });
     expect(screen.getByRole("heading", { level: 1, name: "Editar solicitud" })).toBeInTheDocument();
     expect(screen.getByLabelText("Concepto")).toHaveValue("Placa de yeso para trasdosados");
-    expect(screen.getByRole("textbox", { name: "Importe de 07.04" })).toHaveValue("1000,00");
+    expect(screen.getByRole("textbox", { name: "Importe de 07.04" })).toHaveValue("1.000,00");
     expect(suppliers().getByRole("button", { name: /Yesos y Placas/ })).toHaveAttribute("aria-pressed", "true");
     await userEvent.click(screen.getByRole("button", { name: "Guardar cambios" }));
     expect(actions.updateRequestAction).toHaveBeenCalledWith("req-3", expect.objectContaining({

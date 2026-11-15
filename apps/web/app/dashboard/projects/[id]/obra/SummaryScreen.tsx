@@ -55,8 +55,8 @@ export default function SummaryScreen({
 
   const facts = [
     { label: t("client"), value: project.clientName ?? "—" },
-    { label: t("plannedStart"), value: project.startDate ? f.fullDay(project.startDate) : "—", num: true },
-    { label: t("plannedEnd"), value: project.completionDate ? f.fullDay(project.completionDate) : "—", num: true },
+    { label: t("plannedStart"), value: f.date(project.startDate), num: true },
+    { label: t("plannedEnd"), value: f.date(project.completionDate), num: true },
     {
       label: t("budget"),
       value: budget ? t("budgetValue", { reference: budget.reference ?? t("noReference"), number: budget.number }) : "—",
@@ -71,7 +71,7 @@ export default function SummaryScreen({
       title={t("title")}
       description={project.address}
       aside={
-        <dl className="m-0 grid grid-cols-2 gap-x-7 gap-y-3 text-[13px] sm:grid-cols-4">
+        <dl className="m-0 grid grid-cols-2 gap-x-7 gap-y-3 text-sm sm:grid-cols-4">
           {facts.map((fact) => (
             <div key={fact.label} className="flex flex-col gap-1">
               <dt className="eyebrow">{fact.label}</dt>

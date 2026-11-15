@@ -58,7 +58,8 @@ describe("project actions", () => {
     const project = await createTestProject(tenant.id);
 
     expect(await getProjectList()).toEqual([
-      expect.objectContaining({ id: project.id, budget: { revision: null, generation: null } }),
+      // With its signals: the portal's list asks for them.
+      expect.objectContaining({ id: project.id, budget: { revision: null, generation: null }, schedule: null, progressPct: null, attention: [] }),
     ]);
   });
 

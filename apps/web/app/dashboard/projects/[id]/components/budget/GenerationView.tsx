@@ -79,7 +79,7 @@ export default function GenerationView({
                       : t(`jobs.${job.key}.todo`)}
                   </div>
                 </div>
-                {state === "done" && params.amountCents !== undefined && <span className="num text-[13px] text-muted-foreground">{f.money(Number(params.amountCents))}</span>}
+                {state === "done" && params.amountCents !== undefined && <span className="num text-sm text-muted-foreground">{f.money(Number(params.amountCents))}</span>}
               </li>
             );
           })}
@@ -121,7 +121,7 @@ export default function GenerationView({
               <span className="eyebrow">{t("inconsistencies")}</span>
               <Badge variant="warn">{facts.inconsistencies.length}</Badge>
             </div>
-            <ul className="flex flex-col gap-1.5 text-[13.5px]">
+            <ul className="flex flex-col gap-1.5 text-sm">
               {facts.inconsistencies.slice(0, 3).map((item) => <li key={item}>{item}</li>)}
             </ul>
             <p className={muted}>{t("inconsistenciesHint")}</p>

@@ -6,6 +6,7 @@ import { useTranslations } from "next-intl";
 import { ChevronRight, Clock, FileText } from "lucide-react";
 import {
   orderLabel,
+  PURCHASE_PROGRESS,
   type OrderInvoicing,
   type ProjectPurchaseLines,
   type PurchaseInvoiceListItem,
@@ -13,9 +14,9 @@ import {
   type PurchaseLineOrder,
   type PurchaseProgress,
 } from "@repo/core/contract";
+import { Badge } from "@/components/ui/badge";
 import {
   Table,
-  TableBody,
   TableCell,
   TableFooter,
   TableHead,
@@ -23,9 +24,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import { useVatLabel } from "../../../../components/vat-basis";
 import Kpi from "../obra/Kpi";
 import { deviationTone } from "../construction/format";
+import FoldRow from "../construction/FoldRow";
+import { Dot } from "../construction/pills";
 import { usePurchaseFormat } from "./format";
+import type { LineRollup } from "./line-rollup";
 import { DeviationKpi } from "./ProjectKpis";
 import {
   INVOICES_HREF,
@@ -38,6 +43,7 @@ import {
 import {
   InvoiceStatePill,
   LatePill,
+  PROGRESS_TONE,
   ProgressPill,
   PurchaseKindPill,
   PurchaseStatusPill,
@@ -59,7 +65,7 @@ export function ViewSwitch({
     <Link
       href={href}
       aria-current={view === key ? "page" : undefined}
-      className="inline-flex min-h-[34px] flex-none items-center rounded-[7px] px-3.5 text-[13px] whitespace-nowrap text-muted-foreground transition-colors hover:text-foreground pointer-coarse:min-h-11 aria-[current=page]:bg-card aria-[current=page]:font-semibold aria-[current=page]:text-foreground aria-[current=page]:shadow-card"
+      className="inline-flex min-h-[34px] flex-none items-center rounded-[7px] px-3.5 text-sm whitespace-nowrap text-muted-foreground transition-colors hover:text-foreground pointer-coarse:min-h-11 aria-[current=page]:bg-card aria-[current=page]:font-semibold aria-[current=page]:text-foreground aria-[current=page]:shadow-card"
     >
       {t(key)}
     </Link>
@@ -84,6 +90,7 @@ export function LineKpis({
 }) {
   const t = useTranslations("purchasing.lines.kpis");
   const f = usePurchaseFormat();
+  const vat = useVatLabel();
   const pct = (part: number, whole: number) =>
     whole ? (part * 100) / whole : 0;
   return (
@@ -92,22 +99,22 @@ export function LineKpis({
       className="grid grid-cols-2 gap-3.5 lg:grid-cols-4"
     >
       <Kpi
-        label={t("contracted")}
-        value={f.moneyRound(summary.contractedCents)}
+        label={vat(t("contracted"), "excl")}
+        value={f.money(summary.contractedCents)}
         pct={pct(summary.contractedCents, summary.costCents)}
         barTone="brand"
         hints={[
           t("contractedHint", {
             pct: f.ratio(summary.contractedCents, summary.costCents),
-            cost: f.moneyRound(summary.costCents),
-            left: f.moneyRound(summary.toContractCents),
+            cost: f.money(summary.costCents),
+            left: f.money(summary.toContractCents),
           }),
         ]}
       />
       <DeviationKpi summary={summary} />
       <Kpi
-        label={t("invoiced")}
-        value={f.moneyRound(summary.invoicedCents)}
+        label={vat(t("invoiced"), "excl")}
+        value={f.money(summary.invoicedCents)}
         pct={pct(summary.invoicedCents, summary.contractedCents)}
         barTone="brand"
         hints={[
@@ -121,19 +128,19 @@ export function LineKpis({
         ]}
       />
       <Kpi
-        label={t("paid")}
-        value={f.moneyRound(summary.paidCents)}
+        label={vat(t("paid"), "excl")}
+        value={f.money(summary.paidCents)}
         pct={pct(summary.paidCents, summary.invoicedCents)}
         hints={[
           t("paidHint", {
-            outstanding: f.moneyRound(summary.outstandingCents),
-            retained: f.moneyRound(summary.retainedCents),
+            outstanding: f.money(summary.outstandingCents),
+            retained: f.money(summary.retainedCents),
           }),
           ...(summary.overdueCents > 0
             ? [
                 <span key="overdue" className="text-bad">
                   {t("overdueHint", {
-                    amount: f.moneyRound(summary.overdueCents),
+                    amount: f.money(summary.overdueCents),
                   })}
                 </span>,
               ]
@@ -156,7 +163,7 @@ export function DueBanner({
   return (
     <div
       role="status"
-      className="flex flex-wrap items-start gap-3 rounded-xl border border-warn/30 bg-warn-soft px-4 py-3.5 text-[13.5px] text-warn"
+      className="flex flex-wrap items-start gap-3 rounded-xl border border-warn/30 bg-warn-soft px-4 py-3.5 text-sm text-warn"
     >
       <Clock aria-hidden className="mt-0.5 size-5 flex-none" />
       <div className="min-w-0 flex-[1_1_320px]">
@@ -173,7 +180,7 @@ export function DueBanner({
             </Link>{" "}
             {invoice.dueOn &&
               t(invoice.state === "overdue" ? "overdue" : "dueOn", {
-                date: f.shortDay(invoice.dueOn),
+                date: f.date(invoice.dueOn),
               })}
           </span>
         ))}
@@ -191,7 +198,7 @@ export function DueBanner({
 
 /** A milestone's or invoice's row: concept, amount, state, invoices, payment (stacked on phones). */
 const row =
-  "grid items-center gap-x-3.5 gap-y-1 border-b px-3.5 py-2 text-[13px] last:border-b-0 max-md:grid-cols-2 md:grid-cols-[minmax(0,1fr)_110px_110px_150px_minmax(0,1fr)]";
+  "grid items-center gap-x-3.5 gap-y-1 border-b px-3.5 py-2 text-sm last:border-b-0 max-md:grid-cols-2 md:grid-cols-[minmax(0,1fr)_110px_110px_150px_minmax(0,1fr)]";
 
 /** What a milestone or invoice row says about its payment. */
 function usePayText() {
@@ -204,7 +211,7 @@ function usePayText() {
           text: invoice.kind === "credit_note" ? "" : t("payPaid"),
           tone: "text-good",
         };
-      const date = invoice.dueOn ? f.shortDay(invoice.dueOn) : "—";
+      const date = f.date(invoice.dueOn);
       if (invoice.state === "overdue")
         return { text: t("payOverdue", { date }), tone: "text-bad" };
       if (invoice.state === "partial")
@@ -262,6 +269,7 @@ export function InvoicingFoot({
 }) {
   const t = useTranslations("purchasing.lines.foot");
   const f = usePurchaseFormat();
+  const vat = useVatLabel();
   const items: [string, number, string?][] = [
     [t("invoiced"), invoicing.invoicedCents],
     [t("paid"), invoicing.paidCents, "text-good"],
@@ -278,10 +286,11 @@ export function InvoicingFoot({
   return (
     <p
       className={cn(
-        "m-0 flex flex-wrap gap-x-5 gap-y-1 bg-raise px-3.5 py-2 text-[12.5px]",
+        "m-0 flex flex-wrap gap-x-5 gap-y-1 bg-raise px-3.5 py-2 text-meta",
         className,
       )}
     >
+      <span className="text-muted-foreground">{vat(t("label"), "excl")}</span>
       {items.map(([label, cents, tone]) => (
         <span key={label}>
           {label} <b className={cn("num", tone)}>{f.amount(cents)}</b>
@@ -305,7 +314,7 @@ function LineOrderCard({
   const rows = order.milestones.length > 0;
   return (
     <div className="overflow-hidden rounded-xl border bg-card">
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b px-3.5 py-2.5 text-[13px]">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b px-3.5 py-2.5 text-sm">
         <Link
           href={orderHref(projectId, order.id)}
           className="num font-semibold text-brand-ink hover:text-primary"
@@ -347,14 +356,14 @@ function LineOrderCard({
                     ))
                   )}
                 </span>
-                <span className={cn("min-w-0 text-[12.5px]", text.tone)}>
+                <span className={cn("min-w-0 text-meta", text.tone)}>
                   {text.text}
                 </span>
               </li>
             );
           })
         ) : order.invoices.length === 0 ? (
-          <li className="px-3.5 py-2 text-[13px] text-muted-foreground">
+          <li className="px-3.5 py-2 text-sm text-muted-foreground">
             {t("noInvoices")}
           </li>
         ) : (
@@ -367,8 +376,8 @@ function LineOrderCard({
                     ↳
                   </span>
                   <InvoiceLink invoice={invoice} />{" "}
-                  <span className="text-[12px] text-muted-foreground">
-                    {f.shortDay(invoice.issuedOn)}
+                  <span className="text-meta text-muted-foreground">
+                    {f.date(invoice.issuedOn)}
                   </span>
                 </span>
                 <span className="num md:text-right">
@@ -378,7 +387,7 @@ function LineOrderCard({
                   <InvoiceStatePill state={invoice.state} />
                 </span>
                 <span className="max-md:hidden" />
-                <span className={cn("min-w-0 text-[12.5px]", text.tone)}>
+                <span className={cn("min-w-0 text-meta", text.tone)}>
                   {text.text}
                 </span>
               </li>
@@ -407,8 +416,8 @@ function LineDetail({
   const f = usePurchaseFormat();
   if (line.orders.length === 0) {
     return (
-      <p className="m-0 text-[13px] text-muted-foreground">
-        {t("noOrders")} {orderBy && t("orderBy", { date: f.shortDay(orderBy) })}{" "}
+      <p className="m-0 text-sm text-muted-foreground">
+        {t("noOrders")} {orderBy && t("orderBy", { date: f.date(orderBy) })}{" "}
         {newOrderHref && (
           <Link
             href={newOrderHref}
@@ -429,25 +438,140 @@ function LineDetail({
   );
 }
 
+export type LineChapter = ProjectPurchaseLines["chapters"][number] & {
+  rollup: LineRollup;
+  /** Its lines to contract must be ordered soon (or are late). */
+  soon: { orderBy: string; lateDays: number } | null;
+};
+
+/** A chapter's money folded (or the obra's): cost, contracted, deviation, invoiced and paid. */
+function RollupCells({ rollup }: { rollup: LineRollup }) {
+  const f = usePurchaseFormat();
+  const amount = (cents: number) => (cents ? f.amount(cents) : "—");
+  return (
+    <>
+      <TableCell className="num text-right font-semibold">
+        {f.amount(rollup.costCents)}
+      </TableCell>
+      <TableCell className="num text-right font-semibold">
+        {amount(rollup.contractedCents)}
+      </TableCell>
+      <TableCell
+        className={cn(
+          "num text-right font-semibold",
+          deviationTone(rollup.deviationCents),
+        )}
+      >
+        {rollup.deviationCents === null
+          ? "—"
+          : f.signedAmount(rollup.deviationCents)}
+      </TableCell>
+      <TableCell className="num text-right font-semibold">
+        {amount(rollup.invoicedCents)}
+      </TableCell>
+      <TableCell className="num text-right font-semibold">
+        {amount(rollup.paidCents)}
+      </TableCell>
+    </>
+  );
+}
+
+/** A chapter folded into one row: its lines' totals, how many are in each state, and what needs a look. */
+function ChapterRow({
+  chapter,
+  open,
+  controls,
+  onToggle,
+}: {
+  chapter: LineChapter;
+  open: boolean;
+  /** The id of the rows it folds. */
+  controls: string;
+  onToggle: () => void;
+}) {
+  const t = useTranslations("purchasing.lines");
+  const f = usePurchaseFormat();
+  const { rollup, soon } = chapter;
+  return (
+    <FoldRow
+      code={chapter.code}
+      open={open}
+      controls={controls}
+      onToggle={onToggle}
+      label={
+        <>
+          <b className="min-w-0">{chapter.name}</b>
+          <span className="text-meta text-muted-foreground">
+            {t("lineCount", { count: rollup.lines })}
+          </span>
+          {rollup.overdue > 0 && (
+            <Badge variant="destructive" className="px-2 py-px">
+              <Dot />
+              {t("overdueLines", { count: rollup.overdue })}
+            </Badge>
+          )}
+          {rollup.lateOrders > 0 && (
+            <Badge variant="warn" className="px-2 py-px">
+              <Dot />
+              {t("lateOrders", { count: rollup.lateOrders })}
+            </Badge>
+          )}
+          {soon && (
+            <Badge variant="warn" className="px-2 py-px">
+              <Dot />
+              {soon.lateDays > 0
+                ? t("orderLate", { days: soon.lateDays })
+                : t("orderSoon", { date: f.date(soon.orderBy) })}
+            </Badge>
+          )}
+        </>
+      }
+    >
+      <RollupCells rollup={rollup} />
+      <TableCell className="pr-[18px] whitespace-normal">
+        <span className="flex flex-wrap items-center gap-1">
+          {PURCHASE_PROGRESS.filter((key) => rollup.counts[key] > 0).map(
+            (key) => (
+              <Badge
+                key={key}
+                variant={PROGRESS_TONE[key]}
+                className="px-2 py-px"
+              >
+                <Dot />
+                {t(`stateCount.${key}`, { count: rollup.counts[key] })}
+              </Badge>
+            ),
+          )}
+        </span>
+      </TableCell>
+    </FoldRow>
+  );
+}
+
 /**
- * The budget's lines chapter by chapter, each with its cost, what is
- * contracted, its deviation (only once closed; before, what is left to
- * contract) and its state; a line folds open on its orders, milestones,
- * invoices and payments.
+ * The budget's lines chapter by chapter. Each chapter is one row with its
+ * lines' cost, what is contracted, its deviation (over its closed lines),
+ * invoiced and paid, how many lines are in each state and what needs a look
+ * (invoices past due, late deliveries, lines to order soon); it folds open
+ * on its lines, and a line on its orders, milestones, invoices and payments.
  */
 export function LineTable({
   projectId,
   chapters,
-  summary,
+  total,
+  open,
+  onToggleChapter,
   expanded,
   onToggle,
   newOrderHref,
 }: {
   projectId: string;
-  /** Already filtered. */
-  chapters: ProjectPurchaseLines["chapters"];
+  /** Already filtered, each with its lines' totals. */
+  chapters: LineChapter[];
   /** The obra's totals, shown only while nothing is filtered out. */
-  summary?: ProjectPurchaseLines["summary"];
+  total?: LineRollup;
+  open: (chapterCode: string) => boolean;
+  onToggleChapter: (chapterCode: string) => void;
   expanded: (lineageId: string) => boolean;
   onToggle: (lineageId: string) => void;
   /** "Crear pedido" on a line nobody ordered; omitted for viewers. */
@@ -458,167 +582,145 @@ export function LineTable({
   const count = chapters.reduce((sum, c) => sum + c.lines.length, 0);
   if (count === 0)
     return (
-      <p className="px-[18px] py-6 text-center text-[13.5px] text-muted-foreground">
+      <p className="px-[18px] py-6 text-center text-sm text-muted-foreground">
         {t("noMatch")}
       </p>
     );
   return (
-    <Table className="min-w-[860px] text-[13px]">
+    <Table className="min-w-[940px]">
       <TableHeader>
         <TableRow>
           <TableHead className="pl-[18px]">{t("line")}</TableHead>
           <TableHead className="text-right">{t("cost")}</TableHead>
           <TableHead className="text-right">{t("contracted")}</TableHead>
           <TableHead className="text-right">{t("deviation")}</TableHead>
+          <TableHead className="text-right">{t("invoiced")}</TableHead>
+          <TableHead className="text-right">{t("paid")}</TableHead>
           <TableHead className="pr-[18px]">{t("state")}</TableHead>
         </TableRow>
       </TableHeader>
-      <TableBody>
-        {chapters.map((chapter) => {
-          const contracted = chapter.lines.filter(
-            (l) => l.contracting !== "none",
-          ).length;
-          return (
-            <Fragment key={chapter.code}>
-              <TableRow className="bg-raise/60 hover:bg-raise/60">
-                <TableCell className="pl-[18px] font-semibold whitespace-normal">
-                  <span className="num">{chapter.code}</span> {chapter.name}
-                </TableCell>
-                <TableCell className="num text-right font-semibold">
-                  {f.amount(chapter.costCents)}
-                </TableCell>
-                <TableCell className="num text-right font-semibold">
-                  {chapter.contractedCents
-                    ? f.amount(chapter.contractedCents)
-                    : "—"}
-                </TableCell>
-                <TableCell
-                  className={cn(
-                    "num text-right font-semibold",
-                    deviationTone(chapter.deviationCents),
-                  )}
-                >
-                  {chapter.deviationCents === null
-                    ? "—"
-                    : f.signedDecimal(chapter.deviationCents)}
-                </TableCell>
-                <TableCell className="pr-[18px] text-[12.5px] text-muted-foreground">
-                  {t("chapterSummary", {
-                    contracted,
-                    total: chapter.lines.length,
-                  })}
-                </TableCell>
-              </TableRow>
-              {chapter.lines.map((line) => {
-                const open = expanded(line.lineageId);
-                return (
-                  <Fragment key={line.lineageId}>
-                    <TableRow
-                      className="cursor-pointer"
-                      onClick={() => onToggle(line.lineageId)}
-                    >
-                      <TableCell className="p-0 whitespace-normal">
-                        <button
-                          type="button"
-                          aria-expanded={open}
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            onToggle(line.lineageId);
-                          }}
-                          className="flex min-h-11 w-full cursor-pointer items-center gap-2.5 py-2 pl-[18px] text-left"
-                        >
-                          <ChevronRight
-                            aria-hidden
-                            className={cn(
-                              "size-4 flex-none text-muted-foreground transition-transform",
-                              open && "rotate-90",
-                            )}
-                          />
-                          <span className="num flex-none text-muted-foreground">
-                            {line.code}
-                          </span>
-                          <span className="min-w-0">{line.description}</span>
-                        </button>
-                      </TableCell>
-                      <TableCell className="num text-right">
-                        {f.amount(line.costCents)}
-                      </TableCell>
-                      <TableCell className="num text-right">
-                        {line.contracting === "none"
-                          ? "—"
-                          : f.amount(line.contractedCents)}
-                      </TableCell>
-                      <TableCell
-                        className={cn(
-                          "num text-right",
-                          line.deviationCents === null
-                            ? "text-muted-foreground"
-                            : deviationTone(line.deviationCents),
-                        )}
+      {chapters.map((chapter) => {
+        const body = `lines-chapter-${chapter.code}`;
+        const folded = !open(chapter.code);
+        return (
+          <Fragment key={chapter.code}>
+            <tbody>
+              <ChapterRow
+                chapter={chapter}
+                open={!folded}
+                controls={body}
+                onToggle={() => onToggleChapter(chapter.code)}
+              />
+            </tbody>
+            <tbody id={body}>
+              {!folded &&
+                chapter.lines.map((line) => {
+                  const lineOpen = expanded(line.lineageId);
+                  return (
+                    <Fragment key={line.lineageId}>
+                      <TableRow
+                        className="cursor-pointer"
+                        onClick={() => onToggle(line.lineageId)}
                       >
-                        {line.deviationCents !== null ? (
-                          f.signedDecimal(line.deviationCents)
-                        ) : line.uncontractedCents > 0 ? (
-                          <span className="font-sans text-[12.5px]">
-                            {t("toContract", {
-                              amount: f.amount(line.uncontractedCents),
-                            })}
-                          </span>
-                        ) : (
-                          "—"
-                        )}
-                      </TableCell>
-                      <TableCell className="pr-[18px]">
-                        <span className="flex flex-wrap items-center gap-1.5">
-                          <ProgressPill progress={line.progress} />
-                          {line.overdue && <InvoiceStatePill state="overdue" />}
-                        </span>
-                      </TableCell>
-                    </TableRow>
-                    {open && (
-                      <TableRow className="hover:bg-transparent">
+                        <TableCell className="p-0 whitespace-normal">
+                          <button
+                            type="button"
+                            aria-expanded={lineOpen}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              onToggle(line.lineageId);
+                            }}
+                            className="flex min-h-11 w-full cursor-pointer items-center gap-2.5 py-2 pl-[18px] text-left"
+                          >
+                            <ChevronRight
+                              aria-hidden
+                              className={cn(
+                                "size-4 flex-none text-muted-foreground transition-transform",
+                                lineOpen && "rotate-90",
+                              )}
+                            />
+                            <span className="num flex-none text-muted-foreground">
+                              {line.code}
+                            </span>
+                            <span className="min-w-0">{line.description}</span>
+                          </button>
+                        </TableCell>
+                        <TableCell className="num text-right">
+                          {f.amount(line.costCents)}
+                        </TableCell>
+                        <TableCell className="num text-right">
+                          {line.contracting === "none"
+                            ? "—"
+                            : f.amount(line.contractedCents)}
+                        </TableCell>
                         <TableCell
-                          colSpan={5}
-                          className="bg-raise/40 py-3 pr-[18px] pl-[44px] whitespace-normal"
+                          className={cn(
+                            "num text-right",
+                            line.deviationCents === null
+                              ? "text-muted-foreground"
+                              : deviationTone(line.deviationCents),
+                          )}
                         >
-                          <LineDetail
-                            projectId={projectId}
-                            line={line}
-                            orderBy={chapter.orderBy}
-                            newOrderHref={newOrderHref?.(chapter.code)}
-                          />
+                          {line.deviationCents !== null ? (
+                            f.signedAmount(line.deviationCents)
+                          ) : line.uncontractedCents > 0 ? (
+                            <span className="font-sans text-meta">
+                              {t("toContract", {
+                                amount: f.amount(line.uncontractedCents),
+                              })}
+                            </span>
+                          ) : (
+                            "—"
+                          )}
+                        </TableCell>
+                        <TableCell className="num text-right">
+                          {line.invoicedCents
+                            ? f.amount(line.invoicedCents)
+                            : "—"}
+                        </TableCell>
+                        <TableCell className="num text-right">
+                          {line.paidCents ? f.amount(line.paidCents) : "—"}
+                        </TableCell>
+                        <TableCell className="pr-[18px]">
+                          <span className="flex flex-wrap items-center gap-1.5">
+                            <ProgressPill progress={line.progress} />
+                            {line.overdue && (
+                              <InvoiceStatePill state="overdue" />
+                            )}
+                          </span>
                         </TableCell>
                       </TableRow>
-                    )}
-                  </Fragment>
-                );
-              })}
-            </Fragment>
-          );
-        })}
-      </TableBody>
-      {summary && (
+                      {lineOpen && (
+                        <TableRow className="hover:bg-transparent">
+                          <TableCell
+                            colSpan={7}
+                            className="bg-raise/40 py-3 pr-[18px] pl-[44px] whitespace-normal"
+                          >
+                            <LineDetail
+                              projectId={projectId}
+                              line={line}
+                              orderBy={chapter.orderBy}
+                              newOrderHref={newOrderHref?.(chapter.code)}
+                            />
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </Fragment>
+                  );
+                })}
+            </tbody>
+          </Fragment>
+        );
+      })}
+      {total && (
         <TableFooter>
           <TableRow className="hover:bg-transparent">
-            <TableCell className="pl-[18px]">{t("total", { count })}</TableCell>
-            <TableCell className="num text-right">
-              {f.amount(summary.costCents)}
+            <TableCell className="pl-[18px]">
+              {t("total", { count: total.lines })}
             </TableCell>
-            <TableCell className="num text-right">
-              {f.amount(summary.contractedCents)}
-            </TableCell>
-            <TableCell
-              className={cn(
-                "num text-right",
-                deviationTone(summary.deviationCents),
-              )}
-            >
-              {summary.deviationCents === null
-                ? "—"
-                : f.signedDecimal(summary.deviationCents)}
-            </TableCell>
-            <TableCell className="pr-[18px] text-[12.5px] font-normal text-muted-foreground">
-              {t("closedNote", { count: summary.closedLines })}
+            <RollupCells rollup={total} />
+            <TableCell className="pr-[18px] text-meta font-normal text-muted-foreground">
+              {t("closedNote", { count: total.closedLines })}
             </TableCell>
           </TableRow>
         </TableFooter>

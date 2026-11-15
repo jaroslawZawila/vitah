@@ -61,7 +61,7 @@ export default function Wizard({
     >
       <header className="flex flex-col gap-1.5">
         <h1 id="wizard-title">{title}</h1>
-        <p className="text-[13px] text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           {t("stepOf", { current: position + 1, total: steps.length })}
           {current && ` · ${current.title}`}
         </p>
@@ -76,7 +76,7 @@ export default function Wizard({
               <button
                 type="button"
                 className={cn(
-                  "flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border bg-card px-2 py-1.5 text-[13px] font-medium text-muted-foreground shadow-card transition-colors not-disabled:cursor-pointer not-disabled:hover:border-primary md:justify-start md:px-3",
+                  "flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border bg-card px-2 py-1.5 text-sm font-medium text-muted-foreground shadow-card transition-colors not-disabled:cursor-pointer not-disabled:hover:border-primary md:justify-start md:px-3",
                   state === "current" &&
                     "border-primary font-semibold text-foreground",
                   state === "done" && "text-brand-ink",
@@ -87,7 +87,7 @@ export default function Wizard({
               >
                 <span
                   className={cn(
-                    "inline-flex size-6 flex-none items-center justify-center rounded-full bg-raise text-[11.5px] font-semibold tabular-nums",
+                    "inline-flex size-6 flex-none items-center justify-center rounded-full bg-raise text-xs font-semibold tabular-nums",
                     state === "current" && "bg-primary text-primary-foreground",
                     state === "done" && "bg-brand-soft text-brand-ink",
                   )}

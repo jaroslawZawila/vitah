@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -108,27 +108,31 @@ beforeEach(() => {
 });
 
 describe("CompanyScreen › removing the company from an obra", () => {
-  it("says what happens before removing: it leaves the obra, its assignment is kept", async () => {
-    vi.spyOn(window, "confirm").mockReturnValue(true);
+  it("says what happens before removing: it leaves the obra, and can be brought back", async () => {
     renderScreen();
 
     await userEvent.click(screen.getByRole("button", { name: "Quitar de la obra" }));
 
-    expect(window.confirm).toHaveBeenCalledWith(
-      "¿Quitar a la empresa de VTH-26-001? Dejará de aparecer en esa obra; el registro de su asignación se conserva.",
+    const dialog = within(
+      await screen.findByRole("alertdialog", { name: "¿Quitar a Electricidad Saja S.L. de la obra VTH-26-001?" }),
     );
+    expect(dialog.getByText(/Deja de aparecer en esa obra .* restaurarla desde Elementos eliminados\./)).toBeInTheDocument();
+    expect(actions.removeSubcontractorAssignmentAction).not.toHaveBeenCalled();
+    await userEvent.click(dialog.getByRole("button", { name: "Quitar de la obra" }));
     expect(actions.removeSubcontractorAssignmentAction).toHaveBeenCalledWith("c-1", "p-1");
   });
 
   it("says the same in English, and removes nothing when declined", async () => {
-    vi.spyOn(window, "confirm").mockReturnValue(false);
     renderScreen("en");
 
     await userEvent.click(screen.getByRole("button", { name: "Remove from site" }));
 
-    expect(window.confirm).toHaveBeenCalledWith(
-      "Remove the company from VTH-26-001? It will no longer appear on that site; the record of its assignment is kept.",
+    const dialog = within(
+      await screen.findByRole("alertdialog", { name: "Remove Electricidad Saja S.L. from site VTH-26-001?" }),
     );
+    expect(dialog.getByText(/an administrator can also restore it from Deleted items\./)).toBeInTheDocument();
+    await userEvent.click(dialog.getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
     expect(actions.removeSubcontractorAssignmentAction).not.toHaveBeenCalled();
   });
 });

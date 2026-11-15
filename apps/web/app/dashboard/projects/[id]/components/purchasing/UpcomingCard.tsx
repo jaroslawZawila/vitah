@@ -39,9 +39,9 @@ export default function UpcomingCard({
         </h2>
         {planningMock && <MockBadge />}
       </div>
-      <p className="text-[12.5px] text-muted-foreground">{t("text", { days: UPCOMING_DAYS })}</p>
+      <p className="text-meta text-muted-foreground">{t("text", { days: UPCOMING_DAYS })}</p>
       {upcoming.length === 0 ? (
-        <p className="py-4 text-[13px] text-muted-foreground">{t("empty")}</p>
+        <p className="py-4 text-sm text-muted-foreground">{t("empty")}</p>
       ) : (
         <ul className="m-0 list-none p-0">
           {upcoming.map((chapter) => (
@@ -58,11 +58,11 @@ export default function UpcomingCard({
                 ) : (
                   <div className="font-semibold">{chapter.name}</div>
                 )}
-                <div className="text-[12px] text-muted-foreground">
+                <div className="text-meta text-muted-foreground">
                   {chapter.state === "in_progress"
                     ? t("started")
                     : chapter.plannedStart
-                      ? t("starts", { date: f.shortDay(chapter.plannedStart) })
+                      ? t("starts", { date: f.date(chapter.plannedStart) })
                       : t("noDate")}
                   {" · "}
                   {chapter.orderLateDays !== null ? (
@@ -71,7 +71,7 @@ export default function UpcomingCard({
                       {" · "}
                     </>
                   ) : (
-                    chapter.orderBy && `${tp("orderBy", { date: f.shortDay(chapter.orderBy) })} · `
+                    chapter.orderBy && `${tp("orderBy", { date: f.date(chapter.orderBy) })} · `
                   )}
                   {chapter.pendingOrders.length > 0 ? (
                     chapter.pendingOrders.map((order, index) => (
@@ -88,7 +88,7 @@ export default function UpcomingCard({
                   {chapter.pendingOrders.length > 0 && ` ${t("notSent", { count: chapter.pendingOrders.length })}`}
                 </div>
               </div>
-              <span className="num text-[13px]">{f.moneyRound(chapter.uncontractedCostCents)}</span>
+              <span className="num text-sm">{f.money(chapter.uncontractedCostCents)}</span>
             </li>
           ))}
         </ul>

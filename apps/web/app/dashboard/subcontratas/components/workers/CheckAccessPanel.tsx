@@ -70,7 +70,7 @@ export default function CheckAccessPanel({
       </div>
       <FormError namespace="subcontractors.errors" error={error} />
       {result && (
-        <div role="status" className="flex flex-col gap-1.5 rounded-[10px] bg-raise px-3.5 py-3 text-[13.5px]">
+        <div role="status" className="flex flex-col gap-1.5 rounded-[10px] bg-raise px-3.5 py-3 text-sm">
           {result.worker && result.access ? (
             <>
               <div className="flex flex-wrap items-center gap-2.5">

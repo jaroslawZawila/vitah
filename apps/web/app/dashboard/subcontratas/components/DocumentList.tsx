@@ -48,7 +48,7 @@ export default function DocumentList({
   const [open, setOpen] = useState<string | null>(null);
 
   return (
-    <Table className="min-w-[1000px]">
+    <Table className="min-w-[860px]">
       <TableHeader>
         <TableRow>
           <TableHead>{t("document")}</TableHead>
@@ -64,7 +64,7 @@ export default function DocumentList({
         {groups.map((group) => (
           <Fragment key={group.key}>
             <TableRow className="hover:bg-transparent">
-              <TableCell colSpan={7} className="bg-raise py-1.5 text-[11px] font-semibold tracking-[0.1em] text-muted-foreground uppercase">
+              <TableCell colSpan={7} className="bg-raise py-1.5 text-xs font-semibold tracking-[0.08em] text-muted-foreground uppercase">
                 {group.title}
               </TableCell>
             </TableRow>
@@ -77,21 +77,19 @@ export default function DocumentList({
               return (
                 <Fragment key={key}>
                   <TableRow>
-                    <TableCell className="min-w-72 whitespace-normal">
+                    <TableCell className="min-w-56 whitespace-normal">
                       <div className="font-semibold">{docName}</div>
-                      <div className="text-[12.5px] text-muted-foreground">
-                        {basis(doc.requirementId)} · <span className="num">{doc.requirementId}</span>
-                      </div>
+                      <div className="text-meta text-muted-foreground">{basis(doc.requirementId)}</div>
                       {doc.state === "not_applicable" && doc.notApplicableReason && (
-                        <div className="text-[12.5px] text-muted-foreground">
+                        <div className="text-meta text-muted-foreground">
                           {t("reasonLine", { reason: doc.notApplicableReason })}
                         </div>
                       )}
                       {doc.state === "rejected" && current?.rejectReason && (
-                        <div className="text-[12.5px] text-destructive">{t("reasonLine", { reason: current.rejectReason })}</div>
+                        <div className="text-meta text-destructive">{t("reasonLine", { reason: current.rejectReason })}</div>
                       )}
                       {doc.state === "requested" && doc.requestedAt && (
-                        <div className="text-[12.5px] text-muted-foreground">{t("requestedOn", { date: date(doc.requestedAt) })}</div>
+                        <div className="text-meta text-muted-foreground">{t("requestedOn", { date: date(doc.requestedAt) })}</div>
                       )}
                     </TableCell>
                     <TableCell>
@@ -117,11 +115,12 @@ export default function DocumentList({
                         "—"
                       )}
                     </TableCell>
-                    <TableCell className="text-[12.5px]">
+                    <TableCell className="min-w-24 text-meta whitespace-normal">
                       {current?.outcome === "validated" ? `${current.reviewedBy ?? "—"} · ${date(current.reviewedAt)}` : "—"}
                     </TableCell>
                     <TableCell>
-                      <div className="flex justify-end gap-1.5">
+                      {/* Wraps onto a second line rather than run past the card. */}
+                      <div className="flex flex-wrap justify-end gap-1.5">
                         {current && (
                           <a
                             className={buttonVariants({ variant: "ghost", size: "sm" })}
@@ -166,7 +165,7 @@ export default function DocumentList({
                     <TableRow className="hover:bg-transparent">
                       <TableCell colSpan={7} className="bg-raise pb-3 pl-7 whitespace-normal">
                         <p className="eyebrow mb-1">{t("versions")}</p>
-                        <ul className="m-0 flex list-none flex-col gap-1 p-0 text-[12.5px] text-muted-foreground">
+                        <ul className="m-0 flex list-none flex-col gap-1 p-0 text-meta text-muted-foreground">
                           {doc.versions.map((v) => (
                             <li key={v.id}>
                               <a className="text-foreground underline-offset-2 hover:underline" href={versionUrl(subcontractorId, v.id)} target="_blank" rel="noreferrer">

@@ -54,22 +54,22 @@ export function DatesCard({
           </Button>
         )}
       </div>
-      <div className="grid grid-cols-[auto_minmax(0,1fr)_minmax(0,1fr)] gap-x-4 gap-y-2 text-[13.5px]">
+      <div className="grid grid-cols-[auto_minmax(0,1fr)_minmax(0,1fr)] gap-x-4 gap-y-2 text-sm">
         <span />
         <span className="eyebrow">{t("plan")}</span>
         <span className="eyebrow">{t("actual")}</span>
 
         <span className="text-muted-foreground">{t("startRow")}</span>
-        <span className="num">{chapter.plannedStart ? f.fullDay(chapter.plannedStart) : "—"}</span>
+        <span className="num">{f.date(chapter.plannedStart)}</span>
         <span className="num">
-          {chapter.actualStart ? f.fullDay(chapter.actualStart) : <span className="text-muted-foreground">{t("notRecorded")}</span>}
+          {chapter.actualStart ? f.date(chapter.actualStart) : <span className="font-sans whitespace-normal text-muted-foreground">{t("notRecorded")}</span>}
           {delay(chapter.startDelayDays)}
         </span>
 
         <span className="text-muted-foreground">{t("endRow")}</span>
-        <span className="num">{chapter.plannedEnd ? f.fullDay(chapter.plannedEnd) : "—"}</span>
+        <span className="num">{f.date(chapter.plannedEnd)}</span>
         <span className="num">
-          {chapter.actualEnd ? f.fullDay(chapter.actualEnd) : <span className="text-muted-foreground">{t("notRecorded")}</span>}
+          {chapter.actualEnd ? f.date(chapter.actualEnd) : <span className="font-sans whitespace-normal text-muted-foreground">{t("notRecorded")}</span>}
           {delay(chapter.endDelayDays)}
         </span>
 
@@ -137,24 +137,24 @@ export function MilestoneCard({
         {milestone.chapters.map((c) => {
           const end = actualEnd(c.code);
           return (
-            <li key={c.code} className="flex min-h-10 items-center gap-2.5 border-t text-[13.5px] first:border-t-0">
+            <li key={c.code} className="flex min-h-10 items-center gap-2.5 border-t text-sm first:border-t-0">
               {CHECK[c.state]}
               <span className="num font-semibold">{c.code}</span>
               <span className="min-w-0 flex-1 truncate">{c.code === code ? t("thisChapter") : c.name}</span>
-              <span className="num text-[12.5px] text-muted-foreground">
-                {c.state === "finished" && end ? t("endedOn", { date: f.day(end) }) : tc(c.state).toLowerCase()}
+              <span className="num text-meta text-muted-foreground">
+                {c.state === "finished" && end ? t("endedOn", { date: f.date(end) }) : tc(c.state).toLowerCase()}
               </span>
             </li>
           );
         })}
       </ul>
-      <p className="rounded-lg bg-raise px-3 py-2 text-[13px]">
+      <p className="rounded-lg bg-raise px-3 py-2 text-sm">
         {completes
           ? t("lastOne", { code: milestone.code })
           : milestone.state === "pending"
             ? t("missing", { count: missing, code: milestone.code })
             : milestone.request
-              ? t("requestedOn", { code: milestone.code, date: f.stampDay(milestone.request.requestedAt) })
+              ? t("requestedOn", { code: milestone.code, date: f.date(milestone.request.requestedAt) })
               : t("reached", { code: milestone.code })}
       </p>
       <Link href={paymentsHref} className={moreLink}>
@@ -194,7 +194,7 @@ export function CostCard({
       <div className={kv}>
         <span className="text-muted-foreground">
           {t("contracted")}{" "}
-          <span className="text-[12px]">
+          <span className="text-meta">
             {`· ${t("contractedLines", { closed: chapter.contractedLines, total: chapter.lineCount })}${
               chapter.openLines > 0 ? ` · ${t("openLines", { count: chapter.openLines })}` : ""
             }`}
@@ -205,12 +205,12 @@ export function CostCard({
       <div className={kv}>
         <span className="font-semibold">{t("deviation")}</span>
         <span className={cn("num font-semibold", deviationTone(chapter.deviationCents))}>
-          {chapter.deviationCents === null ? "—" : `${f.signedMoney(chapter.deviationCents)}${bp !== null ? ` · ${f.signedPct(bp)}` : ""}`}
+          {chapter.deviationCents === null ? "—" : `${f.signedMoney(chapter.deviationCents)}${bp !== null ? ` · ${f.signedPercent(bp)}` : ""}`}
         </span>
       </div>
       {chapter.contractedLines > 0 && (
         <p className={footnote}>
-          {t("deviationOn", { count: chapter.contractedLines, amount: f.moneyRound(chapter.contractedCostCents) })}
+          {t("deviationOn", { count: chapter.contractedLines, amount: f.money(chapter.contractedCostCents) })}
         </p>
       )}
       <SourceLabel>
@@ -246,11 +246,11 @@ export function ChapterPhotos({
         </Link>
       </div>
       {photos.length === 0 ? (
-        <p className="text-[13px] text-muted-foreground">{t("noPhotos")}</p>
+        <p className="text-sm text-muted-foreground">{t("noPhotos")}</p>
       ) : (
         <ul className="m-0 grid list-none grid-cols-2 gap-2 p-0 sm:grid-cols-3">
           {photos.slice(0, 6).map((photo) => {
-            const caption = [f.day(photo.takenOn), photo.caption].filter(Boolean).join(" · ");
+            const caption = [f.date(photo.takenOn), photo.caption].filter(Boolean).join(" · ");
             return (
               <li key={photo.id} className="flex min-w-0 flex-col gap-1">
                 <a href={fullUrl(photo)} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-lg bg-raise">
@@ -258,7 +258,7 @@ export function ChapterPhotos({
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={thumbUrl(photo)} alt={caption} loading="lazy" className="block aspect-[4/3] w-full object-cover" />
                 </a>
-                <span className="truncate text-[11.5px] text-muted-foreground">{caption}</span>
+                <span className="truncate text-xs text-muted-foreground">{caption}</span>
               </li>
             );
           })}
@@ -309,15 +309,15 @@ export function LineProgressCard({
           </Button>
         )}
       </div>
-      <p className="text-[13px] text-muted-foreground">{finished ? t("lineProgressFinished") : t("lineProgressHint")}</p>
+      <p className="text-sm text-muted-foreground">{finished ? t("lineProgressFinished") : t("lineProgressHint")}</p>
       {lines.length === 0 ? (
-        <p className="text-[13px] text-muted-foreground">{t("noLines")}</p>
+        <p className="text-sm text-muted-foreground">{t("noLines")}</p>
       ) : (
         <ul className="m-0 flex list-none flex-col p-0">
           {lines.map((line) => {
             const pct = finished ? 100 : (values[line.id] ?? line.executedPct);
             return (
-              <li key={line.id} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-t py-2 text-[13.5px] first:border-t-0">
+              <li key={line.id} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-t py-2 text-sm first:border-t-0">
                 <span className="num w-14 flex-none text-muted-foreground">{line.code}</span>
                 <span className="min-w-0 flex-[1_1_240px] leading-snug">
                   {line.description} <span className="text-muted-foreground">· {line.unit}</span>

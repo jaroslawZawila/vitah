@@ -35,6 +35,7 @@
   --accent: #f7f7f5;
   --accent-foreground: #141412;
   --destructive: var(--bad);
+  --destructive-foreground: #ffffff;
   --border: #e3e2dd;
   --input: #e3e2dd;
   --ring: #6b7a4a;
@@ -43,24 +44,25 @@
   --raise: #f7f7f5;
   --brand-ink: #4a5e2c;
   --brand-soft: #e9ecdf;
-  --good: #23824f;
+  --good: #157947;
   --good-soft: #dff2e7;
-  --yel: #a07a00;
+  --yel: #8a6500;
   --yel-soft: #fbf3cf;
-  --warn: #b85f0c;
+  --warn: #a64e00;
   --warn-soft: #fde6d2;
-  --bad: #c03a2b;
+  --bad: #bb3526;
   --bad-soft: #fbe3df;
   --info: #2a64a0;
   --info-soft: #e0ebf7;
   --shadow: 0 1px 2px #1414120d, 0 6px 18px #1414120a;
   --modal-shadow: 0 20px 60px #0006;
 
-  /* The rail (sidebar) is grafito in both themes. */
+  /* The rail (sidebar) is grafito in both themes; rail-bad is the alert colour on it. */
   --rail: #1e1e1e;
   --rail-foreground: #e8e7e2;
-  --rail-muted: #8a8a82;
+  --rail-muted: #a1a199;
   --rail-accent: #8a9b62;
+  --rail-bad: #f08376;
 
 }
 
@@ -83,6 +85,7 @@
     --accent: #252522;
     --accent-foreground: #e8e7e2;
     --destructive: var(--bad);
+    --destructive-foreground: #141412;
     --border: #2f2f2b;
     --input: #2f2f2b;
     --ring: #8a9b62;
@@ -121,6 +124,7 @@
   --accent: #252522;
   --accent-foreground: #e8e7e2;
   --destructive: var(--bad);
+  --destructive-foreground: #141412;
   --border: #2f2f2b;
   --input: #2f2f2b;
   --ring: #8a9b62;
@@ -162,6 +166,7 @@
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
@@ -183,6 +188,7 @@
   --color-rail-foreground: var(--rail-foreground);
   --color-rail-muted: var(--rail-muted);
   --color-rail-accent: var(--rail-accent);
+  --color-rail-bad: var(--rail-bad);
   --shadow-card: var(--shadow);
   --shadow-modal: var(--modal-shadow);
 
@@ -195,20 +201,34 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/*
+ * Type scale: 14px (text-sm) is reading text: table cells and their figures, fields and their labels,
+ * buttons, paragraphs. 13px (text-meta) is secondary text only: hints, captions, metadata lines.
+ * 12px (text-xs) is the floor: eyebrows, pills, table headings. Nothing is smaller.
+ */
+@theme {
+  --text-xs: 0.75rem;
+  --text-xs--line-height: 1rem;
+  --text-meta: 0.8125rem;
+  --text-meta--line-height: 1.125rem;
+  --text-sm: 0.875rem;
+  --text-sm--line-height: 1.25rem;
+}
+
 /* Small caps label above a title or value. */
 @utility eyebrow {
-  font-size: 11px;
+  font-size: var(--text-xs);
+  line-height: var(--text-xs--line-height);
   font-weight: 600;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--muted-foreground);
 }
 
-/* Figures: money, quantities, percentages, codes. */
+/* Figures: money, quantities, percentages, codes; at the size of the text around them. */
 @utility num {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
-  font-size: 0.9em;
   white-space: nowrap;
 }
 

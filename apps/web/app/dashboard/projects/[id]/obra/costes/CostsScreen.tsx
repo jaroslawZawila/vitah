@@ -1,23 +1,27 @@
 "use client";
 
-// Container for Obra › Costes: read-only, it only filters. The views in
-// ../../components/construction take props only.
+// Container for Obra › Costes: read-only, it filters and folds chapters open,
+// keeping both in the URL (`?capitulo=&estado=&q=&abierto=03,07`, replaced).
+// The views in ../../components/construction take props only.
 
 import Link from "next/link";
-import { useState } from "react";
+import { useMemo } from "react";
 import { useTranslations } from "next-intl";
 import type { ConstructionCosts, CostLine } from "@repo/core/contract";
 import { Input } from "@/components/ui/input";
+import { openGroups, openParam, parseOpen, useUrlState } from "../../../../components/useUrlState";
 import { footnote, moreLink } from "../../components/construction/classes";
+import { rollUpCosts } from "../../components/construction/cost-rollup";
 import CostTable from "../../components/construction/CostTable";
-import { FilterSelect } from "../../components/construction/Filters";
+import { FilterSelect, FoldAllButtons } from "../../components/construction/Filters";
 import ObraFrame, { obraHref, type ObraHeader } from "../../components/construction/ObraFrame";
 import LateDeliveriesBanner from "../../components/construction/LateDeliveriesBanner";
 import { LiveBadge, Source, SourceLabel } from "../../components/construction/pills";
 import { newOrderHref, orderHref } from "../../components/purchasing/links";
 import Segmented from "../../components/construction/Segmented";
 
-type Contracting = "all" | "closed" | "open" | "uncontracted" | "overrun";
+const CONTRACTING = ["all", "closed", "open", "uncontracted", "overrun"] as const;
+type Contracting = (typeof CONTRACTING)[number];
 
 const MATCHES: Record<Contracting, (line: CostLine) => boolean> = {
   all: () => true,
@@ -26,6 +30,23 @@ const MATCHES: Record<Contracting, (line: CostLine) => boolean> = {
   uncontracted: (line) => line.contracting === "none",
   overrun: (line) => (line.deviationCents ?? 0) > 0,
 };
+
+/** What the page shows: the chapter picked, the lines by contracting and text, and the chapters open (null: the default). */
+type CostsView = { chapter: string; contracting: Contracting; query: string; open: string[] | null };
+
+const parseView = (params: URLSearchParams): CostsView => ({
+  chapter: params.get("capitulo") || "all",
+  contracting: CONTRACTING.find((key) => key === params.get("estado")) ?? "all",
+  query: params.get("q") ?? "",
+  open: parseOpen(params.get("abierto")),
+});
+
+const viewParams = (view: CostsView) => ({
+  capitulo: view.chapter === "all" ? null : view.chapter,
+  estado: view.contracting === "all" ? null : view.contracting,
+  q: view.query.trim() ? view.query : null,
+  abierto: openParam(view.open),
+});
 
 /** What each budget line was expected to cost against what was contracted. */
 export default function CostsScreen({
@@ -44,28 +65,40 @@ export default function CostsScreen({
   const t = useTranslations("construction.costs");
   const tf = useTranslations("construction.filters");
   const ts = useTranslations("construction.sources");
-  const [chapter, setChapter] = useState("all");
-  const [contracting, setContracting] = useState<Contracting>("all");
-  const [query, setQuery] = useState("");
-  // Chapters folded open or shut by hand; by default those in progress are open.
-  const [toggled, setToggled] = useState<Record<string, boolean>>({});
+  const [view, setView] = useUrlState(parseView, viewParams);
+  const { chapter, contracting, query } = view;
   const needle = query.trim().toLowerCase();
   const filtering = contracting !== "all" || needle !== "";
 
-  const shown = costs.chapters
-    .filter((c) => chapter === "all" || c.code === chapter)
-    .map((c) => ({
-      ...c,
-      lines: c.lines.filter(
-        (line) =>
-          MATCHES[contracting](line) &&
-          (!needle || line.description.toLowerCase().includes(needle) || line.code.toLowerCase().includes(needle)),
-      ),
-    }))
-    .filter((c) => !filtering || c.lines.length > 0);
+  const shown = useMemo(
+    () =>
+      costs.chapters
+        .filter((c) => chapter === "all" || c.code === chapter)
+        .map((c) => {
+          const lines = c.lines.filter(
+            (line) =>
+              MATCHES[contracting](line) &&
+              (!needle || line.description.toLowerCase().includes(needle) || line.code.toLowerCase().includes(needle)),
+          );
+          return { ...c, lines, rollup: rollUpCosts(lines) };
+        })
+        .filter((c) => !filtering || c.lines.length > 0),
+    [costs.chapters, chapter, contracting, needle, filtering],
+  );
+  // The obra's totals and how many lines each filter keeps: the whole obra, whatever is shown.
+  const { total, counts } = useMemo(() => {
+    const lines = costs.chapters.flatMap((c) => c.lines);
+    return {
+      total: rollUpCosts(lines),
+      counts: Object.fromEntries(CONTRACTING.map((key) => [key, lines.filter(MATCHES[key]).length])) as Record<Contracting, number>,
+    };
+  }, [costs.chapters]);
 
-  const expanded = (code: string) =>
-    toggled[code] ?? (filtering || chapter !== "all" || costs.chapters.find((c) => c.code === code)?.state === "in_progress");
+  // Folded by default; a filter, a search or a chapter picked opens what it shows.
+  const codes = shown.map((c) => c.code);
+  const fallback = filtering || chapter !== "all" ? codes : [];
+  const groups = openGroups(view.open, codes, fallback, (open) => setView({ ...view, open }));
+  const filter = (change: Partial<Omit<CostsView, "open">>) => setView({ ...view, ...change, open: null });
 
   return (
     <ObraFrame
@@ -94,22 +127,28 @@ export default function CostsScreen({
           id="costs-chapter"
           label={tf("chapter")}
           value={chapter}
-          onChange={setChapter}
+          onChange={(value) => filter({ chapter: value })}
           options={[{ value: "all", label: tf("all") }, ...costs.chapters.map((c) => ({ value: c.code, label: `${c.code} · ${c.name}` }))]}
         />
         <Segmented
           label={t("contracting")}
           value={contracting}
-          onChange={setContracting}
-          options={(["all", "closed", "open", "uncontracted", "overrun"] as const).map((key) => ({ key, label: t(`filter.${key}`) }))}
+          onChange={(value) => filter({ contracting: value })}
+          options={CONTRACTING.map((key) => ({ key, label: t(`filter.${key}`), count: counts[key] }))}
         />
         <Input
           type="search"
           value={query}
-          onChange={(event) => setQuery(event.target.value)}
+          onChange={(event) => filter({ query: event.target.value })}
           placeholder={t("search")}
           aria-label={t("search")}
           className="h-10 w-full max-w-[240px] bg-card"
+        />
+        <FoldAllButtons
+          allOpen={groups.allOpen}
+          noneOpen={groups.noneOpen}
+          onExpand={groups.expandAll}
+          onCollapse={groups.collapseAll}
         />
         <Link href={obraHref(projectId)} className={`${moreLink} md:ml-auto`}>
           {t("totalsInSummary")} →
@@ -118,8 +157,9 @@ export default function CostsScreen({
 
       <CostTable
         chapters={shown}
-        expanded={expanded}
-        onToggle={(code) => setToggled((all) => ({ ...all, [code]: !expanded(code) }))}
+        total={filtering || chapter !== "all" ? undefined : total}
+        expanded={groups.isOpen}
+        onToggle={groups.toggle}
         orderHref={(id) => orderHref(projectId, id)}
         newOrderHref={canManage ? (code) => newOrderHref(projectId, code) : undefined}
       />

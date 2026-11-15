@@ -21,6 +21,7 @@ vi.mock("../../../../actions/budget", () => ({
   optionFromLineAction: vi.fn(),
   rejectRevisionAction: vi.fn(),
   searchPriceBaseAction: vi.fn(),
+  takeProjectDataAction: vi.fn(),
   updateChapterAction: vi.fn(),
   updateLineAction: vi.fn(),
   updateOptionAction: vi.fn(),
@@ -104,8 +105,12 @@ beforeEach(() => {
   vi.clearAllMocks();
   for (const fn of Object.values(actions)) (fn as ReturnType<typeof vi.fn>).mockResolvedValue({ success: true });
   vi.mocked(actions.searchPriceBaseAction).mockResolvedValue([]);
-  vi.spyOn(window, "confirm").mockReturnValue(true);
 });
+
+/** The confirmation a button opened, by its title. */
+async function confirmation(name: string) {
+  return within(await screen.findByRole("alertdialog", { name }));
+}
 
 describe("BudgetScreen", () => {
   it("summarises a draft: the AI's checks, figures, chapters and options", async () => {
@@ -125,15 +130,17 @@ describe("BudgetScreen", () => {
   it("leads with the works' price and its margins, then the chapters, the AI's checks last", async () => {
     renderScreen();
 
-    const work = screen.getByText("Importe de la obra").parentElement!;
+    const work = screen.getByText("Importe de la obra · sin IVA").parentElement!;
     expect(work).toHaveTextContent(/38\.554,78/);
     expect(work).toHaveTextContent(/Coste 32\.398,97/);
     expect(work).toHaveTextContent(/Margen bruto 15,97\s%\ssobre la venta/);
-    expect(screen.getByText("Beneficio industrial").parentElement).toHaveTextContent(/1943,94/);
-    expect(screen.getByText("Gastos asociados").parentElement).toHaveTextContent(/4211,87/);
-    expect(screen.getByText("€/m² construido").parentElement).toHaveTextContent("184,91 m² construidos");
+    expect(screen.getByText("Beneficio industrial").parentElement).toHaveTextContent(/1\.943,94/);
+    expect(screen.getByText("Gastos asociados").parentElement).toHaveTextContent(/4\.211,87/);
+    expect(screen.getByText("€/m² construido · sin IVA").parentElement).toHaveTextContent("184,91 m² construidos");
     // Under the chapters: the cost, then each margin in % and €.
     expect(screen.getByText(/Coste de ejecución/)).toBeInTheDocument();
+    // It counts chapter 20; the Obra tab's cost doesn't, so the reserve reconciles the two.
+    expect(screen.getByText(/^La Obra mide el coste sin el cap\. 20 \(1\.836,19\s€\): es la reserva de imprevistos\.$/)).toBeInTheDocument();
     expect(screen.getByText(/Gastos asociados · 13\s%\sdel coste/)).toBeInTheDocument();
     expect(screen.getByText(/Beneficio industrial · 6\s%\sde la venta/)).toBeInTheDocument();
     const chapters = screen.getByRole("table", { name: "Resumen por capítulos" });
@@ -267,10 +274,40 @@ describe("BudgetScreen", () => {
     expect(await dialog.findByText("Escribe el motivo de la revisión antes de emitirla.")).toBeInTheDocument();
   });
 
-  it("deletes the draft after confirmation", async () => {
+  it("deletes the draft after confirmation, saying it can't be undone", async () => {
     renderScreen();
     await userEvent.click(screen.getByRole("button", { name: "Eliminar borrador" }));
+    const dialog = await confirmation("¿Eliminar el borrador Rev.1?");
+    expect(dialog.getByText(/no se puede deshacer\. Las revisiones anteriores no cambian\./)).toBeInTheDocument();
+    expect(actions.deleteRevisionAction).not.toHaveBeenCalled();
+    await userEvent.click(dialog.getByRole("button", { name: "Eliminar borrador" }));
     expect(actions.deleteRevisionAction).toHaveBeenCalledWith("p-1", "rev-1");
+  });
+
+  it("keeps the draft when the confirmation is cancelled, and shows a failure in the dialog", async () => {
+    vi.mocked(actions.deleteRevisionAction).mockResolvedValue({ error: "not_draft" });
+    renderScreen();
+    await userEvent.click(screen.getByRole("button", { name: "Eliminar borrador" }));
+    let dialog = await confirmation("¿Eliminar el borrador Rev.1?");
+    await userEvent.click(dialog.getByRole("button", { name: "Cancelar" }));
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+    expect(actions.deleteRevisionAction).not.toHaveBeenCalled();
+
+    await userEvent.click(screen.getByRole("button", { name: "Eliminar borrador" }));
+    dialog = await confirmation("¿Eliminar el borrador Rev.1?");
+    await userEvent.click(dialog.getByRole("button", { name: "Eliminar borrador" }));
+    expect(await dialog.findByRole("alert")).toBeInTheDocument();
+  });
+
+  it("deletes a line of the draft once confirmed, naming it", async () => {
+    renderScreen({ tab: "lines", chapterCode: "05" });
+
+    await userEvent.click(screen.getByRole("button", { name: "Más acciones de 05.91" }));
+    await userEvent.click(screen.getByRole("button", { name: /Borrar partida/ }));
+    const dialog = await confirmation("¿Borrar la partida 05.91?");
+    expect(dialog.getByText("«Remates de chapa» se borra del borrador, y no se puede deshacer.")).toBeInTheDocument();
+    await userEvent.click(dialog.getByRole("button", { name: "Borrar partida" }));
+    expect(actions.deleteLineAction).toHaveBeenCalledWith("p-1", "line-2");
   });
 
   it("records the client's acceptance with the options they chose and the signed copy", async () => {
@@ -330,7 +367,7 @@ describe("BudgetScreen", () => {
     expect(screen.getByText("Aceptada el 21 oct 2026: es el contrato.")).toBeInTheDocument();
     expect(screen.getByText(/Aceptada por D\. Roberto Guzmán\./)).toBeInTheDocument();
     // When it was registered, in Spain: 22:30 UTC is already the 23rd there.
-    expect(screen.getByText("Registrado por Marta Ruiz el 23 oct 2026, 0:30.")).toBeInTheDocument();
+    expect(screen.getByText("Registrado por Marta Ruiz el 23 oct 2026, 00:30.")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Copia firmada" })).toHaveAttribute("href", "/api/v1/projects/p-1/documents/doc-9");
     expect(screen.queryByText("Sin copia firmada")).not.toBeInTheDocument();
   });
@@ -338,7 +375,7 @@ describe("BudgetScreen", () => {
   it("says so when the contract was registered without a signed copy", () => {
     renderScreen({ budget: accepted({ signedDocumentId: null }) });
 
-    expect(screen.getByText("Registrado por Marta Ruiz el 23 oct 2026, 0:30.")).toBeInTheDocument();
+    expect(screen.getByText("Registrado por Marta Ruiz el 23 oct 2026, 00:30.")).toBeInTheDocument();
     expect(screen.getByText("Sin copia firmada")).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Copia firmada" })).not.toBeInTheDocument();
   });
@@ -357,7 +394,12 @@ describe("BudgetScreen", () => {
     renderScreen({ budget: issued });
 
     await userEvent.click(screen.getByRole("button", { name: "Rechazado" }));
+    const dialog = await confirmation("¿Marcar la Rev.0 como rechazada por el cliente?");
+    expect(dialog.getByText(/ya no se podrá aceptar/)).toBeInTheDocument();
+    expect(actions.rejectRevisionAction).not.toHaveBeenCalled();
+    await userEvent.click(dialog.getByRole("button", { name: "Marcar como rechazada" }));
     expect(actions.rejectRevisionAction).toHaveBeenCalledWith("p-1", "rev-0");
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
     // The buttons wait for that action to finish.
     const next = screen.getByRole("button", { name: "Crear Rev.1 con cambios" });
     await waitFor(() => expect(next).toBeEnabled());
@@ -464,5 +506,68 @@ describe("BudgetScreen", () => {
     renderScreen();
 
     expect(screen.queryByText(/Solo lectura/)).not.toBeInTheDocument();
+  });
+});
+
+describe("the project's client and address", () => {
+  /** The project's client and address, the draft naming others. */
+  const differing = (base: Budget = draft): Budget => ({
+    ...base,
+    revision: {
+      ...base.revision,
+      identity: { client: "Ana Peña Ruiz", address: "Barrio Caviedes 12, Valdáliga", differs: ["promoter", "site"], projectLacks: [] },
+    },
+  });
+
+  it("shows both on the draft's texts and takes the project's on request, or links to correct the project", async () => {
+    renderScreen({ budget: differing(), tab: "texts" });
+
+    const notice = screen.getByRole("status", { name: "El presupuesto no nombra al cliente o la dirección del proyecto" });
+    expect(notice).toHaveTextContent(/Promotor.*En el presupuesto.*D\. Roberto Guzmán Mesa.*En el proyecto.*Ana Peña Ruiz/);
+    expect(notice).toHaveTextContent(/Emplazamiento.*C\/ de la Arboleda 3, Zarzalejo \(Madrid\).*Barrio Caviedes 12, Valdáliga/);
+    expect(within(notice).getByRole("link", { name: "Corregir el proyecto" })).toHaveAttribute("href", "/dashboard/projects/p-1");
+
+    await userEvent.click(within(notice).getByRole("button", { name: "Usar los datos del proyecto" }));
+    expect(actions.takeProjectDataAction).toHaveBeenCalledWith("p-1", "rev-1");
+  });
+
+  it("only mentions what the draft names and the project lacks", () => {
+    const lacking: Budget = { ...draft, revision: { ...draft.revision, identity: { client: null, address: "C/ de la Arboleda 3", differs: [], projectLacks: ["promoter"] } } };
+    renderScreen({ budget: lacking, tab: "texts" });
+
+    expect(screen.getByText(/El proyecto aún no tiene cliente; el presupuesto dice «D\. Roberto Guzmán Mesa»/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Usar los datos del proyecto" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Ir a la pestaña General" })).toHaveAttribute("href", "/dashboard/projects/p-1");
+  });
+
+  it("shows viewers the notice without its actions", () => {
+    renderScreen({ budget: differing(), tab: "texts", canManage: false });
+
+    expect(screen.getByRole("status", { name: /no nombra al cliente/ })).toHaveTextContent("Ana Peña Ruiz");
+    expect(screen.queryByRole("button", { name: "Usar los datos del proyecto" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Corregir el proyecto" })).not.toBeInTheDocument();
+  });
+
+  it("says it in one quiet line on the summary, pointing to the texts", () => {
+    renderScreen({ budget: differing() });
+
+    expect(screen.getByText(/no coinciden con los del proyecto/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Revisar en Textos" })).toHaveAttribute("href", "/dashboard/projects/p-1/budget/texts");
+    expect(screen.queryByRole("button", { name: "Usar los datos del proyecto" })).not.toBeInTheDocument();
+  });
+
+  it("only notes it, read-only, on a revision given to the client", () => {
+    renderScreen({ budget: differing(issued), tab: "texts" });
+
+    expect(screen.getByText(/Los datos del proyecto no coinciden con los de esta revisión: cliente «Ana Peña Ruiz» · dirección «Barrio Caviedes 12, Valdáliga»\. Ya se entregó al cliente/)).toBeInTheDocument();
+    expect(screen.queryByRole("status", { name: /no nombra al cliente/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Usar los datos del proyecto" })).not.toBeInTheDocument();
+  });
+
+  it("says nothing when the draft names the project's data", () => {
+    renderScreen({ tab: "texts" });
+
+    expect(screen.queryByRole("status", { name: /no nombra al cliente/ })).not.toBeInTheDocument();
+    expect(screen.queryByText(/no coinciden/)).not.toBeInTheDocument();
   });
 });

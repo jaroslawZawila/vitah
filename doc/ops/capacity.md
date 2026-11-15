@@ -189,8 +189,9 @@ Load average 4.63 5.45 4.85; median of 7 runs after a warm-up. "was" is the read
 | `getPurchasingCounts` | dashboard layout (rail badges) | 9.8 | 13 | 1 | 1 | 1 |  | 96 B | 96 B | good |
 | `subcontractors getCounts` | dashboard layout (rail badges) | 15 | 16 | 3 | 347 | 347 |  | 47 B | 47 B | good |
 | **Tenant-wide** | | | | | | | | | | |
-| `listProjectsWithBudget` | /dashboard/projects | 13 | 15 | 3 | 114 | 114 | 60 | 33 KB | 33 KB | good |
-| `listProjects` | GET /api/v1/projects, obra pickers | 2.3 | 2.5 | 1 | 60 | 60 | 60 | 29 KB | 29 KB | good |
+| `listProjectsWithBudget (signals)` ¹ | /dashboard/projects | 195 | 469 | 18 | 20,340 | 30,832 | 60 | 44 KB | 44 KB | good |
+| `listProjectsWithBudget` ¹ | GET /api/v1/projects (without `?signals=1`) | 13 | 15 | 3 | 114 | 114 | 60 | 33 KB | 33 KB | good |
+| `listProjects` | obra pickers | 2.3 | 2.5 | 1 | 60 | 60 | 60 | 29 KB | 29 KB | good |
 | `listBudgets` | GET /api/v1/budgets | 79 | 71 | 14 | 10,965 | 10,965 | 60 | 32 KB | 32 KB | good |
 | `listPurchases (page 1)` | /dashboard/compras | 32 | 429 | 13 | 690 | 34,877 | 50 | 51 KB | 1071 KB | good |
 | `listPurchases (page 1, search + late)` | /dashboard/compras?q=&late=1 | 21 | 429 | 11 | 390 | 34,877 | 29 | 37 KB | 1071 KB | good |
@@ -220,15 +221,62 @@ Load average 4.63 5.45 4.85; median of 7 runs after a warm-up. "was" is the read
 | `getPurchaseForm` | /dashboard/projects/[id]/compras/nuevo | 38 | 256 | 17 | 2,320 | 28,127 | 150 | 79 KB | 79 KB | good |
 | `getPurchase` | /dashboard/projects/[id]/compras/[orderId] | 15 | 20 | 28 | 520 | 580 |  | 5.2 KB | 5.2 KB | attention |
 | `getInvoice` | /dashboard/compras/facturas/[invoiceId] | 9.8 | 12 | 13 | 172 | 172 |  | 3.3 KB | 3.3 KB | good |
-| `getControl` | /dashboard/projects/[id]/obra | 50 | 71 | 27 | 3,107 | 4,228 | 19 | 25 KB | 25 KB | attention |
+| `getControl` ¹ | /dashboard/projects/[id]/obra | 33 | 54 | 26 | 3,089 | 3,127 | 19 | 25 KB | 25 KB | attention |
 | `getControlHeader` | every Obra and Compras page of the obra | 2.5 | 3.4 | 4 | 22 | 22 |  | 1.2 KB | 1.2 KB | good |
 | `getCosts` | /dashboard/projects/[id]/obra/costes | 9.1 | 11 | 14 | 503 | 503 | 145 | 71 KB | 71 KB | good |
 | `listIssues` | /dashboard/projects/[id]/obra/incidencias | 3.5 | 4.5 | 3 | 13 | 13 | 12 | 4.9 KB | 4.9 KB | good |
-| `getPlanning` | /dashboard/projects/[id]/obra/planificacion | 8.6 | 11 | 14 | 314 | 314 |  | 12 KB | 12 KB | good |
+| `getPlanning` ¹ | /dashboard/projects/[id]/obra/planificacion | 8.6 | 8.6 | 13 | 295 | 314 |  | 12 KB | 12 KB | good |
 | `getBudget` | /dashboard/projects/[id]/budget | 22 | 24 | 9 | 1,141 | 1,141 | 146 | 91 KB | 91 KB | good |
 | `listHitos` | /dashboard/projects/[id]/payments | 6.4 | 6.9 | 10 | 249 | 249 | 10 | 9.5 KB | 9.5 KB | good |
 | `listPhotos` | /dashboard/projects/[id]/obra/fotos | 1.6 | 2.0 | 2 | 53 | 53 | 52 | 11 KB | 11 KB | good |
 | `listDocuments` | /dashboard/projects/[id]/documents | 1.6 | 1.7 | 2 | 5 | 5 | 4 | 1.1 KB | 1.1 KB | good |
+
+¹ Measured later the same day, after the project list gained its signals (next section); "was" is then the
+read as the signals were first written. Every other row is the paging work's.
+
+### The project list's signals
+
+The Proyectos list gained, per obra, whether it is on time, how much is built and what needs attention
+(`project-signals.ts`). As first written it read 25 statements and 30,832 rows in 469 ms (load average 3.0),
+for every caller of `GET /api/v1/projects` too: it loaded every line of every contract (about 8,900 wide rows)
+for one % per obra, sent most of the subcontractor network's document ids as bind parameters (about 8,600 in
+each of two statements: past Postgres's 65,535 at about ten times the companies, where the list would fail
+outright), and read the approved plan twice, the second time after everything else. Now (load average 1.9;
+median of 7 after a warm-up):
+
+| Read | Time (ms) | was | SQL | was | DB rows | was |
+|---|--:|--:|--:|--:|--:|--:|
+| `listProjectsWithBudget(ctx, { signals: true })` (/dashboard/projects) | 195 | 469 | 18 | 25 | 20,340 | 30,832 |
+| `listProjectsWithBudget(ctx)` (`GET /api/v1/projects`; `?signals=1` asks for them) | 13 | 469 | 3 | 25 | 114 | 30,832 |
+| `getControl` (Obra › Resumen) | 33 | 54 | 26 | 29 | 3,089 | 3,127 |
+| `getPlanning` (Obra › Planificación) | 8.6 | 8.6 | 13 | 14 | 295 | 314 |
+
+- **Opt-in.** Only the portal's list asks for the signals; `/api/v1/projects` without `?signals=1` answers as
+  before the signals existed (they are absent, not null).
+- **No lines.** `loadObraSummaries` (`obra-data.ts`) sums each contract chapter's lines in SQL, priced as the
+  Budget prices them (`linePriceSql`) and rounded per line as `progressOf` rounds them (`LineTotals`), so the
+  same pure `progressOfTotals` gives `loadObra`'s figure; a chapter finished on Avance counts in full, as there.
+  960 rows instead of about 8,900; no hito checks or acta photos. Tests compare it with `loadObra` (options
+  chosen, a deduction on a negative half cent, a chapter finished with lines under 100 %), and on this dataset
+  every one of the 64 obras' schedule, built %, CAE warnings, late deliveries and hitos to invoice equals what
+  its Obra tab says.
+- **No list of ids.** The network's documents and their versions are now selected by subquery
+  (`loadNetwork`, `loadCompanyStatuses`), never by a list of document ids, so no read has a bind parameter per
+  document; the versions go out with the documents instead of after them. The list's CAE count
+  (`countProjectsAttention`) loads no workers and counts per company once, not per obra.
+- **`liveDocument` without JIT.** The documents' "an obra's document only while the company is on it" was a
+  correlated `exists` under an `or`, estimated so high that Postgres compiled it (JIT): 51 ms for the tenant's
+  8,594 documents. As an `in` over the live assignments it executes in 4 ms, same rows. Every Subcontratas read
+  gains: `loadNetwork (whole tenant)` 127 ms (192 just before), `getOverview` 161 (227), `listSuppliers` 133 (189).
+- **The plan read once.** `approvedPlansOf` (`planning-data.ts`) reads the approved version and its items in
+  one statement, alongside the obra; the schedule (`obraSchedule`, now synchronous) and Planificación use it, so
+  Resumen loses two serial round trips and Planificación one statement. `contractSchedule` runs once per obra.
+- Late deliveries are counted per obra in SQL, open material orders only.
+- What is left: the list still reads the assigned companies' documents and their latest versions (about
+  15,400 of its 20,340 rows): the CAE rules are TypeScript, so counting warnings needs every document's state.
+  The fix is the stored status of "Left alone". `loadCompanyStatuses` now always sends its two version reads
+  (in parallel with the rest), so `getPurchase` is at 30 statements (28) and `getSupplierPurchasing` at 14 (12),
+  with no more time.
 
 ### Over HTTP
 
@@ -331,11 +379,11 @@ are sent whole with each page (see "Left alone"). `next start` does not compress
 | Solicitudes (purchase requests), not paged | 14 ms, 301 rows, 180 KB of JSON, 315 KB of RSC, 1.5 MB of HTML (143 KB gzipped) | Under every budget; about 7 requests per obra. | The same paging as the orders; the list already orders by state in memory (`RANK`), which moves to SQL. |
 | Proveedores (`listSuppliers`) | 151 ms in core (was 349), 256 ms over HTTP (was 435), 13,656 rows | Still loads every order and invoice to add up 150 suppliers in TypeScript. Under the budget. | The sums per supplier in SQL (as `bySupplier` now does for orders). |
 | The budgets overview (`listBudgets`, `GET /api/v1/budgets`) | 79 ms, 14 statements | One statement per draft revision for its review checks (9 drafts here): an N+1 that grows with the drafts open, not with history. | Load the drafts' chapters in one statement for `revisionChecks`. |
-| `getControl` (27 statements) and `getPurchase` (28, was 31) | 50 ms and 15 ms | Many small indexed statements sent in parallel; over the "about 25" line by two or three. | Fold `loadObra`'s five hito reads into one. |
+| `getControl` (26 statements) and `getPurchase` (30) | 33 ms and 15 ms | Many small indexed statements sent in parallel; over the "about 25" line by two or three. | Fold `loadObra`'s five hito reads into one. |
 | The unpaged API answers (`/api/v1/purchases`, `…/invoices`, `…/payments`, `…/workers` without `?page`) | 0.85 to 1.7 MB, 40 to 164 ms in core | Kept for compatibility, capped at 5,000 rows. `…/invoices` unpaged is slower than before (83 ms, was 63): it now also counts in SQL. | Make `?page` mandatory once no client asks without it. |
 | Pagos' forecast lists every invoice owed | 258 KB of JSON, 393 KB of RSC | It is what the page shows (268 of the 315 invoices owed here fall in its weeks); it grows with what is owed, not with history. | Show each week's total and open its invoices on demand. |
 | Every page's HTML starts at 190 KB | `es.json` is 161 KB | Not a list; gzipped it is 41 KB. Out of scope here. | Give each route only the namespaces it uses (`NextIntlClientProvider` with picked messages). |
-| `inArray(ids)` with one parameter per id | up to 5,000 ids on an unpaged call | Postgres takes 65,534 parameters; the cap keeps a call well under. | Nothing while lists are paged. |
+| `inArray(ids)` with one parameter per id | up to 5,000 ids on an unpaged call; one per live obra in the project list's signals | Postgres takes 65,534 parameters; the cap keeps a call well under. Document ids are never sent as a list (subqueries). | Nothing while lists are paged. |
 
 One web test (`OrderScreen.test.tsx`, "adds a document…") failed once in a run on the loaded machine and
 passed alone; it does not touch what changed here.

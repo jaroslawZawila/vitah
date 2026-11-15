@@ -48,8 +48,8 @@ describe("MilestonesScreen", () => {
     const requests = within(screen.getByRole("table", { name: "Solicitudes de factura" }));
     const row = requests.getByText("H3 Estructura Steel Frame (03)").closest("tr")!;
     expect(within(row).getByText("· Marta Ruiz Gómez")).toBeInTheDocument();
-    expect(within(row).getByText("11/09")).toBeInTheDocument();
+    expect(within(row).getByText("11 sept 2026")).toBeInTheDocument();
     expect(within(row).getByText("al finalizar 03 · Rubén García")).toBeInTheDocument();
-    expect(within(row).getByText("Facturada 25/09")).toBeInTheDocument();
+    expect(within(row).getByText("Facturada 25 sept 2026")).toBeInTheDocument();
   });
 });

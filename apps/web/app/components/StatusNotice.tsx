@@ -38,7 +38,7 @@ export default function StatusNotice({
       <p className="max-w-[52ch] text-[14.5px] text-pretty text-muted-foreground">{text}</p>
       {children && <div className={cn("mt-2 flex flex-wrap gap-2", page && "justify-center")}>{children}</div>}
       {digest && (
-        <p className="mt-2 text-xs text-muted-foreground">
+        <p className="mt-2 text-meta text-muted-foreground">
           {digest.label}: <code className="num text-foreground select-all">{digest.value}</code>
         </p>
       )}
@@ -52,7 +52,7 @@ export default function StatusNotice({
     <main className="dark flex min-h-svh flex-col items-center justify-center gap-10 bg-grafito px-4 py-10 text-blanco-calido">
       <div className="flex flex-col items-center text-center">
         <p className="font-sans text-[32px] leading-none font-light tracking-[0.15em] sm:text-[40px]">ViTAH</p>
-        {descriptor && <p className="mt-3 text-[10px] tracking-[0.25em] text-verde-oliva-light uppercase">{descriptor}</p>}
+        {descriptor && <p className="mt-3 text-xs tracking-[0.25em] text-verde-oliva-light uppercase">{descriptor}</p>}
       </div>
       <section className="flex w-full max-w-[480px] flex-col items-center gap-3 text-center">{notice}</section>
     </main>

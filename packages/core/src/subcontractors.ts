@@ -9,6 +9,7 @@ import {
   isNull,
   lte,
   projects,
+  sql,
   subcontractorAssignments,
   subcontractorAudit,
   subcontractorDocumentVersions,
@@ -424,21 +425,50 @@ export async function getOverview(ctx: Ctx): Promise<SubcontractorsOverview> {
   };
 }
 
+/** The companies with a live assignment on `projectIds`, as a subquery. */
+const assignedTo = (tenantId: string, projectIds: string[]) =>
+  sql`${db
+    .select({ id: subcontractorAssignments.subcontractorId })
+    .from(subcontractorAssignments)
+    .where(and(inArray(subcontractorAssignments.projectId, projectIds), liveAssignment(tenantId)))}`;
+
 /**
  * What needs attention among the companies working on one obra: their own
  * documents, their workers' and this obra's. The Obra tab warns with it.
  */
 export async function listProjectAttention(ctx: Ctx, projectId: string): Promise<AttentionItem[]> {
   // Only the companies working on this obra are loaded.
-  const rows = await db
-    .select({ id: subcontractorAssignments.subcontractorId })
-    .from(subcontractorAssignments)
-    .where(and(eq(subcontractorAssignments.projectId, projectId), liveAssignment(ctx.tenantId)));
-  if (rows.length === 0) return [];
-  const assigned = new Set(rows.map((r) => r.id));
-  const net = await loadNetwork(ctx.tenantId, [...assigned]);
+  const net = await loadNetwork(ctx.tenantId, assignedTo(ctx.tenantId, [projectId]));
+  const assigned = new Set(net.assignments.filter((a) => a.projectId === projectId).map((a) => a.subcontractorId));
   return attentionItems(net).filter(
     (item) => assigned.has(item.subcontractorId) && (item.projectId === null || item.projectId === projectId),
+  );
+}
+
+/**
+ * How many items `listProjectAttention` gives each of several obras at once
+ * (the project list), by project id; one without any is absent. The same
+ * items, from the same companies, without their workers (only their lines
+ * show them: names, workers affected).
+ */
+export async function countProjectsAttention(ctx: Ctx, projectIds: string[]): Promise<Map<string, number>> {
+  if (projectIds.length === 0) return new Map();
+  const net = await loadNetwork(ctx.tenantId, assignedTo(ctx.tenantId, projectIds), { workers: false });
+  // A company's items: on its own (and its workers') documents, or on one obra's.
+  const counts = new Map<string, number>();
+  const add = (key: string) => counts.set(key, (counts.get(key) ?? 0) + 1);
+  for (const item of attentionItems(net)) add(`${item.subcontractorId}|${item.projectId ?? ""}`);
+  const wanted = new Set(projectIds);
+  const assigned = new Map<string, Set<string>>();
+  for (const a of net.assignments) {
+    if (wanted.has(a.projectId)) assigned.set(a.projectId, (assigned.get(a.projectId) ?? new Set()).add(a.subcontractorId));
+  }
+  return new Map(
+    [...assigned].map(([projectId, companies]) => {
+      let count = 0;
+      for (const id of companies) count += (counts.get(`${id}|`) ?? 0) + (counts.get(`${id}|${projectId}`) ?? 0);
+      return [projectId, count] as const;
+    }),
   );
 }
 

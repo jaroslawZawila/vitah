@@ -11,17 +11,17 @@ export default function AccessRulesCard() {
     <Card aria-labelledby="access-rules-title">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 id="access-rules-title">{t("workers.rulesTitle")}</h2>
-        <span className="text-[12.5px] text-muted-foreground">{t("workers.rulesHint")}</span>
+        <span className="text-meta text-muted-foreground">{t("workers.rulesHint")}</span>
       </div>
       <ol className="m-0 grid list-none gap-x-6 gap-y-3 p-0 md:grid-cols-2 xl:grid-cols-3">
         {ACCESS_RULES.map((rule, index) => (
-          <li key={rule} className="flex gap-3 text-[13.5px]">
+          <li key={rule} className="flex gap-3 text-sm">
             <span className="grid size-6 flex-none place-items-center rounded-full bg-brand-soft font-mono text-xs font-semibold text-brand-ink">
               {index + 1}
             </span>
             <span>
               <b className="block text-sm font-semibold">{t(`accessRules.${rule}.title`)}</b>
-              <span className="text-[12.5px] text-muted-foreground">{t(`accessRules.${rule}.detail`)}</span>
+              <span className="text-meta text-muted-foreground">{t(`accessRules.${rule}.detail`)}</span>
             </span>
           </li>
         ))}

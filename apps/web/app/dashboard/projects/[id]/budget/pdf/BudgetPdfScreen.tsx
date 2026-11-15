@@ -41,14 +41,14 @@ export default function BudgetPdfScreen({
               href={hrefs[key]}
               role="tab"
               aria-selected={key === kind}
-              className={cn("inline-flex min-h-9 items-center rounded-lg px-3.5 text-[13.5px] font-semibold text-rail-muted", key === kind && "bg-rail-foreground text-rail")}
+              className={cn("inline-flex min-h-9 items-center rounded-lg px-3.5 text-sm font-semibold text-rail-muted", key === kind && "bg-rail-foreground text-rail")}
             >
               {t(key)}
             </Link>
           ))}
         </div>
         <span className="flex flex-wrap items-center gap-2.5">
-          <span className="text-[12.5px] text-rail-muted">{t(draft ? "draftHint" : "issuedHint")}</span>
+          <span className="text-meta text-rail-muted">{t(draft ? "draftHint" : "issuedHint")}</span>
           <a href={fileUrl} download className={buttonVariants({ size: "sm" })}>
             <Download aria-hidden />
             {t("download")}

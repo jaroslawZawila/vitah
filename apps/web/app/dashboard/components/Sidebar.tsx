@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import ChangePasswordDialog, { type PasswordChangeResult } from "./ChangePasswordDialog";
+import { PROJECT_TABS } from "./place";
 import TwoStepDialog, { type TwoStepActions } from "./TwoStepDialog";
 import {
   COMPANY_PURCHASES_HREF,
@@ -32,16 +33,6 @@ const NAV_ITEMS = [
   { key: "projects", href: "/dashboard/projects", icon: FolderKanban, adminOnly: false },
   { key: "clients", href: "/dashboard/clients", icon: Contact, adminOnly: true },
   { key: "users", href: "/dashboard/users", icon: UserCog, adminOnly: true },
-] as const;
-
-/** Routes under `dashboard/projects/[id]/`, shown nested under "Projects". */
-const PROJECT_TABS = [
-  { key: "general", path: "" },
-  { key: "budget", path: "/budget" },
-  { key: "obra", path: "/obra" },
-  { key: "purchases", path: "/compras" },
-  { key: "payments", path: "/payments" },
-  { key: "documents", path: "/documents" },
 ] as const;
 
 const SUBCONTRACTORS_HREF = "/dashboard/subcontratas";
@@ -67,7 +58,7 @@ const PURCHASE_TABS = [
 
 const navLinkClass = (active: boolean) =>
   cn(
-    "relative flex min-h-11 items-center gap-2 rounded-[9px] px-2.5 text-[13.5px] font-medium text-rail-foreground transition-colors hover:bg-white/6 lg:min-h-10 lg:gap-[11px] lg:px-3 lg:text-[14.5px]",
+    "relative flex min-h-11 items-center gap-2 rounded-[9px] px-2.5 text-sm font-medium text-rail-foreground transition-colors hover:bg-white/6 lg:min-h-10 lg:gap-[11px] lg:px-3 lg:text-[14.5px]",
     active &&
       "bg-white/8 text-white lg:before:absolute lg:before:inset-y-2 lg:before:-left-3.5 lg:before:w-[3px] lg:before:rounded-r-[3px] lg:before:bg-rail-accent",
   );
@@ -124,7 +115,7 @@ export default function Sidebar({
           <div className="font-heading text-lg leading-none font-bold tracking-[0.16em] text-white lg:text-[21px]">
             ViTAH
           </div>
-          <div className="mt-1 text-[10.5px] tracking-[0.14em] text-rail-muted uppercase">
+          <div className="mt-1 text-xs tracking-[0.12em] text-rail-muted uppercase">
             OS Platform
           </div>
         </div>
@@ -227,12 +218,12 @@ function SettingsMenu({
           className,
         )}
       >
-        <span className="grid size-[30px] flex-none place-items-center rounded-full bg-verde-oliva-dark text-[13px] font-bold text-white">
+        <span className="grid size-[30px] flex-none place-items-center rounded-full bg-verde-oliva-dark text-sm font-bold text-white">
           {displayName.charAt(0).toUpperCase()}
         </span>
         <span className="min-w-0 max-sm:hidden">
-          <span className="block truncate text-[13px] font-semibold text-white">{displayName}</span>
-          {name && email && <span className="block truncate text-[11.5px] text-rail-muted">{email}</span>}
+          <span className="block truncate text-sm font-semibold text-white">{displayName}</span>
+          {name && email && <span className="block truncate text-xs text-rail-muted">{email}</span>}
         </span>
         <Settings aria-hidden className="ml-auto size-4 flex-none text-rail-muted" strokeWidth={1.8} />
         <span className="sr-only">{t("settings")}</span>
@@ -299,7 +290,7 @@ function SubcontractorsNav({ pathname, counts }: { pathname: string; counts: Sub
 
   return (
     <div className="max-lg:contents">
-      <p className="hidden px-3 pt-3 pb-1 text-[10.5px] font-semibold tracking-[0.14em] text-rail-muted uppercase lg:block">
+      <p className="hidden px-3 pt-3 pb-1 text-xs font-semibold tracking-[0.12em] text-rail-muted uppercase lg:block">
         {t("network")}
       </p>
       <Link href={`${SUBCONTRACTORS_HREF}/empresas`} className={navLinkClass(active)} aria-expanded={active}>
@@ -310,7 +301,7 @@ function SubcontractorsNav({ pathname, counts }: { pathname: string; counts: Sub
         />
         {t("subcontractors")}
         {!active && expiries > 0 && (
-          <span className="ml-auto rounded-full bg-bad px-1.5 font-mono text-[11px] text-white">
+          <span className="ml-auto rounded-full bg-bad px-1.5 font-mono text-xs text-destructive-foreground">
             {expiries}
             <span className="sr-only"> · {t("subcontractorTabs.expiriesCount", { count: expiries })}</span>
           </span>
@@ -329,7 +320,7 @@ function SubcontractorsNav({ pathname, counts }: { pathname: string; counts: Sub
                 <Link
                   href={tab.href}
                   className={cn(
-                    "flex min-h-11 items-center gap-2 rounded-full px-3 text-[13px] whitespace-nowrap text-rail-muted transition-colors hover:text-rail-foreground lg:-ml-px lg:min-h-9 lg:rounded-none lg:border-l-2 lg:border-transparent lg:px-3.5 lg:text-[13.5px]",
+                    "relative flex min-h-11 items-center gap-2 rounded-full px-3 text-sm whitespace-nowrap text-rail-muted transition-colors hover:text-rail-foreground lg:-ml-px lg:min-h-9 lg:rounded-none lg:border-l-2 lg:border-transparent lg:px-3.5",
                     current && "bg-white/10 font-semibold text-white lg:border-rail-accent lg:bg-transparent",
                   )}
                   aria-current={current ? "page" : undefined}
@@ -338,8 +329,8 @@ function SubcontractorsNav({ pathname, counts }: { pathname: string; counts: Sub
                   {count !== undefined && (tab.key !== "expiries" || count > 0) && (
                     <span
                       className={cn(
-                        "ml-auto rounded-full px-1.5 font-mono text-[11px]",
-                        tab.key === "expiries" ? "bg-bad text-white" : "bg-white/9 text-rail-foreground",
+                        "ml-auto rounded-full px-1.5 font-mono text-xs",
+                        tab.key === "expiries" ? "bg-bad text-destructive-foreground" : "bg-white/9 text-rail-foreground",
                       )}
                     >
                       {count}
@@ -378,7 +369,7 @@ function PurchasesNav({ pathname, counts }: { pathname: string; counts: Purchasi
         />
         {t("purchases")}
         {due > 0 && (
-          <span className="ml-auto rounded-full bg-bad px-1.5 font-mono text-[11px] text-white">
+          <span className="ml-auto rounded-full bg-bad px-1.5 font-mono text-xs text-destructive-foreground">
             {due}
             <span className="sr-only"> · {t("purchaseTabs.dueCount", { count: due })}</span>
           </span>
@@ -397,14 +388,14 @@ function PurchasesNav({ pathname, counts }: { pathname: string; counts: Purchasi
                 <Link
                   href={tab.href}
                   className={cn(
-                    "flex min-h-11 items-center gap-2 rounded-full px-3 text-[13px] whitespace-nowrap text-rail-muted transition-colors hover:text-rail-foreground lg:-ml-px lg:min-h-9 lg:rounded-none lg:border-l-2 lg:border-transparent lg:px-3.5 lg:text-[13.5px]",
+                    "relative flex min-h-11 items-center gap-2 rounded-full px-3 text-sm whitespace-nowrap text-rail-muted transition-colors hover:text-rail-foreground lg:-ml-px lg:min-h-9 lg:rounded-none lg:border-l-2 lg:border-transparent lg:px-3.5",
                     here && "bg-white/10 font-semibold text-white lg:border-rail-accent lg:bg-transparent",
                   )}
                   aria-current={here ? "page" : undefined}
                 >
                   {t(`purchaseTabs.${tab.key}`)}
                   {count !== undefined && (
-                    <span className="ml-auto rounded-full bg-white/9 px-1.5 font-mono text-[11px] text-rail-foreground">{count}</span>
+                    <span className="ml-auto rounded-full bg-white/9 px-1.5 font-mono text-xs text-rail-foreground">{count}</span>
                   )}
                 </Link>
               </li>
@@ -421,7 +412,7 @@ const subListClass =
 
 const subLinkClass = (current: boolean) =>
   cn(
-    "flex min-h-11 items-center rounded-full px-3 text-[13px] whitespace-nowrap text-rail-muted transition-colors hover:text-rail-foreground lg:-ml-px lg:min-h-9 lg:rounded-none lg:border-l-2 lg:border-transparent lg:px-3.5 lg:text-[13.5px]",
+    "relative flex min-h-11 items-center rounded-full px-3 text-sm whitespace-nowrap text-rail-muted transition-colors hover:text-rail-foreground lg:-ml-px lg:min-h-9 lg:rounded-none lg:border-l-2 lg:border-transparent lg:px-3.5",
     current && "bg-white/10 font-semibold text-white lg:border-rail-accent lg:bg-transparent",
   );
 

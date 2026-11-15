@@ -15,7 +15,7 @@ export default function TabHeader({
       <div className="min-w-0">
         <p className="eyebrow">{projectRef}</p>
         <h1 className="mt-1">{title}</h1>
-        <p className="mt-1.5 text-[13px] text-muted-foreground">{summary}</p>
+        <p className="mt-1.5 text-sm text-muted-foreground">{summary}</p>
       </div>
       {action}
     </header>

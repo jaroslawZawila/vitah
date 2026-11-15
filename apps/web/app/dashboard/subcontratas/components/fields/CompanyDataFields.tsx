@@ -13,7 +13,7 @@ import { taxIdValid, type CompanyFormDraft } from "./draft";
 export const segmentStyles = {
   group: "m-0 flex w-fit flex-wrap gap-[3px] rounded-[10px] border bg-raise p-[3px]",
   option:
-    "flex min-h-11 cursor-pointer items-center rounded-[7px] px-4 text-[13.5px] font-semibold text-muted-foreground transition-colors has-checked:bg-card has-checked:text-foreground has-checked:shadow-card has-disabled:cursor-not-allowed has-disabled:opacity-45 lg:min-h-9 [&>input]:sr-only",
+    "flex min-h-11 cursor-pointer items-center rounded-[7px] px-4 text-sm font-semibold text-muted-foreground transition-colors has-checked:bg-card has-checked:text-foreground has-checked:shadow-card has-disabled:cursor-not-allowed has-disabled:opacity-45 lg:min-h-9 [&>input]:sr-only",
 };
 
 /** The first choice of the company form: on-site company, self-employed, or a material supplier (no CAE). */
@@ -27,7 +27,7 @@ const TYPE_PATCH: Record<CompanyType, Partial<CompanyFormDraft>> = {
 
 const typeStyles = {
   option:
-    "flex min-h-11 cursor-pointer items-start gap-3 rounded-[10px] border bg-card px-3.5 py-3 text-[13.5px] transition-colors hover:border-primary/50 has-checked:border-primary has-checked:bg-brand-soft",
+    "flex min-h-11 cursor-pointer items-start gap-3 rounded-[10px] border bg-card px-3.5 py-3 text-sm transition-colors hover:border-primary/50 has-checked:border-primary has-checked:bg-brand-soft",
   radio: "mt-0.5 size-4 flex-none cursor-pointer accent-primary",
 };
 
@@ -70,7 +70,7 @@ export default function CompanyDataFields({
   return (
     <div className={f.fields}>
       <fieldset className={cn("m-0 flex min-w-0 flex-col gap-1.5 border-0 p-0", f.wide)}>
-        <legend className="mb-1.5 p-0 text-xs font-medium text-muted-foreground">{t("kind")}</legend>
+        <legend className="mb-1.5 p-0 text-sm font-medium text-muted-foreground">{t("kind")}</legend>
         <div className="grid gap-2.5 sm:grid-cols-3">
           {COMPANY_TYPES.map((type) => (
             <label key={type} className={typeStyles.option}>
@@ -86,7 +86,7 @@ export default function CompanyDataFields({
               />
               <span className="min-w-0">
                 <b className="font-semibold">{t(`types.${type}.label`)}</b>
-                <span id={`company-type-${type}-hint`} className="block text-[12.5px] text-muted-foreground">
+                <span id={`company-type-${type}-hint`} className="block text-meta text-muted-foreground">
                   {t(`types.${type}.hint`)}
                 </span>
               </span>
@@ -138,7 +138,7 @@ export default function CompanyDataFields({
       </div>
 
       <Field className={f.wide}>
-        <span className="text-xs leading-none font-medium text-muted-foreground">{t("reaRegion")}</span>
+        <span className="text-sm leading-none font-medium text-muted-foreground">{t("reaRegion")}</span>
         <div
           className={cn(
             "flex min-h-10 items-center gap-2.5 rounded-md px-3 text-sm font-semibold",

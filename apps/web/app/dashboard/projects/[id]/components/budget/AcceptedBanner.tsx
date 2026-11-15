@@ -26,11 +26,11 @@ export default function AcceptedBanner({
   return (
     <div className="rounded-[14px] border border-good/30 bg-good-soft px-4 py-3 text-sm">
       <p>
-        <b>{t("acceptedBanner", { date: revision.acceptedOn ? f.date(revision.acceptedOn) : "—" })}</b>
+        <b>{t("acceptedBanner", { date: f.date(revision.acceptedOn) })}</b>
         {revision.acceptedBy && ` ${t("acceptedBy", { by: revision.acceptedBy })}`}
       </p>
       {(registrar || signedHref) && (
-        <p className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[12.5px] text-muted-foreground">
+        <p className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-meta text-muted-foreground">
           {registrar && acceptedAt && (
             <span>
               {t("acceptedRegistered", {

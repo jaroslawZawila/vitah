@@ -3,6 +3,7 @@
 import { useTranslations } from "next-intl";
 import type { TenantPurchases } from "@repo/core/contract";
 import { cn } from "@/lib/utils";
+import { useVatLabel } from "../../components/vat-basis";
 import Kpi from "../../projects/[id]/components/obra/Kpi";
 import { usePurchaseFormat } from "../../projects/[id]/components/purchasing/format";
 
@@ -19,17 +20,18 @@ export default function CompanyKpis({
 }) {
   const t = useTranslations("purchasing.company.kpis");
   const f = usePurchaseFormat();
+  const vat = useVatLabel();
   const late = summary.lateDeliveries;
 
   return (
     <section aria-label={t("label")} className="grid grid-cols-2 gap-3.5 lg:grid-cols-4">
       <Kpi
-        label={t("year", { year: today.slice(0, 4) })}
-        value={f.moneyRound(summary.yearContractedCents)}
+        label={vat(t("year", { year: today.slice(0, 4) }), "excl")}
+        value={f.money(summary.yearContractedCents)}
         hints={[t("yearHint", { orders: summary.yearOrders, projects: summary.yearProjects })]}
       />
-      <Kpi label={t("open")} value={f.moneyRound(summary.openCents)} hints={[t("openHint", { count: summary.openOrders })]} />
-      <Kpi label={t("pending")} value={f.moneyRound(summary.pendingCents)} hints={[t("pendingHint", { count: summary.pendingOrders })]} />
+      <Kpi label={vat(t("open"), "excl")} value={f.money(summary.openCents)} hints={[t("openHint", { count: summary.openOrders })]} />
+      <Kpi label={vat(t("pending"), "excl")} value={f.money(summary.pendingCents)} hints={[t("pendingHint", { count: summary.pendingOrders })]} />
       <Kpi
         label={t("late")}
         value={<span className={cn(late > 0 && "text-warn")}>{late}</span>}

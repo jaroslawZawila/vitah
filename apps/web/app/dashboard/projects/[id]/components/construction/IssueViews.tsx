@@ -58,9 +58,9 @@ export function IssueCard({
       <div className="flex flex-wrap items-center gap-2">
         <IssueKindPill kind={issue.kind} />
         <span className="num text-muted-foreground">
-          {ref(issue)} · {f.day(issue.occurredOn)}
+          {ref(issue)} · {f.date(issue.occurredOn)}
         </span>
-        <span className="text-[13px] font-semibold">
+        <span className="text-sm font-semibold">
           {issue.chapterCode}
           {chapterName && ` · ${chapterName}`}
         </span>
@@ -69,7 +69,7 @@ export function IssueCard({
         </span>
       </div>
       <p className="text-[14px] leading-snug whitespace-pre-line">{issue.description}</p>
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[12.5px] text-muted-foreground">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-meta text-muted-foreground">
         <span>
           {tp(issue.party)}
           {issue.partyName && ` · ${issue.partyName}`}
@@ -226,7 +226,7 @@ export function IssueForm({
             <label
               key={option}
               className={cn(
-                "flex min-h-10 cursor-pointer items-center gap-2 rounded-[9px] border bg-card px-3 text-[13.5px] pointer-coarse:min-h-11",
+                "flex min-h-10 cursor-pointer items-center gap-2 rounded-[9px] border bg-card px-3 text-sm pointer-coarse:min-h-11",
                 kind === option && "border-primary bg-brand-soft font-semibold",
               )}
             >
@@ -323,7 +323,7 @@ export function IssueForm({
       <Field>
         <Label htmlFor={id("files")}>{t("files")}</Label>
         {issue && issue.files.length > 0 && (
-          <ul className="m-0 flex list-none flex-col gap-1 p-0 text-[13px]" aria-label={t("currentFiles")}>
+          <ul className="m-0 flex list-none flex-col gap-1 p-0 text-sm" aria-label={t("currentFiles")}>
             {issue.files.map((file) => (
               <li key={file.id} className="flex items-center justify-between gap-2 rounded-md bg-raise px-2.5 py-1">
                 {fileUrl ? (
@@ -357,10 +357,10 @@ export function IssueForm({
         </NativeSelect>
       </Field>
 
-      <p className="text-[12px] text-muted-foreground">{t("note")}</p>
+      <p className="text-meta text-muted-foreground">{t("note")}</p>
       <FormError namespace="construction.issues.errors" error={localError ?? error} />
       {progress && (
-        <p role="status" className="text-[13px] text-muted-foreground">
+        <p role="status" className="text-sm text-muted-foreground">
           {t("uploading", { done: progress.done, total: progress.total })}
         </p>
       )}
@@ -378,5 +378,5 @@ export function IssueForm({
 
 function Optional() {
   const t = useTranslations("construction.issues");
-  return <span className="text-[12px] font-normal text-muted-foreground">{t("optional")}</span>;
+  return <span className="text-meta font-normal text-muted-foreground">{t("optional")}</span>;
 }

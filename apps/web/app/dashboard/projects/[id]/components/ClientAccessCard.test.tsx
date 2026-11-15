@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -79,35 +79,43 @@ describe("ClientAccessCard with a client", () => {
     expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
   });
 
-  it("removes the client after confirmation", async () => {
+  /** Quitar del proyecto: the dialog that asks, naming the client. */
+  async function askToRemove() {
+    await userEvent.click(screen.getByRole("button", { name: "Quitar del proyecto" }));
+    return within(await screen.findByRole("alertdialog", { name: "¿Quitar a Ana García de este proyecto?" }));
+  }
+
+  it("removes the client after confirmation, saying the account stays", async () => {
     vi.mocked(actions.unassignProjectClientAction).mockResolvedValue({ success: true });
-    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
     renderCard({ client: ana });
 
-    await userEvent.click(screen.getByRole("button", { name: "Quitar del proyecto" }));
+    const dialog = await askToRemove();
+    expect(dialog.getByText(/Su cuenta se mantiene, pero esta vivienda deja de aparecerle en la app/)).toBeInTheDocument();
+    expect(actions.unassignProjectClientAction).not.toHaveBeenCalled();
+    await userEvent.click(dialog.getByRole("button", { name: "Quitar del proyecto" }));
 
-    expect(confirm).toHaveBeenCalledWith(expect.stringContaining("ana@example.com"));
     await waitFor(() =>
       expect(actions.unassignProjectClientAction).toHaveBeenCalledWith("project-1"),
     );
   });
 
   it("does nothing when removal is not confirmed", async () => {
-    vi.spyOn(window, "confirm").mockReturnValue(false);
     renderCard({ client: ana });
 
-    await userEvent.click(screen.getByRole("button", { name: "Quitar del proyecto" }));
+    const dialog = await askToRemove();
+    await userEvent.click(dialog.getByRole("button", { name: "Cancelar" }));
 
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
     expect(actions.unassignProjectClientAction).not.toHaveBeenCalled();
   });
 
-  it("shows a removal error", async () => {
+  it("shows a removal error in the dialog", async () => {
     vi.mocked(actions.unassignProjectClientAction).mockResolvedValue({ error: "no_client" });
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     renderCard({ client: ana });
 
-    await userEvent.click(screen.getByRole("button", { name: "Quitar del proyecto" }));
+    const dialog = await askToRemove();
+    await userEvent.click(dialog.getByRole("button", { name: "Quitar del proyecto" }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("no tiene ningún cliente");
+    expect(await dialog.findByRole("alert")).toHaveTextContent("no tiene ningún cliente");
   });
 });

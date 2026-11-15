@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import FormError from "../../../../components/FormError";
+import { useVatLabel } from "../../../../components/vat-basis";
 import { usePurchaseFormat } from "./format";
 import { InvoicingFoot } from "./LineViews";
 import { invoiceHref } from "./links";
@@ -68,7 +69,7 @@ export function MilestonesCard({
           <h2 id="milestones-title" className="text-[22px]">
             {t("title")}
           </h2>
-          <p className="mt-1 max-w-[640px] text-[12.5px] text-muted-foreground">{t("hint")}</p>
+          <p className="mt-1 max-w-[640px] text-meta text-muted-foreground">{t("hint")}</p>
         </div>
         {canEdit && rows === null && (
           <Button type="button" variant="outline" onClick={edit}>
@@ -79,15 +80,15 @@ export function MilestonesCard({
 
       {rows === null ? (
         milestones.length === 0 ? (
-          <p className="px-[18px] pb-4 text-[13px] text-muted-foreground">{t("none")}</p>
+          <p className="px-[18px] pb-4 text-sm text-muted-foreground">{t("none")}</p>
         ) : (
           <>
             {scheduled !== amountCents && (
-              <p role="status" className="mx-[18px] mb-2.5 rounded-lg bg-warn-soft px-3 py-2 text-[13px] text-warn">
+              <p role="status" className="mx-[18px] mb-2.5 rounded-lg bg-warn-soft px-3 py-2 text-sm text-warn">
                 {t("gap", { sum: f.amount(scheduled), total: f.amount(amountCents) })}
               </p>
             )}
-            <Table className="min-w-[760px] text-[13px]">
+            <Table className="min-w-[760px]">
               <TableHeader>
                 <TableRow>
                   <TableHead className="pl-[18px]">{t("concept")}</TableHead>
@@ -164,7 +165,7 @@ export function MilestonesCard({
                   disabled={row.locked}
                   onChange={(e) => set(index, { concept: e.target.value })}
                 />
-                <span className="num text-right text-[13px] text-muted-foreground">
+                <span className="num text-right text-sm text-muted-foreground">
                   {Number.isFinite(parsed[index]) ? share(parsed[index]!) : "—"} %
                 </span>
                 <Input
@@ -176,7 +177,7 @@ export function MilestonesCard({
                   onChange={(e) => set(index, { amount: e.target.value })}
                 />
                 {row.locked ? (
-                  <span className="text-[12.5px] text-muted-foreground">{t("locked")}</span>
+                  <span className="text-meta text-muted-foreground">{t("locked")}</span>
                 ) : (
                   <Button
                     type="button"
@@ -202,11 +203,11 @@ export function MilestonesCard({
                 {t("add")}
               </Button>
             )}
-            <span className={cn("num ml-auto text-[13px] font-semibold", rows.length === 0 || sum === amountCents ? "text-good" : "text-warn")}>
+            <span className={cn("num ml-auto text-sm font-semibold", rows.length === 0 || sum === amountCents ? "text-good" : "text-warn")}>
               {f.amount(sum)} / {f.amount(amountCents)}
             </span>
           </div>
-          <p className="m-0 px-[18px] text-[12.5px] text-muted-foreground">{t("editHint", { total: f.amount(amountCents) })}</p>
+          <p className="m-0 px-[18px] text-meta text-muted-foreground">{t("editHint", { total: f.amount(amountCents) })}</p>
           <div className="px-[18px] empty:hidden">
             <FormError namespace="purchasing.errors" error={error} />
           </div>
@@ -220,7 +221,7 @@ export function MilestonesCard({
           </div>
         </form>
       )}
-      {(milestones.length > 0 || order.invoices.length > 0) && rows === null && <InvoicingFoot invoicing={order.invoicing} className="gap-x-6 gap-y-1.5 border-t px-[18px] py-3 text-[13px]" />}
+      {(milestones.length > 0 || order.invoices.length > 0) && rows === null && <InvoicingFoot invoicing={order.invoicing} className="gap-x-6 gap-y-1.5 border-t px-[18px] py-3 text-sm" />}
     </section>
   );
 }
@@ -230,6 +231,7 @@ export function OrderInvoices({ order, registerHref }: { order: PurchaseOrderDet
   const t = useTranslations("purchasing.orderInvoices");
   const ti = useTranslations("purchasing.invoices");
   const f = usePurchaseFormat();
+  const vat = useVatLabel();
   return (
     <section className={cn(cardVariants({ size: "flush" }), "pt-4 pb-1.5")} aria-labelledby="order-invoices-title">
       <div className="flex flex-wrap items-baseline justify-between gap-2.5 px-[18px] pb-2.5">
@@ -237,16 +239,16 @@ export function OrderInvoices({ order, registerHref }: { order: PurchaseOrderDet
           {t("title")} <span className="num text-[16px] text-muted-foreground">{order.invoices.length}</span>
         </h2>
         {registerHref && (
-          <Link href={registerHref} className="text-[13px] font-semibold text-brand-ink hover:text-primary pointer-coarse:inline-flex pointer-coarse:min-h-11 pointer-coarse:items-center">
+          <Link href={registerHref} className="text-sm font-semibold text-brand-ink hover:text-primary pointer-coarse:inline-flex pointer-coarse:min-h-11 pointer-coarse:items-center">
             {t("register")}
           </Link>
         )}
       </div>
       {order.invoices.length === 0 ? (
-        <p className="px-[18px] pb-3 text-[13px] text-muted-foreground">{t("none")}</p>
+        <p className="px-[18px] pb-3 text-sm text-muted-foreground">{t("none")}</p>
       ) : (
         <>
-          <Table className="min-w-[860px] text-[13px]">
+          <Table className="min-w-[860px]">
             <TableHeader>
               <TableRow>
                 <TableHead className="pl-[18px]">{t("number")}</TableHead>
@@ -254,8 +256,8 @@ export function OrderInvoices({ order, registerHref }: { order: PurchaseOrderDet
                 <TableHead>{t("issuedOn")}</TableHead>
                 <TableHead>{t("dueOn")}</TableHead>
                 <TableHead className="text-right">{t("base")}</TableHead>
-                <TableHead className="text-right">{t("payable")}</TableHead>
-                <TableHead className="text-right">{t("paid")}</TableHead>
+                <TableHead className="text-right">{vat(t("payable"), "incl")}</TableHead>
+                <TableHead className="text-right">{vat(t("paid"), "incl")}</TableHead>
                 <TableHead className="pr-[18px]">{t("state")}</TableHead>
               </TableRow>
             </TableHeader>
@@ -267,13 +269,13 @@ export function OrderInvoices({ order, registerHref }: { order: PurchaseOrderDet
                       {invoice.number}
                     </Link>
                     {invoice.rectifiesNumber && (
-                      <span className="block text-[12px] text-muted-foreground">{ti("rectifies", { number: invoice.rectifiesNumber })}</span>
+                      <span className="block text-meta text-muted-foreground">{ti("rectifies", { number: invoice.rectifiesNumber })}</span>
                     )}
                   </TableCell>
                   <TableCell className="whitespace-normal">{invoice.milestoneConcept ?? "—"}</TableCell>
-                  <TableCell className="num">{f.shortDay(invoice.issuedOn)}</TableCell>
+                  <TableCell className="num">{f.date(invoice.issuedOn)}</TableCell>
                   <TableCell className={cn("num", invoice.state === "overdue" && "font-semibold text-bad")}>
-                    {invoice.dueOn ? f.shortDay(invoice.dueOn) : "—"}
+                    {f.date(invoice.dueOn)}
                   </TableCell>
                   <TableCell className="num text-right">{f.amount(invoice.baseCents)}</TableCell>
                   <TableCell className="num text-right">{f.amount(invoice.payableCents)}</TableCell>
@@ -285,7 +287,7 @@ export function OrderInvoices({ order, registerHref }: { order: PurchaseOrderDet
               ))}
             </TableBody>
           </Table>
-          <p className="mx-[18px] mt-2.5 mb-1 text-[12.5px] text-muted-foreground">{t("note")}</p>
+          <p className="mx-[18px] mt-2.5 mb-1 text-meta text-muted-foreground">{t("note")}</p>
         </>
       )}
     </section>

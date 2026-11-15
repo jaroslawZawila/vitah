@@ -52,7 +52,7 @@ export default function TextsView({
             </div>
             <div className="grid gap-3 md:grid-cols-2">
               {COVER_FIELDS.map((key) => (
-                <label key={key} className={cn("flex flex-col gap-1.5 text-[12.5px] font-semibold text-muted-foreground", LONG.has(key) && "md:col-span-2")}>
+                <label key={key} className={cn("flex flex-col gap-1.5 text-meta font-semibold text-muted-foreground", LONG.has(key) && "md:col-span-2")}>
                   <span className="flex flex-wrap items-center gap-2">
                     {t(`coverFields.${key}`)}
                     {key === "cadastral" && !texts.cover.cadastral && <Badge variant="warn">{t("missing")}</Badge>}
@@ -153,7 +153,7 @@ export default function TextsView({
           <span id="inputs-title" className="eyebrow pb-1.5">{t("inputs")}</span>
           {inputs.length === 0 && <p className={muted}>{t("noInputs")}</p>}
           {inputs.map((doc) => (
-            <a key={doc.id} href={fileUrl(doc)} target="_blank" rel="noreferrer" className="flex min-h-11 items-center gap-2.5 border-t py-2 text-[13.5px] hover:text-primary">
+            <a key={doc.id} href={fileUrl(doc)} target="_blank" rel="noreferrer" className="flex min-h-11 items-center gap-2.5 border-t py-2 text-sm hover:text-primary">
               <FileText size={18} className="flex-none text-muted-foreground" aria-hidden />
               <span className="min-w-0 flex-1">
                 {t(`inputKinds.${doc.budgetInput!}`)} · <span className="text-muted-foreground">{doc.filename ?? doc.title}</span>

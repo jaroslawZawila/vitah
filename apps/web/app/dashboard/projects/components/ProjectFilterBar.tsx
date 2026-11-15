@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { BUDGET_FILTERS, OBRA_FILTERS, type BudgetFilter, type ObraFilter } from "@repo/core/contract";
+import { ATTENTION_FILTERS, BUDGET_FILTERS, OBRA_FILTERS, type AttentionFilter, type BudgetFilter, type ObraFilter } from "@repo/core/contract";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { FilterSelect } from "../[id]/components/construction/Filters";
@@ -10,20 +10,22 @@ import { SearchFilter } from "../[id]/components/purchasing/Filters";
 import type { ProjectFilters } from "../project-list";
 
 /**
- * Presentational: the Proyectos list's search and its two filters, Presupuesto
- * and Obra, each with its count. Segmented from 640px; on phones a select each
+ * Presentational: the Proyectos list's search and its three filters, Presupuesto,
+ * Obra and Atención, each with its count. Segmented from 640px; on phones a select each
  * (the Obra pages' `FilterSelect`), so no option scrolls out of sight.
  */
 export default function ProjectFilterBar({
   filters,
   budgetCounts,
   obraCounts,
+  attentionCounts,
   onChange,
   onClear,
 }: {
   filters: ProjectFilters;
   budgetCounts: Record<BudgetFilter, number>;
   obraCounts: Record<ObraFilter, number>;
+  attentionCounts: Record<AttentionFilter, number>;
   onChange: (filters: Partial<ProjectFilters>) => void;
   /** Shown while any filter or search is on. */
   onClear: (() => void) | null;
@@ -54,6 +56,13 @@ export default function ProjectFilterBar({
           value={filters.obra}
           options={OBRA_FILTERS.map((key) => ({ key, label: t(`obraOptions.${key}`), count: obraCounts[key] }))}
           onChange={(obra) => onChange({ obra })}
+        />
+        <FilterGroup
+          id="projects-attention"
+          label={t("attention")}
+          value={filters.attention}
+          options={ATTENTION_FILTERS.map((key) => ({ key, label: t(`attentionOptions.${key}`), count: attentionCounts[key] }))}
+          onChange={(attention) => onChange({ attention })}
         />
       </div>
     </div>

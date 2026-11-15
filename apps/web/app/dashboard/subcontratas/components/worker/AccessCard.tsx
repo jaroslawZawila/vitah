@@ -57,7 +57,7 @@ export default function AccessCard({
       )}
       <ul className="m-0 flex list-none flex-col p-0">
         {access.checks.map((check) => (
-          <li key={check.rule} className="flex items-start gap-2.5 border-t py-2.5 text-[13.5px]">
+          <li key={check.rule} className="flex items-start gap-2.5 border-t py-2.5 text-sm">
             <span
               className={cn(
                 "grid size-[22px] flex-none place-items-center rounded-full",
@@ -73,7 +73,7 @@ export default function AccessCard({
             <span className="min-w-0">
               <b className="font-semibold">{t(`accessRules.${check.rule}.title`)}</b>
               {check.reasons.map((r, i) => (
-                <span key={i} className={cn("block text-[12.5px] font-medium", check.blocking ? "text-bad" : "text-yel")}>
+                <span key={i} className={cn("block text-meta font-medium", check.blocking ? "text-bad" : "text-yel")}>
                   {reason(r, kind)}
                 </span>
               ))}

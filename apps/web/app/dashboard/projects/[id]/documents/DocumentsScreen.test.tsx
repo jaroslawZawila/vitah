@@ -232,28 +232,34 @@ describe("DocumentsScreen", () => {
     expect(screen.getByLabelText("Título")).toHaveValue("");
   });
 
+  async function askToDelete() {
+    await userEvent.click(screen.getByRole("button", { name: "Eliminar Contrato de obra" }));
+    return within(await screen.findByRole("alertdialog", { name: "¿Eliminar el documento «Contrato de obra»?" }));
+  }
+
   it("deletes after confirmation", async () => {
     vi.mocked(actions.deleteProjectDocumentAction).mockResolvedValue({ success: true });
-    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
     renderScreen();
 
-    await userEvent.click(screen.getByRole("button", { name: "Eliminar Contrato de obra" }));
+    const dialog = await askToDelete();
+    // Says what happens: it leaves the portal and the app, and an admin can restore it.
+    expect(dialog.getByText("Deja de verse en el portal y en la app del cliente. Un administrador puede restaurarlo desde Elementos eliminados.")).toBeInTheDocument();
+    expect(actions.deleteProjectDocumentAction).not.toHaveBeenCalled();
+    await userEvent.click(dialog.getByRole("button", { name: "Eliminar documento" }));
 
-    // Says what happens: it stops being shown, and the file is kept.
-    expect(confirm).toHaveBeenCalledWith(
-      "¿Eliminar «Contrato de obra»? Dejará de verse en el portal y en la app del cliente; el archivo se conserva.",
-    );
     await waitFor(() =>
       expect(actions.deleteProjectDocumentAction).toHaveBeenCalledWith("project-1", "doc-1"),
     );
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
   });
 
   it("does nothing when deletion is not confirmed", async () => {
-    vi.spyOn(window, "confirm").mockReturnValue(false);
     renderScreen();
 
-    await userEvent.click(screen.getByRole("button", { name: "Eliminar Contrato de obra" }));
+    const dialog = await askToDelete();
+    await userEvent.click(dialog.getByRole("button", { name: "Cancelar" }));
 
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
     expect(actions.deleteProjectDocumentAction).not.toHaveBeenCalled();
   });
 });

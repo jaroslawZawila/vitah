@@ -26,8 +26,11 @@ describe("HitosScreen", () => {
 
     expect(screen.getByRole("heading", { name: "Pagos" })).toBeInTheDocument();
     expect(screen.getByText("53.784,60 €")).toBeInTheDocument();
-    const invoiced = screen.getByText("Facturado, pendiente de cobro").parentElement!;
+    // The hitos' agreed amounts, without VAT, as the summary says.
+    expect(screen.getByText("Cobrado · sin IVA").parentElement).toHaveTextContent("53.784,60 €");
+    const invoiced = screen.getByText("Facturado, pendiente de cobro · sin IVA").parentElement!;
     expect(within(invoiced).getByText("67.230,75 €")).toBeInTheDocument();
+    expect(screen.getByText("Por facturar · sin IVA")).toBeInTheDocument();
     expect(screen.getByText("H3 · vence el 1 oct 2026")).toBeInTheDocument();
 
     const link = screen.getByRole("link", { name: "Envolvente estanca" });

@@ -10,6 +10,7 @@
     "./health": "./src/health.ts",
     "./obra-calc": "./src/obra-calc.ts",
     "./control-calc": "./src/control-calc.ts",
+    "./format": "./src/format.ts",
     "./planning-calc": "./src/planning-calc.ts",
     "./purchase-calc": "./src/purchase-calc.ts",
     "./projects": "./src/projects.ts",

@@ -1,4 +1,4 @@
-import type { ChapterState, ControlChapter, ControlMilestone } from "@repo/core/contract";
+import { lateToStartDays, type ChapterState, type ControlChapter, type ControlMilestone, type ScheduleStatus } from "@repo/core/contract";
 import { finishRequestsInvoice } from "@repo/core/control-calc";
 import { daysBetween } from "./format";
 
@@ -37,10 +37,28 @@ export function scheduleOf(
     return chapter.plannedStart ? { tone: "good", key: "onTime", days: 0 } : null;
   }
   if (!chapter.plannedStart) return null;
+  // Late to start: core's rule, the same as the obra's schedule status.
+  const late = lateToStartDays(chapter.state, chapter.plannedStart, today);
+  if (late !== null) return { tone: "warn", key: "notStarted", days: late };
   const days = daysBetween(today, chapter.plannedStart);
-  if (days < 0) return { tone: "warn", key: "notStarted", days: -days };
   return days <= SOON_DAYS ? { tone: "muted", key: "startsIn", days } : null;
 }
+
+/** The tone of the obra's schedule status (core's `scheduleStatus`), the same wherever it shows. */
+export const STATUS_TONE: Record<ScheduleStatus["status"], ScheduleTone> = {
+  on_time: "good",
+  late: "warn",
+  simulated: "muted",
+  no_dates: "muted",
+};
+
+/** A tone as a text colour. */
+export const TONE_TEXT: Record<ScheduleTone, string> = {
+  good: "text-good",
+  yel: "text-yel",
+  warn: "text-warn",
+  muted: "text-muted-foreground",
+};
 
 /** The order the tables group chapters in: what is happening now first. */
 export const STATE_ORDER: ChapterState[] = ["in_progress", "pending", "finished"];

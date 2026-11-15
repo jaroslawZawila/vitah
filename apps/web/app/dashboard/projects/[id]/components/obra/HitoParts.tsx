@@ -195,9 +195,9 @@ export function HitoFileCard({
       </div>
       {children}
       {href ? (
-        <div className="grid grid-flow-col auto-cols-auto grid-cols-[auto_minmax(0,1fr)] items-center gap-3 border-b py-2.5 text-[13.5px] last:border-b-0">
+        <div className="grid grid-flow-col auto-cols-auto grid-cols-[auto_minmax(0,1fr)] items-center gap-3 border-b py-2.5 text-sm last:border-b-0">
           <span
-            className="grid h-[42px] w-9 place-items-center rounded-sm border bg-raise text-[9.5px] font-semibold text-brand-ink"
+            className="grid h-[42px] w-9 place-items-center rounded-sm border bg-raise text-xs font-semibold text-brand-ink"
             aria-hidden
           >
             PDF
@@ -206,7 +206,7 @@ export function HitoFileCard({
             <a href={href} target="_blank" rel="noreferrer" className="font-medium text-info [overflow-wrap:anywhere] hover:underline">
               {fileName}
             </a>
-            <span className="text-xs text-muted-foreground">{detail}</span>
+            <span className="text-meta text-muted-foreground">{detail}</span>
           </div>
           {onUpload && (
             <Button type="button" variant="ghost" size="sm" onClick={onUpload}>
@@ -344,11 +344,11 @@ export function PaymentCard({
       <span className="eyebrow">{t("paymentTitle")}</span>
       {hito.paidOn ? (
         <>
-          <span className="text-[13.5px] font-semibold text-good">
+          <span className="text-sm font-semibold text-good">
             {t("paid", { date: f.date(hito.paidOn), amount: f.money(hito.paidAmountCents ?? 0) })}
           </span>
           {onCancel && (
-            <Button type="button" variant="destructive" className="w-fit" onClick={onCancel} disabled={pending}>
+            <Button type="button" variant="ghost-destructive" className="w-fit" onClick={onCancel} disabled={pending}>
               {t("cancelPayment")}
             </Button>
           )}
@@ -384,7 +384,7 @@ function HitoEventText({ event }: { event: HitoEvent }) {
   const t = useTranslations("obra.hito.history");
   const f = useObraFormat();
   const file = (facts: HitoFileFacts) => ({
-    date: facts.date ? f.date(facts.date) : "—",
+    date: f.date(facts.date),
     size: facts.sizeBytes === null ? "—" : f.fileSize(facts.sizeBytes),
   });
   const payment = (facts: HitoPaymentFacts) => ({
@@ -431,15 +431,15 @@ export function HitoHistory({ events }: { events: HitoEvent[] }) {
         <span className={muted}>{t("hint")}</span>
       </div>
       {events.length === 0 ? (
-        <p className="text-[13px] text-muted-foreground">{t("empty")}</p>
+        <p className="text-sm text-muted-foreground">{t("empty")}</p>
       ) : (
         <ul className="m-0 list-none p-0" aria-labelledby="hito-history-title">
           {events.map((event) => (
             <li
               key={event.id}
-              className="grid gap-x-4 gap-y-0.5 border-b py-2.5 text-[13.5px] last:border-b-0 sm:grid-cols-[150px_minmax(0,1fr)]"
+              className="grid gap-x-4 gap-y-0.5 border-b py-2.5 text-sm last:border-b-0 sm:grid-cols-[150px_minmax(0,1fr)]"
             >
-              <time dateTime={event.at} className="num text-[12.5px] text-muted-foreground">
+              <time dateTime={event.at} className="num text-meta text-muted-foreground">
                 {f.dateTime(event.at)}
               </time>
               <div className="min-w-0 [overflow-wrap:anywhere]">

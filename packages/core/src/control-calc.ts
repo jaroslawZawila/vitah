@@ -9,6 +9,7 @@ import {
 } from "./contract";
 import { addDays } from "./obra-calc";
 import { templateLeadDays } from "./planning-calc";
+import { lateToFinishDays } from "./schedule-status";
 import { daysBetween } from "./subcontractor-rules";
 
 // ─── Construction control arithmetic ─────────────────────────────────────────
@@ -42,7 +43,7 @@ export function chapterTiming(dates: Dates | undefined, plan: Plan, today: strin
     startDelayDays: plan && start ? daysBetween(plan.start, start) : null,
     endDelayDays: plan && end ? daysBetween(plan.end, end) : null,
     // Passing a planned date changes nothing by itself; it is only shown.
-    overdueDays: plan && state === "in_progress" && today > plan.end ? daysBetween(plan.end, today) : null,
+    overdueDays: plan ? lateToFinishDays(state, plan.end, today) : null,
     plannedDays: plan ? spanDays(plan.start, plan.end) : null,
     actualDays: start ? spanDays(start, end ?? today) : null,
   };

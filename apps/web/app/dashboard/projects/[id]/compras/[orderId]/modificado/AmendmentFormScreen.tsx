@@ -75,7 +75,7 @@ export default function AmendmentFormScreen({
         <p className="mt-1 max-w-[680px] text-[14px] text-muted-foreground">{t("intro")}</p>
       </header>
       {documentFailed ? (
-        <div role="alert" className="flex flex-col gap-2 rounded-xl bg-warn-soft px-4 py-3 text-[13.5px] text-warn">
+        <div role="alert" className="flex flex-col gap-2 rounded-xl bg-warn-soft px-4 py-3 text-sm text-warn">
           <p className="m-0 font-semibold">{t("documentFailed", { number })}</p>
           <Link className={buttonVariants({ variant: "outline", size: "sm", className: "w-fit" })} href={back}>
             {t("goToOrder")}

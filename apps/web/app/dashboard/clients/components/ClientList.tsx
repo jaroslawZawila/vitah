@@ -1,10 +1,11 @@
 "use client";
 
-import { useFormatter, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import type { ClientListItem } from "@repo/core/contract";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { useFormat } from "@/lib/format";
 import {
   Table,
   TableBody,
@@ -13,7 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { calendarDate, displayName } from "./display";
+import { displayName } from "./display";
 
 /** Presentational: the clients table. */
 export default function ClientList({
@@ -24,14 +25,13 @@ export default function ClientList({
   onSetPassword: (client: ClientListItem) => void;
 }) {
   const t = useTranslations("clientsPage");
-  const format = useFormatter();
+  const format = useFormat();
 
   if (clients.length === 0)
-    return <p className="py-10 text-center text-[13.5px] text-muted-foreground">{t("empty")}</p>;
+    return <p className="py-10 text-center text-sm text-muted-foreground">{t("empty")}</p>;
 
   const dash = "—";
-  const date = (value: string | null) =>
-    value ? format.dateTime(calendarDate(value), { dateStyle: "medium", timeZone: "UTC" }) : dash;
+  const date = (value: string | null) => (value ? format.date(value) : dash);
 
   return (
     <Card size="list">

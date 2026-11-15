@@ -64,7 +64,7 @@ export default function CompaniesKpis({
         hints={
           onSiteToday.blocked.length > 0
             ? [
-                <span key="blocked" className="text-bad">
+                <span key="blocked" className="text-rail-bad">
                   {t("blocked", { names: onSiteToday.blocked.join(", ") })}
                 </span>,
               ]

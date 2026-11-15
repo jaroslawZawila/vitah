@@ -58,6 +58,9 @@ describe("/api/v1/projects/:id/planning", () => {
     expect(planning.draft).toBeNull();
     const control = await (await getControl(apiRequest(token), at)).json();
     expect(control.sources.planning).toBe("live");
+    // Both answer the same schedule status (an added field), on the same baseline.
+    expect(planning.schedule).toMatchObject({ planning: "live", forecast: planning.baseline.forecast });
+    expect(control.schedule).toEqual(planning.schedule);
 
     const versions = await (await getVersions(apiRequest(token), at)).json();
     expect(versions.versions.map((v: { number: number; status: string }) => [v.number, v.status])).toEqual([[1, "approved"]]);

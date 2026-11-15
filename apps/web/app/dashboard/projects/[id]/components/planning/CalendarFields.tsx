@@ -8,7 +8,7 @@ import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
 // Presentational: which days a plan works: the region's holidays and the
 // August and Christmas closures (generating a first plan, editing a draft).
 
-const check = "flex min-h-11 cursor-pointer items-center gap-2.5 text-[13.5px]";
+const check = "flex min-h-11 cursor-pointer items-center gap-2.5 text-sm";
 
 export default function CalendarFields({
   id,

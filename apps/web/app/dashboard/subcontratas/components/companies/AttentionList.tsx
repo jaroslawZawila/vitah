@@ -61,10 +61,10 @@ export default function AttentionList({
           <h2 id="attention-title">{t("title")}</h2>
           {items.length > 0 && <Badge variant="destructive">{items.length}</Badge>}
         </div>
-        <span className="text-[12.5px] text-muted-foreground">{t("hint")}</span>
+        <span className="text-meta text-muted-foreground">{t("hint")}</span>
       </div>
       {items.length === 0 ? (
-        <p className="py-4 text-[13.5px] text-muted-foreground">{t("empty")}</p>
+        <p className="py-4 text-sm text-muted-foreground">{t("empty")}</p>
       ) : (
         <ul className="m-0 flex list-none flex-col p-0">
           {items.map((item) => {
@@ -93,12 +93,12 @@ export default function AttentionList({
                 </span>
                 <div className="min-w-0 flex-[1_1_260px]">
                   <div className="font-semibold">{title}</div>
-                  <div className="text-[12.5px] text-muted-foreground">
+                  <div className="text-meta text-muted-foreground">
                     {who}
                     {many && ` · ${item.requirementIds.map((id) => name(id, kind)).join(", ")}`}
                   </div>
                 </div>
-                {detail && <div className="flex-[0_1_220px] text-[12.5px] text-muted-foreground">{detail}</div>}
+                {detail && <div className="flex-[0_1_220px] text-meta text-muted-foreground">{detail}</div>}
                 <DocStateBadge state={item.state} daysLeft={item.daysLeft} />
                 {canManage &&
                   (action === "validate" ? (

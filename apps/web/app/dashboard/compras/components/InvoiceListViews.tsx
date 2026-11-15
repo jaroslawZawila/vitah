@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { cardVariants } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import { useVatLabel } from "../../components/vat-basis";
 import Kpi from "../../projects/[id]/components/obra/Kpi";
 import { daysBetween } from "../../projects/[id]/components/construction/format";
 import { usePurchaseFormat } from "../../projects/[id]/components/purchasing/format";
@@ -22,28 +23,29 @@ import { InvoiceStatePill } from "../../projects/[id]/components/purchasing/pill
 export function InvoiceKpis({ summary }: { summary: TenantInvoices["summary"] }) {
   const t = useTranslations("purchasing.invoices.kpis");
   const f = usePurchaseFormat();
+  const vat = useVatLabel();
   return (
     <section aria-label={t("label")} className="grid grid-cols-2 gap-3.5 lg:grid-cols-4">
       <Kpi
-        label={t("outstanding")}
-        value={f.moneyRound(summary.outstandingCents)}
+        label={vat(t("outstanding"), "incl")}
+        value={f.money(summary.outstandingCents)}
         hints={[t("outstandingHint", { count: summary.outstandingInvoices, suppliers: summary.outstandingSuppliers })]}
       />
       <Kpi
-        label={t("overdue")}
-        value={<span className={summary.overdueCents > 0 ? "text-bad" : undefined}>{f.moneyRound(summary.overdueCents)}</span>}
+        label={vat(t("overdue"), "incl")}
+        value={<span className={summary.overdueCents > 0 ? "text-bad" : undefined}>{f.money(summary.overdueCents)}</span>}
         hints={[t("countHint", { count: summary.overdueInvoices })]}
         className={summary.overdueCents > 0 ? "border-bad/40" : undefined}
       />
       <Kpi
-        label={t("dueSoon")}
-        value={<span className={summary.dueSoonCents > 0 ? "text-warn" : undefined}>{f.moneyRound(summary.dueSoonCents)}</span>}
+        label={vat(t("dueSoon"), "incl")}
+        value={<span className={summary.dueSoonCents > 0 ? "text-warn" : undefined}>{f.money(summary.dueSoonCents)}</span>}
         hints={[t("countHint", { count: summary.dueSoonInvoices })]}
         className={summary.dueSoonCents > 0 ? "border-warn/40" : undefined}
       />
       <Kpi
-        label={t("paidMonth")}
-        value={<span className="text-good">{f.moneyRound(summary.paidThisMonthCents)}</span>}
+        label={vat(t("paidMonth"), "incl")}
+        value={<span className="text-good">{f.money(summary.paidThisMonthCents)}</span>}
         hints={[t("paidMonthHint", { count: summary.paymentsThisMonth })]}
       />
     </section>
@@ -76,9 +78,10 @@ export function InvoiceTable({
 }) {
   const t = useTranslations("purchasing.invoices.cols");
   const f = usePurchaseFormat();
-  if (invoices.length === 0) return <p className="px-[18px] py-6 text-center text-[13.5px] text-muted-foreground">{empty}</p>;
+  const vat = useVatLabel();
+  if (invoices.length === 0) return <p className="px-[18px] py-6 text-center text-sm text-muted-foreground">{empty}</p>;
   return (
-    <Table className="min-w-[1040px] text-[13px]">
+    <Table className="min-w-[900px]">
       <TableHeader>
         <TableRow>
           <TableHead className="pl-[18px]">{t("dueOn")}</TableHead>
@@ -86,8 +89,8 @@ export function InvoiceTable({
           <TableHead>{t("supplier")}</TableHead>
           <TableHead>{t("order")}</TableHead>
           <TableHead className="text-right">{t("base")}</TableHead>
-          <TableHead className="text-right">{t("payable")}</TableHead>
-          <TableHead className="text-right">{t("outstanding")}</TableHead>
+          <TableHead className="text-right">{vat(t("payable"), "incl")}</TableHead>
+          <TableHead className="text-right">{vat(t("outstanding"), "incl")}</TableHead>
           <TableHead className="pr-[18px]">{t("state")}</TableHead>
         </TableRow>
       </TableHeader>
@@ -95,8 +98,8 @@ export function InvoiceTable({
         {invoices.map((invoice) => (
           <TableRow key={invoice.id}>
             <TableCell className="pl-[18px]">
-              <span className="num">{invoice.dueOn ? f.shortDay(invoice.dueOn) : "—"}</span>
-              <span className="block text-[12px] text-muted-foreground">
+              <span className="num">{f.date(invoice.dueOn)}</span>
+              <span className="block text-meta text-muted-foreground">
                 <DueNote invoice={invoice} today={today} />
               </span>
             </TableCell>
@@ -132,6 +135,7 @@ export function InvoiceTable({
 export function PaymentForecast({ forecast }: { forecast: TenantPayments["forecast"] }) {
   const t = useTranslations("purchasing.payments");
   const f = usePurchaseFormat();
+  const vat = useVatLabel();
   const weeks = forecast.filter((week) => week.from !== null || week.invoices.length > 0);
   return (
     <section className={cardVariants()} aria-labelledby="forecast-title">
@@ -139,18 +143,18 @@ export function PaymentForecast({ forecast }: { forecast: TenantPayments["foreca
         <h2 id="forecast-title" className="text-[22px]">
           {t("forecastTitle")}
         </h2>
-        <span className="text-[12.5px] text-muted-foreground">{t("forecastHint")}</span>
+        <span className="text-meta text-muted-foreground">{vat(t("forecastHint"), "incl")}</span>
       </div>
       <ul className="m-0 list-none p-0">
         {weeks.map((week) => (
           <li key={week.from ?? "overdue"} className="grid gap-x-4 gap-y-1.5 border-b py-3 last:border-b-0 sm:grid-cols-[150px_minmax(0,1fr)_auto]">
-            <b className={cn("text-[13.5px]", week.from === null && "text-bad")}>
-              {week.from === null ? t("overdue") : f.range(week.from, week.to)}
+            <b className={cn("text-sm", week.from === null && "text-bad")}>
+              {week.from === null ? t("overdue") : f.dateRange(week.from, week.to)}
             </b>
             {week.invoices.length === 0 ? (
-              <span className="text-[13px] text-muted-foreground">{t("nothing")}</span>
+              <span className="text-sm text-muted-foreground">{t("nothing")}</span>
             ) : (
-              <ul className="m-0 flex list-none flex-col gap-1.5 p-0 text-[13px]">
+              <ul className="m-0 flex list-none flex-col gap-1.5 p-0 text-sm">
                 {week.invoices.map((invoice) => (
                   <li key={invoice.id} className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
                     <Link href={invoiceHref(invoice.id)} className="num font-semibold text-brand-ink hover:text-primary">
@@ -158,7 +162,7 @@ export function PaymentForecast({ forecast }: { forecast: TenantPayments["foreca
                     </Link>
                     <span>{invoice.supplierName}</span>
                     <span className="text-muted-foreground">
-                      · <span className="num">{invoice.projectRef}</span> · {invoice.dueOn && f.shortDay(invoice.dueOn)}
+                      · <span className="num">{invoice.projectRef}</span> · {invoice.dueOn && f.date(invoice.dueOn)}
                     </span>
                     <span className="num ml-auto text-muted-foreground sm:hidden">{f.amount(invoice.outstandingCents)}</span>
                   </li>
@@ -202,6 +206,7 @@ export function PaymentTable({
   const tm = useTranslations("purchasing.method");
   const tr = useTranslations("purchasing.invoice.payments");
   const f = usePurchaseFormat();
+  const vat = useVatLabel();
   const titleId = useId();
   const columns = (invoiceColumns ? 7 : 5) + (onRemove ? 1 : 0);
   return (
@@ -212,15 +217,15 @@ export function PaymentTable({
         </h2>
       </div>
       {payments.length === 0 ? (
-        <p className="px-[18px] pb-3 text-[13px] text-muted-foreground">{empty}</p>
+        <p className="px-[18px] pb-3 text-sm text-muted-foreground">{empty}</p>
       ) : (
-        <Table className={cn("text-[13px]", invoiceColumns ? "min-w-[900px]" : "min-w-[640px]")}>
+        <Table className={invoiceColumns ? "min-w-[900px]" : "min-w-[640px]"}>
           <TableHeader>
             <TableRow>
               <TableHead className="pl-[18px]">{t("paidOn")}</TableHead>
               {invoiceColumns && <TableHead>{t("supplier")}</TableHead>}
               {invoiceColumns && <TableHead>{t("invoice")}</TableHead>}
-              <TableHead className="text-right">{t("amount")}</TableHead>
+              <TableHead className="text-right">{vat(t("amount"), "incl")}</TableHead>
               <TableHead>{t("method")}</TableHead>
               <TableHead>{t("proof")}</TableHead>
               <TableHead className={onRemove ? undefined : "pr-[18px]"}>{t("by")}</TableHead>
@@ -230,20 +235,20 @@ export function PaymentTable({
           <TableBody>
             {payments.map((payment) => (
               <TableRow key={payment.id}>
-                <TableCell className="num pl-[18px]">{f.shortDay(payment.paidOn)}</TableCell>
+                <TableCell className="num pl-[18px]">{f.date(payment.paidOn)}</TableCell>
                 {invoiceColumns && <TableCell className="whitespace-normal">{payment.supplierName}</TableCell>}
                 {invoiceColumns && (
                   <TableCell>
                     <Link href={invoiceHref(payment.invoiceId)} className="num font-semibold text-brand-ink hover:text-primary">
                       {payment.invoiceNumber}
                     </Link>{" "}
-                    <span className="num text-[12px] text-muted-foreground">{payment.projectRef}</span>
+                    <span className="num text-meta text-muted-foreground">{payment.projectRef}</span>
                   </TableCell>
                 )}
                 <TableCell className="num text-right">{f.amount(payment.amountCents)}</TableCell>
                 <TableCell>
                   {tm(payment.method)}
-                  {payment.reference && <span className="num block text-[12px] text-muted-foreground">{payment.reference}</span>}
+                  {payment.reference && <span className="num block text-meta text-muted-foreground">{payment.reference}</span>}
                 </TableCell>
                 <TableCell>
                   {payment.file ? (
@@ -263,7 +268,7 @@ export function PaymentTable({
                       variant="ghost-destructive"
                       size="sm"
                       disabled={pending}
-                      aria-label={tr("removeOf", { date: f.shortDay(payment.paidOn) })}
+                      aria-label={tr("removeOf", { date: f.date(payment.paidOn) })}
                       onClick={() => onRemove(payment)}
                     >
                       {tr("remove")}

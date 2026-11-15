@@ -393,6 +393,7 @@ describe("writes the client sees", () => {
     "createDefaultHitos",
     "createRevision",
     "updateRevision",
+    "takeProjectData",
     "deleteRevision",
     "addChapter",
     "updateChapter",
@@ -445,6 +446,9 @@ describe("writes the client sees", () => {
     "requireAssignableClient",
     "toBudgetChapters",
     "photosByChapter",
+    // A read: whether the obra is on time (Resumen and Planificación).
+    "obraSchedule",
+    "obraContract",
     // Reads behind Proyectos › Presupuestos (budget-overview.ts).
     "toSummary",
     "revisionChecks",

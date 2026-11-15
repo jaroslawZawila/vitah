@@ -14,9 +14,10 @@ import {
   type PlanningVersions,
   type PlanningVersionSummary,
   type ProjectPlanning,
+  type ScheduleStatus,
 } from "./contract";
 import { toCalendarDate } from "./calendar";
-import { chapterState } from "./control-calc";
+import { chapterState, contractSchedule } from "./control-calc";
 import { notifyProjectClient } from "./notifications";
 import { todayInSpain } from "./obra-calc";
 import {
@@ -43,6 +44,7 @@ import {
 } from "./planning-calc";
 import { approvedPlanDates } from "./planning-data";
 import { projectInTenant, projectNotDeleted } from "./project-client";
+import { scheduleStatus } from "./schedule-status";
 
 // ─── Planning ────────────────────────────────────────────────────────────────
 // The works schedule (the Obra tab's Planificación): per version, each contract
@@ -77,25 +79,31 @@ const toInput = (row: ItemRow): PlanningItemInput => ({
   leadDays: row.leadDays,
 });
 
+type Obra = Awaited<ReturnType<typeof loadObra>>;
+type Works = { startDate: string | null; completionDate: string | null };
+
+/** What the plan is measured with: what Avance recorded, today, and the contract's end and price. */
+type Measure = { recorded: ReadonlyMap<string, Recorded>; today: string; completionDate: string | null; contractCents: number };
+
+const recordedOf = (obra: Pick<Obra, "progressRows">) =>
+  new Map<string, Recorded>(obra.progressRows.map((r) => [r.chapterCode, { actualStart: r.actualStart, actualEnd: r.actualEnd }]));
+
 /** The project, its contract's chapters (chapter 20 aside) and what Avance recorded. */
 async function loadProject(tenantId: string, projectId: string) {
-  const project = await requireProject(tenantId, projectId);
-  const obra = await loadObra(tenantId, projectId);
+  const [project, obra] = await Promise.all([requireProject(tenantId, projectId), loadObra(tenantId, projectId)]);
   const hitoOf = new Map(obra.hitos.flatMap((h) => h.chapters.map((c) => [c.code, h.code] as const)));
   const progressOf = new Map(obra.chapters.map((c) => [c.code, c.progressPct]));
   const chapters = obra.costChapters
     .filter((c) => c.code !== CONTINGENCY_CHAPTER)
     .map((c) => ({ code: c.code, name: c.name, hitoCode: hitoOf.get(c.code) ?? null, progressPct: progressOf.get(c.code) ?? 0 }));
-  const recorded = new Map<string, Recorded>(
-    obra.progressRows.map((r) => [r.chapterCode, { actualStart: r.actualStart, actualEnd: r.actualEnd }]),
-  );
   return {
     project,
+    obra,
     stage: project.obraStage as ObraStage,
     startDate: toCalendarDate(project.startDate),
     completionDate: toCalendarDate(project.completionDate),
     chapters,
-    recorded,
+    recorded: recordedOf(obra),
     contractCents: obra.progress.totalCents,
     today: todayInSpain(),
   };
@@ -149,8 +157,65 @@ const storedDates = (items: ItemRow[]) =>
   new Map<string, Dates>(items.map((row) => [row.chapterCode, { start: row.plannedStart, end: row.plannedEnd }]));
 
 /** The rules' dates as of today, with what Avance recorded. */
-const scheduleNow = (loaded: Loaded, startDate: string, calendar: PlanningCalendar, rules: PlanningItemInput[]) =>
-  schedulePlan(rules, { startDate, calendar, recorded: loaded.recorded, today: loaded.today });
+const scheduleNow = (measure: Measure, startDate: string, calendar: PlanningCalendar, rules: PlanningItemInput[]) =>
+  schedulePlan(rules, { startDate, calendar, recorded: measure.recorded, today: measure.today });
+
+/** The baseline's stored dates, where it is heading as of today, and both against the contract. */
+function baselineForecast(measure: Measure, approved: VersionRow, rows: ItemRow[]) {
+  const planned = storedDates(rows);
+  const forecast = scheduleNow(measure, approved.startDate, calendarOf(approved), rows.map(toInput));
+  const plannedEnd = planEnd(planned) ?? approved.startDate;
+  return {
+    planned,
+    forecast,
+    plannedEnd,
+    plannedCheck: planCheck(plannedEnd, measure.completionDate, measure.contractCents),
+    forecastCheck: planCheck(planEnd(forecast) ?? plannedEnd, measure.completionDate, measure.contractCents),
+  };
+}
+
+/** What the schedule reads of an obra: `loadObra`'s, or the project list's `loadObraSummaries`. */
+type ScheduleObra = Pick<Obra, "progressRows" | "planDates" | "plan"> & {
+  costChapters: { code: string; name: string }[];
+  hitos: { pctBp: number; chapters: { code: string }[] }[];
+  progress: { totalCents: number };
+};
+
+/** The contract's chapters with their states and planned dates (control-calc's `contractSchedule`). */
+export function obraContract<C extends { code: string; name: string }>(obra: ScheduleObra & { costChapters: C[] }, works: Works) {
+  return contractSchedule(obra.costChapters, obra.hitos, obra.progressRows, works, obra.planDates);
+}
+
+type Contract = Pick<ReturnType<typeof obraContract<{ code: string; name: string }>>, "items" | "states" | "plan" | "planSource">;
+
+/** The status from the contract's chapters (Avance's states, the baseline's dates or simulated ones) and the forecast. */
+function statusOf(
+  { items, states, plan, planSource }: Contract,
+  today: string,
+  forecast: ScheduleStatus["forecast"],
+): ScheduleStatus {
+  const chapters = items.map(({ code, name }) => ({
+    code,
+    name,
+    state: states.get(code)!,
+    plannedStart: plan.get(code)?.start ?? null,
+    plannedEnd: plan.get(code)?.end ?? null,
+  }));
+  return scheduleStatus({ chapters, planning: planSource, forecast, today });
+}
+
+/**
+ * Whether the obra is on time (./schedule-status), from its `obra` (with its
+ * approved baseline, read with it) and the project's contract dates: what Obra
+ * › Resumen and the project list state, the same as Planificación's
+ * `schedule`. `contract` is `obraContract(obra, works)`, when the caller has
+ * it already.
+ */
+export function obraSchedule(obra: ScheduleObra, works: Works, today: string, contract: Contract = obraContract(obra, works)): ScheduleStatus {
+  const measure = { recorded: recordedOf(obra), today, completionDate: works.completionDate, contractCents: obra.progress.totalCents };
+  const forecast = obra.plan ? baselineForecast(measure, obra.plan.version, obra.plan.items).forecastCheck : null;
+  return statusOf(contract, today, forecast);
+}
 
 /** A version's chapters with their planned (`planned`) and forecast dates, in its order. */
 function rowsOf(loaded: Loaded, items: ItemRow[], planned: Map<string, Dates>, forecast: Map<string, Dates>): PlanningRow[] {
@@ -182,28 +247,28 @@ function rowsOf(loaded: Loaded, items: ItemRow[], planned: Map<string, Dates>, f
 
 /** The Obra tab's Planificación: the baseline with where it is heading, and whether a draft is open. */
 export async function getPlanning(ctx: Ctx, projectId: string): Promise<ProjectPlanning> {
-  const [loaded, { versions, draft, approved }] = await Promise.all([
+  const [loaded, { versions, draft }] = await Promise.all([
     loadProject(ctx.tenantId, projectId),
     loadVersions(ctx.tenantId, projectId),
   ]);
   const [items, names, copyFrom] = await Promise.all([
-    loadItems([approved, draft]),
+    loadItems([draft]),
     namesOf(ctx.tenantId, versions),
     otherBaselines(ctx.tenantId, projectId),
   ]);
 
+  // The baseline as `loadObra` read it, with its items: the one Resumen measures too.
+  const approved = loaded.obra.plan?.version;
   let baseline: ProjectPlanning["baseline"] = null;
   if (approved) {
-    const rows = items.get(approved.id) ?? [];
-    const planned = storedDates(rows);
-    const forecast = scheduleNow(loaded, approved.startDate, calendarOf(approved), rows.map(toInput));
-    const plannedEnd = planEnd(planned) ?? approved.startDate;
+    const rows = loaded.obra.plan!.items;
+    const { planned, forecast, plannedEnd, plannedCheck, forecastCheck } = baselineForecast(loaded, approved, rows);
     baseline = {
       ...summaryOf(approved, plannedEnd, names),
       calendar: calendarOf(approved),
       rows: rowsOf(loaded, rows, planned, forecast),
-      planned: planCheck(plannedEnd, loaded.completionDate, loaded.contractCents),
-      forecast: planCheck(planEnd(forecast) ?? plannedEnd, loaded.completionDate, loaded.contractCents),
+      planned: plannedCheck,
+      forecast: forecastCheck,
     };
   }
   return {
@@ -216,6 +281,7 @@ export async function getPlanning(ctx: Ctx, projectId: string): Promise<ProjectP
     chapters: loaded.chapters.map(({ code, name }) => ({ code, name })),
     copyFrom,
     today: loaded.today,
+    schedule: statusOf(obraContract(loaded.obra, loaded), loaded.today, baseline?.forecast ?? null),
   };
 }
 

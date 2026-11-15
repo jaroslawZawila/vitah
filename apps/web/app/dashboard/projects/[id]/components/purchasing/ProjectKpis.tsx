@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { orderLabel, type ProjectPurchases, type PurchaseOrderListItem } from "@repo/core/contract";
 import { cn } from "@/lib/utils";
+import { useVatLabel } from "../../../../components/vat-basis";
 import Kpi from "../obra/Kpi";
 import { deviationTone } from "../construction/format";
 import { usePurchaseFormat } from "./format";
@@ -12,13 +13,14 @@ import { usePurchaseFormat } from "./format";
 export function DeviationKpi({ summary }: { summary: Pick<ProjectPurchases["summary"], "deviationCents" | "deviationBp" | "closedLines"> }) {
   const t = useTranslations("purchasing.kpis");
   const f = usePurchaseFormat();
+  const vat = useVatLabel();
   const { deviationCents, deviationBp, closedLines } = summary;
   return (
     <Kpi
-        label={t("deviation")}
+        label={vat(t("deviation"), "excl")}
         value={
           <span className={deviationTone(deviationCents)}>
-            {deviationCents === null ? "—" : `${f.signedEuros(deviationCents)} €`}
+            {deviationCents === null ? "—" : f.signedMoney(deviationCents)}
           </span>
         }
         hints={[
@@ -47,6 +49,7 @@ export default function ProjectKpis({
 }) {
   const t = useTranslations("purchasing.kpis");
   const f = usePurchaseFormat();
+  const vat = useVatLabel();
   const { costCents, contractedCents } = summary;
   const pct = costCents ? (contractedCents * 100) / costCents : 0;
   const first = late[0];
@@ -54,16 +57,16 @@ export default function ProjectKpis({
   return (
     <section aria-label={t("label")} className="grid grid-cols-2 gap-3.5 lg:grid-cols-4">
       <Kpi
-        label={t("contracted")}
-        value={f.moneyRound(contractedCents)}
+        label={vat(t("contracted"), "excl")}
+        value={f.money(contractedCents)}
         pct={pct}
         barTone="brand"
-        hints={[t("contractedHint", { pct: f.ratio(contractedCents, costCents), cost: f.moneyRound(costCents) })]}
+        hints={[t("contractedHint", { pct: f.ratio(contractedCents, costCents), cost: f.money(costCents) })]}
       />
       <DeviationKpi summary={summary} />
       <Kpi
-        label={t("toContract")}
-        value={f.moneyRound(summary.toContractCents)}
+        label={vat(t("toContract"), "excl")}
+        value={f.money(summary.toContractCents)}
         hints={[t("toContractHint", { lines: summary.uncontractedLines, pending: summary.pendingOrders })]}
       />
       <Kpi
@@ -78,7 +81,7 @@ export default function ProjectKpis({
               </Link>{" "}
               {t("lateHint", {
                 supplier: first.supplierName,
-                date: first.expectedOn ? f.shortDay(first.expectedOn) : "—",
+                date: f.date(first.expectedOn),
                 days: first.lateDays ?? 0,
               })}
             </>

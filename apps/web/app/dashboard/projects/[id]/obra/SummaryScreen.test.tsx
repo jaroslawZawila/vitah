@@ -3,8 +3,9 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { scheduleStatus, type ControlChapter, type PlanningCheck } from "@repo/core/contract";
 import messages from "../../../../../messages/es.json";
-import { control, header } from "../../../../../test/construction-fixture";
+import { control, controlChapter, header } from "../../../../../test/construction-fixture";
 import SummaryScreen from "./SummaryScreen";
 
 vi.mock("../../../../actions/construction", () => ({ reviewChangesAction: vi.fn() }));
@@ -42,17 +43,83 @@ describe("SummaryScreen", () => {
 
     const kpis = within(screen.getByRole("region", { name: "Indicadores" }));
     expect(kpis.getByText("de 6 finalizados")).toBeInTheDocument();
-    expect(kpis.getByText("+8 d")).toBeInTheDocument();
-    expect(kpis.getByText("06 Envolvente térmica Thermochip: fin previsto 09/10, sigue en curso")).toBeInTheDocument();
-    // Planning is still simulated (labelled so); purchasing comes from Compras.
+    // Planning is still simulated (labelled so): the schedule says so instead of "on time"; purchasing comes from Compras.
+    expect(kpis.getByText("Sin plan")).toBeInTheDocument();
+    expect(kpis.queryByText("En plazo")).not.toBeInTheDocument();
+    expect(kpis.getByText(/No hay plan aprobado, así que no se puede decir si la obra va en plazo/)).toBeInTheDocument();
+    expect(kpis.getByText("Según las fechas simuladas:")).toBeInTheDocument();
+    expect(
+      kpis.getByText("1 capítulo en curso ha pasado su fin previsto: 06 Envolvente térmica Thermochip, fin previsto 9 oct 2026."),
+    ).toBeInTheDocument();
     expect(kpis.getAllByText("Simulado")).toHaveLength(1);
     expect(kpis.getAllByText("Compras").length).toBeGreaterThan(0);
+  });
+
+  it("says which VAT the money is in, and that the cost leaves chapter 20 out", () => {
+    renderScreen();
+    const kpis = within(screen.getByRole("region", { name: "Indicadores" }));
+    expect(kpis.getByText("Coste · sin IVA")).toBeInTheDocument();
+    expect(kpis.getByText("Venta · sin IVA")).toBeInTheDocument();
+    // The budget's cost total counts chapter 20; the obra's doesn't: the reserve reconciles them.
+    expect(kpis.getByText("Sin el cap. 20 (imprevistos, 24.759,00 €): queda como reserva.")).toBeInTheDocument();
+    expect(screen.getByText(/^Importes en euros, a coste y sin IVA\. Imprevistos \(cap\. 20, .+ €\) quedan como reserva, fuera del total\./)).toBeInTheDocument();
+  });
+
+  describe("the schedule, with an approved plan", () => {
+    const live = (chapters: ControlChapter[], forecast: PlanningCheck) =>
+      renderScreen({
+        control: {
+          ...control,
+          chapters,
+          sources: { planning: "live", purchasing: "live" },
+          schedule: scheduleStatus({ chapters, planning: "live", forecast, today: control.today }),
+        },
+      });
+    const schedule = () => within(screen.getByRole("region", { name: "Indicadores" }));
+    const withinContract = { endDate: "2027-03-01", contractEnd: "2027-03-31", delayDays: -30, penaltyCents: 0 };
+    const onPlan = [controlChapter({ overdueDays: null, plannedEnd: "2026-10-30" })];
+    // Chapter 17 spans the works: planned from the start, never recorded as started.
+    const notStarted = controlChapter({
+      code: "17",
+      name: "Control de calidad",
+      state: "pending",
+      plannedStart: "2026-02-10",
+      plannedEnd: "2027-03-01",
+      actualStart: null,
+      overdueDays: null,
+    });
+
+    it("is on time only when nothing contradicts it", () => {
+      live(onPlan, withinContract);
+      expect(schedule().getByText("En plazo")).toBeInTheDocument();
+      expect(schedule().getByText("ningún capítulo va tarde")).toBeInTheDocument();
+      expect(schedule().getByText("Fin previsto 1 mar 2027, dentro del contrato (31 mar 2027).")).toBeInTheDocument();
+    });
+
+    it("is late when a chapter's planned start has passed, even with nothing in progress late", () => {
+      live([...onPlan, notStarted], withinContract);
+      expect(schedule().queryByText("En plazo")).not.toBeInTheDocument();
+      expect(schedule().getByText("+249 d")).toBeInTheDocument();
+      expect(schedule().getByText("inicio previsto superado")).toBeInTheDocument();
+      expect(
+        schedule().getByText("1 capítulo sin empezar ha pasado su inicio previsto: 17 Control de calidad, inicio previsto 10 feb 2026."),
+      ).toBeInTheDocument();
+    });
+
+    it("leads with a forecast past the contract and its penalty", () => {
+      live([...onPlan, notStarted], { endDate: "2027-07-10", contractEnd: "2027-03-31", delayDays: 101, penaltyCents: 1_305_000 });
+      expect(schedule().getByText("+101 d")).toBeInTheDocument();
+      expect(schedule().getByText("sobre el contrato")).toBeInTheDocument();
+      expect(schedule().getByText("Fin previsto 10 jul 2027: 101 días después del contrato (31 mar 2027).")).toBeInTheDocument();
+      expect(schedule().getByText(/^Penalización prevista: 13\.050,00\s€\.$/)).toBeInTheDocument();
+      expect(schedule().getByText(/^1 capítulo sin empezar ha pasado su inicio previsto/)).toBeInTheDocument();
+    });
   });
 
   it("warns about late deliveries without changing anything", () => {
     renderScreen();
     const banner = screen.getByRole("status");
-    expect(banner).toHaveTextContent("1 entrega con retraso: PED-049 Piedra de Liébana, capítulo 06, prevista el 14 oct. Solo es un aviso");
+    expect(banner).toHaveTextContent("1 entrega con retraso: PED-049 Piedra de Liébana, capítulo 06, prevista el 14 oct 2026. Solo es un aviso");
     expect(within(banner).getByRole("link", { name: "PED-049" })).toHaveAttribute("href", "/dashboard/projects/p-1/compras/order-49");
   });
 
@@ -65,14 +132,15 @@ describe("SummaryScreen", () => {
     const row = within(table).getByRole("link", { name: "Envolvente térmica Thermochip" }).closest("tr")!;
     expect(row.querySelector("a")).toHaveAttribute("href", "/dashboard/projects/p-1/obra/avance/06");
     expect(within(row).getByText("Fin superado +8 d")).toBeInTheDocument();
-    expect(within(row).getByText("−440 · −1,4 %")).toBeInTheDocument();
+    // The amount over its share, stacked to keep the column narrow.
+    expect(within(row).getByText("−440,00")).toContainElement(within(row).getByText("−1,4 %"));
     // Not contracted: a dash, never zero.
     const pending = within(table).getByRole("link", { name: "Electricidad e iluminación" }).closest("tr")!;
     expect(within(pending).getByText("empieza en 2 d")).toBeInTheDocument();
     expect(within(pending).getAllByText("—").length).toBeGreaterThanOrEqual(2);
     // An overrun is negative.
     const roof = within(table).getByRole("link", { name: "Cubierta inclinada" }).closest("tr")!;
-    expect(within(roof).getByText("+2544 · +4,6 %")).toBeInTheDocument();
+    expect(within(roof).getByText("+2.544,00")).toContainElement(within(roof).getByText("+4,6 %"));
   });
 
   it("filters the chapters by chapter, state and period", async () => {
@@ -101,7 +169,7 @@ describe("SummaryScreen", () => {
 
     const issues = within(screen.getByRole("region", { name: "Incidencias y cambios abiertos" }));
     expect(issues.getByText(/Corredera elevable/)).toBeInTheDocument();
-    expect(issues.getByText(/\+2350 € est\./)).toBeInTheDocument();
+    expect(issues.getByText(/\+2.350,00 € est\./)).toBeInTheDocument();
 
     const documents = within(screen.getByRole("region", { name: "Documentación" }));
     expect(documents.getByText("1 caduca")).toBeInTheDocument();
@@ -110,7 +178,7 @@ describe("SummaryScreen", () => {
     const photos = within(screen.getByRole("region", { name: "Fotos de obra" }));
     expect(photos.getByRole("link", { name: "Ver las 148 →" })).toHaveAttribute("href", "/dashboard/projects/p-1/obra/fotos");
     expect(photos.getByRole("link", { name: "Subir fotos" })).toHaveAttribute("href", "/dashboard/projects/p-1/obra/fotos");
-    expect(photos.getByRole("img", { name: "17/10 · 06 · Fachada norte" })).toHaveAttribute(
+    expect(photos.getByRole("img", { name: "17 oct 2026 · 06 · Fachada norte" })).toHaveAttribute(
       "src",
       "/api/v1/projects/p-1/photos/photo-1?size=thumb",
     );

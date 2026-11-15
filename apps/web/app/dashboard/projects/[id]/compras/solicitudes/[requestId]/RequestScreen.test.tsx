@@ -26,7 +26,6 @@ const decision = () => within(screen.getByRole("region", { name: "Aprobación" }
 beforeEach(() => {
   vi.mocked(actions.decideRequestAction).mockReset().mockResolvedValue({ success: true });
   vi.mocked(actions.cancelRequestAction).mockReset().mockResolvedValue({ success: true });
-  vi.spyOn(window, "confirm").mockReturnValue(true);
 });
 
 describe("RequestScreen", () => {
@@ -34,22 +33,22 @@ describe("RequestScreen", () => {
     renderScreen();
     expect(screen.getByRole("heading", { level: 1, name: "Placa de yeso para trasdosados" })).toBeInTheDocument();
     expect(screen.getByText("VTH-26-001 · SOL-003")).toBeInTheDocument();
-    expect(screen.getByText("Solicitada por Laura Pérez el 10 oct")).toBeInTheDocument();
-    expect(screen.getByRole("status")).toHaveTextContent("2 días tarde Hacía falta para el 15 oct y todavía no hay pedido.");
+    expect(screen.getByText("Solicitada por Laura Pérez el 10 oct 2026")).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("2 días tarde Hacía falta para el 15 oct 2026 y todavía no hay pedido.");
 
     const lines = within(screen.getByRole("region", { name: "Partidas" }));
     expect(lines.getAllByRole("row").map((row) => row.textContent)).toEqual([
       "PartidaCosteYa contratadoEstimado",
-      "07.01 Trasdosado de placa de yeso 310,00 m²7440,00—6250,00",
-      "07.04 Placa hidrófuga en baños 54,00 m²2660,001000,001000,00",
-      "Total estimado7250,00",
+      "07.01 Trasdosado de placa de yeso 310,00 m²7.440,00—6.250,00",
+      "07.04 Placa hidrófuga en baños 54,00 m²2.660,001.000,001.000,00",
+      "Total estimado7.250,00",
     ]);
     expect(screen.getByRole("link", { name: "Yesos y Placas del Norte S.L." })).toHaveAttribute("href", "/dashboard/subcontratas/empresas/sup-yesos");
 
     const history = within(screen.getByRole("region", { name: "Historial" })).getAllByRole("listitem");
-    expect(history[0]).toHaveTextContent("Importe de 07.01: 6000,00 → 6250,00 · Laura Pérez");
-    expect(history[1]).toHaveTextContent("Para el: 20 oct → 15 oct");
-    expect(history[2]).toHaveTextContent("Creado con 2 partidas, 7000,00 €");
+    expect(history[0]).toHaveTextContent("Importe de 07.01: 6.000,00 → 6.250,00 · Laura Pérez");
+    expect(history[1]).toHaveTextContent("Para el: 20 oct 2026 → 15 oct 2026");
+    expect(history[2]).toHaveTextContent("Creado con 2 partidas, 7.000,00 €");
     expect(decision().getByText("Espera la aprobación de un administrador.")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Editar" })).toHaveAttribute("href", "/dashboard/projects/p-1/compras/solicitudes/req-3/editar");
   });
@@ -80,12 +79,22 @@ describe("RequestScreen", () => {
 
   it("once approved, turns into an order and can still be cancelled", async () => {
     renderScreen({ request: approvedRequest });
-    expect(decision().getByText(/Aprobada por Ana Admin el 16 oct/)).toHaveTextContent("“Adelante”");
+    expect(decision().getByText(/Aprobada por Ana Admin el 16 oct 2026/)).toHaveTextContent("“Adelante”");
     expect(decision().getByText("Lista para pedir.")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Crear pedido" })).toHaveAttribute("href", "/dashboard/projects/p-1/compras/nuevo?solicitud=req-3");
     expect(screen.getAllByRole("listitem")[0]).toHaveTextContent("Aprobada “Adelante” · Ana Admin");
     expect(screen.queryByRole("link", { name: "Editar" })).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Cancelar solicitud" }));
+    let dialog = within(await screen.findByRole("alertdialog", { name: "¿Cancelar la solicitud SOL-003?" }));
+    expect(dialog.getByText(/ya no se podrá convertir en pedido ni reabrir/)).toBeInTheDocument();
+    // Backing out says "keep", not a second "Cancelar".
+    await userEvent.click(dialog.getByRole("button", { name: "Mantener solicitud" }));
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+    expect(actions.cancelRequestAction).not.toHaveBeenCalled();
+
+    await userEvent.click(screen.getByRole("button", { name: "Cancelar solicitud" }));
+    dialog = within(await screen.findByRole("alertdialog", { name: "¿Cancelar la solicitud SOL-003?" }));
+    await userEvent.click(dialog.getByRole("button", { name: "Cancelar solicitud" }));
     expect(actions.cancelRequestAction).toHaveBeenCalledWith("req-3");
   });
 

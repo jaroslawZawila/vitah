@@ -24,10 +24,6 @@ export function useObraAction<S extends ActionState<string> = ObraState>() {
     state,
     pending,
     run,
-    /** `run` once the user confirms `message`. */
-    confirmThen(message: string, action: () => Promise<S>, after?: () => void) {
-      if (confirm(message)) run(action, after);
-    },
     reset: () => setState(null),
   };
 }

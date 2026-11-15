@@ -48,7 +48,7 @@ export default function RequestsScreen({
 
       <RequestKpis summary={requests.summary} />
       <RequestBoard requests={requests.requests} empty={t("none")} />
-      <p className="max-w-[860px] text-[12.5px] leading-normal text-muted-foreground">{t("footnote")}</p>
+      <p className="max-w-[860px] text-meta leading-normal text-muted-foreground">{t("footnote")}</p>
     </div>
   );
 }

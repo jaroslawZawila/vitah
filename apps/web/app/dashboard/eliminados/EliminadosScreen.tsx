@@ -14,8 +14,8 @@ import { FormMessage } from "@/components/ui/field";
 import { cn } from "@/lib/utils";
 import { listDeletedAction, restoreDeletedAction } from "../../actions/deleted";
 import FormError from "../components/FormError";
+import { useConfirm } from "../components/useConfirm";
 import { DeletedFilterBar, DeletedIntro, DeletedTable, type DeletedFilterValue } from "./components/DeletedViews";
-import RestoreDialog from "./components/RestoreDialog";
 import { useDeletedText } from "./components/text";
 
 /** What a reload after a restore asks for at most: the most the server answers at once. */
@@ -31,9 +31,8 @@ export default function EliminadosScreen({ initial }: { initial: DeletedList }) 
   const [filters, setFilters] = useState<DeletedFilterValue>({ kind: "", projectId: "" });
   const [listError, setListError] = useState<string | null>(null);
   const [loading, startLoading] = useTransition();
-  const [confirming, setConfirming] = useState<DeletedItem | null>(null);
-  const [restoreError, setRestoreError] = useState<string | null>(null);
-  const [restoring, startRestoring] = useTransition();
+  const tc = useTranslations("deletedPage.confirm");
+  const confirm = useConfirm("deletedPage.errors");
   const [restored, setRestored] = useState<string | null>(null);
   // Only the last request's answer is shown: a slow page never overwrites a newer filter.
   const request = useRef(0);
@@ -73,22 +72,24 @@ export default function EliminadosScreen({ initial }: { initial: DeletedList }) 
     });
   }
 
+  /** Asks first; the dialog restores `item` and shows why it couldn't. */
   function open(item: DeletedItem) {
-    setRestoreError(null);
-    setConfirming(item);
+    confirm.ask({
+      title: tc("title", { item: text.title(item) }),
+      description: tc(`description.${item.kind}`),
+      confirmLabel: tc("confirm"),
+      pendingLabel: tc("restoring"),
+      action: () => restoreDeletedAction(item.kind, item.id),
+      onDone: () => afterRestore(item),
+    });
   }
 
-  function restore() {
-    const item = confirming;
-    if (!item) return;
-    startRestoring(async () => {
-      const state = await restoreDeletedAction(item.kind, item.id);
-      if (state?.error) return setRestoreError(state.error);
-      setConfirming(null);
-      setRestored(text.title(item));
-      const shown = list.items.length;
-      // Gone from the list at once; then read again: what hung from it can now be restored too.
-      setList((current) => ({ ...current, items: current.items.filter((other) => !same(other, item)) }));
+  function afterRestore(item: DeletedItem) {
+    setRestored(text.title(item));
+    const shown = list.items.length;
+    // Gone from the list at once; then read again: what hung from it can now be restored too.
+    setList((current) => ({ ...current, items: current.items.filter((other) => !same(other, item)) }));
+    startLoading(async () => {
       await load({ ...queryOf(filters), limit: Math.min(Math.max(shown, 1), MAX_RELOAD) });
     });
   }
@@ -126,7 +127,7 @@ export default function EliminadosScreen({ initial }: { initial: DeletedList }) 
         )}
       </section>
 
-      <RestoreDialog item={confirming} error={restoreError} pending={restoring} onConfirm={restore} onClose={() => setConfirming(null)} />
+      {confirm.dialog}
     </div>
   );
 }

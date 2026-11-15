@@ -106,7 +106,7 @@ export default function StartView({
                     <FileText size={20} className="flex-none text-muted-foreground" aria-hidden />
                     <a href={fileUrl(doc)} target="_blank" rel="noreferrer" className="min-w-0 flex-1 hover:underline">
                       <span className="block truncate text-sm font-semibold">{doc.filename ?? doc.title}</span>
-                      <span className="num text-xs text-muted-foreground">{f.fileSize(doc.sizeBytes)}</span>
+                      <span className="num text-meta text-muted-foreground">{f.fileSize(doc.sizeBytes)}</span>
                     </a>
                     {onRemove && (
                       <Button type="button" variant="ghost" size="sm" onClick={() => onRemove(doc)}>{t("remove")}</Button>
@@ -116,7 +116,7 @@ export default function StartView({
                 {progress !== undefined ? (
                   <div className="flex items-center gap-2.5" aria-live="polite">
                     <ProgressBar pct={progress} />
-                    <span className="num text-xs text-muted-foreground">{t("uploading", { pct: progress })}</span>
+                    <span className="num text-meta text-muted-foreground">{t("uploading", { pct: progress })}</span>
                   </div>
                 ) : (
                   docs.length === 0 && onUpload && (
@@ -137,7 +137,7 @@ export default function StartView({
                       <Upload size={20} className="text-muted-foreground" aria-hidden />
                       <span className={muted}>{t("drop", { types: ACCEPT[kind].replaceAll(".", "").toUpperCase().replaceAll(",", ", ") })}</span>
                       <span className="flex flex-wrap justify-center gap-2">
-                        <label className="inline-flex min-h-8 cursor-pointer items-center rounded-[7px] border bg-card px-2.5 text-[12.5px] font-semibold hover:bg-raise pointer-coarse:min-h-11">
+                        <label className="inline-flex min-h-8 cursor-pointer items-center rounded-[7px] border bg-card px-2.5 text-meta font-semibold hover:bg-raise pointer-coarse:min-h-11">
                           {t("upload")}
                           <input type="file" className="sr-only" accept={ACCEPT[kind]} onChange={(event) => event.target.files?.[0] && onUpload(kind, event.target.files[0])} />
                         </label>

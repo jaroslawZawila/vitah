@@ -31,7 +31,7 @@ export default function Kpi({
       <span
         className={cn(
           "font-heading text-2xl leading-[1.05] font-semibold tabular-nums [overflow-wrap:anywhere] sm:text-[30px]",
-          "[&_small]:font-sans [&_small]:text-[13px] [&_small]:font-normal [&_small]:text-muted-foreground",
+          "[&_small]:font-sans [&_small]:text-sm [&_small]:font-normal [&_small]:text-muted-foreground",
           highlight && "text-rail-accent [&_small]:text-rail-muted",
         )}
       >

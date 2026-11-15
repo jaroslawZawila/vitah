@@ -38,10 +38,18 @@ describe("PlanningScreen", () => {
     expect(screen.getByText(/motivo: «Lluvias de septiembre»/)).toBeInTheDocument();
 
     const kpis = within(screen.getByRole("region", { name: "Resumen del plan" }));
-    expect(kpis.getByText("17/12/2026")).toBeInTheDocument();
+    expect(kpis.getByText("17 dic 2026")).toBeInTheDocument();
     expect(kpis.getByText("6 días sobre el contrato")).toBeInTheDocument();
     expect(kpis.getByText("Empieza en 9 días: 150 €/día")).toBeInTheDocument();
     expect(kpis.getByText("02 → 03 → 04")).toBeInTheDocument();
+
+    // The same status Obra › Resumen states: late, the forecast past the contract first.
+    const schedule = within(screen.getByRole("region", { name: "Plazo" }));
+    expect(schedule.getByText("+6 d")).toBeInTheDocument();
+    expect(schedule.getByText("sobre el contrato")).toBeInTheDocument();
+    expect(schedule.getByText("Fin previsto 17 dic 2026: 6 días después del contrato (11 dic 2026).")).toBeInTheDocument();
+    expect(schedule.getByText("Todavía sin penalización: empieza el día 15 de retraso.")).toBeInTheDocument();
+    expect(schedule.queryByText("En plazo")).not.toBeInTheDocument();
 
     expect(table().getByRole("link", { name: "Revestimientos interiores y falsos techos" })).toHaveAttribute(
       "href",
@@ -51,9 +59,9 @@ describe("PlanningScreen", () => {
     expect(finishes.getByText("Tras 02 · H8")).toBeInTheDocument();
     expect(finishes.getByText("Crítica")).toBeInTheDocument();
     expect(finishes.getByText("+7 d vs. línea base")).toBeInTheDocument();
-    expect(finishes.getByText("02/11 – 27/11")).toBeInTheDocument();
+    expect(finishes.getByText("2 nov 2026 – 27 nov 2026")).toBeInTheDocument();
     // Pending: its orders go out 14 days before its baseline start (26/10).
-    expect(finishes.getByText("· pedir antes del 12/10")).toBeInTheDocument();
+    expect(finishes.getByText("· pedir antes del 12 oct 2026")).toBeInTheDocument();
     expect(table().getByText("Toda la obra")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Versiones" })).toHaveAttribute("href", "/dashboard/projects/p-1/obra/planificacion/versiones");
   });

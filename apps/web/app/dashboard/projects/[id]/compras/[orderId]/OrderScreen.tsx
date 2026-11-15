@@ -25,6 +25,7 @@ import {
 } from "../../../../../actions/purchasing";
 import { setOrderMilestonesAction } from "../../../../../actions/purchase-invoices";
 import FormError from "../../../../components/FormError";
+import { useConfirm } from "../../../../components/useConfirm";
 import { obraHref } from "../../components/construction/ObraFrame";
 import { useObraAction } from "../../components/obra/useObraAction";
 import {
@@ -60,6 +61,7 @@ export default function OrderScreen({
   const file = useObraAction();
   const schedule = useObraAction();
   const review = useObraAction();
+  const confirm = useConfirm("purchasing.errors");
   // The AI reviews a new PDF after its upload: the page re-reads until it is done.
   useRefreshWhile(reviewing(order.checks));
   // Invoices go only to a placed order; the form lives in Compras › Facturas.
@@ -93,12 +95,18 @@ export default function OrderScreen({
         <Button
           type="button"
           variant="ghost-destructive"
-          disabled={status.pending}
-          onClick={() =>
-            status.confirmThen(t("confirmCancel", { number: orderLabel(order.number) }), () =>
-              setPurchaseStatusAction(projectId, order.id, { status: "cancelled" }),
-            )
-          }
+          disabled={status.pending || confirm.pending}
+          onClick={() => {
+            status.reset();
+            confirm.ask({
+              t,
+              key: "cancelDialog",
+              values: { number: orderLabel(order.number) },
+              keep: true,
+              destructive: true,
+              action: () => setPurchaseStatusAction(projectId, order.id, { status: "cancelled" }),
+            });
+          }}
         >
           {t("cancelOrder")}
         </Button>
@@ -111,6 +119,7 @@ export default function OrderScreen({
       <BackLink href={purchasesHref(projectId)} />
 
       <OrderHeading order={order} actions={actions || undefined} />
+      {confirm.dialog}
       {!dated && <FormError namespace="purchasing.errors" error={status.state?.error} />}
 
       <LateBanner order={order} issuesHref={obraHref(projectId, "issues")} />
@@ -165,7 +174,7 @@ export default function OrderScreen({
             documents={order.documents}
             documentUrl={(documentId, versionId) => orderDocumentUrl(order.id, documentId, versionId)}
             canManage={canManage}
-            pending={file.pending}
+            pending={file.pending || confirm.pending}
             error={file.state?.error}
             onAdd={({ title, file: chosen }, done) => {
               const data = new FormData();
@@ -180,11 +189,16 @@ export default function OrderScreen({
               file.run(() => addOrderDocumentVersionAction(projectId, order.id, documentId, data), done);
             }}
             onDismiss={file.reset}
-            onRemove={(document) =>
-              file.confirmThen(t("documents.confirmRemove", { title: document.title }), () =>
-                deleteOrderDocumentAction(projectId, order.id, document.id),
-              )
-            }
+            onRemove={(document) => {
+              file.reset();
+              confirm.ask({
+                t,
+                key: "documents.removeDialog",
+                values: { title: document.title },
+                destructive: true,
+                action: () => deleteOrderDocumentAction(projectId, order.id, document.id),
+              });
+            }}
           />
         </div>
         <div className="flex min-w-0 flex-col gap-[18px] lg:col-span-2">

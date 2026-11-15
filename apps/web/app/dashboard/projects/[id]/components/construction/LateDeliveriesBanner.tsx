@@ -23,7 +23,7 @@ export default function LateDeliveriesBanner({
   if (orders.length === 0) return null;
 
   return (
-    <div role="status" className="flex items-start gap-2.5 rounded-xl border border-warn/30 bg-warn-soft px-4 py-3 text-[13.5px] text-warn">
+    <div role="status" className="flex items-start gap-2.5 rounded-xl border border-warn/30 bg-warn-soft px-4 py-3 text-sm text-warn">
       <Clock aria-hidden className="mt-0.5 size-[18px] flex-none" />
       <p className="m-0 min-w-0">
         <b>{t("title", { count: orders.length })}</b>{" "}
@@ -35,7 +35,7 @@ export default function LateDeliveriesBanner({
             </Link>{" "}
             {order.supplierName}
             {order.chapterCodes.length > 0 && `, ${t("chapter", { codes: order.chapterCodes.join(", ") })}`}
-            {order.expectedOn && `, ${t("expected", { date: f.shortDay(order.expectedOn) })}`}
+            {order.expectedOn && `, ${t("expected", { date: f.date(order.expectedOn) })}`}
           </span>
         ))}
         . {t("onlyWarning")}

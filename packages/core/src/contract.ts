@@ -410,6 +410,21 @@ export type BudgetTexts = {
   includes: string;
 };
 
+/** The cover fields that name the project's own data: its client (`promoter`) and its address (`site`). */
+export const IDENTITY_FIELDS = ["promoter", "site"] as const;
+export type IdentityField = (typeof IDENTITY_FIELDS)[number];
+
+/** A FRAMER revision's promoter and site against the project's client and address (core budget-identity.ts). */
+export type BudgetIdentity = {
+  /** The project's client (first name and surnames) and its address; null where it has none. */
+  client: string | null;
+  address: string | null;
+  /** Cover fields that don't name the project's value (where it has one). */
+  differs: IdentityField[];
+  /** Cover fields filled where the project has nothing: the project could take them, by hand. */
+  projectLacks: IdentityField[];
+};
+
 export type BudgetConditions = {
   validityDays: number;
   term: string;
@@ -536,6 +551,8 @@ export type BudgetRevision = BudgetRevisionSummary & {
   contingencyBp: number;
   quality: BudgetQuality | null;
   texts: BudgetTexts;
+  /** Its promoter and site against the project's client and address; null for budgets entered before the FRAMER model. */
+  identity: BudgetIdentity | null;
   conditions: BudgetConditions;
   changeReason: string | null;
   validUntil: string | null;
@@ -623,6 +640,39 @@ import type { PageQuery, Paging } from "./paging";
 export type BudgetState = {
   revision: Pick<BudgetRevisionSummary, "number" | "status"> | null;
   generation: { status: BudgetGenerationStatus; step: number } | null;
+};
+
+/** What an obra on the project list may need from staff, in the order the list names them. */
+export const PROJECT_ATTENTION_KINDS = [
+  "to_invoice",
+  "collection_overdue",
+  "supplier_overdue",
+  "requests",
+  "late_deliveries",
+  "documents",
+] as const;
+export type ProjectAttentionKind = (typeof PROJECT_ATTENTION_KINDS)[number];
+
+/**
+ * One reason an obra needs attention, and how many: hitos to invoice (reached
+ * or requested on Obra › Hitos), hitos invoiced and past their due day unpaid,
+ * supplier invoices overdue (`amountCents`: what they still owe, VAT in),
+ * purchase requests waiting for approval, material deliveries late, and its
+ * subcontractors' CAE document warnings (`listProjectAttention`).
+ */
+export type ProjectAttention = { kind: ProjectAttentionKind; count: number; amountCents?: number };
+
+/** The obra's schedule as the list shows it: `scheduleStatus`'s verdict and, when late, its headline days. */
+export type ProjectSchedule = Pick<ScheduleStatus, "status" | "worst"> & { days: number | null };
+
+/** What the project list shows of each obra besides its budget: none of it for an obra without a contract but `attention`. */
+export type ProjectSignals = {
+  /** Null without an accepted budget. */
+  schedule: ProjectSchedule | null;
+  /** The built % (Obra's figure); null without an accepted budget. */
+  progressPct: number | null;
+  /** Empty when nothing needs doing. */
+  attention: ProjectAttention[];
 };
 
 /** An obra's newest revision as the list shows it, at the client's price (the PEC, margins in). */
@@ -1033,6 +1083,8 @@ export type ConstructionControl = {
   photos: ProjectPhoto[];
   photoCount: number;
   sources: ControlSources;
+  /** On time or late: the same as GET …/planning's `schedule`. */
+  schedule: ScheduleStatus;
 };
 
 /** GET /api/v1/projects/:id/obra/header: what every Obra page's header and forms need, cheaply. */
@@ -1738,6 +1790,8 @@ export type ProjectPurchaseLines = {
   chapters: {
     code: string;
     name: string;
+    /** From Avance's dates: nothing more is ordered "soon" for a finished one. */
+    state: ChapterState;
     /** The day its orders must be placed by (planned start − lead time). */
     orderBy: string | null;
     costCents: number;
@@ -2058,6 +2112,33 @@ export type PlanningCheck = {
   penaltyCents: number;
 };
 
+export { lateToFinishDays, lateToStartDays, projectSchedule, scheduleStatus, type ScheduleChapterInput } from "./schedule-status";
+
+/** A chapter behind its planned dates today: `plannedDate` is the start (late to start) or end (late to finish) it passed. */
+export type ScheduleLateChapter = { code: string; name: string; plannedDate: string; days: number };
+
+/**
+ * Whether the obra is on time: the one rule the portal states, on Obra ›
+ * Resumen and Planificación alike (`scheduleStatus` in ./schedule-status).
+ * - `on_time`: an approved baseline, and nothing contradicts it
+ * - `late`: an approved baseline, and its forecast ends after the contract,
+ *   or a chapter is late to start or to finish
+ * - `simulated`: no approved baseline; the dates are a stand-in, so nothing is asserted
+ * - `no_dates`: nothing to measure against (no baseline and no project dates)
+ */
+export type ScheduleStatus = {
+  status: "on_time" | "late" | "simulated" | "no_dates";
+  planning: PlanningSource;
+  /** Where the approved baseline is heading against the contract; null without one. */
+  forecast: PlanningCheck | null;
+  /** Pending chapters whose planned start has passed, most days first. */
+  lateToStart: ScheduleLateChapter[];
+  /** Chapters in progress past their planned end, most days first. */
+  lateToFinish: ScheduleLateChapter[];
+  /** What to lead with: the forecast past the contract, else the chapter most days behind (finish before start on a tie). */
+  worst: "forecast" | "finish" | "start" | null;
+};
+
 /** GET /api/v1/projects/:id/planning: the Obra tab's Planificación. */
 export type ProjectPlanning = {
   ref: string;
@@ -2074,6 +2155,8 @@ export type ProjectPlanning = {
         planned: PlanningCheck;
       })
     | null;
+  /** On time or late: the same as GET …/obra/control's `schedule`. */
+  schedule: ScheduleStatus;
   draft: PlanningVersionSummary | null;
   /** The contract's chapters (chapter 20 aside), to generate a first plan from. */
   chapters: { code: string; name: string }[];

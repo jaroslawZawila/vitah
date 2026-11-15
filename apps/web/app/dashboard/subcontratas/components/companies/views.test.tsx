@@ -115,7 +115,7 @@ describe("AttentionList", () => {
 
     const list = screen.getByRole("region", { name: /Requiere atención/ });
     expect(list).toHaveAttribute("id", "caducidades");
-    expect(screen.getByText("Caducó el 09/10/2026 · 3 trabajadores sin acceso")).toBeInTheDocument();
+    expect(screen.getByText("Caducó el 9 oct 2026 · 3 trabajadores sin acceso")).toBeInTheDocument();
     // The self-employed see their RETA receipt instead of the RNT.
     expect(screen.getByText("Recibo RETA del último mes")).toBeInTheDocument();
     expect(screen.getByText("Faltan 3 documentos obligatorios")).toBeInTheDocument();

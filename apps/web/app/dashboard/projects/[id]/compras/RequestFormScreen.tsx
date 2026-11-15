@@ -65,7 +65,7 @@ export default function RequestFormScreen({
         <p className="mt-1 max-w-[640px] text-[14px] text-muted-foreground">{t("intro")}</p>
       </header>
       {form.chapters.length === 0 ? (
-        <p className="rounded-xl border bg-card px-4 py-6 text-center text-[13.5px] text-muted-foreground">{t("noBudget")}</p>
+        <p className="rounded-xl border bg-card px-4 py-6 text-center text-sm text-muted-foreground">{t("noBudget")}</p>
       ) : (
         <RequestForm
           form={form}

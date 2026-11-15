@@ -63,13 +63,13 @@ export default function Stepper({ steps, label }: { steps: Step[]; label: string
             </span>
             <span
               className={cn(
-                "text-[12.5px] leading-tight font-semibold",
+                "text-meta leading-tight font-semibold",
                 step.state === "todo" && "text-muted-foreground",
               )}
             >
               {step.label}
             </span>
-            {step.meta && <span className="text-[11.5px] leading-snug text-muted-foreground">{step.meta}</span>}
+            {step.meta && <span className="text-xs leading-snug text-muted-foreground">{step.meta}</span>}
           </li>
         );
       })}

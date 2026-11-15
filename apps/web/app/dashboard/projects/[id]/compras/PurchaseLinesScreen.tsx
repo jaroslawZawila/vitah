@@ -1,24 +1,45 @@
 "use client";
 
 // Container for the project's Compras tab by budget line (its default view):
-// read-only, it filters and folds lines open. The views in
-// ../components/purchasing take props only.
+// read-only, it filters and folds chapters and lines open, keeping the filters
+// and the chapters open in the URL (`?estado=&capitulo=&q=&abierto=03,07`,
+// replaced). The views in ../components/purchasing take props only.
 
 import Link from "next/link";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Plus } from "lucide-react";
 import { PURCHASE_PROGRESS, type ProjectPurchaseLines, type PurchaseProgress } from "@repo/core/contract";
 import { buttonVariants } from "@/components/ui/button";
 import { cardVariants } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { FilterSelect } from "../components/construction/Filters";
+import { openGroups, openParam, parseOpen, useUrlState } from "../../../components/useUrlState";
+import { FilterSelect, FoldAllButtons } from "../components/construction/Filters";
 import { StageEyebrow, type ObraHeader } from "../components/construction/ObraFrame";
 import Segmented from "../components/construction/Segmented";
 import { DueBanner, LineKpis, LineTable, ViewSwitch } from "../components/purchasing/LineViews";
+import { orderSoon, rollUpLines } from "../components/purchasing/line-rollup";
 import { newOrderHref } from "../components/purchasing/links";
 
 type ProgressFilter = "all" | PurchaseProgress;
+
+/** What the page shows: the lines by state, chapter and text, and the chapters open (null: the default). */
+type LinesView = { progress: ProgressFilter; chapter: string; query: string; open: string[] | null };
+
+const parseView = (params: URLSearchParams): LinesView => ({
+  progress: PURCHASE_PROGRESS.find((key) => key === params.get("estado")) ?? "all",
+  chapter: params.get("capitulo") ?? "",
+  query: params.get("q") ?? "",
+  open: parseOpen(params.get("abierto")),
+});
+
+const viewParams = (view: LinesView) => ({
+  estado: view.progress === "all" ? null : view.progress,
+  capitulo: view.chapter || null,
+  q: view.query.trim() ? view.query : null,
+  abierto: openParam(view.open),
+});
 
 /** The obra's budget lines with what is contracted, invoiced and paid of each (the four states). */
 export default function PurchaseLinesScreen({
@@ -35,21 +56,41 @@ export default function PurchaseLinesScreen({
   const t = useTranslations("purchasing.lines");
   const tp = useTranslations("purchasing.progress");
   const tproject = useTranslations("purchasing.project");
-  const [progress, setProgress] = useState<ProgressFilter>("all");
-  const [chapter, setChapter] = useState("");
-  const [open, setOpen] = useState<ReadonlySet<string>>(() => new Set());
+  const [view, setView] = useUrlState(parseView, viewParams);
+  const { progress, chapter, query } = view;
+  // Lines folded open on their orders: not kept in the URL.
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set());
   const toggle = (lineageId: string) =>
-    setOpen((current) => {
+    setExpanded((current) => {
       const next = new Set(current);
       if (!next.delete(lineageId)) next.add(lineageId);
       return next;
     });
 
-  const total = lines.chapters.reduce((sum, c) => sum + c.lines.length, 0);
-  const shown = lines.chapters
-    .filter((c) => !chapter || c.code === chapter)
-    .map((c) => ({ ...c, lines: c.lines.filter((l) => progress === "all" || l.progress === progress) }))
-    .filter((c) => c.lines.length > 0);
+  const needle = query.trim().toLowerCase();
+  const filtering = progress !== "all" || needle !== "" || chapter !== "";
+  const shown = useMemo(
+    () =>
+      lines.chapters
+        .filter((c) => !chapter || c.code === chapter)
+        .map((c) => {
+          const kept = c.lines.filter(
+            (l) =>
+              (progress === "all" || l.progress === progress) &&
+              (!needle || l.code.toLowerCase().includes(needle) || l.description.toLowerCase().includes(needle)),
+          );
+          return { ...c, lines: kept, rollup: rollUpLines(kept), soon: orderSoon({ state: c.state, orderBy: c.orderBy, lines: kept }, lines.today) };
+        })
+        .filter((c) => c.lines.length > 0),
+    [lines.chapters, lines.today, chapter, progress, needle],
+  );
+  const all = useMemo(() => rollUpLines(lines.chapters.flatMap((c) => c.lines)), [lines.chapters]);
+
+  // Folded by default; a filter, a search or a chapter picked opens what it shows.
+  const codes = shown.map((c) => c.code);
+  const fallback = filtering ? codes : [];
+  const groups = openGroups(view.open, codes, fallback, (open) => setView({ ...view, open }));
+  const filter = (change: Partial<Omit<LinesView, "open">>) => setView({ ...view, ...change, open: null });
 
   return (
     <div className="flex flex-col gap-[18px]">
@@ -79,15 +120,15 @@ export default function PurchaseLinesScreen({
             <h2 id="lines-title" className="text-[22px]">
               {t("tableTitle")}
             </h2>
-            <span className="text-[12.5px] text-muted-foreground">{t("tableHint")}</span>
+            <span className="text-meta text-muted-foreground">{t("tableHint")}</span>
           </div>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2.5">
             <Segmented
               label={t("filter")}
               value={progress}
-              onChange={setProgress}
+              onChange={(value) => filter({ progress: value })}
               options={[
-                { key: "all" as const, label: t("all"), count: total },
+                { key: "all" as const, label: t("all"), count: all.lines },
                 ...PURCHASE_PROGRESS.map((key) => ({ key, label: tp(key), count: lines.counts[key] })),
               ]}
             />
@@ -95,29 +136,46 @@ export default function PurchaseLinesScreen({
               id="lines-chapter"
               label={t("chapter")}
               value={chapter}
-              onChange={setChapter}
+              onChange={(value) => filter({ chapter: value })}
               options={[
                 { value: "", label: t("allChapters") },
                 ...lines.chapters.map((c) => ({ value: c.code, label: `${c.code} ${c.name}` })),
               ]}
             />
+            <Input
+              type="search"
+              value={query}
+              onChange={(event) => filter({ query: event.target.value })}
+              placeholder={t("search")}
+              aria-label={t("search")}
+              className="h-10 w-full max-w-[240px] bg-card"
+            />
+            <FoldAllButtons
+              className="md:ml-auto"
+              allOpen={groups.allOpen}
+              noneOpen={groups.noneOpen}
+              onExpand={groups.expandAll}
+              onCollapse={groups.collapseAll}
+            />
           </div>
         </div>
-        {total === 0 ? (
-          <p className="px-[18px] py-6 text-center text-[13.5px] text-muted-foreground">{t("none")}</p>
+        {all.lines === 0 ? (
+          <p className="px-[18px] py-6 text-center text-sm text-muted-foreground">{t("none")}</p>
         ) : (
           <LineTable
             projectId={projectId}
             chapters={shown}
-            summary={progress === "all" && !chapter ? lines.summary : undefined}
-            expanded={(id) => open.has(id)}
+            total={filtering ? undefined : all}
+            open={groups.isOpen}
+            onToggleChapter={groups.toggle}
+            expanded={(id) => expanded.has(id)}
             onToggle={toggle}
             newOrderHref={canManage ? (code) => newOrderHref(projectId, code) : undefined}
           />
         )}
       </section>
 
-      <p className="max-w-[900px] text-[12.5px] leading-normal text-muted-foreground">
+      <p className="max-w-[900px] text-meta leading-normal text-muted-foreground">
         {t.rich("footnote", { b: (chunks) => <b className="text-foreground">{chunks}</b> })}
       </p>
     </div>

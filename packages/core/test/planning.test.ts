@@ -254,6 +254,69 @@ describe("changing the plan", () => {
   });
 });
 
+describe("on time or late", () => {
+  /** Resumen (getControl) and Planificación (getPlanning) state the same schedule status: it is returned. */
+  async function bothSay(ctx: Ctx, projectId: string) {
+    const [control, planning] = await Promise.all([
+      constructionService.getControl(ctx, projectId),
+      svc.getPlanning(ctx, projectId),
+    ]);
+    expect(control.schedule).toEqual(planning.schedule);
+    return planning.schedule;
+  }
+
+  it("doesn't call simulated dates on time, and lists what runs behind them", async () => {
+    const { ctx, project } = await setup();
+    expect(await bothSay(ctx, project.id)).toMatchObject({ status: "simulated", planning: "mock", forecast: null, worst: null });
+    vi.setSystemTime(new Date("2026-07-01T10:00:00Z"));
+    const status = await bothSay(ctx, project.id);
+    expect(status).toMatchObject({ status: "simulated", worst: "start" });
+    expect(status.lateToStart.map((c) => c.code)).toContain("01");
+  });
+
+  it("is late when a chapter's planned start has passed though nothing is in progress", async () => {
+    const { ctx, project } = await setup();
+    await svc.createPlanningDraft(ctx, project.id, PLAIN);
+    await svc.approvePlanningDraft(ctx, project.id, {});
+    expect(await bothSay(ctx, project.id)).toMatchObject({ status: "on_time", planning: "live", worst: null });
+
+    // 01 should have started on Monday 1 June: no chapter is in progress, and yet the obra is late.
+    vi.setSystemTime(new Date("2026-06-03T10:00:00Z"));
+    expect(await bothSay(ctx, project.id)).toMatchObject({
+      status: "late",
+      worst: "start",
+      lateToFinish: [],
+      lateToStart: [{ code: "01", plannedDate: "2026-06-01", days: 2 }],
+      forecast: { contractEnd: "2027-03-31", delayDays: expect.any(Number) },
+    });
+  });
+
+  it("is late when a chapter runs past its planned end, and leads with a forecast past the contract", async () => {
+    const { ctx, project } = await setup();
+    await svc.createPlanningDraft(ctx, project.id, PLAIN);
+    await svc.approvePlanningDraft(ctx, project.id, {});
+    vi.setSystemTime(new Date("2026-06-17T10:00:00Z"));
+    await constructionService.startChapter(ctx, project.id, "01", { date: "2026-06-01" });
+    // 01 was due on the 12th, 02 to start on the 15th; the forecast still ends before the contract.
+    const late = await bothSay(ctx, project.id);
+    expect(late).toMatchObject({
+      status: "late",
+      worst: "finish",
+      lateToFinish: [{ code: "01", plannedDate: "2026-06-12", days: 5 }],
+      lateToStart: [{ code: "02", plannedDate: "2026-06-15", days: 2 }],
+    });
+    expect(late.forecast!.delayDays).toBeLessThan(0);
+
+    // Nothing more recorded by March: the forecast ends after the contract's 31 March.
+    vi.setSystemTime(new Date("2027-03-25T10:00:00Z"));
+    const worse = await bothSay(ctx, project.id);
+    expect(worse).toMatchObject({ status: "late", worst: "forecast", forecast: { contractEnd: "2027-03-31" } });
+    expect(worse.forecast!.delayDays).toBeGreaterThan(14);
+    expect(worse.forecast!.penaltyCents).toBeGreaterThan(0);
+    expect(worse.forecast).toEqual((await svc.getPlanning(ctx, project.id)).baseline!.forecast);
+  });
+});
+
 describe("who and what", () => {
   it("lets viewers read but only admins and managers write", async () => {
     const { ctx: viewer, project, admin } = await setup("viewer");

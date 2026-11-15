@@ -23,16 +23,24 @@ describe("SuppliersScreen", () => {
     renderScreen();
     expect(screen.getByRole("heading", { level: 1, name: "Proveedores" })).toBeInTheDocument();
     const kpis = within(screen.getByRole("region", { name: "Resumen" }));
-    expect(kpis.getByText("90.120 €")).toBeInTheDocument();
+    expect(kpis.getByText("90.120,00 €")).toBeInTheDocument();
     expect(kpis.getByText("2 proveedores con pedidos")).toBeInTheDocument();
-    expect(kpis.getByText("4200 €")).toHaveClass("text-bad");
+    expect(kpis.getByText("4.200,00 €")).toHaveClass("text-bad");
     expect(kpis.getByText("1 proveedor con facturas vencidas")).toBeInTheDocument();
+    // Each figure says its VAT: contracted as compared with the cost, the rest as Administration pays it.
+    expect(kpis.getByText("Contratado · sin IVA").parentElement).toHaveTextContent("90.120,00 €");
+    expect(kpis.getByText("Pendiente de pago · IVA incl.")).toBeInTheDocument();
+    expect(kpis.getByText("Vencido · IVA incl.")).toBeInTheDocument();
+    expect(kpis.getByText("Retenciones · IVA incl.")).toBeInTheDocument();
+    for (const name of ["Contratado · sin IVA", "Facturado · sin IVA", "Pagado · sin IVA", "Pendiente · IVA incl."]) {
+      expect(table().getByRole("columnheader", { name })).toBeInTheDocument();
+    }
 
     expect(names()).toEqual(["Montajes Steel Norte S.L.", "Piedra de Liébana S.L."]);
     const [msn, liebana] = table().getAllByRole("row").slice(1);
     expect(msn).toHaveTextContent("CAE pendiente");
     expect(msn).toHaveTextContent("3 · 2 obras");
-    expect(liebana).toHaveTextContent("4200,00 vencido");
+    expect(liebana).toHaveTextContent("4.200,00 vencido");
     expect(table().getByRole("link", { name: "Montajes Steel Norte S.L." })).toHaveAttribute("href", "/dashboard/compras/proveedores/sup-msn");
   });
 

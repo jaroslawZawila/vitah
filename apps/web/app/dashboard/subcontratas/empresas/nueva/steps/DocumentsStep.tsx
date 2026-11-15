@@ -23,7 +23,7 @@ export function DocumentsStep({ draft, onChange }: CompanyStepProps) {
   const optional = REQUIREMENTS.filter((r) => !r.mandatory);
   return (
     <div className="flex flex-col gap-4">
-      <p className="text-[13px] text-muted-foreground">{t("intro")}</p>
+      <p className="text-sm text-muted-foreground">{t("intro")}</p>
       <section aria-labelledby="documents-mandatory">
         <h3 id="documents-mandatory" className="eyebrow mb-1">
           {t("mandatory", { chosen: mandatory.filter((r) => documentDraft(draft, r.id).file).length, total: mandatory.length })}
@@ -65,7 +65,7 @@ function DocumentRow({
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="font-semibold">{name}</div>
-          <div className="text-xs text-muted-foreground">
+          <div className="text-meta text-muted-foreground">
             {basis} · <span className="num">{req.id}</span>
           </div>
         </div>
@@ -105,7 +105,7 @@ function DocumentRow({
           </Field>
         </div>
       )}
-      {needsDate && <p className="m-0 text-xs text-destructive">{t("needsDate")}</p>}
+      {needsDate && <p className="m-0 text-meta text-destructive">{t("needsDate")}</p>}
       {!req.mandatory && (
         <div className="flex flex-col gap-2">
           <label className="flex min-h-11 w-fit cursor-pointer items-center gap-2.5 text-sm font-medium lg:min-h-9">

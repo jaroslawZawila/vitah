@@ -36,14 +36,14 @@ describe("PurchasesScreen", () => {
     expect(screen.getByRole("heading", { level: 1, name: "Compras" })).toBeInTheDocument();
     expect(screen.getByText("Etapa 6 · Ejecución de obra")).toBeInTheDocument();
     const kpis = within(screen.getByRole("region", { name: "Resumen de compras" }));
-    expect(kpis.getByText("214.270 €")).toBeInTheDocument();
-    expect(kpis.getByText(/de 312.840 € a coste/)).toBeInTheDocument();
-    expect(kpis.getByText("−3412 €")).toHaveClass("text-good");
+    expect(kpis.getByText("214.270,00 €")).toBeInTheDocument();
+    expect(kpis.getByText(/de 312.840,00 € a coste/)).toBeInTheDocument();
+    expect(kpis.getByText("−3.412,00 €")).toHaveClass("text-good");
     expect(kpis.getByText(/Ahorro del 1,9 % sobre 58 partidas cerradas/)).toBeInTheDocument();
-    expect(kpis.getByText("98.170 €")).toBeInTheDocument();
+    expect(kpis.getByText("98.170,00 €")).toBeInTheDocument();
     expect(kpis.getByText("44 partidas sin pedido · 1 pedido pendiente de enviar")).toBeInTheDocument();
     expect(kpis.getByRole("link", { name: "PED-049" })).toHaveAttribute("href", "/dashboard/projects/p-1/compras/order-49");
-    expect(kpis.getByText(/Piedra de Liébana · prevista 14 oct, 3 días/)).toBeInTheDocument();
+    expect(kpis.getByText(/Piedra de Liébana · prevista 14 oct 2026, 3 días/)).toBeInTheDocument();
 
     expect(screen.getByRole("link", { name: "Nuevo pedido" })).toHaveAttribute("href", "/dashboard/projects/p-1/compras/nuevo");
   });
@@ -55,12 +55,13 @@ describe("PurchasesScreen", () => {
     const table = within(screen.getByRole("table", { name: "Pedidos" }));
     const late = table.getByRole("link", { name: "PED-049" }).closest("tr")!;
     expect(within(late).getByText("3 d tarde")).toBeInTheDocument();
-    expect(within(late).getByText("14 oct")).toBeInTheDocument();
+    expect(within(late).getByText("14 oct 2026")).toBeInTheDocument();
     expect(within(late).getByText("En tránsito")).toBeInTheDocument();
-    expect(within(late).getByText("3120,00")).toBeInTheDocument();
+    expect(within(late).getByText("3.120,00")).toBeInTheDocument();
     const revocos = table.getByRole("link", { name: "PED-047" }).closest("tr")!;
     expect(within(revocos).getByText("CAE pendiente")).toBeInTheDocument();
-    expect(within(revocos).getByText("20 oct – 7 nov")).toBeInTheDocument();
+    // The span breaks after the dash in a narrow column: two elements, one text.
+    expect(revocos).toHaveTextContent("20 oct 2026 – 7 nov 2026");
     // Phones get cards with the same orders.
     expect(within(screen.getByRole("list", { name: "Pedidos" })).getAllByRole("listitem")).toHaveLength(5);
   });
@@ -99,10 +100,10 @@ describe("PurchasesScreen", () => {
     expect(soon.getByText("Simulado")).toBeInTheDocument();
     expect(soon.getByRole("link", { name: "Climatización" })).toHaveAttribute("href", "/dashboard/projects/p-1/compras/nuevo?capitulo=12");
     expect(soon.getByRole("link", { name: "PED-055" })).toHaveAttribute("href", "/dashboard/projects/p-1/compras/order-55");
-    expect(soon.getByText(/Inicio 2 nov · pedir antes del 19 oct · 4 partidas/)).toBeInTheDocument();
+    expect(soon.getByText(/Inicio 2 nov 2026 · pedir antes del 19 oct 2026 · 4 partidas/)).toBeInTheDocument();
     // Climatización's orders should have gone out on 21 September.
     expect(soon.getByText("pedir ya: 26 días tarde")).toBeInTheDocument();
-    expect(soon.getByText("23.410 €")).toBeInTheDocument();
+    expect(soon.getByText("23.410,00 €")).toBeInTheDocument();
   });
 
   it("hides every way to order from viewers", () => {

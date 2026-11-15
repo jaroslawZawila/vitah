@@ -1,10 +1,8 @@
 "use client";
 
-import { useFormatter, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import type { DeletedItem } from "@repo/core/contract";
-
-/** YYYY-MM-DD → a Date at UTC midnight. */
-const dayDate = (day: string) => new Date(`${day}T00:00:00Z`);
+import { useFormat } from "@/lib/format";
 
 /**
  * A deleted record in words: what it is (`title`, with a second line), when
@@ -12,9 +10,9 @@ const dayDate = (day: string) => new Date(`${day}T00:00:00Z`);
  */
 export function useDeletedText() {
   const t = useTranslations("deletedPage");
-  const format = useFormatter();
-  const day = (value: string) => format.dateTime(dayDate(value), { dateStyle: "medium", timeZone: "UTC" });
-  const money = (cents: number) => format.number(cents / 100, { style: "currency", currency: "EUR" });
+  const format = useFormat();
+  const day = format.date;
+  const money = format.money;
   const parts = (...values: (string | null | false)[]) => values.filter(Boolean).join(" · ") || null;
 
   return {
@@ -49,8 +47,7 @@ export function useDeletedText() {
       }
     },
     /** "14 nov 2026, 10:02" in Spain's time. */
-    when: (item: DeletedItem) =>
-      format.dateTime(new Date(item.deletedAt), { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Madrid" }),
+    when: (item: DeletedItem) => format.dateTime(item.deletedAt),
     by: (item: DeletedItem) => (item.deletedBy ? t("deletedBy", { name: item.deletedBy.name }) : t("deletedByUnknown")),
     /** Why it can't come back yet; null when it can. */
     blocked(item: DeletedItem): string | null {

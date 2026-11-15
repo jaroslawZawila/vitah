@@ -18,7 +18,7 @@ export function Notice({ tone, children }: { tone: "warn" | "bad"; children: Rea
   return (
     <p
       className={cn(
-        "m-0 flex items-start gap-2.5 rounded-[10px] px-3.5 py-3 text-[13.5px] font-medium",
+        "m-0 flex items-start gap-2.5 rounded-[10px] px-3.5 py-3 text-sm font-medium",
         tone === "warn" ? "bg-warn-soft text-warn" : "bg-bad-soft text-bad",
       )}
     >
@@ -33,7 +33,7 @@ function Section({ title, hint, children }: { title: string; hint?: string; chil
     <section className="flex flex-col gap-3 border-t pt-4 first:border-t-0 first:pt-0">
       <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
         <h3>{title}</h3>
-        {hint && <span className="text-xs text-muted-foreground">{hint}</span>}
+        {hint && <span className="text-meta text-muted-foreground">{hint}</span>}
       </div>
       {children}
     </section>
@@ -133,7 +133,7 @@ export default function ActivityFields({
             />
           </Field>
           <Field>
-            <span className="text-xs leading-none font-medium text-muted-foreground">{t("permanentShare")}</span>
+            <span className="text-sm leading-none font-medium text-muted-foreground">{t("permanentShare")}</span>
             <div
               className={cn(
                 "flex min-h-10 items-center rounded-md px-3 font-mono text-sm font-semibold",

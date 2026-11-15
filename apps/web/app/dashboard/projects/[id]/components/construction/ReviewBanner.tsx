@@ -31,7 +31,7 @@ export default function ReviewBanner({
   return (
     <section
       aria-labelledby="review-title"
-      className="flex flex-col gap-2.5 rounded-xl border border-info/30 bg-info-soft px-4 py-3.5 text-[13.5px]"
+      className="flex flex-col gap-2.5 rounded-xl border border-info/30 bg-info-soft px-4 py-3.5 text-sm"
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex min-w-0 items-start gap-2.5">
@@ -66,8 +66,8 @@ export default function ReviewBanner({
                 {" · "}
                 {c.actualStart
                   ? t("recorded", {
-                      start: f.day(c.actualStart),
-                      end: c.actualEnd ? f.day(c.actualEnd) : "…",
+                      start: f.date(c.actualStart),
+                      end: c.actualEnd ? f.date(c.actualEnd) : "…",
                     })
                   : t("nothingRecorded")}
               </span>

@@ -27,7 +27,7 @@ export function useImpact() {
   const f = useControlFormat();
   return {
     cost: (issue: ObraIssue) =>
-      issue.costImpactCents === null ? null : t("estimated", { value: `${f.signedEuros(issue.costImpactCents)} €` }),
+      issue.costImpactCents === null ? null : t("estimated", { value: f.signedMoney(issue.costImpactCents) }),
     days: (issue: ObraIssue) =>
       issue.scheduleImpactDays === null ? null : t("estimated", { value: f.signedDays(issue.scheduleImpactDays) }),
   };
@@ -45,7 +45,7 @@ export function MilestonesCard({ milestones, href }: { milestones: ControlMilest
         </Link>
       </div>
       {milestones.length === 0 ? (
-        <p className="text-[13px] text-muted-foreground">{t("empty")}</p>
+        <p className="text-sm text-muted-foreground">{t("empty")}</p>
       ) : (
         <ul className="m-0 flex list-none flex-col p-0">
           {milestones.map((m) => {
@@ -84,13 +84,13 @@ export function OpenIssuesCard({ issues, href }: { issues: ObraIssue[]; href: st
         </Link>
       </div>
       {issues.length === 0 ? (
-        <p className="text-[13px] text-muted-foreground">{t("empty")}</p>
+        <p className="text-sm text-muted-foreground">{t("empty")}</p>
       ) : (
         <ul className="m-0 flex list-none flex-col gap-2.5 p-0">
           {issues.slice(0, 5).map((issue) => (
             <li key={issue.id} className="flex items-start gap-2.5">
               <IssueKindPill kind={issue.kind} />
-              <span className="text-[13px] leading-snug">
+              <span className="text-sm leading-snug">
                 <span className="num">{issue.chapterCode}</span> · {issue.description}{" "}
                 <span className="text-muted-foreground">
                   · {ts(issue.status).toLowerCase()}
@@ -151,9 +151,9 @@ export function DocumentAlertsCard({ items, subcontractorsHref }: { items: Atten
         {summary.length > 0 ? <Badge variant="destructive">{summary.join(" · ")}</Badge> : <Badge variant="good">{t("ok")}</Badge>}
       </div>
       {items.length === 0 ? (
-        <p className="text-[13px] text-muted-foreground">{t("empty")}</p>
+        <p className="text-sm text-muted-foreground">{t("empty")}</p>
       ) : (
-        <ul className="m-0 flex list-none flex-col gap-2.5 p-0 text-[13px] leading-snug">
+        <ul className="m-0 flex list-none flex-col gap-2.5 p-0 text-sm leading-snug">
           {items.slice(0, 6).map((item) => (
             <li key={`${item.documentId ?? item.subcontractorId}|${item.requirementIds.join(",")}`} className="flex gap-2.5">
               <span aria-hidden className={cn("font-bold", DOT_TONE[DOC_STATE_VARIANT[item.state]])}>
@@ -216,11 +216,11 @@ export function RecentPhotosCard({
         </div>
       </div>
       {photos.length === 0 ? (
-        <p className="text-[13px] text-muted-foreground">{t("empty")}</p>
+        <p className="text-sm text-muted-foreground">{t("empty")}</p>
       ) : (
         <ul className="m-0 grid list-none grid-cols-2 gap-2 p-0 sm:grid-cols-3">
           {photos.map((photo) => {
-            const caption = [f.day(photo.takenOn), photo.chapterCode, photo.caption ?? (photo.chapterCode && chapterName(photo.chapterCode))]
+            const caption = [f.date(photo.takenOn), photo.chapterCode, photo.caption ?? (photo.chapterCode && chapterName(photo.chapterCode))]
               .filter(Boolean)
               .join(" · ");
             return (
@@ -228,7 +228,7 @@ export function RecentPhotosCard({
                 {/* Served by our authenticated API, so next/image can't optimise it. */}
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={thumbUrl(photo)} alt={caption} loading="lazy" className="aspect-[4/3] w-full rounded-lg bg-raise object-cover" />
-                <span className="truncate text-[11.5px] text-muted-foreground">{caption}</span>
+                <span className="truncate text-xs text-muted-foreground">{caption}</span>
               </li>
             );
           })}

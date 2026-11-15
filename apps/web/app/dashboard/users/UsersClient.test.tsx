@@ -123,7 +123,7 @@ describe("the Users page: two-step verification", () => {
   const rowOf = (name: string) => within(screen.getByRole("cell", { name }).closest("tr")!);
   const openRemove = async () => {
     await userEvent.click(screen.getByRole("button", { name: "Quitar verificación en dos pasos de Marcos" }));
-    return within(await screen.findByRole("dialog", { name: "Quitar verificación en dos pasos de Marcos" }));
+    return within(await screen.findByRole("alertdialog", { name: "¿Quitar la verificación en dos pasos de Marcos?" }));
   };
 
   it("shows who has it on", () => {
@@ -161,7 +161,7 @@ describe("the Users page: two-step verification", () => {
     expect(await screen.findByRole("status")).toHaveTextContent(
       "Verificación en dos pasos de Marcos quitada. Sus sesiones se han cerrado.",
     );
-    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
   });
 
   it("does nothing on Cancelar", async () => {
@@ -170,7 +170,7 @@ describe("the Users page: two-step verification", () => {
 
     await userEvent.click(dialog.getByRole("button", { name: "Cancelar" }));
 
-    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
     expect(actions.removeUserMfaAction).not.toHaveBeenCalled();
   });
 
@@ -187,5 +187,49 @@ describe("the Users page: two-step verification", () => {
 
     expect(await dialog.findByRole("alert")).toHaveTextContent(text);
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+});
+
+describe("the Users page: deactivating a user", () => {
+  beforeEach(() => {
+    vi.mocked(actions.toggleUserActive).mockReset().mockResolvedValue({});
+  });
+
+  const askToDeactivate = async () => {
+    const row = within(screen.getByRole("cell", { name: "Marcos" }).closest("tr")!);
+    await userEvent.click(row.getByRole("button", { name: "Desactivar" }));
+    return within(await screen.findByRole("alertdialog", { name: "¿Desactivar a Marcos?" }));
+  };
+
+  it("asks first, saying their sessions end, then deactivates", async () => {
+    renderUsers();
+    const dialog = await askToDeactivate();
+    expect(dialog.getByText(/No podrá entrar en el portal y se cierran todas sus sesiones/)).toBeInTheDocument();
+    expect(actions.toggleUserActive).not.toHaveBeenCalled();
+
+    await userEvent.click(dialog.getByRole("button", { name: "Desactivar usuario" }));
+
+    await waitFor(() => expect(actions.toggleUserActive).toHaveBeenCalledExactlyOnceWith(marcos.id, false));
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+  });
+
+  it("does nothing on Cancelar, and shows a refusal in the dialog", async () => {
+    vi.mocked(actions.toggleUserActive).mockResolvedValue({ error: "last_admin" });
+    renderUsers();
+    let dialog = await askToDeactivate();
+    await userEvent.click(dialog.getByRole("button", { name: "Cancelar" }));
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+    expect(actions.toggleUserActive).not.toHaveBeenCalled();
+
+    dialog = await askToDeactivate();
+    await userEvent.click(dialog.getByRole("button", { name: "Desactivar usuario" }));
+    expect(await dialog.findByRole("alert")).toHaveTextContent("La organización debe tener al menos un administrador activo.");
+  });
+
+  it("activates an inactive user straight away: nothing is lost", async () => {
+    renderUsers([laura, { ...marcos, active: false }]);
+    await userEvent.click(screen.getByRole("button", { name: "Activar" }));
+    expect(actions.toggleUserActive).toHaveBeenCalledWith(marcos.id, true);
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
   });
 });

@@ -201,6 +201,7 @@ export const budget: ProjectBudget = {
       exclusions: ["Estudio geotécnico", "Mobiliario"],
       includes: "El movimiento de tierras",
     },
+    identity: { client: "Roberto Guzmán Mesa", address: "C/ de la Arboleda 3, Zarzalejo (Madrid)", differs: [], projectLacks: [] },
     conditions: { validityDays: 90, term: "8 a 10 meses", penalty: "150 €/día", signingPlace: "Zarzalejo" },
     changeReason: "Mediciones del BC3",
     validUntil: null,

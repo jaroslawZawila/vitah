@@ -148,7 +148,7 @@ describe("a material supplier", () => {
     expect(table.getByRole("link", { name: "PED-049" })).toHaveAttribute("href", "/dashboard/projects/p-1/compras/order-49");
     expect(table.getByRole("link", { name: "VTH-26-003" })).toHaveAttribute("href", "/dashboard/projects/p-3/compras");
     expect(table.getByText("3 d tarde")).toBeInTheDocument();
-    expect(table.getByText("Contratado con este proveedor").closest("tr")).toHaveTextContent("4380,00");
+    expect(table.getByText("Contratado con este proveedor · sin IVA").closest("tr")).toHaveTextContent("4.380,00");
     expect(screen.getByRole("heading", { name: "Sin documentación CAE" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Contacto" })).toBeInTheDocument();
   });
@@ -173,7 +173,7 @@ describe("BlockingBanner", () => {
         onRequest={onRequest}
       />,
     );
-    expect(screen.getByRole("alert")).toHaveTextContent("Acceso a obra bloqueado desde el 10/10/2026");
+    expect(screen.getByRole("alert")).toHaveTextContent("Acceso a obra bloqueado desde el 10 oct 2026");
     expect(screen.getByText(/Documentos caducados: Certificado AEAT de contratistas\./)).toBeInTheDocument();
     expect(screen.getByText(/Trabajadores afectados: Iván Gómez Ruiz, Laura Cobo Fernández\./)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: /Solicitar documento/ }));
@@ -238,6 +238,21 @@ describe("HistoryList", () => {
     expect(screen.getByText("Editó datos: teléfono, email")).toBeInTheDocument();
     expect(screen.getByText("Ana Requejo · Trabajador: Iván Gómez Ruiz")).toBeInTheDocument();
   });
+
+  it("never shows a code: an action or a field this build doesn't know is said in words", () => {
+    const { container } = wrap(
+      <HistoryList
+        kind="company"
+        entries={[
+          { id: "1", at: "2026-10-16T09:40:00.000Z", action: "merged_into", userName: "Pablo Ortiz", workerName: null, detail: {} },
+          { id: "2", at: "2026-09-02T10:14:00.000Z", action: "updated", userName: "Ana Requejo", workerName: null, detail: { fields: { suppliesOnly: [false, true], futureA: [1, 2], futureB: [1, 2] } } },
+        ]}
+      />,
+    );
+    expect(screen.getByText("Registró un cambio")).toBeInTheDocument();
+    expect(screen.getByText("Editó datos: proveedor de material, otro dato")).toBeInTheDocument();
+    expect(container.textContent).not.toMatch(/merged_into|suppliesOnly|future/);
+  });
 });
 
 describe("ObrasTab", () => {
@@ -264,7 +279,7 @@ describe("ObrasTab", () => {
       <ObrasTab assignments={[assignment]} projects={projects} kind="company" canManage busy={false} onSave={async () => true} onRemove={() => {}} />,
     );
     expect(screen.getByText("Electricidad e iluminación")).toBeInTheDocument();
-    expect(screen.getByText("Asiento nº 7 · 20/09/2026")).toBeInTheDocument();
+    expect(screen.getByText("Asiento nº 7 · 20 sept 2026")).toBeInTheDocument();
     expect(screen.getByText("0 con acceso · 0 pendientes · 3 bloqueados")).toBeInTheDocument();
   });
 

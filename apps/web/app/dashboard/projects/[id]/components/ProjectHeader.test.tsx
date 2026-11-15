@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -58,7 +58,7 @@ describe("ProjectHeader", () => {
 
     expect(screen.getByText("VTH-2026-014")).toBeInTheDocument();
     expect(screen.getByText("Calle Mayor 1, Santander")).toBeInTheDocument();
-    expect(screen.getByText("1 de marzo de 2026")).toBeInTheDocument();
+    expect(screen.getByText("1 mar 2026")).toBeInTheDocument();
     expect(screen.getByText("Por confirmar")).toBeInTheDocument();
   });
 
@@ -104,18 +104,22 @@ describe("ProjectHeader", () => {
     expect(router.refresh).not.toHaveBeenCalled();
   });
 
+  /** Edit › Eliminar proyecto: the dialog that asks. */
+  async function askToDelete() {
+    await userEvent.click(screen.getByRole("button", { name: "Editar" }));
+    await userEvent.click(screen.getByRole("button", { name: "Eliminar proyecto" }));
+    return within(await screen.findByRole("alertdialog", { name: "¿Eliminar el proyecto VTH-2026-014?" }));
+  }
+
   it("deletes the project after confirmation, saying what a delete really does", async () => {
-    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+    vi.mocked(deleteProject).mockResolvedValue({ success: true });
     renderHeader();
 
-    await userEvent.click(screen.getByRole("button", { name: "Editar" }));
-    await userEvent.click(
-      screen.getByRole("button", { name: "Eliminar proyecto" }),
-    );
+    const dialog = await askToDelete();
+    expect(dialog.getByText(/dejan de verse en el portal y en la app del cliente. Un administrador puede restaurarlo desde Elementos eliminados/)).toBeInTheDocument();
+    expect(deleteProject).not.toHaveBeenCalled();
+    await userEvent.click(dialog.getByRole("button", { name: "Eliminar proyecto" }));
 
-    expect(confirm).toHaveBeenCalledWith(
-      "¿Eliminar este proyecto? Dejará de verse en el portal y en la app del cliente. No se borra nada: sus datos y documentos se conservan.",
-    );
     await waitFor(() =>
       expect(deleteProject).toHaveBeenCalledWith("project-1"),
     );
@@ -130,26 +134,24 @@ describe("ProjectHeader", () => {
     ["not_found", "Proyecto no encontrado."],
     ["some_new_code", "No se ha podido completar la operación. Inténtalo de nuevo."],
   ])("stays on the project and explains when the delete answers %s", async (error, message) => {
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     vi.mocked(deleteProject).mockResolvedValue({ error });
     renderHeader();
 
-    await userEvent.click(screen.getByRole("button", { name: "Editar" }));
-    await userEvent.click(screen.getByRole("button", { name: "Eliminar proyecto" }));
+    const dialog = await askToDelete();
+    await userEvent.click(dialog.getByRole("button", { name: "Eliminar proyecto" }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(message);
+    // In the dialog, which stays open.
+    expect(await dialog.findByRole("alert")).toHaveTextContent(message);
     expect(router.push).not.toHaveBeenCalled();
   });
 
   it("does not delete when the confirmation is cancelled", async () => {
-    vi.spyOn(window, "confirm").mockReturnValue(false);
     renderHeader();
 
-    await userEvent.click(screen.getByRole("button", { name: "Editar" }));
-    await userEvent.click(
-      screen.getByRole("button", { name: "Eliminar proyecto" }),
-    );
+    const dialog = await askToDelete();
+    await userEvent.click(dialog.getByRole("button", { name: "Cancelar" }));
 
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
     expect(deleteProject).not.toHaveBeenCalled();
   });
 

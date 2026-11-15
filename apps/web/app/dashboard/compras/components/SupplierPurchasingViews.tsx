@@ -10,6 +10,7 @@ import Kpi from "../../projects/[id]/components/obra/Kpi";
 import { usePurchaseFormat } from "../../projects/[id]/components/purchasing/format";
 import { supplierHref } from "../../projects/[id]/components/purchasing/links";
 import { SupplierCaePill } from "../../projects/[id]/components/purchasing/pills";
+import { useVatLabel } from "../../components/vat-basis";
 
 // Presentational: Compras › Proveedores, every company as a supplier, and one
 // supplier's figures. The containers (SuppliersScreen, SupplierScreen) filter.
@@ -24,46 +25,64 @@ function useSupplierType() {
 export function SuppliersKpis({ summary }: { summary: TenantSuppliers["summary"] }) {
   const t = useTranslations("purchasing.suppliers.kpis");
   const f = usePurchaseFormat();
+  const vat = useVatLabel();
   const overdue = summary.overdueCents > 0;
   return (
     <section aria-label={t("label")} className="grid grid-cols-2 gap-3.5 lg:grid-cols-4">
-      <Kpi label={t("contracted")} value={f.moneyRound(summary.contractedCents)} hints={[t("active", { count: summary.active })]} />
-      <Kpi label={t("outstanding")} value={f.moneyRound(summary.outstandingCents)} hints={[t("outstandingHint")]} />
+      <Kpi label={vat(t("contracted"), "excl")} value={f.money(summary.contractedCents)} hints={[t("active", { count: summary.active })]} />
+      <Kpi label={vat(t("outstanding"), "incl")} value={f.money(summary.outstandingCents)} hints={[t("outstandingHint")]} />
       <Kpi
-        label={t("overdue")}
-        value={<span className={cn(overdue && "text-bad")}>{f.moneyRound(summary.overdueCents)}</span>}
+        label={vat(t("overdue"), "incl")}
+        value={<span className={cn(overdue && "text-bad")}>{f.money(summary.overdueCents)}</span>}
         className={cn(overdue && "border-bad/40")}
         hints={[overdue ? t("overdueSuppliers", { count: summary.overdueSuppliers }) : t("noneOverdue")]}
       />
-      <Kpi label={t("retained")} value={f.moneyRound(summary.retainedCents)} hints={[t("retainedHint")]} />
+      <Kpi label={vat(t("retained"), "incl")} value={f.money(summary.retainedCents)} hints={[t("retainedHint")]} />
     </section>
   );
 }
 
-/** One supplier's own figures: contracted, invoiced, paid, owed and held back. */
+/**
+ * One supplier's own figures in two groups, each under its VAT basis: what is
+ * compared with the cost (contracted, invoiced, paid; without VAT) and what
+ * Administration pays (owed, of it past due, and held back; with VAT).
+ */
 export function SupplierFigures({ supplier }: { supplier: PurchaseSupplierItem }) {
   const t = useTranslations("purchasing.suppliers.kpis");
   const f = usePurchaseFormat();
+  const vat = useVatLabel();
   const overdue = supplier.overdueCents > 0;
+  const caption = "eyebrow font-sans";
   return (
-    <section aria-label={t("label")} className="grid grid-cols-2 gap-3.5 lg:grid-cols-4">
-      <Kpi
-        label={t("contracted")}
-        value={f.moneyRound(supplier.contractedCents)}
-        hints={[t("orders", { count: supplier.orders, projects: supplier.projects })]}
-      />
-      <Kpi
-        label={t("invoiced")}
-        value={f.moneyRound(supplier.invoicedCents)}
-        hints={[t("paid", { amount: f.moneyRound(supplier.paidCents) })]}
-      />
-      <Kpi
-        label={t("outstanding")}
-        value={<span className={cn(overdue && "text-bad")}>{f.moneyRound(supplier.outstandingCents)}</span>}
-        className={cn(overdue && "border-bad/40")}
-        hints={[overdue ? t("overdueOf", { amount: f.moneyRound(supplier.overdueCents) }) : t("outstandingHint")]}
-      />
-      <Kpi label={t("retained")} value={f.moneyRound(supplier.retainedCents)} hints={[t("retainedHint")]} />
+    <section aria-label={t("label")} className="grid gap-x-3.5 gap-y-4 xl:grid-cols-[3fr_2fr]">
+      <section aria-labelledby="supplier-cost-figures" className="flex min-w-0 flex-col gap-2">
+        <h2 id="supplier-cost-figures" className={caption}>
+          {vat(t("againstCost"), "excl")}
+        </h2>
+        <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-3">
+          <Kpi
+            label={t("contracted")}
+            value={f.money(supplier.contractedCents)}
+            hints={[t("orders", { count: supplier.orders, projects: supplier.projects })]}
+          />
+          <Kpi label={t("invoiced")} value={f.money(supplier.invoicedCents)} />
+          <Kpi label={t("paid")} value={f.money(supplier.paidCents)} />
+        </div>
+      </section>
+      <section aria-labelledby="supplier-payable-figures" className="flex min-w-0 flex-col gap-2">
+        <h2 id="supplier-payable-figures" className={caption}>
+          {vat(t("toPay"), "incl")}
+        </h2>
+        <div className="grid grid-cols-2 gap-3.5">
+          <Kpi
+            label={t("outstanding")}
+            value={<span className={cn(overdue && "text-bad")}>{f.money(supplier.outstandingCents)}</span>}
+            className={cn(overdue && "border-bad/40")}
+            hints={[overdue ? t("overdueOf", { amount: f.money(supplier.overdueCents) }) : t("outstandingHint")]}
+          />
+          <Kpi label={t("retained")} value={f.money(supplier.retainedCents)} hints={[t("retainedHint")]} />
+        </div>
+      </section>
     </section>
   );
 }
@@ -77,7 +96,7 @@ function Owed({ supplier }: { supplier: PurchaseSupplierItem }) {
     <>
       <span className="font-semibold">{f.amount(supplier.outstandingCents)}</span>
       {supplier.overdueCents > 0 && (
-        <span className="block text-[12px] text-bad">{t("overdue", { amount: f.amount(supplier.overdueCents) })}</span>
+        <span className="block text-meta text-bad">{t("overdue", { amount: f.amount(supplier.overdueCents) })}</span>
       )}
     </>
   );
@@ -87,8 +106,9 @@ function Owed({ supplier }: { supplier: PurchaseSupplierItem }) {
 export function SupplierList({ suppliers, empty }: { suppliers: PurchaseSupplierItem[]; empty: string }) {
   const t = useTranslations("purchasing.suppliers.list");
   const f = usePurchaseFormat();
+  const vat = useVatLabel();
   const typeOf = useSupplierType();
-  if (suppliers.length === 0) return <p className="px-[18px] py-6 text-center text-[13.5px] text-muted-foreground">{empty}</p>;
+  if (suppliers.length === 0) return <p className="px-[18px] py-6 text-center text-sm text-muted-foreground">{empty}</p>;
   const name = (supplier: PurchaseSupplierItem, className?: string) => (
     <Link href={supplierHref(supplier.id)} className={cn("font-semibold text-brand-ink hover:text-primary", className)}>
       {supplier.legalName}
@@ -104,10 +124,10 @@ export function SupplierList({ suppliers, empty }: { suppliers: PurchaseSupplier
               {name(supplier, "min-w-0 after:absolute after:inset-0 [overflow-wrap:anywhere]")}
               <SupplierCaePill suppliesOnly={supplier.suppliesOnly} status={supplier.caeStatus} />
             </div>
-            <div className="mt-0.5 text-[13px] text-muted-foreground">
+            <div className="mt-0.5 text-sm text-muted-foreground">
               {typeOf(supplier)} · {t("ordersCount", { count: supplier.orders })}
             </div>
-            <div className="mt-2.5 flex items-end justify-between gap-2.5 text-[13px]">
+            <div className="mt-2.5 flex items-end justify-between gap-2.5 text-sm">
               <span className="num">{t("contractedShort", { amount: f.amount(supplier.contractedCents) })}</span>
               <span className="num text-right">
                 <Owed supplier={supplier} />
@@ -119,15 +139,15 @@ export function SupplierList({ suppliers, empty }: { suppliers: PurchaseSupplier
 
       {/* From 768px: the table. */}
       <div className="hidden md:block">
-        <Table className="min-w-[980px] text-[13px]" aria-label={t("table")}>
+        <Table className="min-w-[980px]" aria-label={t("table")}>
           <TableHeader>
             <TableRow>
               <TableHead className="pl-[18px]">{t("supplier")}</TableHead>
               <TableHead>{t("orders")}</TableHead>
-              <TableHead className="text-right">{t("contracted")}</TableHead>
-              <TableHead className="text-right">{t("invoiced")}</TableHead>
-              <TableHead className="text-right">{t("paid")}</TableHead>
-              <TableHead className="text-right">{t("outstanding")}</TableHead>
+              <TableHead className="text-right">{vat(t("contracted"), "excl")}</TableHead>
+              <TableHead className="text-right">{vat(t("invoiced"), "excl")}</TableHead>
+              <TableHead className="text-right">{vat(t("paid"), "excl")}</TableHead>
+              <TableHead className="text-right">{vat(t("outstanding"), "incl")}</TableHead>
               <TableHead className="pr-[18px]">{t("lastOrder")}</TableHead>
             </TableRow>
           </TableHeader>
@@ -136,7 +156,7 @@ export function SupplierList({ suppliers, empty }: { suppliers: PurchaseSupplier
               <TableRow key={supplier.id}>
                 <TableCell className="min-w-[220px] pl-[18px] whitespace-normal">
                   {name(supplier)}
-                  <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[12px] text-muted-foreground">
+                  <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-meta text-muted-foreground">
                     {typeOf(supplier)}
                     {!supplier.suppliesOnly && supplier.caeStatus !== "apta" && (
                       <SupplierCaePill suppliesOnly={false} status={supplier.caeStatus} />
@@ -149,7 +169,7 @@ export function SupplierList({ suppliers, empty }: { suppliers: PurchaseSupplier
                   ) : (
                     <>
                       <span className="num">{supplier.orders}</span>
-                      <span className="text-[12px] text-muted-foreground"> · {t("projects", { count: supplier.projects })}</span>
+                      <span className="text-meta text-muted-foreground"> · {t("projects", { count: supplier.projects })}</span>
                     </>
                   )}
                 </TableCell>
@@ -160,7 +180,7 @@ export function SupplierList({ suppliers, empty }: { suppliers: PurchaseSupplier
                   <Owed supplier={supplier} />
                 </TableCell>
                 <TableCell className="num pr-[18px] whitespace-nowrap">
-                  {supplier.lastOrderOn ? f.shortDay(supplier.lastOrderOn) : <Dash />}
+                  {supplier.lastOrderOn ? f.date(supplier.lastOrderOn) : <Dash />}
                 </TableCell>
               </TableRow>
             ))}

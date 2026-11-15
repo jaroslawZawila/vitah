@@ -38,7 +38,7 @@ export default function CompanyTabs({
           >
             {t(key)}
             {counts[key] !== undefined && (
-              <span className="num rounded-full bg-raise px-1.5 text-[11.5px]">{counts[key]}</span>
+              <span className="num rounded-full bg-raise px-1.5 text-xs">{counts[key]}</span>
             )}
           </button>
         );

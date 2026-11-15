@@ -39,7 +39,7 @@ export default function VersionsScreen({ projectId, data }: { projectId: string;
           </div>
         </div>
       ) : (
-        <p className={cn(cardVariants(), "text-center text-[13.5px] text-muted-foreground")}>{t("empty")}</p>
+        <p className={cn(cardVariants(), "text-center text-sm text-muted-foreground")}>{t("empty")}</p>
       )}
     </div>
   );

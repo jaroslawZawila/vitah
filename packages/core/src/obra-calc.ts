@@ -132,26 +132,79 @@ export type Progress = {
  * reads 100 once every line is done (and 0 only with nothing done).
  */
 export function progressOf(lines: { amountCents: number; executedPct: number }[]): Progress {
+  return progressOfTotals(lineTotals(lines));
+}
+
+/**
+ * What `progressOf` reads of its lines, summed. Sums of different lines add up
+ * (`addTotals`), so the project list can take them per chapter from SQL
+ * (`loadObraSummaries` in obra-data.ts) and get the same progress.
+ */
+export type LineTotals = {
+  lines: number;
+  /** Lines of works: amount ≥ 0. */
+  worksLines: number;
+  /** Works lines at 100 % / above 0 %. */
+  worksDone: number;
+  worksStarted: number;
+  worksCents: number;
+  /** Each works line's amount × its %, rounded per line. */
+  worksExecutedCents: number;
+  /** The negative lines' sum. */
+  deductedCents: number;
+};
+
+export const NO_LINES: LineTotals = { lines: 0, worksLines: 0, worksDone: 0, worksStarted: 0, worksCents: 0, worksExecutedCents: 0, deductedCents: 0 };
+
+export function lineTotals(lines: { amountCents: number; executedPct: number }[]): LineTotals {
   // A negative line (a chosen deduction: works the owner does) isn't built:
   // the progress is that of the works, and the deduction is applied to the
   // money executed in step with them.
-  const works = lines.filter((line) => line.amountCents >= 0);
-  let worksCents = 0;
-  let worksExecutedCents = 0;
-  for (const line of works) {
-    worksCents += line.amountCents;
-    worksExecutedCents += Math.round((line.amountCents * line.executedPct) / 100);
+  const totals = { ...NO_LINES, lines: lines.length };
+  for (const line of lines) {
+    if (line.amountCents < 0) {
+      totals.deductedCents += line.amountCents;
+      continue;
+    }
+    totals.worksLines++;
+    if (line.executedPct === 100) totals.worksDone++;
+    if (line.executedPct > 0) totals.worksStarted++;
+    totals.worksCents += line.amountCents;
+    totals.worksExecutedCents += Math.round((line.amountCents * line.executedPct) / 100);
   }
-  const deductedCents = lines.reduce((sum, line) => sum + Math.min(0, line.amountCents), 0);
-  const share = worksCents > 0 ? worksExecutedCents / worksCents : works.length > 0 ? 0 : 1;
-  const done = lines.length > 0 && works.every((line) => line.executedPct === 100);
-  const started = works.some((line) => line.executedPct > 0);
+  return totals;
+}
+
+export function addTotals(a: LineTotals, b: LineTotals): LineTotals {
+  return {
+    lines: a.lines + b.lines,
+    worksLines: a.worksLines + b.worksLines,
+    worksDone: a.worksDone + b.worksDone,
+    worksStarted: a.worksStarted + b.worksStarted,
+    worksCents: a.worksCents + b.worksCents,
+    worksExecutedCents: a.worksExecutedCents + b.worksExecutedCents,
+    deductedCents: a.deductedCents + b.deductedCents,
+  };
+}
+
+/** The same lines with every one at 100 % (a chapter recorded as finished: `loadObra`). */
+export const allDone = (t: LineTotals): LineTotals => ({
+  ...t,
+  worksDone: t.worksLines,
+  worksStarted: t.worksLines,
+  worksExecutedCents: t.worksCents,
+});
+
+export function progressOfTotals(t: LineTotals): Progress {
+  const share = t.worksCents > 0 ? t.worksExecutedCents / t.worksCents : t.worksLines > 0 ? 0 : 1;
+  const done = t.lines > 0 && t.worksDone === t.worksLines;
+  const started = t.worksStarted > 0;
   const rounded = Math.round(share * 100);
   const progressPct = done ? 100 : started ? Math.min(99, Math.max(1, rounded)) : 0;
   const status: ProgressStatus = done ? "done" : started ? "active" : "pending";
   return {
-    totalCents: worksCents + deductedCents,
-    executedCents: worksExecutedCents + Math.round(deductedCents * share),
+    totalCents: t.worksCents + t.deductedCents,
+    executedCents: t.worksExecutedCents + Math.round(t.deductedCents * share),
     progressPct,
     status,
   };

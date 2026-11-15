@@ -277,6 +277,7 @@ export const lines: ProjectPurchaseLines = {
     {
       code: "02",
       name: "Cimentación y protección frente al radón",
+      state: "in_progress",
       orderBy: null,
       costCents: 310_000,
       contractedCents: 318_000,
@@ -321,6 +322,7 @@ export const lines: ProjectPurchaseLines = {
     {
       code: "03",
       name: "Estructura Steel Frame e ingeniería BIM",
+      state: "in_progress",
       orderBy: null,
       costCents: 8_000_000,
       contractedCents: 8_700_000,
@@ -349,6 +351,7 @@ export const lines: ProjectPurchaseLines = {
     {
       code: "10",
       name: "Carpintería exterior e interior",
+      state: "pending",
       orderBy: "2026-11-03",
       costCents: 1_090_000,
       contractedCents: 0,

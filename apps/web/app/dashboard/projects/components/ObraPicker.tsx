@@ -106,11 +106,11 @@ export default function ObraPicker({
                   onMouseEnter={() => setActive(index)}
                 >
                   <ObraLabel obra={option} />
-                  {option.id === currentId && <span className="flex-none text-[12px] text-muted-foreground">{t("current")}</span>}
+                  {option.id === currentId && <span className="flex-none text-meta text-muted-foreground">{t("current")}</span>}
                 </li>
               ))}
             </ul>
-            {matches.length === 0 && <p className="m-0 px-3 py-2.5 text-[13px] text-muted-foreground">{t("noMatch")}</p>}
+            {matches.length === 0 && <p className="m-0 px-3 py-2.5 text-sm text-muted-foreground">{t("noMatch")}</p>}
           </div>
         )}
         <span role="status" className="sr-only">

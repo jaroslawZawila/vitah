@@ -52,10 +52,10 @@ export function OrderAmendments({
         )}
       </div>
       {amendments.length === 0 ? (
-        <p className="m-0 text-[13px] text-muted-foreground">{t("none")}</p>
+        <p className="m-0 text-sm text-muted-foreground">{t("none")}</p>
       ) : (
         <>
-          <p className="m-0 flex flex-wrap items-baseline gap-x-2 text-[13.5px]">
+          <p className="m-0 flex flex-wrap items-baseline gap-x-2 text-sm">
             <span className="text-muted-foreground">{t("original")}</span>
             <span className="num">{f.money(order.originalAmountCents)}</span>
             <span className="text-muted-foreground">→ {t("current")}</span>
@@ -66,26 +66,26 @@ export function OrderAmendments({
             {amendments.map((amendment) => {
               const delta = amendment.amountAfterCents - amendment.amountBeforeCents;
               return (
-                <li key={amendment.id} className="flex flex-col gap-1 border-t py-3 text-[13.5px] first:border-t-0">
+                <li key={amendment.id} className="flex flex-col gap-1 border-t py-3 text-sm first:border-t-0">
                   <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
                     <b>{t("number", { number: amendment.number })}</b>
-                    <span className="num text-muted-foreground">{f.shortDay(amendment.signedOn)}</span>
+                    <span className="num text-muted-foreground">{f.date(amendment.signedOn)}</span>
                     <Badge variant="outline" className={cn("num", deviationTone(delta))}>
                       {f.signedMoney(delta)}
                     </Badge>
                   </div>
                   <p className="m-0 [overflow-wrap:anywhere]">{amendment.concept}</p>
-                  <p className="m-0 text-[12.5px] text-muted-foreground">
+                  <p className="m-0 text-meta text-muted-foreground">
                     <EventText event={{ id: amendment.id, action: "lines", detail: { changes: amendment.changes }, note: null, by: null, at: amendment.at }} />
                   </p>
-                  <p className="m-0 flex flex-wrap items-center gap-x-2 text-[12.5px] text-muted-foreground">
+                  <p className="m-0 flex flex-wrap items-center gap-x-2 text-meta text-muted-foreground">
                     {amendment.document && (
                       <a href={documentUrl(amendment.document.id)} download className="inline-flex items-center gap-1 font-medium text-brand-ink hover:text-primary">
                         <FileText aria-hidden className="size-3.5 flex-none" />
                         {amendment.document.title}
                       </a>
                     )}
-                    <span>{t("recorded", { by: amendment.by ?? "—", date: f.shortDay(day(amendment.at)) })}</span>
+                    <span>{t("recorded", { by: amendment.by ?? "—", date: f.date(day(amendment.at)) })}</span>
                   </p>
                 </li>
               );
@@ -178,9 +178,9 @@ export function AmendmentForm({
 
       <section className={cn(cardVariants(), "gap-3")} aria-labelledby="amendment-document">
         <h2 id="amendment-document" className="text-[22px]">
-          {t("documentTitle")} <span className="font-sans text-[13px] font-normal tracking-normal text-muted-foreground">{t("optional")}</span>
+          {t("documentTitle")} <span className="font-sans text-sm font-normal tracking-normal text-muted-foreground">{t("optional")}</span>
         </h2>
-        <p className="m-0 text-[13px] text-muted-foreground">{t("documentHint", { number })}</p>
+        <p className="m-0 text-sm text-muted-foreground">{t("documentHint", { number })}</p>
         <FileSlot
           id="amendment-file"
           label={t("chooseFile")}

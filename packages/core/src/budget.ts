@@ -33,6 +33,7 @@ import {
   revisionInProject,
   syncDraft,
 } from "./budget-draft";
+import { compareIdentity, projectIdentity, withProjectIdentity } from "./budget-identity";
 import { computeChecks, reviewedKeys, tenantRatios } from "./budget-review";
 import { markChanged } from "./changes";
 import { raiseStage } from "./obra-stage";
@@ -268,13 +269,14 @@ export async function revisionView(
   previous: RevisionRow | undefined,
   totals: Map<string, number>,
 ): Promise<BudgetRevision> {
-  const [loaded, before, hitoOf, pdfs, ratios, names] = await Promise.all([
+  const [loaded, before, hitoOf, pdfs, ratios, names, project] = await Promise.all([
     loadChapters(row.id),
     previous ? loadChapters(previous.id) : null,
     hitoByChapter(row.projectId),
     revisionPdfs(row.id),
     row.model === BUDGET_MODEL ? tenantRatios(row.tenantId, row.projectId) : {},
     userNamesById(row.tenantId, [row.acceptedByUserId]),
+    row.model === BUDGET_MODEL ? projectIdentity(row.tenantId, row.projectId) : null,
   ]);
   const registrar = row.acceptedByUserId === null ? undefined : names.get(row.acceptedByUserId);
   const priced = withPrices(loaded, row);
@@ -317,6 +319,7 @@ export async function revisionView(
     contingencyBp: row.contingencyBp,
     quality: row.quality,
     texts,
+    identity: project && compareIdentity(texts.cover, project),
     conditions: readConditions(row.conditions),
     changeReason: row.changeReason,
     validUntil: row.validUntil,
@@ -394,7 +397,9 @@ type ChapterNotes = Map<string, string>;
 
 /**
  * Inserts a FRAMER revision with its twenty chapters, and the standard hitos
- * if the project has none yet. The caller holds the project lock.
+ * if the project has none yet. Its cover names the project's client and
+ * address (budget-identity.ts), over the given texts. The caller holds the
+ * project lock.
  */
 export async function insertFramerRevision(
   tx: Tx,
@@ -403,16 +408,18 @@ export async function insertFramerRevision(
   values: NewRevision,
   notes: ChapterNotes = new Map(),
 ) {
+  const texts = values.texts ?? defaultTexts();
+  const cover = withProjectIdentity(texts.cover, await projectIdentity(tenantId, projectId, tx));
   const [revision] = await tx
     .insert(budgetRevisions)
     .values({
       tenantId,
       projectId,
       model: BUDGET_MODEL,
-      texts: defaultTexts(),
       conditions: defaultConditions(),
       ...DEFAULT_MARGINS,
       ...values,
+      texts: { ...texts, cover },
     })
     .returning({ id: budgetRevisions.id, contingencyBp: budgetRevisions.contingencyBp });
   const revisionId = revision!.id;
@@ -454,7 +461,11 @@ export async function createBudget(ctx: Ctx, projectId: string, input: Record<st
   return created;
 }
 
-/** A new draft copied from the newest revision (issued, rejected or accepted), progress included. */
+/**
+ * A new draft copied from the newest revision (issued, rejected or accepted),
+ * progress included; its cover names the project's client and address as they
+ * are now (budget-identity.ts).
+ */
 export async function createRevision(ctx: Ctx, projectId: string) {
   requireEditor(ctx);
   await requireProject(ctx.tenantId, projectId);
@@ -471,7 +482,12 @@ export async function createRevision(ctx: Ctx, projectId: string) {
     if (newest.status === "draft") fail("draft_exists");
 
     const { tenantId, reference, vatRateBp, builtAreaCm2, usefulAreaCm2, exclusions } = newest;
-    const { model, contingencyBp, overheadBp, profitBp, quality, texts, conditions } = newest;
+    const { model, contingencyBp, overheadBp, profitBp, quality, conditions } = newest;
+    let { texts } = newest;
+    if (model === BUDGET_MODEL) {
+      const stored = readTexts(texts);
+      texts = { ...stored, cover: withProjectIdentity(stored.cover, await projectIdentity(tenantId, projectId, tx)) };
+    }
     const [revision] = await tx
       .insert(budgetRevisions)
       .values({
@@ -509,6 +525,32 @@ export async function createRevision(ctx: Ctx, projectId: string) {
     }
     return { revisionId };
   });
+}
+
+/**
+ * "Usar los datos del proyecto": a FRAMER draft's cover takes the project's
+ * client and address where it doesn't already name them (`identity.differs`);
+ * what names them, saying more, stays. Drafts only (`not_draft`): an issued
+ * revision was given to the client. Answers the fields it changed.
+ */
+export async function takeProjectData(ctx: Ctx, projectId: string, revisionId: string) {
+  const revision = await revisionInProject(ctx, projectId, revisionId);
+  if (revision.model !== BUDGET_MODEL) fail("invalid_input");
+  const identity = await projectIdentity(ctx.tenantId, projectId);
+  const changed = await inDraft(revisionId, async (tx) => {
+    // Read under inDraft's row lock, so an edit saved meanwhile isn't undone.
+    const [row] = await tx.select({ texts: budgetRevisions.texts }).from(budgetRevisions).where(eq(budgetRevisions.id, revisionId));
+    const texts = readTexts(row?.texts);
+    const { differs } = compareIdentity(texts.cover, identity);
+    if (differs.length > 0) {
+      await tx
+        .update(budgetRevisions)
+        .set({ texts: { ...texts, cover: withProjectIdentity(texts.cover, identity) } })
+        .where(eq(budgetRevisions.id, revisionId));
+    }
+    return differs;
+  }, { sync: false });
+  return { revisionId, changed };
 }
 
 /** Partial texts over the stored ones; each section is validated as a whole. */

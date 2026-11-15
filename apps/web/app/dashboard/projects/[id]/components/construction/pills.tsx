@@ -71,7 +71,7 @@ export function IssueStatusPill({ status }: { status: IssueStatus }) {
 export function MockBadge() {
   const t = useTranslations("construction.sources");
   return (
-    <Badge variant="outline" className="px-1.5 py-0 text-[10.5px] tracking-[0.04em] uppercase" title={t("mockHint")}>
+    <Badge variant="outline" className="px-1.5 py-0 text-xs tracking-[0.04em] uppercase" title={t("mockHint")}>
       {t("mock")}
     </Badge>
   );
@@ -81,7 +81,7 @@ export function MockBadge() {
 export function LiveBadge() {
   const t = useTranslations("construction.sources");
   return (
-    <Badge variant="good" className="px-2 py-0 text-[10.5px]" title={t("liveHint")}>
+    <Badge variant="good" className="px-2 py-0 text-xs" title={t("liveHint")}>
       <Dot />
       {t("live")}
     </Badge>
@@ -101,7 +101,7 @@ export function Source({ name, mock = false }: { name: string; mock?: boolean })
 /** Where figures come from: "Plan: **Planificación** [Simulado]" (compose with `Source`). */
 export function SourceLabel({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <span className={cn("inline-flex flex-wrap items-center gap-1.5 text-[11.5px] text-muted-foreground", className)}>
+    <span className={cn("inline-flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground", className)}>
       {children}
     </span>
   );

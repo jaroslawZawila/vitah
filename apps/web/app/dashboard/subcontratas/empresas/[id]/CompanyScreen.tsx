@@ -26,6 +26,7 @@ import {
   validateSubcontractorDocumentAction,
 } from "../../../../actions/subcontractors";
 import FormError from "../../../components/FormError";
+import { useConfirm } from "../../../components/useConfirm";
 import { cardVariants } from "@/components/ui/card";
 import BlockingBanner from "../../components/company/BlockingBanner";
 import CompanyHeader from "../../components/company/CompanyHeader";
@@ -70,6 +71,7 @@ export default function CompanyScreen({
   const [error, setError] = useState<SubcontractorError | undefined>();
   const [busy, startTransition] = useTransition();
   const documents = useDocumentActions(company.id, company.kind, DOCUMENT_ACTIONS);
+  const confirm = useConfirm("subcontractors.errors");
 
   function changeTab(next: CompanyTab) {
     setTab(next);
@@ -106,8 +108,14 @@ export default function CompanyScreen({
     run(() => assignSubcontractorAction(company.id, projectId, values));
 
   function remove(assignment: SubcontractorAssignment) {
-    if (!confirm(t("obras.confirmRemove", { ref: assignment.projectRef }))) return;
-    void run(() => removeSubcontractorAssignmentAction(company.id, assignment.projectId));
+    setError(undefined);
+    confirm.ask({
+      t,
+      key: "obras.removeDialog",
+      values: { company: company.legalName, ref: assignment.projectRef },
+      destructive: true,
+      action: () => removeSubcontractorAssignmentAction(company.id, assignment.projectId),
+    });
   }
 
   return (
@@ -147,7 +155,7 @@ export default function CompanyScreen({
           <section className={cardVariants()} aria-labelledby="documents-title">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h2 id="documents-title">{t("documents.title")}</h2>
-              <span className="text-[12.5px] text-muted-foreground">{t("documents.hint")}</span>
+              <span className="text-meta text-muted-foreground">{t("documents.hint")}</span>
             </div>
             <FormError namespace="subcontractors.errors" error={documents.error} />
             <DocumentList
@@ -175,12 +183,13 @@ export default function CompanyScreen({
             projects={projects}
             kind={company.kind}
             canManage={company.canManage}
-            busy={busy}
+            busy={busy || confirm.pending}
             error={error}
             onSave={save}
             onRemove={remove}
           />
         )}
+        {confirm.dialog}
         {tab === "pedidos" && <OrdersTab company={company} orders={orders} />}
         {tab === "historial" && <HistoryList entries={company.history} kind={company.kind} />}
       </div>

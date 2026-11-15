@@ -82,7 +82,7 @@ export default function GeneratePlanForm({
         </div>
 
         <fieldset className="flex flex-col gap-2">
-          <legend className="mb-2 text-[13.5px] font-medium">{t("from")}</legend>
+          <legend className="mb-2 text-sm font-medium">{t("from")}</legend>
           <label className={choice}>
             <input type="radio" name="from" className="mt-1 accent-primary" checked={from === "template"} onChange={() => setFrom("template")} />
             <span>
@@ -119,7 +119,7 @@ export default function GeneratePlanForm({
         </fieldset>
 
         <fieldset className="flex flex-col gap-1">
-          <legend className="mb-2 text-[13.5px] font-medium">{t("calendar")}</legend>
+          <legend className="mb-2 text-sm font-medium">{t("calendar")}</legend>
           <CalendarFields id="plan" calendar={calendar} onChange={(change) => setCalendar((c) => ({ ...c, ...change }))} />
         </fieldset>
 
@@ -139,7 +139,7 @@ export default function GeneratePlanForm({
             <div className="flex flex-wrap items-end gap-4">
               <div className="flex flex-col">
                 <span className={muted}>{t("previewEnd")}</span>
-                <span className="font-heading text-[24px] font-semibold">{f.fullDay(end)}</span>
+                <span className="font-heading text-[24px] font-semibold">{f.date(end)}</span>
               </div>
               {margin !== null && (
                 <Badge variant={margin >= 0 ? "good" : "destructive"}>
@@ -157,11 +157,11 @@ export default function GeneratePlanForm({
                 const d = dates.get(item.code)!;
                 const name = chapters.find((c) => c.code === item.code)?.name ?? item.code;
                 return (
-                  <li key={item.code} className="grid grid-cols-[36px_minmax(0,1fr)_92px] items-center gap-x-2.5 border-t px-[18px] py-1.5 text-[13px] sm:grid-cols-[36px_minmax(0,1fr)_100px_minmax(120px,1.2fr)]">
+                  <li key={item.code} className="grid grid-cols-[36px_minmax(0,1fr)_92px] items-center gap-x-2.5 border-t px-[18px] py-1.5 text-sm sm:grid-cols-[36px_minmax(0,1fr)_100px_minmax(120px,1.2fr)]">
                     <span className="num font-semibold">{item.code}</span>
                     <span className="truncate">{name}</span>
-                    <span className="num text-[12px] text-muted-foreground">
-                      {f.day(d.start)} – {f.day(d.end)}
+                    <span className="num text-meta text-muted-foreground">
+                      {f.date(d.start)} – {f.date(d.end)}
                     </span>
                     <span aria-hidden className="relative hidden h-2.5 rounded-[3px] bg-raise sm:block">
                       <span className="absolute inset-y-0 rounded-[3px] bg-primary" style={bar(timeline, d.start, d.end)} />

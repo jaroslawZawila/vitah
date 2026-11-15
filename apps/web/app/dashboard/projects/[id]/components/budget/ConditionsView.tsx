@@ -105,7 +105,7 @@ export default function ConditionsView({
               + {t("addExclusion")}
             </Button>
           )}
-          <label className="flex flex-col gap-1.5 text-[12.5px] font-semibold text-muted-foreground">
+          <label className="flex flex-col gap-1.5 text-meta font-semibold text-muted-foreground">
             {t("includes")}
             <SaveOnBlur key={texts.includes} label={t("includes")} multiline rows={3} value={texts.includes} onSave={onTexts ? (includes) => onTexts({ includes }) : undefined} />
           </label>
@@ -128,7 +128,7 @@ export default function ConditionsView({
           <p className={muted}>{t("fixedNote")}</p>
           <div className="grid gap-3 sm:grid-cols-2">
             {(["validityDays", "term", "penalty", "signingPlace"] as const).map((key) => (
-              <label key={key} className="flex flex-col gap-1.5 text-[12.5px] font-semibold text-muted-foreground">
+              <label key={key} className="flex flex-col gap-1.5 text-meta font-semibold text-muted-foreground">
                 {t(`terms.${key}`)}
                 <SaveOnBlur
                   key={key + String(conditions[key])}

@@ -59,7 +59,7 @@ describe("OrderFormScreen", () => {
     expect(screen.getByText("VTH-26-001 · se numerará PED-057")).toBeInTheDocument();
     expect(screen.getByRole("combobox", { name: "Capítulo" })).toHaveValue("07");
     expect(screen.getByText(/Capítulo 07 previsto/)).toBeInTheDocument();
-    expect(screen.getByText(/pedir antes del 19 oct/)).toBeInTheDocument();
+    expect(screen.getByText(/pedir antes del 19 oct 2026/)).toBeInTheDocument();
     expect(screen.getByText("Simulado")).toBeInTheDocument();
     expect(screen.getByLabelText("Entrega prevista")).toBeInTheDocument();
   });
@@ -94,12 +94,12 @@ describe("OrderFormScreen", () => {
 
     const open = screen.getByRole("textbox", { name: "Importe de 07.04" }).closest("tr")!;
     // 07.04 starts on what is left to contract: 2.660 − 1.000.
-    expect(screen.getByRole("textbox", { name: "Importe de 07.04" })).toHaveValue("1660,00");
+    expect(screen.getByRole("textbox", { name: "Importe de 07.04" })).toHaveValue("1.660,00");
     expect(within(open).getByText("abierta")).toBeInTheDocument();
     const closed = screen.getByRole("textbox", { name: "Importe de 07.01" }).closest("tr")!;
     expect(within(closed).getByText("−190,00")).toHaveClass("text-good");
 
-    expect(total().getByText("8910,00 €")).toBeInTheDocument();
+    expect(total().getByText("8.910,00 €")).toBeInTheDocument();
     expect(total().getByText("Desviación en 1 partida cerrada")).toBeInTheDocument();
     expect(total().getByText("−190,00 €")).toBeInTheDocument();
   });
@@ -229,7 +229,7 @@ describe("OrderFormScreen", () => {
     // Placed: the kind is fixed.
     expect(screen.getByRole("radio", { name: /Subcontrato/ })).toBeDisabled();
     expect(screen.getByRole("combobox", { name: "Capítulo" })).toHaveValue("06");
-    expect(screen.getByRole("textbox", { name: "Importe de 06.05" })).toHaveValue("3120,00");
+    expect(screen.getByRole("textbox", { name: "Importe de 06.05" })).toHaveValue("3.120,00");
     expect(screen.queryByLabelText("Elegir archivo")).not.toBeInTheDocument();
 
     await userEvent.selectOptions(screen.getByRole("combobox", { name: "Capítulo" }), "07");
@@ -274,7 +274,7 @@ describe("OrderFormScreen from a purchase request", () => {
     expect(screen.getByLabelText("Concepto")).toHaveValue("Placa de yeso para trasdosados");
     expect(screen.getByLabelText("Entrega prevista")).toHaveValue("2026-10-15");
     expect(screen.getByRole("combobox", { name: "Capítulo" })).toHaveValue("07");
-    expect(screen.getByRole("textbox", { name: "Importe de 07.01" })).toHaveValue("6250,00");
+    expect(screen.getByRole("textbox", { name: "Importe de 07.01" })).toHaveValue("6.250,00");
     expect(suppliers().getByRole("button", { name: /Yesos y Placas/ })).toHaveAttribute("aria-pressed", "true");
 
     await userEvent.click(screen.getByRole("button", { name: "Guardar como pendiente" }));

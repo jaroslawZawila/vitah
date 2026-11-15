@@ -176,7 +176,7 @@ export default function WorkerForm({
               />
               <span>
                 {tr(`roles.${role}`)}
-                <span className="text-xs font-normal text-muted-foreground">
+                <span className="text-meta font-normal text-muted-foreground">
                   {" · "}
                   {t("roleNeeds", { document: requirementName(ROLE_TRAININGS[role]) })}
                 </span>

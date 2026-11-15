@@ -20,21 +20,21 @@ export function RecentEvents({ events }: { events: ProgressEvent[] }) {
     <section className={cn(cardVariants(), "gap-2.5")} aria-labelledby="recent-events">
       <h2 id="recent-events">{t("recentTitle")}</h2>
       {events.length === 0 ? (
-        <p className="text-[13px] text-muted-foreground">{t("empty")}</p>
+        <p className="text-sm text-muted-foreground">{t("empty")}</p>
       ) : (
         <ul className="m-0 flex list-none flex-col p-0">
           {events.map((event) => (
-            <li key={event.id} className="flex flex-col gap-0.5 border-t py-2.5 text-[13px] first:border-t-0 first:pt-0">
+            <li key={event.id} className="flex flex-col gap-0.5 border-t py-2.5 text-sm first:border-t-0 first:pt-0">
               <div className="flex flex-wrap items-baseline justify-between gap-x-3">
                 <span>
                   <b>{t(`kind.${event.kind}`, { code: event.chapterCode })}</b> ·{" "}
                   <span className="num">
                     {isCorrection(event)
-                      ? `${event.previousDate ? f.day(event.previousDate) : "—"} → ${event.newDate ? f.day(event.newDate) : "—"}`
-                      : event.newDate && f.fullDay(event.newDate)}
+                      ? `${f.date(event.previousDate)} → ${f.date(event.newDate)}`
+                      : event.newDate && f.date(event.newDate)}
                   </span>
                 </span>
-                <span className="num text-muted-foreground">{f.stamp(event.recordedAt)}</span>
+                <span className="num text-muted-foreground">{f.dateTime(event.recordedAt)}</span>
               </div>
               <span className="text-muted-foreground">
                 {[
@@ -62,12 +62,12 @@ export function HistoryTable({ events }: { events: ProgressEvent[] }) {
     <section className={cn(cardVariants({ size: "flush" }), "pt-[18px] pb-1.5")} aria-labelledby="history-title">
       <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 px-[18px] pb-3">
         <h2 id="history-title">{t("title")}</h2>
-        <span className="text-[12.5px] text-muted-foreground">{t("hint")}</span>
+        <span className="text-meta text-muted-foreground">{t("hint")}</span>
       </div>
       {events.length === 0 ? (
-        <p className="px-[18px] pb-4 text-[13px] text-muted-foreground">{t("empty")}</p>
+        <p className="px-[18px] pb-4 text-sm text-muted-foreground">{t("empty")}</p>
       ) : (
-        <Table className="min-w-[720px] text-[13px]" aria-labelledby="history-title">
+        <Table className="min-w-[720px]" aria-labelledby="history-title">
           <TableHeader>
             <TableRow>
               <TableHead className="pl-[18px]">{t("record")}</TableHead>
@@ -88,9 +88,9 @@ export function HistoryTable({ events }: { events: ProgressEvent[] }) {
                       : t(event.kind === "start" ? "pendingToInProgress" : "inProgressToFinished")}
                   </div>
                 </TableCell>
-                <TableCell className="num">{event.previousDate ? f.fullDay(event.previousDate) : <Muted />}</TableCell>
-                <TableCell className="num">{event.newDate ? f.fullDay(event.newDate) : <Muted text={t("cleared")} />}</TableCell>
-                <TableCell className="num text-muted-foreground">{f.stamp(event.recordedAt)}</TableCell>
+                <TableCell className="num">{event.previousDate ? f.date(event.previousDate) : <Muted />}</TableCell>
+                <TableCell className="num">{event.newDate ? f.date(event.newDate) : <Muted text={t("cleared")} />}</TableCell>
+                <TableCell className="num text-muted-foreground">{f.dateTime(event.recordedAt)}</TableCell>
                 <TableCell className="pr-[18px]">{event.recordedBy ?? <Muted />}</TableCell>
               </TableRow>
             ))}

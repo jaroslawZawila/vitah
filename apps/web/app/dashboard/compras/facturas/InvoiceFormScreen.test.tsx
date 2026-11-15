@@ -46,12 +46,12 @@ describe("InvoiceFormScreen", () => {
     expect(screen.getByLabelText("Base imponible (€)")).toHaveValue("27.000,00");
     expect(screen.getByLabelText("Vence")).toHaveValue("2026-11-18");
     expect(screen.getByRole("button", { name: "Inversión del sujeto pasivo" })).toHaveAttribute("aria-pressed", "true");
-    expect(summary().getByText("−1350,00")).toBeInTheDocument();
+    expect(summary().getByText("−1.350,00")).toBeInTheDocument();
     expect(summary().getByText("25.650,00")).toBeInTheDocument();
-    expect(summary().getByText("Quedarán 1200,00 por facturar.")).toBeInTheDocument();
+    expect(summary().getByText("Quedarán 1.200,00 por facturar.")).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: "21 %" }));
-    expect(summary().getByText("5670,00")).toBeInTheDocument();
+    expect(summary().getByText("5.670,00")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Inversión del sujeto pasivo" }));
     await userEvent.type(screen.getByLabelText("Nº de factura del proveedor"), "MSN-2026/171");
     const pdf = new File(["%PDF"], "MSN-171.pdf", { type: "application/pdf" });
@@ -84,7 +84,7 @@ describe("InvoiceFormScreen", () => {
     renderScreen();
     const split = within(screen.getByRole("region", { name: "4 · Reparto por partidas" }));
     expect(split.getByLabelText("Importe de 03.01 en esta factura")).toHaveValue("25.137,93");
-    expect(split.getByLabelText("Importe de 03.02 en esta factura")).toHaveValue("1862,07");
+    expect(split.getByLabelText("Importe de 03.02 en esta factura")).toHaveValue("1.862,07");
 
     const second = split.getByLabelText("Importe de 03.02 en esta factura");
     await userEvent.clear(second);

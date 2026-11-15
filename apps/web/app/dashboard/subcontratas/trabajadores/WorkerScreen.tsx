@@ -117,7 +117,7 @@ export default function WorkerScreen({
           {headerAccess && <AccessBadge status={headerAccess.status} />}
         </div>
         {worker && (
-          <p className="m-0 text-[13px] text-muted-foreground">
+          <p className="m-0 text-sm text-muted-foreground">
             <Link className="underline-offset-3 hover:underline" href={companyHref(worker.subcontractorId)}>
               {worker.subcontractorName}
             </Link>
@@ -144,15 +144,16 @@ export default function WorkerScreen({
               {t("saved")}
             </FormMessage>
           )}
-          {worker ? <WorkerDocuments worker={worker} canManage={canManage} /> : <p className="m-0 text-[13px] text-muted-foreground">{t("documentsAfter")}</p>}
         </div>
         <aside className="flex min-w-0 flex-col gap-3.5 lg:w-[340px] lg:flex-none">
           <AccessCard access={access} kind={kind} obras={worker?.obras ?? []} obraId={obraId} onObra={setObraId} />
           {worker && !draftMatches(worker, draft) && (
-            <p className="m-0 text-[12.5px] text-muted-foreground">{t("unsaved")}</p>
+            <p className="m-0 text-meta text-muted-foreground">{t("unsaved")}</p>
           )}
         </aside>
       </div>
+      {/* The documents' table at the page's full width, not beside the access card: its actions fit. */}
+      {worker ? <WorkerDocuments worker={worker} canManage={canManage} /> : <p className="m-0 text-sm text-muted-foreground">{t("documentsAfter")}</p>}
     </>
   );
 }
@@ -172,7 +173,7 @@ function WorkerDocuments({ worker, canManage }: { worker: WorkerDetail; canManag
     <Card size="list" aria-labelledby="worker-documents-title">
       <div className="flex flex-wrap items-baseline justify-between gap-2 pt-2">
         <h2 id="worker-documents-title">{t("title")}</h2>
-        <span className="text-[12.5px] text-muted-foreground">{t("hint")}</span>
+        <span className="text-meta text-muted-foreground">{t("hint")}</span>
       </div>
       <FormError namespace="subcontractors.errors" error={error} />
       <DocumentList

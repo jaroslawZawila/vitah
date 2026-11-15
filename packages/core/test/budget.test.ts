@@ -807,7 +807,8 @@ describe("revisions", () => {
       exclusions: ["Geotécnico", "Mobiliario"],
       conditions: { validityDays: 60, signingPlace: "Zarzalejo" },
     });
-    expect(revision.texts.cover).toMatchObject({ promoter: "D. Roberto Guzmán Mesa", site: "" });
+    // The site is the project's address, from the start.
+    expect(revision.texts.cover).toMatchObject({ promoter: "D. Roberto Guzmán Mesa", site: "Calle Mayor 1, Santander" });
     expect(revision.texts.justification.blocks).toEqual([{ title: "Estructura", text: "Steel Frame" }]);
     // The intro keeps its default: sections merge, fields within them are replaced.
     expect(revision.texts.justification.intro).toContain("FRAMER Steel Frame");

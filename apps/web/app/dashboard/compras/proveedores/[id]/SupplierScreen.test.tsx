@@ -17,7 +17,15 @@ describe("SupplierScreen", () => {
     expect(screen.getByRole("link", { name: "Ficha en Subcontratas" })).toHaveAttribute("href", "/dashboard/subcontratas/empresas/sup-msn");
     const figures = within(screen.getByRole("region", { name: "Resumen" }));
     expect(figures.getByText("3 pedidos en 2 obras")).toBeInTheDocument();
-    expect(figures.getByText("Pagado 42.000 € sin IVA")).toBeInTheDocument();
+    // Two groups, each under its VAT basis: what is compared with the cost, and what Administration pays.
+    const cost = within(figures.getByRole("region", { name: "Frente al coste · sin IVA" }));
+    expect(cost.getByText("Contratado").parentElement).toHaveTextContent("87.000,00 €");
+    expect(cost.getByText("Facturado").parentElement).toHaveTextContent("60.000,00 €");
+    expect(cost.getByText("Pagado").parentElement).toHaveTextContent("42.000,00 €");
+    const payable = within(figures.getByRole("region", { name: "Lo que paga Administración · IVA incl." }));
+    expect(payable.getByText("Pendiente de pago").parentElement).toHaveTextContent("13.500,00 €");
+    expect(payable.getByText("Retenciones").parentElement).toHaveTextContent("3.000,00 €");
+    expect(cost.queryByText("Pendiente de pago")).not.toBeInTheDocument();
 
     const orders = within(screen.getByRole("region", { name: /Pedidos/ }));
     expect(orders.getAllByRole("link", { name: "PED-004" })[0]).toHaveAttribute("href", "/dashboard/projects/p-1/compras/order-4");

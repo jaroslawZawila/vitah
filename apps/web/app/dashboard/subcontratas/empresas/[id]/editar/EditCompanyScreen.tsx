@@ -40,11 +40,11 @@ export default function EditCompanyScreen({ id, initial }: { id: string; initial
   return (
     <form className="flex max-w-[860px] flex-col gap-5" onSubmit={handleSubmit} aria-labelledby="edit-company-title">
       <header className="flex flex-col gap-1.5">
-        <Link className="text-[12.5px] text-muted-foreground hover:text-foreground" href={companyHref(id)}>
+        <Link className="text-meta text-muted-foreground hover:text-foreground" href={companyHref(id)}>
           ← {initial.legalName}
         </Link>
         <h1 id="edit-company-title">{t("title")}</h1>
-        <p className="m-0 text-[13px] text-muted-foreground">{t("intro")}</p>
+        <p className="m-0 text-sm text-muted-foreground">{t("intro")}</p>
       </header>
       <section className={cardVariants()} aria-labelledby="edit-company-data">
         <h2 id="edit-company-data">{t("data")}</h2>

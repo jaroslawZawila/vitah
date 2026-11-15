@@ -7,12 +7,12 @@
 import { useTranslations } from "next-intl";
 import type { TenantPayments } from "@repo/core/contract";
 import { Pager } from "@/components/ui/pager";
-import { deletePaymentAction } from "../../../actions/purchase-invoices";
 import { useListQuery } from "../../components/useListQuery";
-import FormError from "../../components/FormError";
-import { useObraAction } from "../../projects/[id]/components/obra/useObraAction";
+import { useConfirm } from "../../components/useConfirm";
+import { useVatLabel } from "../../components/vat-basis";
 import { usePurchaseFormat } from "../../projects/[id]/components/purchasing/format";
 import { PaymentForecast, PaymentTable } from "../components/InvoiceListViews";
+import { useRemovePayment } from "./useRemovePayment";
 
 export default function PaymentsScreen({
   payments,
@@ -22,9 +22,10 @@ export default function PaymentsScreen({
   canManage: boolean;
 }) {
   const t = useTranslations("purchasing.payments");
-  const tr = useTranslations("purchasing.invoice.payments");
   const f = usePurchaseFormat();
-  const remove = useObraAction();
+  const vat = useVatLabel();
+  const remove = useConfirm("purchasing.errors");
+  const removeRequest = useRemovePayment();
   const list = useListQuery();
   return (
     <div className="flex flex-col gap-[18px]">
@@ -34,20 +35,18 @@ export default function PaymentsScreen({
         <p className="mt-1 max-w-[640px] text-[14px] text-muted-foreground">{t("description")}</p>
       </header>
       <PaymentForecast forecast={payments.forecast} />
-      <FormError namespace="purchasing.errors" error={remove.state?.error} />
+      {remove.dialog}
       <PaymentTable
         payments={payments.payments}
         title={t("listTitle")}
         empty={t("none")}
-        footer={t("month", { amount: f.money(payments.summary.monthCents), count: payments.summary.monthPayments })}
+        footer={vat(t("month", { amount: f.money(payments.summary.monthCents), count: payments.summary.monthPayments }), "incl")}
         pending={remove.pending}
         pager={<Pager paging={payments.paging} hrefOf={list.pageHref} />}
         onRemove={
           canManage
             ? (payment) =>
-                remove.confirmThen(tr("confirmRemove", { amount: f.money(payment.amountCents) }), () =>
-                  deletePaymentAction(payment.id),
-                )
+                remove.ask(removeRequest(payment))
             : undefined
         }
       />

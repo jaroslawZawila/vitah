@@ -25,7 +25,6 @@ function renderScreen(canManage = true, list = payments) {
 
 beforeEach(() => {
   vi.mocked(actions.deletePaymentAction).mockReset().mockResolvedValue({ success: true });
-  vi.spyOn(window, "confirm").mockReturnValue(true);
 });
 
 describe("PaymentsScreen", () => {
@@ -36,20 +35,23 @@ describe("PaymentsScreen", () => {
     expect(forecast.getByText("Vencido")).toHaveClass("text-bad");
     expect(forecast.getByRole("link", { name: "SOC-2026/0912" })).toHaveAttribute("href", "/dashboard/compras/facturas/inv-912");
     expect(forecast.getByText("Nada")).toBeInTheDocument();
+    // What Administration pays: with VAT, as invoiced.
+    expect(forecast.getByText("Lo pendiente de cada factura, por semana de vencimiento · IVA incl.")).toBeInTheDocument();
 
     const list = within(screen.getByRole("region", { name: "Pagos registrados" }));
     const row = list.getByRole("link", { name: "MSN-2026/148" }).closest("tr")!;
     expect(within(row).getByText("15.000,00")).toBeInTheDocument();
+    expect(list.getByRole("columnheader", { name: "Importe · IVA incl." })).toBeInTheDocument();
     expect(within(row).getByText("Transferencia")).toBeInTheDocument();
     expect(within(row).getByRole("link", { name: "Justificante.pdf" })).toHaveAttribute("href", "/api/v1/purchases/payments/pay-1/file");
-    expect(list.getByText(/^Este mes: 15\.000,00\s€ en 1 pago$/)).toBeInTheDocument();
+    expect(list.getByText(/^Este mes: 15\.000,00\s€ en 1 pago · IVA incl\.$/)).toBeInTheDocument();
   });
 
   it("pages through the payments made; the month's total is the whole month's", () => {
     renderScreen(true, { ...payments, paging: { page: 2, limit: 50, total: 130, pages: 3 }, summary: { monthCents: 9_876_500, monthPayments: 42 } });
 
     const list = within(screen.getByRole("region", { name: "Pagos registrados" }));
-    expect(list.getByText(/^Este mes: 98\.765,00\s€ en 42 pagos$/)).toBeInTheDocument();
+    expect(list.getByText(/^Este mes: 98\.765,00\s€ en 42 pagos · IVA incl\.$/)).toBeInTheDocument();
     const pager = within(list.getByRole("navigation", { name: "Páginas" }));
     expect(pager.getByText("51–100 de 130")).toBeInTheDocument();
     expect(pager.getByRole("link", { name: "Anterior" })).toHaveAttribute("href", "/dashboard/compras/pagos");
@@ -58,10 +60,11 @@ describe("PaymentsScreen", () => {
 
   it("takes back a payment recorded by mistake", async () => {
     renderScreen();
-    await userEvent.click(screen.getByRole("button", { name: "Quitar el pago del 15 oct" }));
-    expect(window.confirm).toHaveBeenCalledWith(
-      expect.stringMatching(/^¿Quitar el pago de 15\.000,00\s€\? Sale de las listas y de los totales; sus datos y su justificante se conservan\.$/),
-    );
+    await userEvent.click(screen.getByRole("button", { name: "Quitar el pago del 15 oct 2026" }));
+    const dialog = within(await screen.findByRole("alertdialog", { name: /^¿Quitar el pago de 15\.000,00\s€ del 15 oct 2026\?$/ }));
+    expect(dialog.getByText(/^Es un pago de la factura MSN-2026\/148 de .*Elementos eliminados\.$/)).toBeInTheDocument();
+    expect(actions.deletePaymentAction).not.toHaveBeenCalled();
+    await userEvent.click(dialog.getByRole("button", { name: "Quitar pago" }));
     expect(actions.deletePaymentAction).toHaveBeenCalledWith("pay-1");
   });
 

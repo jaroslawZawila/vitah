@@ -19,6 +19,7 @@ import { SleepingCamera } from "../../components/illustrations";
 import { projectPhotoUrl } from "../../components/photoUrl";
 import { usePhotoName } from "../../components/usePhotoName";
 import FormError from "../../../../components/FormError";
+import { useConfirm } from "../../../../components/useConfirm";
 import ObraFrame, { type ObraHeader } from "../../components/construction/ObraFrame";
 import { PhotoGroups, PhotoUploadForm, usePhotoGroups, type PhotoGrouping, type PhotoUploadValues } from "../../components/construction/PhotoViews";
 import Segmented from "../../components/construction/Segmented";
@@ -105,7 +106,8 @@ export default function PhotosScreen({
 }) {
   const t = useTranslations("construction.photos");
   const [grouping, setGrouping] = useState<PhotoGrouping>("date");
-  const { state, pending, run, confirmThen } = useObraAction<PhotosState>();
+  const { state, pending, run, reset } = useObraAction<PhotosState>();
+  const confirm = useConfirm("construction.photos.errors");
   const groups = usePhotoGroups(photos, grouping, chapters, today);
   const photoName = usePhotoName();
 
@@ -147,9 +149,23 @@ export default function PhotosScreen({
                     ? (photo, visibleToClient) => run(() => setPhotoVisibilityAction(projectId, photo.id, visibleToClient))
                     : undefined
                 }
-                onDelete={canManage ? (photo) => confirmThen(t("confirmDelete"), () => deleteProjectPhotoAction(projectId, photo.id)) : undefined}
-                busy={pending}
+                onDelete={
+                  canManage
+                    ? (photo) => {
+                        reset();
+                        confirm.ask({
+                          t,
+                          key: "deleteDialog",
+                          values: { name: photoName(photo) },
+                          destructive: true,
+                          action: () => deleteProjectPhotoAction(projectId, photo.id),
+                        });
+                      }
+                    : undefined
+                }
+                busy={pending || confirm.pending}
               />
+              {confirm.dialog}
             </>
           )}
         </section>

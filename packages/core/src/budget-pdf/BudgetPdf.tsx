@@ -10,7 +10,7 @@ import {
 import { codeRange, type BudgetPdfKind } from "../contract";
 import { ofBp, perM2Cents } from "../obra-calc";
 import { DEJAVU_SANS, DEJAVU_SANS_BOLD } from "./fonts";
-import { fill, money, num, pct, type BudgetPdfData } from "./format";
+import { day, fill, money, num, pct, type BudgetPdfData } from "./format";
 
 // ─── The budget PDF ───────────────────────────────────────────────────────────
 // One document, two kinds: `general` (for the client: no line items, option
@@ -428,7 +428,7 @@ function Revisions({ d }: { d: BudgetPdfData }) {
       <Table
         cols={[{ w: 44, fixed: true }, { w: 64, fixed: true }, { w: 1 }, { w: 80, fixed: true, right: true }]}
         head={["Rev.", "Fecha", "Cambios", "PEC (€)"]}
-        rows={d.history.map((h) => [`Rev.${h.number}`, h.date, h.number === 0 ? "Primera emisión" : (h.reason ?? ""), money(h.totalCents)])}
+        rows={d.history.map((h) => [`Rev.${h.number}`, h.date && day(h.date), h.number === 0 ? "Primera emisión" : (h.reason ?? ""), money(h.totalCents)])}
       />
     </View>
   );

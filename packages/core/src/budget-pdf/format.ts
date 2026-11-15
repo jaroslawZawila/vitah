@@ -1,4 +1,5 @@
 import type { BudgetPdfKind, BudgetRevision } from "../contract";
+import { formatAmount, formatDate, formatDecimal, formatPercent } from "../format";
 
 // What the budget PDF is drawn from, and the Spanish number formats it prints.
 
@@ -29,25 +30,17 @@ export type BudgetPdfData = {
   contractValues: Record<string, string>;
 };
 
-const group = (digits: string) => digits.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-
 /** Cents as Spanish money without the symbol: 415346 → "4.153,46" (the template always groups). */
-export function money(cents: number) {
-  const sign = cents < 0 ? "−" : "";
-  const abs = Math.abs(cents);
-  return `${sign}${group(String(Math.floor(abs / 100)))},${String(abs % 100).padStart(2, "0")}`;
-}
+export const money = (cents: number) => formatAmount(cents, "es");
 
 /** A quantity with two decimals: 28.15 → "28,15", 1234.5 → "1.234,50". */
-export function num(value: number) {
-  const [whole, decimals] = Math.abs(value).toFixed(2).split(".");
-  return `${value < 0 ? "−" : ""}${group(whole!)},${decimals}`;
-}
+export const num = (value: number) => formatDecimal(value, "es");
 
-/** Basis points as a percentage: 1246 → "12,46 %". */
-export function pct(bp: number, decimals = 2) {
-  return `${(bp / 100).toFixed(decimals).replace(".", ",")} %`;
-}
+/** A day as the PDFs print it: "2026-10-14" → "14 oct 2026". */
+export const day = (value: string) => formatDate(value, "es");
+
+/** Basis points as a percentage with `decimals` decimals: 1246 → "12,46 %". */
+export const pct = (bp: number, decimals = 2) => formatPercent(bp, "es", { minDecimals: decimals });
 
 /** Replaces `{name}` with `values.name` (unknown names stay, to be noticed). */
 export function fill(template: string, values: Record<string, string>) {

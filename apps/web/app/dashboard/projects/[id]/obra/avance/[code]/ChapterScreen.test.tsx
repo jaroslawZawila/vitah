@@ -46,14 +46,14 @@ describe("ChapterScreen", () => {
     expect(screen.getByRole("link", { name: "← Volver" })).toHaveAttribute("href", "/dashboard/projects/p-1/obra/avance");
 
     const dates = within(screen.getByRole("region", { name: "Fechas" }));
-    expect(dates.getByText("14/09/2026")).toBeInTheDocument();
+    expect(dates.getByText("14 sept 2026")).toBeInTheDocument();
     expect(dates.getByText("27 d hasta hoy")).toBeInTheDocument();
     expect(dates.getByText("Simulado")).toBeInTheDocument();
 
     const hito = within(screen.getByRole("region", { name: /Hito H4/ }));
     expect(hito.getByText("80.792,40 €")).toBeInTheDocument();
     expect(hito.getByText("Este capítulo")).toBeInTheDocument();
-    expect(hito.getByText("fin 14/10")).toBeInTheDocument();
+    expect(hito.getByText("fin 14 oct 2026")).toBeInTheDocument();
     expect(hito.getByText(/Es el último que falta/)).toBeInTheDocument();
     expect(hito.getByRole("link", { name: "Ver en Pagos →" })).toHaveAttribute("href", "/dashboard/projects/p-1/payments/hito-h4");
 
@@ -63,7 +63,7 @@ describe("ChapterScreen", () => {
     expect(cost.queryByText("Simulado")).not.toBeInTheDocument();
 
     // Compras: the late delivery is a warning only; the chapter's orders are listed.
-    expect(screen.getByRole("status")).toHaveTextContent("1 entrega con retraso: PED-049 Piedra de Liébana, capítulo 06, prevista el 14 oct.");
+    expect(screen.getByRole("status")).toHaveTextContent("1 entrega con retraso: PED-049 Piedra de Liébana, capítulo 06, prevista el 14 oct 2026.");
     const orders = within(screen.getByRole("region", { name: /^Pedidos/ }));
     expect(orders.getByRole("link", { name: "PED-049" })).toHaveAttribute("href", "/dashboard/projects/p-1/compras/order-49");
     expect(orders.getByRole("link", { name: "PED-041" })).toHaveAttribute("href", "/dashboard/projects/p-1/compras/order-41");
@@ -80,7 +80,7 @@ describe("ChapterScreen", () => {
     const history = within(screen.getByRole("table", { name: "Historial" }));
     expect(history.getByText("Corrección de inicio real")).toBeInTheDocument();
     expect(history.getByText("«El montaje empezó el lunes 21»")).toBeInTheDocument();
-    expect(history.getAllByText("22/09/2026")).toHaveLength(2);
+    expect(history.getAllByText("22 sept 2026")).toHaveLength(2);
   });
 
   it("saves the lines' executed %, only what changed", async () => {
@@ -149,15 +149,20 @@ describe("ChapterScreen", () => {
   });
 
   it("edits an issue and removes an attachment", async () => {
-    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
     renderScreen();
 
     await userEvent.click(screen.getByRole("button", { name: "Editar INC-007" }));
     const dialog = within(await screen.findByRole("dialog", { name: "Editar registro" }));
     await userEvent.click(dialog.getByRole("button", { name: "Quitar albaran.pdf" }));
-    // Says what happens: it stops being shown, and the file is kept.
-    expect(confirm).toHaveBeenCalledWith("¿Quitar el adjunto albaran.pdf? Dejará de verse en el portal; el archivo se conserva.");
+    // Asks over the editor, saying what happens: it leaves the record, an admin can restore it.
+    const ask = within(await screen.findByRole("alertdialog", { name: "¿Quitar el adjunto albaran.pdf?" }));
+    expect(ask.getByText("Deja de verse en el registro. Un administrador puede restaurarlo desde Elementos eliminados.")).toBeInTheDocument();
+    expect(actions.deleteIssueFileAction).not.toHaveBeenCalled();
+    await userEvent.click(ask.getByRole("button", { name: "Quitar adjunto" }));
     expect(actions.deleteIssueFileAction).toHaveBeenCalledWith("p-1", "issue-7", "file-1");
+    // The editor stays open behind it.
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+    expect(screen.getByRole("dialog", { name: "Editar registro" })).toBeInTheDocument();
     // The form is busy ("Guardando…") until the attachment is gone.
     const save = await dialog.findByRole("button", { name: "Guardar registro" });
     await waitFor(() => expect(save).toBeEnabled());

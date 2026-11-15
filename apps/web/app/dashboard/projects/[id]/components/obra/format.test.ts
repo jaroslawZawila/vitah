@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { formatDecimal, formatQuantity } from "@repo/core/format";
 import { parseDecimal, parseHundredths } from "./format";
 
 describe("parseDecimal", () => {
@@ -26,10 +27,10 @@ describe("parseDecimal", () => {
   });
 
   it("reads back what the portal shows", () => {
-    const quantity = new Intl.NumberFormat("es-ES", { maximumFractionDigits: 3 }).format(12345.5);
-    expect(parseDecimal(quantity, "es")).toBe(12345.5);
-    const price = new Intl.NumberFormat("en-GB", { minimumFractionDigits: 2 }).format(1234.5);
-    expect(parseDecimal(price, "en")).toBe(1234.5);
+    expect(parseDecimal(formatQuantity(12345.5, "es"), "es")).toBe(12345.5);
+    expect(parseDecimal(formatDecimal(1234.5, "es"), "es")).toBe(1234.5);
+    expect(parseDecimal(formatDecimal(1234.5, "en"), "en")).toBe(1234.5);
+    expect(parseDecimal(formatDecimal(1234567.89, "es"), "es")).toBe(1234567.89);
   });
 
   it("rejects what isn't a number", () => {

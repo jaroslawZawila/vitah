@@ -1,6 +1,6 @@
 "use client";
 
-import { useFormatter, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { MAX_DOCUMENT_BYTES, type DocumentError, type ProjectDocument } from "@repo/core/contract";
 import FormError from "../../../components/FormError";
 import { Badge } from "@/components/ui/badge";
@@ -38,8 +38,6 @@ export default function DocumentList({
   error?: DocumentError;
 }) {
   const t = useTranslations("projectDetailPage.documents");
-  const format = useFormatter();
-
   const f = useObraFormat();
 
   return (
@@ -50,10 +48,10 @@ export default function DocumentList({
           return (
             <li
               key={document.id}
-              className="flex min-h-14 flex-wrap items-center gap-3 border-b py-2.5 text-[13.5px] last:border-b-0"
+              className="flex min-h-14 flex-wrap items-center gap-3 border-b py-2.5 text-sm last:border-b-0"
             >
               <span
-                className="grid h-[42px] w-9 flex-none place-items-center rounded-sm border bg-raise text-[9.5px] font-semibold tracking-[0.04em] text-brand-ink"
+                className="grid h-[42px] w-9 flex-none place-items-center rounded-sm border bg-raise text-xs font-semibold tracking-[0.04em] text-brand-ink"
                 aria-hidden
               >
                 {typeOf(document)}
@@ -67,15 +65,11 @@ export default function DocumentList({
                 >
                   {document.title}
                 </a>
-                <span className="text-xs wrap-anywhere text-muted-foreground">
+                <span className="text-meta wrap-anywhere text-muted-foreground">
                   {[
                     document.filename,
                     t(`categories.${document.category}`),
-                    format.dateTime(new Date(document.uploadedAt), {
-                      dateStyle: "medium",
-                      // Fixed zone: server and browser must render the same text.
-                      timeZone: "Europe/Madrid",
-                    }),
+                    f.date(document.uploadedAt),
                     f.fileSize(document.sizeBytes),
                     document.uploadedBy,
                   ]
@@ -90,7 +84,7 @@ export default function DocumentList({
                   aria-pressed={document.visibleToClient}
                   aria-label={t("visibleLabel", { title: document.title })}
                   onClick={() => onToggleVisibility(document, !document.visibleToClient)}
-                  className="inline-flex min-h-11 items-center gap-2 px-1 text-[13px] font-semibold"
+                  className="inline-flex min-h-11 items-center gap-2 px-1 text-sm font-semibold"
                 >
                   <span className={cn("relative h-5 w-9 flex-none rounded-full bg-border transition-colors", document.visibleToClient && "bg-good")} aria-hidden>
                     <span className={cn("absolute top-0.5 left-0.5 size-4 rounded-full bg-white shadow transition-all", document.visibleToClient && "left-[18px]")} />

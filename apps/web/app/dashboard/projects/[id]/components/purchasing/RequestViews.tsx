@@ -21,6 +21,7 @@ import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import FormError from "../../../../components/FormError";
+import { useVatLabel } from "../../../../components/vat-basis";
 import { companyHref } from "../../../../subcontratas/components/display";
 import { FilterSelect } from "../construction/Filters";
 import Segmented from "../construction/Segmented";
@@ -45,15 +46,16 @@ const groupOf = ({ status }: PurchaseRequestListItem): Exclude<RequestGroup, "al
 export function RequestKpis({ summary }: { summary: TenantRequests["summary"] }) {
   const t = useTranslations("purchasing.requests.kpis");
   const f = usePurchaseFormat();
+  const vat = useVatLabel();
   return (
     <section aria-label={t("label")} className="grid grid-cols-2 gap-3.5 lg:max-w-[640px]">
       <Kpi
         label={t("pending")}
         value={<span className={cn(summary.pending > 0 && "text-yel")}>{summary.pending}</span>}
         className={cn(summary.pending > 0 && "border-yel/40")}
-        hints={[t("amount", { amount: f.moneyRound(summary.pendingCents) })]}
+        hints={[vat(t("amount", { amount: f.money(summary.pendingCents) }), "excl")]}
       />
-      <Kpi label={t("approved")} value={summary.approved} hints={[t("amount", { amount: f.moneyRound(summary.approvedCents) })]} />
+      <Kpi label={t("approved")} value={summary.approved} hints={[vat(t("amount", { amount: f.money(summary.approvedCents) }), "excl")]} />
     </section>
   );
 }
@@ -63,7 +65,7 @@ function NeededBy({ request }: { request: PurchaseRequestListItem }) {
   const f = usePurchaseFormat();
   return (
     <span className="inline-flex flex-wrap items-center gap-1.5 whitespace-nowrap">
-      <span className="num">{request.neededBy ? f.shortDay(request.neededBy) : "—"}</span>
+      <span className="num">{f.date(request.neededBy)}</span>
       {request.lateDays !== null && <LatePill days={request.lateDays} />}
     </span>
   );
@@ -90,6 +92,7 @@ export function RequestBoard({
   const tg = useTranslations("purchasing.requests.groups");
   const tk = useTranslations("purchasing.kind");
   const f = usePurchaseFormat();
+  const vat = useVatLabel();
   const [group, setGroup] = useState<RequestGroup>("all");
   const [projectId, setProjectId] = useState("");
   const inProject = requests.filter((r) => !projectId || r.projectId === projectId);
@@ -127,7 +130,7 @@ export function RequestBoard({
       </div>
 
       {shown.length === 0 ? (
-        <p className="px-[18px] py-6 text-center text-[13.5px] text-muted-foreground">{requests.length === 0 ? empty : t("noMatch")}</p>
+        <p className="px-[18px] py-6 text-center text-sm text-muted-foreground">{requests.length === 0 ? empty : t("noMatch")}</p>
       ) : (
         <>
           {/* Phones: one card per request. */}
@@ -144,10 +147,10 @@ export function RequestBoard({
                   <RequestStatusPill status={request.status} />
                 </div>
                 <div className="mt-2 font-semibold [overflow-wrap:anywhere]">{request.description}</div>
-                <div className="mt-0.5 text-[13px] text-muted-foreground">
+                <div className="mt-0.5 text-sm text-muted-foreground">
                   {tk(request.kind)} · {request.supplierName ?? t("noSupplier")}
                 </div>
-                <div className="mt-2.5 flex items-center justify-between gap-2.5 text-[13px]">
+                <div className="mt-2.5 flex items-center justify-between gap-2.5 text-sm">
                   <NeededBy request={request} />
                   <span className="num font-semibold">{f.money(request.amountCents)}</span>
                 </div>
@@ -157,13 +160,13 @@ export function RequestBoard({
 
           {/* From 768px: the table. */}
           <div className="hidden md:block">
-            <Table className="min-w-[960px] text-[13px]" aria-label={t("table")}>
+            <Table className="min-w-[960px]" aria-label={t("table")}>
               <TableHeader>
                 <TableRow>
                   <TableHead className="pl-[18px]">{company ? t("projectNumber") : t("number")}</TableHead>
                   <TableHead>{t("concept")}</TableHead>
                   <TableHead>{t("supplier")}</TableHead>
-                  <TableHead className="text-right">{t("estimate")}</TableHead>
+                  <TableHead className="text-right">{vat(t("estimate"), "excl")}</TableHead>
                   <TableHead>{t("neededBy")}</TableHead>
                   <TableHead>{t("requestedBy")}</TableHead>
                   <TableHead className="pr-[18px]">{t("status")}</TableHead>
@@ -175,7 +178,7 @@ export function RequestBoard({
                     <TableCell className="pl-[18px] whitespace-nowrap">
                       {company && (
                         <>
-                          <span className="num text-[12px] text-muted-foreground">{request.projectRef}</span>
+                          <span className="num text-meta text-muted-foreground">{request.projectRef}</span>
                           <br />
                         </>
                       )}
@@ -183,7 +186,7 @@ export function RequestBoard({
                     </TableCell>
                     <TableCell className="max-w-[320px] min-w-[220px] whitespace-normal">
                       {request.description}
-                      <div className="text-[12px] text-muted-foreground">
+                      <div className="text-meta text-muted-foreground">
                         {tk(request.kind)}
                         {request.chapterCodes.length > 0 && ` · ${t("chapterShort", { codes: request.chapterCodes.join(", ") })}`}
                       </div>
@@ -195,12 +198,12 @@ export function RequestBoard({
                     </TableCell>
                     <TableCell className="whitespace-normal text-muted-foreground">
                       {request.createdBy ?? "—"}
-                      <div className="num text-[12px]">{f.shortDay(day(request.createdAt))}</div>
+                      <div className="num text-meta">{f.date(day(request.createdAt))}</div>
                     </TableCell>
                     <TableCell className="pr-[18px]">
                       <RequestStatusPill status={request.status} />
                       {request.order && (
-                        <div className="num mt-1 text-[12px] text-muted-foreground">{orderLabel(request.order.number)}</div>
+                        <div className="num mt-1 text-meta text-muted-foreground">{orderLabel(request.order.number)}</div>
                       )}
                     </TableCell>
                   </TableRow>
@@ -228,7 +231,7 @@ export function RequestHeading({ request, actions }: { request: PurchaseRequestD
         </div>
         <h1 className="mt-1.5 [overflow-wrap:anywhere]">{request.description}</h1>
         <p className="mt-1 text-[14px] text-muted-foreground">
-          {t("askedBy", { name: request.createdBy ?? "—", date: f.shortDay(day(request.createdAt)) })}
+          {t("askedBy", { name: request.createdBy ?? "—", date: f.date(day(request.createdAt)) })}
         </p>
       </div>
       {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
@@ -242,10 +245,10 @@ export function RequestLateBanner({ request }: { request: PurchaseRequestDetail 
   const f = usePurchaseFormat();
   if (request.lateDays === null || !request.neededBy) return null;
   return (
-    <div role="status" className="flex items-start gap-3 rounded-xl border border-warn/30 bg-warn-soft px-4 py-3.5 text-[13.5px] text-warn">
+    <div role="status" className="flex items-start gap-3 rounded-xl border border-warn/30 bg-warn-soft px-4 py-3.5 text-sm text-warn">
       <Clock aria-hidden className="mt-0.5 size-5 flex-none" />
       <p className="m-0 min-w-0">
-        <b>{t("late", { days: request.lateDays })}</b> {t("lateHint", { date: f.shortDay(request.neededBy) })}
+        <b>{t("late", { days: request.lateDays })}</b> {t("lateHint", { date: f.date(request.neededBy) })}
       </p>
     </div>
   );
@@ -277,10 +280,10 @@ export function DecisionCard({
   const [note, setNote] = useState("");
   // Who decided, while that decision still stands (not for a request later withdrawn).
   const decided = request.decidedAt && request.status !== "cancelled" && (
-    <p className="m-0 text-[13.5px]">
+    <p className="m-0 text-sm">
       {t(request.status === "rejected" ? "rejectedBy" : "approvedBy", {
         name: request.decidedBy ?? "—",
-        date: f.shortDay(day(request.decidedAt)),
+        date: f.date(day(request.decidedAt)),
       })}
       {request.decisionNote && <span className="text-muted-foreground"> “{request.decisionNote}”</span>}
     </p>
@@ -294,10 +297,10 @@ export function DecisionCard({
       <h2 id="decision-title" className="text-[22px]">
         {t("title")}
       </h2>
-      {request.status === "pending" && !canDecide && <p className="m-0 text-[13.5px] text-muted-foreground">{t("waiting")}</p>}
+      {request.status === "pending" && !canDecide && <p className="m-0 text-sm text-muted-foreground">{t("waiting")}</p>}
       {request.status === "pending" && canDecide && !rejecting && (
         <>
-          <p className="m-0 text-[13.5px] text-muted-foreground">{t("hint")}</p>
+          <p className="m-0 text-sm text-muted-foreground">{t("hint")}</p>
           <FormActions className="md:justify-start">
             <Button type="button" disabled={pending} onClick={() => onDecide("approve", "")}>
               {t("approve")}
@@ -332,9 +335,9 @@ export function DecisionCard({
         </form>
       )}
       {decided}
-      {request.status === "approved" && <p className="m-0 text-[13.5px] text-muted-foreground">{t("toOrder")}</p>}
+      {request.status === "approved" && <p className="m-0 text-sm text-muted-foreground">{t("toOrder")}</p>}
       {request.status === "ordered" && request.order && (
-        <p className="m-0 text-[13.5px]">
+        <p className="m-0 text-sm">
           {t("ordered")}{" "}
           {orderHref ? (
             <Link href={orderHref} className="num font-semibold text-brand-ink hover:text-primary">
@@ -345,7 +348,7 @@ export function DecisionCard({
           )}
         </p>
       )}
-      {request.status === "cancelled" && <p className="m-0 text-[13.5px] text-muted-foreground">{t("cancelled")}</p>}
+      {request.status === "cancelled" && <p className="m-0 text-sm text-muted-foreground">{t("cancelled")}</p>}
       <FormError namespace="purchasing.requestErrors" error={error} />
     </section>
   );
@@ -360,7 +363,7 @@ export function RequestLines({ request }: { request: PurchaseRequestDetail }) {
       <h2 id="request-lines-title" className="px-[18px] pb-3 text-[22px]">
         {t("lines")}
       </h2>
-      <Table className="min-w-[680px] text-[13px]">
+      <Table className="min-w-[680px]">
         <TableHeader>
           <TableRow>
             <TableHead className="pl-[18px]">{t("line")}</TableHead>
@@ -375,7 +378,7 @@ export function RequestLines({ request }: { request: PurchaseRequestDetail }) {
               <TableCell className="max-w-[380px] min-w-[260px] pl-[18px] whitespace-normal">
                 <span className="num font-semibold">{line.code ?? line.chapterCode}</span> {line.description ?? t("notInBudget")}{" "}
                 {line.quantity !== null && (
-                  <span className="num text-[12px] text-muted-foreground">
+                  <span className="num text-meta text-muted-foreground">
                     {f.decimal(line.quantity)} {line.unit}
                   </span>
                 )}
@@ -404,7 +407,7 @@ export function RequestData({ request }: { request: PurchaseRequestDetail }) {
   const t = useTranslations("purchasing.requests.detail");
   const f = usePurchaseFormat();
   const rows: [string, React.ReactNode][] = [
-    [t("neededBy"), request.neededBy ? f.date(request.neededBy) : "—"],
+    [t("neededBy"), f.date(request.neededBy)],
     [
       t("supplier"),
       request.subcontractorId && request.supplierName ? (
@@ -423,7 +426,7 @@ export function RequestData({ request }: { request: PurchaseRequestDetail }) {
       <h2 id="request-data-title" className="text-[22px]">
         {t("data")}
       </h2>
-      <dl className="m-0 grid grid-cols-[minmax(0,130px)_minmax(0,1fr)] gap-x-3.5 gap-y-2.5 text-[13.5px]">
+      <dl className="m-0 grid grid-cols-[minmax(0,130px)_minmax(0,1fr)] gap-x-3.5 gap-y-2.5 text-sm">
         {rows.map(([label, value]) => (
           <div key={label} className="contents">
             <dt className="text-muted-foreground">{label}</dt>

@@ -9,7 +9,7 @@ import { cardHead, codeChip, columns, muted, table } from "../obra/classes";
 import { useObraFormat } from "../obra/format";
 import InlinePct from "./InlinePct";
 
-const COLUMNS = "52px minmax(200px, 1fr) 70px 110px 120px 70px 84px minmax(150px, auto)";
+const COLUMNS = "52px minmax(180px, 1fr) 70px 110px 120px 70px 84px minmax(150px, auto)";
 
 /**
  * Presentational: the twenty chapters as the client sees them (the PDF's
@@ -29,6 +29,8 @@ export default function ChapterSummary({
   const t = useTranslations("budget.chapters");
   const f = useObraFormat();
   const offAverage = new Set(revision.checks.filter((c) => c.kind === "ratio").map((c) => c.chapterCode));
+  // Chapter 20 at cost: the Obra tab's cost leaves it out, so saying so reconciles the two totals.
+  const contingency = revision.chapters.find((c) => c.computed);
 
   return (
     <section className={cardVariants()} aria-labelledby="chapters-title">
@@ -88,13 +90,16 @@ export default function ChapterSummary({
       <dl className="grid gap-1.5 px-4 text-sm">
         {(
           [
-            [t("costTotal"), revision.costCents],
-            [t("overhead", { pct: f.share(revision.overheadBp) }), revision.overheadCents],
-            [t("profit", { pct: f.share(revision.profitBp) }), revision.profitCents],
+            [t("costTotal"), revision.costCents, contingency && t("costTotalNote", { amount: f.money(contingency.totalCents) })],
+            [t("overhead", { pct: f.share(revision.overheadBp) }), revision.overheadCents, null],
+            [t("profit", { pct: f.share(revision.profitBp) }), revision.profitCents, null],
           ] as const
-        ).map(([label, cents]) => (
+        ).map(([label, cents, note]) => (
           <div key={label} className="flex flex-wrap justify-between gap-2">
-            <dt className="text-muted-foreground">{label}</dt>
+            <dt className="text-muted-foreground">
+              {label}
+              {note && <span className="block text-meta">{note}</span>}
+            </dt>
             <dd className="num">{f.money(cents)}</dd>
           </div>
         ))}

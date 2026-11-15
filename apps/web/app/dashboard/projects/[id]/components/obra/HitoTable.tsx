@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useFormatter, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import type { Hito } from "@repo/core/contract";
 import { Badge } from "@/components/ui/badge";
 import { useObraFormat } from "./format";
@@ -9,7 +9,7 @@ import { codeChip, columns, muted, table } from "./classes";
 import StatusPill from "./StatusPill";
 
 /** A small outlined tag in the chapters column. */
-const TAG = "inline-flex items-center gap-1.5 rounded-full border bg-card px-2 py-0.5 text-[11.5px] whitespace-nowrap";
+const TAG = "inline-flex items-center gap-1.5 rounded-full border bg-card px-2 py-0.5 text-xs whitespace-nowrap";
 
 const COLUMNS = "44px minmax(160px, 1fr) 48px 120px minmax(120px, 0.8fr) minmax(140px, 1fr) 140px";
 
@@ -25,11 +25,10 @@ export default function HitoTable({
 }) {
   const t = useTranslations("obra.payments");
   const f = useObraFormat();
-  const format = useFormatter();
   /** Finishing its last chapter on the Obra tab asked Administration to invoice it. */
   const requested = (hito: Hito) =>
     hito.invoiceRequestedAt && hito.status !== "invoiced" && hito.status !== "paid"
-      ? format.dateTime(new Date(hito.invoiceRequestedAt), { dateStyle: "medium", timeZone: "Europe/Madrid" })
+      ? f.date(hito.invoiceRequestedAt)
       : null;
   const when = (hito: Hito) => {
     if (hito.paidOn) return t("paidOn", { date: f.date(hito.paidOn) });
@@ -75,7 +74,8 @@ export default function HitoTable({
             </span>
             <span role="cell" className="flex flex-col items-start gap-1">
               <StatusPill status={hito.status} />
-              {requested(hito) && <Badge variant="yel">{t("requested", { date: requested(hito)! })}</Badge>}
+              {/* Wraps within the state column ("Factura solicitada · 14 nov 2026") rather than run past the card. */}
+              {requested(hito) && <Badge variant="yel" className="rounded-[9px] whitespace-normal">{t("requested", { date: requested(hito)! })}</Badge>}
               {when(hito) && <span className={muted}>{when(hito)}</span>}
             </span>
           </div>

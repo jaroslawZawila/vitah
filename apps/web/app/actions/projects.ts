@@ -37,9 +37,9 @@ export async function getProjects() {
   return svc.listProjects(await requireSession());
 }
 
-/** The project list: every project with its budget's state (Presupuesto filter and pill). */
+/** The project list: every project with its budget's state (Presupuesto filter and pill) and its signals (Atención). */
 export async function getProjectList() {
-  return budgetOverviewService.listProjectsWithBudget(await requireSession());
+  return budgetOverviewService.listProjectsWithBudget(await requireSession(), { signals: true });
 }
 
 /**

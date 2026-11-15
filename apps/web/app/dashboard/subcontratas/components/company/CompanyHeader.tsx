@@ -29,23 +29,23 @@ export default function CompanyHeader({ company }: { company: SubcontractorDetai
   return (
     <header className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-end md:justify-between">
       <div className="flex min-w-0 flex-col gap-2">
-        <Link href="/dashboard/subcontratas/empresas" className="text-[12.5px] text-muted-foreground hover:text-foreground">
+        <Link href="/dashboard/subcontratas/empresas" className="text-meta text-muted-foreground hover:text-foreground">
           {t("back")}
         </Link>
         <div className="flex flex-wrap items-center gap-x-3.5 gap-y-2">
           <h1 className="[overflow-wrap:anywhere]">{company.legalName}</h1>
           {company.suppliesOnly ? (
             <>
-              <Badge className="px-3 py-1 text-[13px]">{ts("fields.types.supplier.label")}</Badge>
-              <Badge variant="outline" className="px-3 py-1 text-[13px]">
+              <Badge className="px-3 py-1 text-sm">{ts("fields.types.supplier.label")}</Badge>
+              <Badge variant="outline" className="px-3 py-1 text-sm">
                 {ts("noCae")}
               </Badge>
             </>
           ) : (
-            <CompanyStatusBadge status={company.status.status} className="px-3 py-1 text-[13px]" />
+            <CompanyStatusBadge status={company.status.status} className="px-3 py-1 text-sm" />
           )}
         </div>
-        <dl className="m-0 flex flex-wrap gap-x-5 gap-y-1 text-[13.5px]">
+        <dl className="m-0 flex flex-wrap gap-x-5 gap-y-1 text-sm">
           {meta.map(([label, value]) => (
             <div key={label} className="flex gap-1.5">
               <dt className="text-muted-foreground">{label}</dt>

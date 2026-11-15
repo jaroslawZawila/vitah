@@ -14,7 +14,7 @@ function FieldDescription({ className, ...props }: React.ComponentProps<"p">) {
   return (
     <p
       data-slot="field-description"
-      className={cn("text-xs text-muted-foreground", className)}
+      className={cn("text-meta text-muted-foreground", className)}
       {...props}
     />
   )
@@ -41,7 +41,7 @@ function FormMessage({
     <p
       data-slot="form-message"
       className={cn(
-        "text-[13px]",
+        "text-sm",
         tone === "error" ? "text-destructive" : "text-good",
         className
       )}

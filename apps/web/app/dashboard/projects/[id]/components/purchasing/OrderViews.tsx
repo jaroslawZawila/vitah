@@ -21,6 +21,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import { DateRange } from "../../../../components/DateRange";
 import FormError from "../../../../components/FormError";
 import { companyHref } from "../../../../subcontratas/components/display";
 import { ChapterStatePill } from "../construction/pills";
@@ -82,11 +83,11 @@ export function LateBanner({ order, issuesHref }: { order: PurchaseOrderDetail; 
   if (order.lateDays === null) return null;
   const running = order.chapters.filter((c) => c.state === "in_progress").map((c) => c.code);
   return (
-    <div role="status" className="flex flex-wrap items-start gap-3 rounded-xl border border-warn/30 bg-warn-soft px-4 py-3.5 text-[13.5px] text-warn">
+    <div role="status" className="flex flex-wrap items-start gap-3 rounded-xl border border-warn/30 bg-warn-soft px-4 py-3.5 text-sm text-warn">
       <Clock aria-hidden className="mt-0.5 size-5 flex-none" />
       <p className="m-0 min-w-0 flex-[1_1_320px]">
         <b>{t("late.title", { days: order.lateDays })}</b>{" "}
-        {t("late.expected", { date: order.expectedOn ? f.shortDay(order.expectedOn) : "—" })}{" "}
+        {t("late.expected", { date: f.date(order.expectedOn) })}{" "}
         {running.length > 0 && t("late.running", { count: running.length, codes: running.join(", ") })}{" "}
         {t("late.onlyWarning")}
       </p>
@@ -135,7 +136,7 @@ export function StatusForm({
         <h2 id="status-form-title" className="text-[22px]">
           {title}
         </h2>
-        <p className="mt-1 text-[13px] text-muted-foreground">{hint}</p>
+        <p className="mt-1 text-sm text-muted-foreground">{hint}</p>
       </div>
       <div className="grid gap-3.5 sm:grid-cols-2">
         <Field>
@@ -182,12 +183,12 @@ export function StatusSteps({ order }: { order: PurchaseOrderDetail }) {
               <span aria-hidden className="relative block h-1 overflow-hidden rounded-full bg-border">
                 {(done || now) && <span className={cn("absolute inset-y-0 left-0 bg-primary", now ? "w-1/2" : "w-full")} />}
               </span>
-              <b className="text-[13px] [overflow-wrap:anywhere]">{t(`status.${status}`)}</b>
-              <span className="num text-[12px] text-muted-foreground">
+              <b className="text-sm [overflow-wrap:anywhere]">{t(`status.${status}`)}</b>
+              <span className="num text-meta whitespace-normal text-muted-foreground">
                 {date
-                  ? f.shortDay(date)
+                  ? f.date(date)
                   : index === last && planned && current !== -1
-                    ? t("order.plannedOn", { date: f.shortDay(planned) })
+                    ? t("order.plannedOn", { date: f.date(planned) })
                     : ""}
               </span>
             </li>
@@ -195,8 +196,8 @@ export function StatusSteps({ order }: { order: PurchaseOrderDetail }) {
         })}
       </ol>
       {order.status === "cancelled" && (
-        <p className="text-[13px] text-bad">
-          {t("order.cancelledOn", { date: reached.cancelled ? f.shortDay(reached.cancelled) : "—" })}
+        <p className="text-sm text-bad">
+          {t("order.cancelledOn", { date: f.date(reached.cancelled) })}
         </p>
       )}
     </section>
@@ -215,11 +216,11 @@ export function OrderLines({ order }: { order: PurchaseOrderDetail }) {
         <h2 id="lines-title" className="text-[22px]">
           {t("title")}
         </h2>
-        <span className="text-[12.5px] text-muted-foreground">
+        <span className="text-meta text-muted-foreground">
           {order.budgetNumber !== null ? t("atCostRevision", { number: order.budgetNumber }) : t("atCost")}
         </span>
       </div>
-      <Table className="min-w-[760px] text-[13px]">
+      <Table className="min-w-[760px]">
         <TableHeader>
           <TableRow>
             <TableHead className="pl-[18px]">{t("line")}</TableHead>
@@ -238,7 +239,7 @@ export function OrderLines({ order }: { order: PurchaseOrderDetail }) {
               <TableCell className="min-w-[240px] whitespace-normal">
                 {line.description ?? <span className="text-muted-foreground">{t("gone")}</span>}
                 {line.quantity !== null && (
-                  <span className="num text-[12px] text-muted-foreground">
+                  <span className="num text-meta text-muted-foreground">
                     {" "}
                     {f.decimal(line.quantity)} {line.unit}
                   </span>
@@ -252,11 +253,11 @@ export function OrderLines({ order }: { order: PurchaseOrderDetail }) {
               </TableCell>
               <TableCell className={cn("num pr-[18px] text-right", deviationTone(line.deviationCents))}>
                 {line.deviationCents === null ? (
-                  <span className="font-sans text-[12px] text-muted-foreground">{t("open")}</span>
+                  <span className="font-sans text-meta text-muted-foreground">{t("open")}</span>
                 ) : (
                   <>
-                    {f.signedDecimal(line.deviationCents)}
-                    {line.deviationBp !== null && <span className="text-[12px]"> ({f.signedPct(line.deviationBp)})</span>}
+                    {f.signedAmount(line.deviationCents)}
+                    {line.deviationBp !== null && <span className="text-meta"> ({f.signedPercent(line.deviationBp)})</span>}
                   </>
                 )}
               </TableCell>
@@ -273,7 +274,7 @@ export function OrderLines({ order }: { order: PurchaseOrderDetail }) {
           </TableRow>
         </TableFooter>
       </Table>
-      <p className="mx-[18px] mt-2.5 text-[12.5px] leading-normal text-muted-foreground">{anyClosed ? t("closedNote") : t("openNote")}</p>
+      <p className="mx-[18px] mt-2.5 text-meta leading-normal text-muted-foreground">{anyClosed ? t("closedNote") : t("openNote")}</p>
     </section>
   );
 }
@@ -291,20 +292,20 @@ export function OrderData({
   const tv = useTranslations("purchasing.vat");
   const f = usePurchaseFormat();
   const material = order.kind === "material";
-  const date = (value: string | null) => (value ? f.date(value) : "—");
   const works =
-    order.workStart || order.workEnd ? `${date(order.workStart)} – ${date(order.workEnd)}` : "—";
+    order.workStart || order.workEnd ? `${f.date(order.workStart)} – ${f.date(order.workEnd)}` : "—";
   const change = editHref && (
-    <Link href={editHref} className="ml-1.5 font-sans text-[12.5px] font-medium text-brand-ink hover:text-primary">
+    <Link href={editHref} className="ml-1.5 inline-block text-meta font-medium text-brand-ink hover:text-primary">
       {t("change")}
     </Link>
   );
   const rows: [string, React.ReactNode, boolean?][] = [
-    [t("orderedOn"), date(order.orderedOn), true],
+    [t("orderedOn"), f.date(order.orderedOn), true],
+    // Not a `num` row: "Cambiar" goes under the dates when the card is narrow.
     material
-      ? [t("expectedOn"), <>{date(order.expectedOn)}{change}</>, true]
-      : [t("works"), <>{works}{change}</>, true],
-    [material ? t("deliveredOn") : t("finishedOn"), date(order.completedOn), true],
+      ? [t("expectedOn"), <><span className="num">{f.date(order.expectedOn)}</span>{change}</>]
+      : [t("works"), <><DateRange text={works} />{change}</>],
+    [material ? t("deliveredOn") : t("finishedOn"), f.date(order.completedOn), true],
     [
       order.chapters.length === 1 ? t("chapter") : t("chapters"),
       order.chapters.length === 0 ? (
@@ -323,15 +324,16 @@ export function OrderData({
     [t("retention"), order.terms.retentionBp > 0 ? t("retentionValue", { pct: f.share(order.terms.retentionBp) }) : t("noRetention")],
     [t("vat"), tv(order.terms.vatKind)],
     ...(order.notes ? ([[t("notes"), <span key="notes" className="whitespace-pre-line">{order.notes}</span>]] as [string, React.ReactNode][]) : []),
-    [t("createdBy"), `${order.createdBy ?? "—"} · ${f.shortDay(day(order.createdAt))}`],
+    [t("createdBy"), `${order.createdBy ?? "—"} · ${f.date(day(order.createdAt))}`],
   ];
 
   return (
-    <section className={cardVariants()} aria-labelledby="data-title">
+    <section className={cn(cardVariants(), "@container")} aria-labelledby="data-title">
       <h2 id="data-title" className="text-[22px]">
         {t("title")}
       </h2>
-      <dl className="m-0 grid grid-cols-[minmax(0,130px)_minmax(0,1fr)] gap-x-3.5 gap-y-2.5 text-[13.5px]">
+      {/* In a narrow column (the side column at 1024px), each value goes under its label. */}
+      <dl className="m-0 grid gap-x-3.5 gap-y-1 text-sm @[17rem]:grid-cols-[minmax(0,130px)_minmax(0,1fr)] @[17rem]:gap-y-2.5">
         {rows.map(([label, value, num]) => (
           <div key={label} className="contents">
             <dt className="text-muted-foreground">{label}</dt>
@@ -357,7 +359,7 @@ export function EventText({ event }: { event: PurchaseOrderEvent }) {
   const text = (value: unknown) => (typeof value === "string" ? value : "");
   const shown = (key: string, value: unknown) => {
     if (value === null || value === undefined || value === "") return "—";
-    if (FIELD_DATES.has(key)) return f.shortDay(String(value));
+    if (FIELD_DATES.has(key)) return f.date(String(value));
     if (key === "kind") return tk(String(value) as "material");
     if (key === "vatKind") return tv(String(value) as "vat21");
     if (key === "retentionBp" || key === "irpfBp") return f.share(Number(value));
@@ -376,7 +378,7 @@ export function EventText({ event }: { event: PurchaseOrderEvent }) {
       return (
         <>
           {label}
-          {completed && typeof d.date === "string" && t(to === "delivered" ? "deliveredOn" : "finishedOn", { date: f.shortDay(d.date) })}
+          {completed && typeof d.date === "string" && t(to === "delivered" ? "deliveredOn" : "finishedOn", { date: f.date(d.date) })}
         </>
       );
     }
@@ -390,7 +392,7 @@ export function EventText({ event }: { event: PurchaseOrderEvent }) {
               {key === "subcontractorId" || key === "notes"
                 ? t(`changed.${key}`)
                 : t("field", {
-                    field: t.has(`fields.${key}`) ? t(`fields.${key}`) : key,
+                    field: t.has(`fields.${key}`) ? t(`fields.${key}`) : t("fields.other"),
                     from: shown(key, change.from),
                     to: shown(key, change.to),
                   })}
@@ -432,7 +434,7 @@ export function EventText({ event }: { event: PurchaseOrderEvent }) {
     case "amended":
       return (
         <>
-          {t("amended", { number: num(d.number), amount: f.signedDecimal(num(d.deltaCents)) })}
+          {t("amended", { number: num(d.number), amount: f.signedAmount(num(d.deltaCents)) })}
           {typeof d.concept === "string" && <span className="text-muted-foreground"> “{d.concept}”</span>}
         </>
       );
@@ -448,7 +450,7 @@ export function EventText({ event }: { event: PurchaseOrderEvent }) {
             .map(([key, change]) => (
               <span key={key}>
                 {" · "}
-                {t("field", { field: t.has(`fields.${key}`) ? t(`fields.${key}`) : key, from: shown(key, change.from), to: shown(key, change.to) })}
+                {t("field", { field: t.has(`fields.${key}`) ? t(`fields.${key}`) : t("fields.other"), from: shown(key, change.from), to: shown(key, change.to) })}
               </span>
             ))}
         </>
@@ -481,7 +483,8 @@ export function EventText({ event }: { event: PurchaseOrderEvent }) {
     case "file_removed":
       return <>{t("fileRemoved", { name: text(d.name) })}</>;
     default:
-      return <>{event.action}</>;
+      // An action this build doesn't know (written by a newer one): never its code.
+      return <>{t("other")}</>;
   }
 }
 
@@ -501,12 +504,12 @@ export function OrderHistory({
         {t("title")}
       </h2>
       {events.length === 0 ? (
-        <p className="text-[13px] text-muted-foreground">{t("empty")}</p>
+        <p className="text-sm text-muted-foreground">{t("empty")}</p>
       ) : (
         <ul className="m-0 list-none p-0">
           {events.map((event) => (
-            <li key={event.id} className="grid gap-x-4 gap-y-0.5 border-b py-2.5 text-[13.5px] last:border-b-0 sm:grid-cols-[110px_minmax(0,1fr)]">
-              <span className="num text-[12.5px] text-muted-foreground">{f.date(day(event.at))}</span>
+            <li key={event.id} className="grid gap-x-4 gap-y-0.5 border-b py-2.5 text-sm last:border-b-0 sm:grid-cols-[110px_minmax(0,1fr)]">
+              <span className="num text-meta text-muted-foreground">{f.date(day(event.at))}</span>
               <div className="min-w-0 [overflow-wrap:anywhere]">
                 <Text event={event} />
                 {event.note && <span className="text-muted-foreground"> “{event.note}”</span>}

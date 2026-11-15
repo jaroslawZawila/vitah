@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { orderLabel, type PurchaseOrderListItem } from "@repo/core/contract";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { cn } from "@/lib/utils";
+import { DateRange } from "../../../../components/DateRange";
+import { useVatLabel } from "../../../../components/vat-basis";
 import { Dash } from "../construction/SummaryTable";
 import { usePurchaseFormat } from "./format";
 import { contractedCents } from "./orders";
@@ -21,7 +22,7 @@ function SupplierLine({ order }: { order: PurchaseOrderListItem }) {
   const t = useTranslations("purchasing");
   const caePending = !order.suppliesOnly && order.caeStatus !== null && order.caeStatus !== "apta";
   return (
-    <div className="text-[12px] text-muted-foreground">
+    <div className="text-meta text-muted-foreground">
       {t(`kind.${order.kind}`)}
       {caePending && (
         <>
@@ -37,8 +38,8 @@ function When({ order }: { order: PurchaseOrderListItem }) {
   const f = usePurchaseFormat();
   const when = f.when(order);
   return (
-    <span className="inline-flex flex-wrap items-center gap-1.5 whitespace-nowrap">
-      <span className="num">{when ?? "—"}</span>
+    <span className="inline-flex flex-wrap items-center gap-1.5">
+      {when ? <DateRange text={when} /> : <span className="num">—</span>}
       {order.lateDays !== null && <LatePill days={order.lateDays} />}
     </span>
   );
@@ -71,22 +72,23 @@ export default function OrderList({
   const t = useTranslations("purchasing.list");
   const tp = useTranslations("purchasing");
   const f = usePurchaseFormat();
+  const vat = useVatLabel();
   // The project's own list leaves the obra out; a supplier's, the supplier.
   const inProject = variant === "project";
   const isCompany = variant === "company";
   const withSupplier = variant !== "supplier";
 
   if (orders.length === 0) {
-    return <p className="px-[18px] py-6 text-center text-[13.5px] text-muted-foreground">{empty}</p>;
+    return <p className="px-[18px] py-6 text-center text-sm text-muted-foreground">{empty}</p>;
   }
 
   const ref = (order: PurchaseOrderListItem) =>
     projectHref ? (
-      <Link href={projectHref(order)} className="num text-[12px] text-muted-foreground hover:text-primary">
+      <Link href={projectHref(order)} className="num text-meta text-muted-foreground hover:text-primary">
         {order.projectRef}
       </Link>
     ) : (
-      <span className="num text-[12px] text-muted-foreground">{order.projectRef}</span>
+      <span className="num text-meta text-muted-foreground">{order.projectRef}</span>
     );
   const number = (order: PurchaseOrderListItem) => (
     <Link href={orderHref(order)} className="num font-semibold text-brand-ink hover:text-primary">
@@ -94,7 +96,7 @@ export default function OrderList({
     </Link>
   );
   const chapters = (order: PurchaseOrderListItem) => order.chapterCodes.join(", ");
-  const footer = isCompany ? t("footer", { count: totals?.count ?? orders.length }) : t("supplierFooter");
+  const footer = vat(isCompany ? t("footer", { count: totals?.count ?? orders.length }) : t("supplierFooter"), "excl");
 
   return (
     <>
@@ -115,8 +117,8 @@ export default function OrderList({
               <PurchaseStatusPill status={order.status} />
             </div>
             {withSupplier && <div className="mt-2 font-semibold">{order.supplierName}</div>}
-            <div className="mt-0.5 text-[13px] text-muted-foreground">{order.description}</div>
-            <div className="mt-2.5 flex items-center justify-between gap-2.5 text-[13px]">
+            <div className="mt-0.5 text-sm text-muted-foreground">{order.description}</div>
+            <div className="mt-2.5 flex items-center justify-between gap-2.5 text-sm">
               <When order={order} />
               <span className="num font-semibold">{f.money(order.amountCents)}</span>
             </div>
@@ -126,14 +128,14 @@ export default function OrderList({
 
       {/* From 768px: the table. */}
       <div className="hidden md:block">
-        <Table className={cn("text-[13px]", inProject ? "min-w-[940px]" : "min-w-[1060px]")} aria-label={t("table")}>
+        <Table className="min-w-[940px]" aria-label={t("table")}>
           <TableHeader>
             <TableRow>
               <TableHead className="pl-[18px]">{inProject ? t("number") : t("projectNumber")}</TableHead>
               {withSupplier && <TableHead>{t("supplier")}</TableHead>}
               <TableHead>{t("concept")}</TableHead>
               {inProject && <TableHead>{t("chapter")}</TableHead>}
-              <TableHead className="text-right">{t("amount")}</TableHead>
+              <TableHead className="text-right">{vat(t("amount"), "excl")}</TableHead>
               <TableHead className="text-right">{t("invoiced")}</TableHead>
               {isCompany && <TableHead>{t("orderedOn")}</TableHead>}
               <TableHead>{inProject ? t("expected") : t("when")}</TableHead>
@@ -155,15 +157,15 @@ export default function OrderList({
                   )}
                 </TableCell>
                 {withSupplier && (
-                  <TableCell className="min-w-[180px] whitespace-normal">
+                  <TableCell className="min-w-[150px] whitespace-normal">
                     <div className="font-semibold">{order.supplierName}</div>
                     <SupplierLine order={order} />
                   </TableCell>
                 )}
-                <TableCell className="max-w-[300px] min-w-[200px] whitespace-normal">
+                <TableCell className="max-w-[300px] min-w-[150px] whitespace-normal">
                   {order.description}
                   {!inProject && order.chapterCodes.length > 0 && (
-                    <span className="num text-[12px] text-muted-foreground"> {t("chapterShort", { codes: chapters(order) })}</span>
+                    <span className="num text-meta text-muted-foreground"> {t("chapterShort", { codes: chapters(order) })}</span>
                   )}
                 </TableCell>
                 {inProject && <TableCell className="num">{chapters(order) || <Dash />}</TableCell>}
@@ -172,7 +174,7 @@ export default function OrderList({
                   {order.invoicedCents ? f.ratio(order.invoicedCents, order.amountCents) : <Dash />}
                 </TableCell>
                 {isCompany && (
-                  <TableCell className="num whitespace-nowrap">{order.orderedOn ? f.shortDay(order.orderedOn) : <Dash />}</TableCell>
+                  <TableCell className="num whitespace-nowrap">{order.orderedOn ? f.date(order.orderedOn) : <Dash />}</TableCell>
                 )}
                 <TableCell>
                   <When order={order} />
@@ -190,7 +192,7 @@ export default function OrderList({
                   {footer}
                 </TableCell>
                 <TableCell className="num text-right">{f.amount(totals?.contractedCents ?? contractedCents(orders))}</TableCell>
-                <TableCell colSpan={isCompany ? 4 : 3} className="pr-[18px] text-[12px] font-normal text-muted-foreground">
+                <TableCell colSpan={isCompany ? 4 : 3} className="pr-[18px] text-meta font-normal text-muted-foreground">
                   {tp("notCounted")}
                 </TableCell>
               </TableRow>

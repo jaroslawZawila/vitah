@@ -73,14 +73,14 @@ export function InvoiceBanner({ invoice }: { invoice: PurchaseInvoiceDetail }) {
   const f = usePurchaseFormat();
   if (invoice.kind === "credit_note") {
     return (
-      <p role="status" className="m-0 rounded-xl border bg-raise px-4 py-3 text-[13.5px]">
+      <p role="status" className="m-0 rounded-xl border bg-raise px-4 py-3 text-sm">
         {t("credit", { number: invoice.rectifiesNumber ?? "—", amount: f.money(-invoice.payableCents) })}
       </p>
     );
   }
   if (invoice.state === "paid") {
     return (
-      <div role="status" className="flex flex-wrap items-start gap-3 rounded-xl border border-good/30 bg-good-soft px-4 py-3.5 text-[13.5px] text-good">
+      <div role="status" className="flex flex-wrap items-start gap-3 rounded-xl border border-good/30 bg-good-soft px-4 py-3.5 text-sm text-good">
         <CircleCheck aria-hidden className="mt-0.5 size-5 flex-none" />
         <p className="m-0 min-w-0 flex-1">
           <b>{t("paid")}</b>{" "}
@@ -91,12 +91,12 @@ export function InvoiceBanner({ invoice }: { invoice: PurchaseInvoiceDetail }) {
     );
   }
   const overdue = invoice.state === "overdue";
-  const date = invoice.dueOn ? f.shortDay(invoice.dueOn) : "—";
+  const date = f.date(invoice.dueOn);
   return (
     <div
       role="status"
       className={cn(
-        "flex flex-wrap items-start gap-3 rounded-xl border px-4 py-3.5 text-[13.5px]",
+        "flex flex-wrap items-start gap-3 rounded-xl border px-4 py-3.5 text-sm",
         overdue ? "border-bad/30 bg-bad-soft text-bad" : "border-warn/30 bg-warn-soft text-warn",
       )}
     >
@@ -159,7 +159,7 @@ export function PaymentForm({
         <h2 id="pay-form-title" className="text-[22px]">
           {t("title")}
         </h2>
-        <p className="mt-1 text-[13px] text-muted-foreground">{t("hint")}</p>
+        <p className="mt-1 text-sm text-muted-foreground">{t("hint")}</p>
       </div>
       <div className="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
         <Field>
@@ -218,7 +218,7 @@ export function InvoiceAmountsList({
   const tv = useTranslations("purchasing.vat");
   const f = usePurchaseFormat();
   return (
-    <dl className="m-0 grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-2 text-[13.5px]">
+    <dl className="m-0 grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-2 text-sm">
       <AmountRow label={t("base")} cents={amounts?.baseCents} />
       <AmountRow label={t("vat", { kind: tv(vatKind) })} cents={amounts?.vatCents} />
       {amounts && amounts.irpfCents !== 0 && <AmountRow label={t("irpf", { pct: f.share(amounts.irpfBp) })} cents={-amounts.irpfCents} />}
@@ -260,7 +260,7 @@ export function AmountsCard({ invoice }: { invoice: PurchaseInvoiceDetail }) {
       {invoice.kind === "invoice" && (
         <div className="flex flex-col gap-1.5">
           <ProgressBar pct={owed > 0 ? (invoice.paidCents * 100) / owed : 0} />
-          <div className="flex flex-wrap justify-between gap-2 text-[13px]">
+          <div className="flex flex-wrap justify-between gap-2 text-sm">
             <span>
               {t("paid")} <b className="num text-good">{f.amount(invoice.paidCents)}</b>
             </span>
@@ -313,14 +313,14 @@ export function InvoiceData({ invoice }: { invoice: PurchaseInvoiceDetail }) {
       </ul>,
     ],
     ...(invoice.notes ? ([[t("notes"), <span key="n" className="whitespace-pre-line">{invoice.notes}</span>]] as [string, React.ReactNode][]) : []),
-    [t("createdBy"), `${invoice.createdBy ?? "—"} · ${f.shortDay(day(invoice.createdAt))}`],
+    [t("createdBy"), `${invoice.createdBy ?? "—"} · ${f.date(day(invoice.createdAt))}`],
   ];
   return (
     <section className={cardVariants()} aria-labelledby="invoice-data-title">
       <h2 id="invoice-data-title" className="text-[22px]">
         {t("title")}
       </h2>
-      <dl className="m-0 grid grid-cols-[minmax(0,110px)_minmax(0,1fr)] gap-x-3.5 gap-y-2.5 text-[13.5px]">
+      <dl className="m-0 grid grid-cols-[minmax(0,110px)_minmax(0,1fr)] gap-x-3.5 gap-y-2.5 text-sm">
         {rows.map(([label, value]) => (
           <div key={label} className="contents">
             <dt className="text-muted-foreground">{label}</dt>
@@ -370,20 +370,20 @@ export function InvoiceFiles({
         )}
       </div>
       {invoice.files.length === 0 ? (
-        <p className="text-[13px] text-muted-foreground">{t("none")}</p>
+        <p className="text-sm text-muted-foreground">{t("none")}</p>
       ) : (
         <ul className="m-0 list-none p-0">
           {invoice.files.map((file, index) => (
-            <li key={file.id} className={cn("flex flex-wrap items-center gap-x-2.5 gap-y-1 border-b py-2.5 text-[13px] last:border-b-0", index > 0 && "text-muted-foreground")}>
+            <li key={file.id} className={cn("flex flex-wrap items-center gap-x-2.5 gap-y-1 border-b py-2.5 text-sm last:border-b-0", index > 0 && "text-muted-foreground")}>
               <a href={invoiceFileUrl(invoice.id, index === 0 ? undefined : file.id)} download className={cn("inline-flex items-center gap-1.5 font-semibold", index === 0 ? "text-brand-ink hover:text-primary" : "hover:text-foreground")}>
                 <FileText aria-hidden className="size-4 flex-none" />
                 {file.filename}
               </a>
-              <span className="rounded-full bg-raise px-2 py-px text-[11.5px] font-semibold">
+              <span className="rounded-full bg-raise px-2 py-px text-xs font-semibold">
                 {index === 0 ? t("current", { version: file.version }) : t("version", { version: file.version })}
               </span>
-              <span className="text-[12px] text-muted-foreground">
-                {f.shortDay(day(file.at))} · {f.fileSize(file.sizeBytes)}
+              <span className="text-meta text-muted-foreground">
+                {f.date(day(file.at))} · {f.fileSize(file.sizeBytes)}
                 {file.by && ` · ${file.by}`}
                 {invoice.files[index - 1]?.note && index > 0 && ` · ${t("replaced")}: «${invoice.files[index - 1]!.note}»`}
               </span>
@@ -419,7 +419,7 @@ export function InvoiceFiles({
           </FormActions>
         </form>
       )}
-      <p className="m-0 text-[12.5px] text-muted-foreground">{t("keepAll")}</p>
+      <p className="m-0 text-meta text-muted-foreground">{t("keepAll")}</p>
     </section>
   );
 }
@@ -436,11 +436,11 @@ export function CreditNotes({ invoice }: { invoice: PurchaseInvoiceDetail }) {
       </h2>
       <ul className="m-0 list-none p-0">
         {invoice.creditNotes.map((credit) => (
-          <li key={credit.id} className="flex flex-wrap items-center gap-x-2.5 border-b py-2 text-[13px] last:border-b-0">
+          <li key={credit.id} className="flex flex-wrap items-center gap-x-2.5 border-b py-2 text-sm last:border-b-0">
             <Link href={invoiceHref(credit.id)} className="num font-semibold text-brand-ink hover:text-primary">
               {credit.number}
             </Link>
-            <span className="text-muted-foreground">{f.shortDay(credit.issuedOn)}</span>
+            <span className="text-muted-foreground">{f.date(credit.issuedOn)}</span>
             <span className="num ml-auto">{f.amount(credit.payableCents)}</span>
           </li>
         ))}

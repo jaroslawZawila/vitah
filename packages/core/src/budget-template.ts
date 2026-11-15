@@ -3,6 +3,7 @@ import {
   type BudgetConditions,
   type BudgetTexts,
 } from "./contract";
+import { formatNumber } from "./format";
 
 // ─── The FRAMER budget model ──────────────────────────────────────────────────
 // Every budget has the same twenty chapters (names can be adjusted per
@@ -37,7 +38,7 @@ export const TEMPLATE_CHAPTERS = BUDGET_CHAPTER_CODES.map((code) => ({ code, nam
 
 /** Chapter 20's single line, worded for its share (500 bp → "5 %"). */
 export function contingencyDescription(contingencyBp: number) {
-  const pct = (contingencyBp / 100).toLocaleString("es-ES", { maximumFractionDigits: 2 });
+  const pct = formatNumber(contingencyBp / 100, "es", { maxDecimals: 2 });
   return (
     `Fondo de imprevistos equivalente al ${pct} % del importe de los capítulos 01 a 19, ` +
     "destinado a absorber las desviaciones de medición propias de un presupuesto elaborado sobre planos."

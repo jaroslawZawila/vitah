@@ -38,7 +38,7 @@ import {
 
 const section = cn(cardVariants(), "gap-3.5");
 const option =
-  "group flex min-h-11 w-full cursor-pointer items-center gap-3 rounded-[10px] border bg-card px-3.5 py-3 text-left text-[13.5px] transition-colors hover:border-primary/50 disabled:cursor-not-allowed disabled:bg-raise disabled:opacity-60 aria-checked:border-primary aria-checked:bg-brand-soft";
+  "group flex min-h-11 w-full cursor-pointer items-center gap-3 rounded-[10px] border bg-card px-3.5 py-3 text-left text-sm transition-colors hover:border-primary/50 disabled:cursor-not-allowed disabled:bg-raise disabled:opacity-60 aria-checked:border-primary aria-checked:bg-brand-soft";
 const dot =
   "size-4 flex-none rounded-full border-2 border-border bg-card group-aria-checked:border-primary group-aria-checked:bg-primary group-aria-checked:shadow-[inset_0_0_0_3px_var(--card)]";
 
@@ -50,7 +50,7 @@ function Heading({ id, children, hint }: { id: string; children: React.ReactNode
       <h2 id={id} className="text-[22px]">
         {children}
       </h2>
-      {hint && <p className="mt-1 text-[12.5px] text-muted-foreground">{hint}</p>}
+      {hint && <p className="mt-1 text-meta text-muted-foreground">{hint}</p>}
     </div>
   );
 }
@@ -94,7 +94,7 @@ function OrderAndNumber({
         )}
       </div>
       {form.orders.length === 0 ? (
-        <p className="text-[13px] text-muted-foreground">{t("noOrders")}</p>
+        <p className="text-sm text-muted-foreground">{t("noOrders")}</p>
       ) : (
         <div className="grid gap-3.5 sm:grid-cols-2">
           <Field>
@@ -151,7 +151,7 @@ function OrderAndNumber({
             <Field>
               <Label htmlFor="invoice-rectifies">{t("rectifies")}</Label>
               {rectifiable.length === 0 ? (
-                <p className="text-[13px] text-muted-foreground">{t("noInvoices")}</p>
+                <p className="text-sm text-muted-foreground">{t("noInvoices")}</p>
               ) : (
                 <NativeSelect id="invoice-rectifies" className="w-full" value={draft.rectifiesId} disabled={editing} onChange={(e) => onChange({ rectifiesId: e.target.value })}>
                   <NativeSelectOption value="">{t("chooseInvoice")}</NativeSelectOption>
@@ -215,7 +215,7 @@ function Milestone({
                 <b>
                   {index + 1}. {m.concept}
                 </b>{" "}
-                <span className="text-[12.5px] text-muted-foreground">
+                <span className="text-meta text-muted-foreground">
                   · {m.invoices.length > 0 ? t("milestoneInvoiced", { numbers: m.invoices.map((i) => i.number).join(", ") }) : t("milestoneLeft")}
                 </span>
               </span>
@@ -270,7 +270,7 @@ function Amounts({
         )}
       </div>
       <div className="flex flex-col gap-2">
-        <span className="text-[13px] font-semibold">{t("vat")}</span>
+        <span className="text-sm font-semibold">{t("vat")}</span>
         <div role="group" aria-label={t("vat")} className="flex flex-wrap gap-2">
           {PURCHASE_VAT_KINDS.map((kind) => (
             <button
@@ -279,13 +279,13 @@ function Amounts({
               aria-pressed={draft.vatKind === kind}
               disabled={locked}
               onClick={() => onChange({ vatKind: kind })}
-              className="inline-flex min-h-10 cursor-pointer items-center rounded-full border bg-card px-3.5 text-[13px] font-semibold transition-colors hover:border-primary/50 disabled:cursor-not-allowed disabled:opacity-60 pointer-coarse:min-h-11 aria-pressed:border-rail aria-pressed:bg-rail aria-pressed:text-white"
+              className="inline-flex min-h-10 cursor-pointer items-center rounded-full border bg-card px-3.5 text-sm font-semibold transition-colors hover:border-primary/50 disabled:cursor-not-allowed disabled:opacity-60 pointer-coarse:min-h-11 aria-pressed:border-rail aria-pressed:bg-rail aria-pressed:text-white"
             >
               {tv(kind)}
             </button>
           ))}
         </div>
-        <span className="text-[12.5px] text-muted-foreground">{th(draft.vatKind)}</span>
+        <span className="text-meta text-muted-foreground">{th(draft.vatKind)}</span>
       </div>
     </section>
   );
@@ -326,7 +326,7 @@ function Split({
         )}
       </div>
       <div className="-mx-[18px]">
-        <Table className="min-w-[640px] text-[13px]">
+        <Table className="min-w-[640px]">
           <TableHeader>
             <TableRow>
               <TableHead className="pl-[18px]">{t("line")}</TableHead>
@@ -366,7 +366,7 @@ function Split({
         </Table>
       </div>
       {!splitMatches(draft, order, parse) && (
-        <p role="alert" className="text-[12.5px] font-semibold text-bad">
+        <p role="alert" className="text-meta font-semibold text-bad">
           {t("splitMismatch", { sum: f.amount(sum), base: Number.isFinite(base) ? f.amount(base) : "—" })}
         </p>
       )}
@@ -411,11 +411,11 @@ function Summary({
       </h2>
       <div className="flex flex-col gap-1.5">
         <ProgressBar pct={order.amountCents ? (after * 100) / order.amountCents : 0} tone="brand" />
-        <div className="flex justify-between gap-2 text-[12.5px] text-muted-foreground">
+        <div className="flex justify-between gap-2 text-meta text-muted-foreground">
           <span>{t("progress")}</span>
           <span className="num font-semibold text-foreground">{t("progressOf", { amount: f.amount(after), total: f.amount(order.amountCents) })}</span>
         </div>
-        <span className={cn("text-[12.5px] font-semibold", after > order.amountCents ? "text-warn" : after === order.amountCents ? "text-good" : "text-muted-foreground")}>
+        <span className={cn("text-meta font-semibold", after > order.amountCents ? "text-warn" : after === order.amountCents ? "text-good" : "text-muted-foreground")}>
           {after > order.amountCents
             ? t("over", { amount: f.amount(after - order.amountCents) })
             : after === order.amountCents
@@ -424,10 +424,10 @@ function Summary({
         </span>
       </div>
       <InvoiceAmountsList amounts={amounts} vatKind={draft.vatKind} />
-      <p className="m-0 text-[12.5px] text-muted-foreground">
+      <p className="m-0 text-meta text-muted-foreground">
         {draft.kind === "credit_note"
           ? rectifiedNumber && t("creditNote", { number: rectifiedNumber })
-          : due && t("dueNote", { date: f.shortDay(due) })}
+          : due && t("dueNote", { date: f.date(due) })}
       </p>
       <FormError namespace="purchasing.errors" error={error} />
       <div className="flex flex-col gap-2">
@@ -506,7 +506,7 @@ export default function InvoiceForm({
           editing={editing}
         />
         {locked && (
-          <p role="status" className="m-0 rounded-xl bg-warn-soft px-4 py-3 text-[13.5px] text-warn">
+          <p role="status" className="m-0 rounded-xl bg-warn-soft px-4 py-3 text-sm text-warn">
             {t("paidLocked")}
           </p>
         )}
@@ -528,7 +528,7 @@ export default function InvoiceForm({
               <section className={section} aria-labelledby="invoice-document">
                 <Heading id="invoice-document" hint={t("documentHint")}>
                   {t("documentTitle", { n: next() })}{" "}
-                  <span className="font-sans text-[13px] font-normal tracking-normal text-muted-foreground">{t("optional")}</span>
+                  <span className="font-sans text-sm font-normal tracking-normal text-muted-foreground">{t("optional")}</span>
                 </Heading>
                 <FileSlot
                   id="invoice-file"

@@ -10,7 +10,7 @@ import { isOpenRequest, requestLabel, type PurchaseRequestDetail } from "@repo/c
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cancelRequestAction, decideRequestAction } from "../../../../../../actions/purchase-requests";
 import BackLink from "../../../../../components/BackLink";
-import FormError from "../../../../../components/FormError";
+import { useConfirm } from "../../../../../components/useConfirm";
 import { useObraAction } from "../../../components/obra/useObraAction";
 import { editRequestHref, orderFromRequestHref, orderHref, requestsViewHref } from "../../../components/purchasing/links";
 import { OrderHistory } from "../../../components/purchasing/OrderViews";
@@ -37,7 +37,7 @@ export default function RequestScreen({
 }) {
   const t = useTranslations("purchasing.requests.detail");
   const decision = useObraAction();
-  const cancel = useObraAction();
+  const cancel = useConfirm("purchasing.requestErrors");
   const newOrderHref = canManage && request.status === "approved" ? orderFromRequestHref(projectId, request.id) : undefined;
 
   const actions = canManage && (
@@ -58,7 +58,14 @@ export default function RequestScreen({
           variant="ghost-destructive"
           disabled={cancel.pending}
           onClick={() =>
-            cancel.confirmThen(t("confirmCancel", { number: requestLabel(request.number) }), () => cancelRequestAction(request.id))
+            cancel.ask({
+              t,
+              key: "cancelDialog",
+              values: { number: requestLabel(request.number) },
+              keep: true,
+              destructive: true,
+              action: () => cancelRequestAction(request.id),
+            })
           }
         >
           {t("cancel")}
@@ -71,7 +78,7 @@ export default function RequestScreen({
     <div className="flex flex-col gap-[18px]">
       <BackLink href={requestsViewHref(projectId)} />
       <RequestHeading request={request} actions={actions || undefined} />
-      <FormError namespace="purchasing.requestErrors" error={cancel.state?.error} />
+      {cancel.dialog}
       <RequestLateBanner request={request} />
 
       <DecisionCard

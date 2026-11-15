@@ -18,6 +18,7 @@ import {
   registerBudgetInputAction,
 } from "../../../../actions/documents";
 import FormError from "../../../components/FormError";
+import { useConfirm } from "../../../components/useConfirm";
 import GenerationView from "../components/budget/GenerationView";
 import StartView, { type GenerateInput } from "../components/budget/StartView";
 import TabHeader from "../components/TabHeader";
@@ -45,6 +46,8 @@ export default function BudgetStartScreen({
   const router = useRouter();
   const { state, pending, run } = useObraAction();
   const docs = useObraAction<DocumentsState>();
+  const confirmRemove = useConfirm("budget.start.errors");
+  const confirmStop = useConfirm("obra.errors");
   // The page keys this screen by the run and its status: a new one starts fresh.
   const [generation, setGeneration] = useState(initial);
   const [uploading, setUploading] = useState<Partial<Record<BudgetInput, number>>>({});
@@ -105,8 +108,20 @@ export default function BudgetStartScreen({
       {active && generation ? (
         <GenerationView
           generation={generation}
-          pending={pending}
-          onCancel={canManage ? () => run(() => cancelGenerationAction(projectId, generation.id), () => router.refresh()) : undefined}
+          pending={pending || confirmStop.pending}
+          onCancel={
+            canManage
+              ? () =>
+                  confirmStop.ask({
+                    t,
+                    key: "generation.cancelDialog",
+                    keep: true,
+                    destructive: true,
+                    action: () => cancelGenerationAction(projectId, generation.id),
+                    onDone: () => router.refresh(),
+                  })
+              : undefined
+          }
         />
       ) : (
         <StartView
@@ -114,15 +129,30 @@ export default function BudgetStartScreen({
           documents={documents.filter((d) => !d.budgetInput && !d.budgetPdf)}
           uploading={uploading}
           failed={generation?.status === "failed" ? generation : null}
-          pending={pending || docs.pending}
+          pending={pending || docs.pending || confirmRemove.pending}
           error={state?.error}
           fileUrl={(doc) => `/api/v1/projects/${projectId}/documents/${doc.id}`}
           onUpload={canManage ? uploadInput : undefined}
           onChoose={canManage ? (kind, documentId) => docs.run(() => markBudgetInputAction(projectId, documentId, kind)) : undefined}
-          onRemove={canManage ? (doc) => docs.run(() => deleteProjectDocumentAction(projectId, doc.id)) : undefined}
+          onRemove={
+            canManage
+              ? (doc) => {
+                  docs.reset();
+                  confirmRemove.ask({
+                    t,
+                    key: "start.removeDialog",
+                    values: { name: doc.filename ?? doc.title },
+                    destructive: true,
+                    action: () => deleteProjectDocumentAction(projectId, doc.id),
+                  });
+                }
+              : undefined
+          }
           onGenerate={canManage ? generate : undefined}
         />
       )}
+      {confirmStop.dialog}
+      {confirmRemove.dialog}
     </div>
   );
 }

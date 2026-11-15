@@ -87,7 +87,7 @@ export function LoginForm() {
       <form action={formAction} className="mt-12 flex w-full max-w-[380px] flex-col gap-5">
         <h2 className="text-center text-xl">{t("code.title")}</h2>
         <Field>
-          <Label htmlFor="code" className="tracking-[0.08em] uppercase">
+          <Label htmlFor="code" className="text-xs tracking-[0.08em] uppercase">
             {t(recovery ? "code.recoveryLabel" : "code.label")}
           </Label>
           <Input
@@ -137,7 +137,7 @@ export function LoginForm() {
   return (
     <form action={formAction} className="mt-12 flex w-full max-w-[380px] flex-col gap-5">
       <Field>
-        <Label htmlFor="email" className="tracking-[0.08em] uppercase">
+        <Label htmlFor="email" className="text-xs tracking-[0.08em] uppercase">
           {t("emailLabel")}
         </Label>
         <Input
@@ -152,7 +152,7 @@ export function LoginForm() {
       </Field>
 
       <Field>
-        <Label htmlFor="password" className="tracking-[0.08em] uppercase">
+        <Label htmlFor="password" className="text-xs tracking-[0.08em] uppercase">
           {t("passwordLabel")}
         </Label>
         <Input

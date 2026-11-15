@@ -57,7 +57,7 @@ export default function ObraStages({
           };
         })}
       />
-      {auto.length > 0 && <p className="text-[12.5px] text-muted-foreground">{auto.join(" · ")}</p>}
+      {auto.length > 0 && <p className="text-meta text-muted-foreground">{auto.join(" · ")}</p>}
     </section>
   );
 }

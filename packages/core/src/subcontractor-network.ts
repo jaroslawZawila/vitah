@@ -14,6 +14,7 @@ import {
   or,
   projects,
   sql,
+  type SQL,
   subcontractorAssignments,
   subcontractorAudit,
   subcontractorDocumentVersions,
@@ -236,30 +237,28 @@ export const liveAssignment = (tenantId: string) =>
     inArray(subcontractorAssignments.projectId, projectIdsInTenant(tenantId)),
   );
 
-/** A company's or a worker's document, or an obra's one while the company is assigned to it. */
+/**
+ * A company's or a worker's document, or an obra's one while the company is assigned to it. An `in` over
+ * the live assignments, read once (a correlated `exists` under the `or` was planned per document, at a cost
+ * that turned JIT on: 50 ms for the tenant's 8,600 documents, 4 ms this way).
+ */
 export const liveDocument = (tenantId: string) =>
   or(
     isNull(subcontractorDocuments.projectId),
-    sql<boolean>`exists (${db
-      .select({ id: subcontractorAssignments.id })
+    sql<boolean>`(${subcontractorDocuments.subcontractorId}, ${subcontractorDocuments.projectId}) in (${db
+      .select({ subcontractorId: subcontractorAssignments.subcontractorId, projectId: subcontractorAssignments.projectId })
       .from(subcontractorAssignments)
-      .where(
-        and(
-          liveAssignment(tenantId),
-          eq(subcontractorAssignments.subcontractorId, subcontractorDocuments.subcontractorId),
-          eq(subcontractorAssignments.projectId, subcontractorDocuments.projectId),
-        ),
-      )})`,
+      .where(liveAssignment(tenantId))})`,
   );
 
 /**
- * Each document's latest version, keyed by document id. With `validatedOnly`,
- * the latest validated one of the documents whose current version isn't: the
- * only ones the rules look behind (a renewal uploaded early, or rejected),
- * and a handful among thousands.
+ * Each document's latest version, keyed by document id: of `documents` (a
+ * subquery of their ids; the tenant's every document without one). With
+ * `validatedOnly`, the latest validated one of the documents whose current
+ * version isn't: the only ones the rules look behind (a renewal uploaded
+ * early, or rejected), and a handful among thousands.
  */
-async function latestVersions(tenantId: string, documentIds: string[] | undefined, validatedOnly: boolean) {
-  if (documentIds?.length === 0) return new Map<string, VersionRow>();
+async function latestVersions(tenantId: string, documents: SQL | undefined, validatedOnly: boolean) {
   const v = subcontractorDocumentVersions;
   const rows = await db
     .selectDistinctOn([v.documentId])
@@ -267,7 +266,7 @@ async function latestVersions(tenantId: string, documentIds: string[] | undefine
     .where(
       and(
         eq(v.tenantId, tenantId),
-        documentIds ? inArray(v.documentId, documentIds) : undefined,
+        documents ? inArray(v.documentId, documents) : undefined,
         validatedOnly
           ? and(
               isNotNull(v.reviewedAt),
@@ -287,29 +286,38 @@ async function latestVersions(tenantId: string, documentIds: string[] | undefine
   return new Map(rows.map((row) => [row.documentId, row]));
 }
 
-/** Everything of the tenant's network, optionally only one company's (or a few's). */
-export async function loadNetwork(tenantId: string, subcontractorId?: string | string[]) {
-  const only = subcontractorId === undefined ? undefined : [subcontractorId].flat();
+/** The ids of the documents `where` selects, as a subquery: never a list of ids, however many. */
+const documentIds = (where: SQL | undefined) =>
+  sql`${db.select({ id: subcontractorDocuments.id }).from(subcontractorDocuments).where(where)}`;
+
+/**
+ * Everything of the tenant's network, optionally only one company's, a few's
+ * (`subcontractorId`: ids, or a subquery of them). Without `workers`, no
+ * workers: a company's warnings (but for their names and how many workers an
+ * expired document stops) and status don't need them.
+ */
+export async function loadNetwork(tenantId: string, subcontractorId?: string | string[] | SQL, { workers: withWorkers = true } = {}) {
+  const only = typeof subcontractorId === "string" ? [subcontractorId] : subcontractorId;
   const scoped = (tenantColumn: AnyColumn, subcontractorColumn: AnyColumn) =>
     and(eq(tenantColumn, tenantId), only ? inArray(subcontractorColumn, only) : undefined);
+  const docsWhere = and(scoped(subcontractorDocuments.tenantId, subcontractorDocuments.subcontractorId), liveDocument(tenantId));
+  // The versions are read beside the documents, by a subquery of theirs (without `only`, the tenant's every one).
+  const docIds = only ? documentIds(docsWhere) : undefined;
 
-  const [companies, workers, docs, assignments, projectRows] = await Promise.all([
+  const [companies, workers, docs, assignments, projectRows, versions, validated] = await Promise.all([
     db
       .select()
       .from(subcontractors)
       .where(scoped(subcontractors.tenantId, subcontractors.id))
       .orderBy(asc(subcontractors.legalName)),
-    db
-      .select()
-      .from(subcontractorWorkers)
-      .where(scoped(subcontractorWorkers.tenantId, subcontractorWorkers.subcontractorId))
-      .orderBy(asc(subcontractorWorkers.surnames), asc(subcontractorWorkers.firstName)),
-    db
-      .select()
-      .from(subcontractorDocuments)
-      .where(
-        and(scoped(subcontractorDocuments.tenantId, subcontractorDocuments.subcontractorId), liveDocument(tenantId)),
-      ),
+    withWorkers
+      ? db
+          .select()
+          .from(subcontractorWorkers)
+          .where(scoped(subcontractorWorkers.tenantId, subcontractorWorkers.subcontractorId))
+          .orderBy(asc(subcontractorWorkers.surnames), asc(subcontractorWorkers.firstName))
+      : [],
+    db.select().from(subcontractorDocuments).where(docsWhere),
     db
       .select()
       .from(subcontractorAssignments)
@@ -321,11 +329,8 @@ export async function loadNetwork(tenantId: string, subcontractorId?: string | s
       .from(projects)
       .where(projectsInTenant(tenantId))
       .orderBy(asc(projects.ref)),
-  ]);
-  const ids = only ? docs.map((d) => d.id) : undefined;
-  const [versions, validated] = await Promise.all([
-    latestVersions(tenantId, ids, false),
-    latestVersions(tenantId, ids, true),
+    latestVersions(tenantId, docIds, false),
+    latestVersions(tenantId, docIds, true),
   ]);
   return new Network(companies, workers, docs, versions, validated, assignments, projectRows, todayInSpain());
 }
@@ -337,30 +342,25 @@ export async function loadNetwork(tenantId: string, subcontractorId?: string | s
  * rows `loadNetwork` reads.
  */
 export async function loadCompanyStatuses(tenantId: string, subcontractorIds?: string[]): Promise<Pick<Network, "companies" | "status">> {
+  if (subcontractorIds?.length === 0) return new Network([], [], [], new Map(), new Map(), [], [], todayInSpain());
   const only = (column: AnyColumn) => (subcontractorIds ? inArray(column, subcontractorIds) : undefined);
-  const [companies, docs] =
-    subcontractorIds?.length === 0
-      ? [[], []]
-      : await Promise.all([
-          db
-            .select()
-            .from(subcontractors)
-            .where(and(eq(subcontractors.tenantId, tenantId), only(subcontractors.id)))
-            .orderBy(asc(subcontractors.legalName)),
-          db
-            .select()
-            .from(subcontractorDocuments)
-            .where(
-              and(
-                eq(subcontractorDocuments.tenantId, tenantId),
-                only(subcontractorDocuments.subcontractorId),
-                isNull(subcontractorDocuments.workerId),
-                isNull(subcontractorDocuments.projectId),
-              ),
-            ),
-        ]);
-  const ids = docs.map((d) => d.id);
-  const [versions, validated] = await Promise.all([latestVersions(tenantId, ids, false), latestVersions(tenantId, ids, true)]);
+  const companyDocs = and(
+    eq(subcontractorDocuments.tenantId, tenantId),
+    only(subcontractorDocuments.subcontractorId),
+    isNull(subcontractorDocuments.workerId),
+    isNull(subcontractorDocuments.projectId),
+  );
+  const docIds = documentIds(companyDocs);
+  const [companies, docs, versions, validated] = await Promise.all([
+    db
+      .select()
+      .from(subcontractors)
+      .where(and(eq(subcontractors.tenantId, tenantId), only(subcontractors.id)))
+      .orderBy(asc(subcontractors.legalName)),
+    db.select().from(subcontractorDocuments).where(companyDocs),
+    latestVersions(tenantId, docIds, false),
+    latestVersions(tenantId, docIds, true),
+  ]);
   return new Network(companies, [], docs, versions, validated, [], [], todayInSpain());
 }
 

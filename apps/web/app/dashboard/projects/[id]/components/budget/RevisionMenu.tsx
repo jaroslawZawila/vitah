@@ -37,7 +37,7 @@ export default function RevisionMenu({
         number={revision.number}
         status={revision.status}
         render={<button type="button" aria-expanded={open} aria-haspopup="dialog" onClick={() => setOpen(!open)} />}
-        className="min-h-8 cursor-pointer pr-2.5 pl-3 text-[13px] hover:brightness-95 pointer-coarse:min-h-11"
+        className="min-h-8 cursor-pointer pr-2.5 pl-3 text-sm hover:brightness-95 pointer-coarse:min-h-11"
       >
         <ChevronDown aria-hidden className={cn("transition-transform", open && "rotate-180")} />
       </RevisionPill>
@@ -58,9 +58,9 @@ export default function RevisionMenu({
                   <Check aria-hidden className={cn("size-4 flex-none text-brand-ink", !current && "invisible")} />
                   <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                     <RevisionPill number={r.number} status={r.status} />
-                    <span className="text-xs text-muted-foreground">{dates(r)}</span>
+                    <span className="text-meta text-muted-foreground">{dates(r)}</span>
                   </span>
-                  <span className="num text-[12.5px] whitespace-nowrap">{f.money(r.totalCents)}</span>
+                  <span className="num text-meta whitespace-nowrap">{f.money(r.totalCents)}</span>
                 </Link>
               </li>
             );

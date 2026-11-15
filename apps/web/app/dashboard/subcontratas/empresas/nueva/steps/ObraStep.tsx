@@ -21,7 +21,7 @@ export function ObraStep({ draft, onChange, options }: CompanyStepProps) {
 
   return (
     <div className="flex flex-col gap-4">
-      <p className="text-[13px] text-muted-foreground">{t("intro")}</p>
+      <p className="text-sm text-muted-foreground">{t("intro")}</p>
       <Field>
         <Label htmlFor="obra-project">{t("project")}</Label>
         <NativeSelect

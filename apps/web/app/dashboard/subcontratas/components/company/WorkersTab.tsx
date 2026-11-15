@@ -41,7 +41,7 @@ export default function WorkersTab({
         )}
       </div>
       {workers.length === 0 ? (
-        <p className="py-6 text-center text-[13.5px] text-muted-foreground">{t("empty")}</p>
+        <p className="py-6 text-center text-sm text-muted-foreground">{t("empty")}</p>
       ) : (
         <Table className="min-w-[760px]">
           <TableHeader>
@@ -63,7 +63,7 @@ export default function WorkersTab({
                     <Link href={workerHref(w.id)} className="font-semibold hover:underline hover:underline-offset-3">
                       {workerName(w)}
                     </Link>
-                    <div className="num text-[12.5px] text-muted-foreground">{w.idDocumentMasked}</div>
+                    <div className="num text-meta text-muted-foreground">{w.idDocumentMasked}</div>
                   </TableCell>
                   <TableCell className="whitespace-normal">
                     {[w.trade && ts(`trades.${w.trade}`), w.category && ts(`categories.${w.category}`)]
@@ -76,7 +76,7 @@ export default function WorkersTab({
                   </TableCell>
                   <TableCell className="whitespace-normal">
                     <AccessBadge status={w.access.status} />
-                    {failing && <div className="mt-0.5 text-[12.5px] text-muted-foreground">{reason(failing, kind)}</div>}
+                    {failing && <div className="mt-0.5 text-meta text-muted-foreground">{reason(failing, kind)}</div>}
                   </TableCell>
                 </TableRow>
               );

@@ -57,6 +57,11 @@ export async function updateRevisionAction(projectId: string, revisionId: string
   return mutate(projectId, (ctx) => svc.updateRevision(ctx, projectId, revisionId, input));
 }
 
+/** "Usar los datos del proyecto": the draft's cover takes the project's client and address. */
+export async function takeProjectDataAction(projectId: string, revisionId: string): Promise<ObraState> {
+  return mutate(projectId, (ctx) => svc.takeProjectData(ctx, projectId, revisionId));
+}
+
 export async function deleteRevisionAction(projectId: string, revisionId: string): Promise<ObraState> {
   return mutate(projectId, (ctx) => svc.deleteRevision(ctx, projectId, revisionId));
 }

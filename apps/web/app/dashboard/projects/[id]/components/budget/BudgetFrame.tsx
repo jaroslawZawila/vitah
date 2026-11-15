@@ -90,7 +90,7 @@ export default function BudgetFrame({
               hrefOf={revisionHref}
             />
             {viewingOld && (
-              <span className="inline-flex items-center gap-1.5 text-[13px] text-muted-foreground">
+              <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
                 <Lock aria-hidden className="size-3.5" />
                 {t("readOnly")}
                 <Link href={revisionHref(newest.id)} className="font-semibold text-brand-ink hover:underline">
@@ -99,7 +99,7 @@ export default function BudgetFrame({
               </span>
             )}
           </div>
-          <p className="mt-1.5 text-[13px] text-muted-foreground">
+          <p className="mt-1.5 text-sm text-muted-foreground">
             {summary.join(" · ")}
             {revision.status === "draft" && (
               <span className={cn("ml-2", saving ? "text-muted-foreground" : "text-good")} aria-live="polite">
@@ -138,7 +138,7 @@ export default function BudgetFrame({
           >
             {t(`tabs.${key}`)}
             {counts[key] !== undefined && (
-              <span className="rounded-full bg-raise px-1.5 font-mono text-[11px] text-muted-foreground">{counts[key]}</span>
+              <span className="rounded-full bg-raise px-1.5 font-mono text-xs text-muted-foreground">{counts[key]}</span>
             )}
           </Link>
         ))}
