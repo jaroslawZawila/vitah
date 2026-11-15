@@ -2,7 +2,7 @@ import { usersService } from "@repo/core";
 import { readJson, withContext } from "../../../../../lib/api";
 
 // Admin only (403 otherwise).
-// PATCH /api/v1/users/:id  body { role?, active? } → { id }
+// PATCH /api/v1/users/:id  body { role?, active?, phone? } (phone null clears it) → { id }
 
 type Params = { params: Promise<{ id: string }> };
 

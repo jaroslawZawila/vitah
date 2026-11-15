@@ -1,4 +1,5 @@
 import { and, asc, db, eq, isClientUser, isNotNull, isNull, projects, users, sql, type AnyColumn, type SQL } from "@repo/db";
+import { lapseApprovals } from "./budget-approvals";
 import { markChanged } from "./changes";
 import { requireAdmin, type Ctx } from "./context";
 import { CHANGE_AREAS, type ClientOption, type ProjectClientError } from "./contract";
@@ -91,7 +92,11 @@ export async function listAssignableClients(ctx: Ctx): Promise<ClientOption[]> {
     .orderBy(asc(users.name), asc(users.email));
 }
 
-/** Attaches an existing client to the project. Body: { clientId } */
+/**
+ * Attaches an existing client to the project. Body: { clientId }. A request to
+ * approve a budget revision still waiting (asked of a client since removed, or
+ * one whose account was deleted) lapses: the new client is asked anew.
+ */
 export async function assignProjectClient(
   ctx: Ctx,
   projectId: string,
@@ -116,8 +121,9 @@ export async function assignProjectClient(
       .update(projects)
       .set({ clientUserId: clientId, updatedAt: new Date() })
       .where(projectInTenant(ctx.tenantId, projectId));
+    await lapseApprovals(tx, projectId, ctx.userId);
   });
-  // A client removed and attached again between two polls still reloads.
+  // A client removed and attached again between two polls still reloads (the obra too: a request lapsed).
   await markChanged(ctx.tenantId, projectId, CHANGE_AREAS);
 
   return { projectId };
@@ -126,18 +132,24 @@ export async function assignProjectClient(
 /**
  * Detaches the project's client. Their account stays (see the Clients tab);
  * the app shows them their other projects, or none until they get another one.
+ * A request asked of them to approve a budget revision, still waiting, lapses.
  */
 export async function unassignProjectClient(ctx: Ctx, projectId: string) {
   requireAdmin(ctx);
 
-  const updated = await db
-    .update(projects)
-    .set({ clientUserId: null, updatedAt: new Date() })
-    .where(
-      and(projectInTenant(ctx.tenantId, projectId), isNotNull(projects.clientUserId)),
-    )
-    .returning({ id: projects.id });
-  if (updated.length === 0) fail("no_client");
+  const lapsed = await db.transaction(async (tx) => {
+    // The project's row first, as every write on those requests takes it.
+    const updated = await tx
+      .update(projects)
+      .set({ clientUserId: null, updatedAt: new Date() })
+      .where(
+        and(projectInTenant(ctx.tenantId, projectId), isNotNull(projects.clientUserId)),
+      )
+      .returning({ id: projects.id });
+    if (updated.length === 0) fail("no_client");
+    return lapseApprovals(tx, projectId, ctx.userId);
+  });
+  if (lapsed > 0) await markChanged(ctx.tenantId, projectId, ["obra"]);
 
   return { projectId };
 }

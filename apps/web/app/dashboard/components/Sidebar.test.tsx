@@ -91,6 +91,7 @@ describe("Sidebar", () => {
       ["Compras", "/dashboard/projects/p-1/compras"],
       ["Pagos", "/dashboard/projects/p-1/payments"],
       ["Documentos", "/dashboard/projects/p-1/documents"],
+      ["Garantía", "/dashboard/projects/p-1/garantia"],
     ]);
     expect(tabs.getByRole("link", { current: "page" })).toHaveTextContent(current);
   });
@@ -203,6 +204,13 @@ describe("Sidebar", () => {
     fireEvent.click(screen.getAllByRole("button", { name: /Ajustes/ })[0]!);
     expect(await screen.findByRole("menuitem", { name: "Cambiar contraseña" })).toBeInTheDocument();
     expect(screen.queryByRole("menuitem", { name: "Elementos eliminados" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Contacto para clientes" })).not.toBeInTheDocument();
+  });
+
+  it("offers the office the client's app shows in the settings menu, to admins", async () => {
+    renderAt("/dashboard/projects");
+    fireEvent.click(screen.getAllByRole("button", { name: /Ajustes/ })[0]!);
+    expect(await screen.findByRole("menuitem", { name: "Contacto para clientes" })).toHaveAttribute("href", "/dashboard/contacto");
   });
 
   it.each([

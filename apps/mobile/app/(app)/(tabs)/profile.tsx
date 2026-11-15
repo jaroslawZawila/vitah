@@ -1,27 +1,41 @@
 import Feather from "@react-native-vector-icons/feather";
 import Constants from "expo-constants";
-import { useRouter } from "expo-router";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useFocusEffect, useRouter } from "expo-router";
+import { useCallback, useRef } from "react";
+import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { AppLanguage } from "@repo/core/contract";
+import { DeletionRequestFoot } from "../../../components/deletion-request";
 import { NotificationSettings } from "../../../components/notification-settings";
 import { Marker } from "../../../components/obra-parts";
 import { homeStatus, street, useSeveralHomes } from "../../../components/project-switch";
 import { ToggleRow, styles as rowStyles } from "../../../components/toggle-row";
+import { HELP_URL, PRIVACY_URL } from "../../../constants/links";
 import { colors, spacing, type } from "../../../constants/theme";
+import { api } from "../../../lib/api";
 import { useAppLock } from "../../../lib/app-lock";
 import { useAuth } from "../../../lib/auth";
-import { useI18n } from "../../../lib/i18n";
+import { useI18n, type MessageKey } from "../../../lib/i18n";
+import { useClientData } from "../../../lib/use-client-data";
 import { useProject } from "../../../lib/use-project";
 
-// Tab "Perfil" — doc/mobile-app-design/A-Settings.dc.html. Help and privacy
-// links are left out until those pages exist. A client with several homes
-// also picks the one shown here (A-Viviendas.dc.html, "Mis viviendas").
+// Tab "Perfil" — doc/mobile-app-design/A-Settings.dc.html. The help and
+// privacy rows show only when the build sets their pages (constants/links.ts).
+// A client with several homes also picks the one shown here
+// (A-Viviendas.dc.html, "Mis viviendas"). At the foot, not in the mockup: asking
+// for the account to be deleted (components/deletion-request.tsx).
 
 const LANGUAGES: { id: AppLanguage; label: string }[] = [
   { id: "es", label: "Español" },
   { id: "en", label: "English" },
 ];
+
+const links = (): { url: string | null; label: MessageKey }[] => [
+  { url: HELP_URL, label: "account.help" },
+  { url: PRIVACY_URL, label: "account.privacy" },
+];
+
+const getSettings = (token: string) => api.getSettings(token);
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
@@ -32,6 +46,18 @@ export default function ProfileScreen() {
   const { project: shown, projects = [], select } = useProject();
   const several = useSeveralHomes();
   const displayName = user?.name || user?.email || "";
+  const settings = useClientData(getSettings);
+
+  // Back from asking for the account to be deleted (or from another tab): where it stands now.
+  const { reload } = settings;
+  const focusedBefore = useRef(false);
+  useFocusEffect(
+    useCallback(() => {
+      // The first time, useClientData is already loading.
+      if (focusedBefore.current) void reload();
+      focusedBefore.current = true;
+    }, [reload]),
+  );
 
   return (
     <ScrollView
@@ -125,15 +151,35 @@ export default function ProfileScreen() {
         )}
       </View>
 
-      {token && <NotificationSettings token={token} allHomes={several} />}
+      {token && <NotificationSettings token={token} saved={settings.data} allHomes={several} />}
 
-      <Pressable
-        onPress={() => void signOut()}
-        accessibilityRole="button"
-        style={({ pressed }) => [styles.signOut, pressed && { opacity: 0.6 }]}
-      >
-        <Text style={styles.signOutText}>{t("profile.signOut")}</Text>
-      </Pressable>
+      <View>
+        {links().map(
+          ({ url, label }) =>
+            url && (
+              <Pressable
+                key={label}
+                onPress={() => void Linking.openURL(url).catch(() => {})}
+                accessibilityRole="link"
+                style={({ pressed }) => [styles.linkRow, pressed && { opacity: 0.6 }]}
+              >
+                <Text style={styles.rowText}>{t(label)}</Text>
+              </Pressable>
+            ),
+        )}
+        <Pressable
+          onPress={() => void signOut()}
+          accessibilityRole="button"
+          style={({ pressed }) => [styles.signOut, pressed && { opacity: 0.6 }]}
+        >
+          <Text style={styles.signOutText}>{t("profile.signOut")}</Text>
+        </Pressable>
+      </View>
+
+      {/* Only once the server says where the request stands (an older one doesn't). */}
+      {settings.data?.deletionRequestedAt !== undefined && (
+        <DeletionRequestFoot requestedAt={settings.data.deletionRequestedAt} onChanged={settings.reload} />
+      )}
 
       <Text style={styles.version}>
         {t("profile.version", { version: Constants.expoConfig?.version ?? "" })}
@@ -168,6 +214,7 @@ const styles = StyleSheet.create({
   segmentText: { fontSize: 15, color: colors.blancoCalido },
   rowText: { flex: 1, fontSize: 15, color: colors.blancoCalido },
   homeRow: { minHeight: 68, paddingVertical: 10 },
+  linkRow: { minHeight: 52, justifyContent: "center", borderBottomWidth: 1, borderColor: colors.divider },
   viewing: { ...type.label, letterSpacing: 1.8, color: colors.verdeOlivaLight },
   signOut: { minHeight: 52, justifyContent: "center" },
   signOutText: { fontSize: 15, color: colors.destructive },

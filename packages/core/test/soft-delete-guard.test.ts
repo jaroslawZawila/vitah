@@ -60,9 +60,11 @@ describe("soft deletion in the codebase", () => {
     expect(under.sort()).toEqual(
       [
         "aiUsage",
+        "budgetApprovals",
         "budgetChapters",
         "budgetGenerations",
         "budgetLines",
+        "budgetRevisionChanges",
         "budgetRevisions",
         "obraChapterProgress",
         "obraHitoChapters",
@@ -97,6 +99,9 @@ describe("soft deletion in the codebase", () => {
         "subcontractorAssignments",
         "subcontractorDocumentVersions",
         "subcontractorDocuments",
+        "warrantyClaimEvents",
+        "warrantyClaimPhotos",
+        "warrantyClaims",
       ].sort(),
     );
     const narrowing = Object.fromEntries(schema.soft.map((t) => [t, [...schema.tables.get(t)!.scoping].sort()]));

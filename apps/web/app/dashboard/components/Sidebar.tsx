@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState, useTransition } from "react";
 import { useParams, usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { ArchiveRestore, Contact, FolderKanban, HardHat, KeyRound, LogOut, Settings, ShieldCheck, ShoppingCart, UserCog } from "lucide-react";
+import { ArchiveRestore, Building2, Contact, FolderKanban, HardHat, KeyRound, LogOut, Settings, ShieldCheck, ShoppingCart, UserCog } from "lucide-react";
 import { APP_LANGUAGES, type AppLanguage, type MfaStatus, type PurchasingCounts, type SubcontractorCounts } from "@repo/core/contract";
 import {
   DropdownMenu,
@@ -39,6 +39,9 @@ const SUBCONTRACTORS_HREF = "/dashboard/subcontratas";
 
 /** What users deleted, for an admin to restore: reached from the settings menu, not a rail section. */
 const DELETED_HREF = "/dashboard/eliminados";
+
+/** The office the client's app shows on Contacto, for an admin to set: also in the settings menu. */
+const OFFICE_CONTACT_HREF = "/dashboard/contacto";
 
 /** The Subcontratas section's pages, nested under it in the rail's "Red" group. */
 const SUBCONTRACTOR_TABS = [
@@ -258,6 +261,12 @@ function SettingsMenu({
           <DropdownMenuItem onClick={onTwoStep}>
             <ShieldCheck aria-hidden strokeWidth={1.8} />
             {t("twoStep")}
+          </DropdownMenuItem>
+        )}
+        {isAdmin && (
+          <DropdownMenuItem render={<Link href={OFFICE_CONTACT_HREF} />}>
+            <Building2 aria-hidden strokeWidth={1.8} />
+            {t("officeContact")}
           </DropdownMenuItem>
         )}
         {isAdmin && (

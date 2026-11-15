@@ -3,7 +3,7 @@
     "name": "ViTAH",
     "slug": "vitah-app",
     "scheme": "vitah",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
     "icon": "./assets/icon.png",
@@ -33,7 +33,15 @@
           "faceIDPermission": "ViTAH usa Face ID para proteger el acceso a tu proyecto."
         }
       ],
-      "expo-font"
+      "expo-font",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "ViTAH usa tus fotos para adjuntarlas a una solicitud de garantía.",
+          "cameraPermission": "ViTAH usa la cámara para fotografiar lo que quieres que revisemos en garantía.",
+          "microphonePermission": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

@@ -52,6 +52,7 @@ import { chapterState, chapterTiming, contractTotals, deviation, milestoneState 
 import { idempotent } from "./idempotency";
 import { MAX_TEXT } from "./input";
 import { changesOf, parse } from "./inputs/fields";
+import { revisionsOfChanges } from "./budget-approvals";
 import { chapterCorrectionSchema, chapterDateSchema, issueChangesSchema, issueListSchema, newIssueSchema } from "./inputs/construction";
 import { fail, loadObra, requireProject, userName } from "./obra-data";
 import { todayInSpain } from "./obra-calc";
@@ -288,6 +289,8 @@ async function issueRows(ctx: Ctx, projectId: string, where?: ReturnType<typeof 
     .where(and(issuesOf(ctx, projectId), where))
     .orderBy(desc(obraIssues.occurredOn), desc(obraIssues.createdAt));
   const files = new Map<string, IssueFile[]>();
+  const changes = rows.filter((r) => r.issue.kind === "change").map((r) => r.issue.id);
+  const revisions = await revisionsOfChanges(ctx.tenantId, changes);
   if (rows.length > 0) {
     const fileRows = await db
       .select()
@@ -317,6 +320,7 @@ async function issueRows(ctx: Ctx, projectId: string, where?: ReturnType<typeof 
     scheduleImpactDays: issue.scheduleImpactDays,
     status: issue.status,
     files: files.get(issue.id) ?? [],
+    revisions: revisions.get(issue.id) ?? [],
     createdBy: by,
     createdAt: issue.createdAt.toISOString(),
     updatedAt: issue.updatedAt.toISOString(),

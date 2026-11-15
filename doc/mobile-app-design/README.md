@@ -28,7 +28,23 @@ seed. In the app every string goes through i18n (`es` + `en`), and data comes fr
 | `A-Settings.dc.html` | Ajustes / Perfil | Profile, language (ES/EN), change password, Face ID, notification toggles, help, logout | Tab **Perfil** |
 | `A-Password.dc.html` | Cambiar contraseña | Current / new / repeat, strength meter | Settings |
 | `A-Warranty.dc.html` | Solicitud de garantía | LOE coverage (1/3/10 años), type chips, room, description, photos, urgent flag, "Mis solicitudes" | Home shortcut, Contact |
-| `A-Contact.dc.html` | Contacto | Site manager card (call / message / email), book a site visit, office info | Home shortcut |
+| `A-Contact.dc.html` | Contacto | Site manager card (call / message / email), book a site visit, office info | Home shortcut, Hito "Contactar" |
+
+**Contacto as built (2026-11-15):** the site manager card has **Llamar** and **Correo** only (an action whose data
+staff left blank is not drawn), with no availability line ("Disponible · responde en ~2 h" has no source). The
+**Mensaje** action and **Visita tu obra** (slots, "Solicitar visita") are left out: the platform has no messaging or
+site visits yet. The office rows are address, phone (tap to call), email (tap to write) and hours, under "OFICINA
+{company}"; its last row, "Abrir una solicitud de garantía", opens the Garantía screen. With nothing entered
+by the builder, the screen says so in one line under the title.
+
+### Garantía as built (2026-11-15)
+
+`app/(app)/warranty/` follows `A-Warranty.dc.html` with these differences: the room is a row of chips like the type
+(the app has no dropdown), the coverage tiles show each period's end once the home is handed over, and before hand-over
+the screen only explains that the guarantee starts then (no form). Not drawn, in the same language: **Mis solicitudes**
+(rows: GAR-001 · kind, status · day · urgent, the builder's last answer) and **one claim** (status pill, visit day and
+answer in a card, description, photos, history "Tú / ViTAH", "Cancelar solicitud" in the bottom bar while nobody has
+started on it).
 
 ### Several homes (approved 2026-11-04)
 
@@ -48,9 +64,52 @@ of all when every one is). One home is shown across Inicio, Obra, Fotos and Docu
 (Fase, Pagos, Hito) belong to it and have no switch. A notification names its home (its ref after the
 title) and opens the app on it. Each home's documents are kept offline.
 
+### Cambio para aprobar (2026-11-15, no mockup)
+
+When staff ask the client to approve a priced change to the contract (a budget revision from Rev.1 on), Inicio
+shows a card right below the project card, and nothing when there is none. It extends the language of
+`A-Hito` and `A-Obra-Pagos`:
+
+- **Card (Inicio):** the standard card with a `verdeOliva` border (an action waiting), a 10 pt label
+  "CAMBIO PARA APROBAR · REV.2" in `verdeOlivaLight`, the reason for the change (16 pt), the difference in muted
+  meta ("+500,00 € sobre tu contrato, sin IVA"), the link "Revisar y responder" and a trailing chevron. A push
+  ("Cambio para aprobar") opens the screen directly.
+- **Screen `aprobacion` (pushed, back "Inicio", no tab bar):** label "CAMBIO EN TU CONTRATO · REV.2", title
+  "¿Apruebas este cambio?", "MOTIVO DEL CAMBIO", the team's message in a card, then an amounts card like the Hito's:
+  "Contrato actual", "Con este cambio", a rule, "DIFERENCIA" in 26/300, and a meta line with the difference with VAT.
+  Then "QUÉ CAMBIA" (CAM-004 rows), "OPCIONES INCLUIDAS" and the budget's PDF row (file icon, download icon) opened
+  like Documentos. A muted note says the answer is recorded and the team registers the acceptance.
+- **Fixed bottom bar:** "Rechazar" (secondary) and "Aprobar" (primary). Either swaps the bar to "Cancelar" + "Confirmar"
+  / "Enviar" and shows one field above the note: "TU CONTRASEÑA" to approve, "MOTIVO DEL RECHAZO" (multiline) to
+  reject. Once sent, the screen says "Has aprobado / rechazado el cambio" with one button, "Volver al inicio", and the
+  card goes.
+
 Navigation: bottom tab bar with 5 tabs (Inicio · Obra · Fotos · Documentos · Perfil). Warranty,
 Contact and Password are pushed screens with a back chevron and no tab bar. Primary actions in
 pushed screens sit in a fixed bottom bar.
+
+### Offline (no mockup: extends the same language)
+
+Inicio, Obra and Fotos open on the last data the phone loaded, then refresh. When the refresh fails for
+lack of a connection the stored data stays and a quiet note sits under the header: a 14 px `wifi-off`
+line icon in muted and "Sin conexión · datos del 22 sept, 14:05" (13 px muted, no colour, no banner, no
+alert tone). It goes as soon as the network answers; without stored data the usual error with "Reintentar"
+shows. A photo never downloaded shows a surface-coloured tile with a muted `image` icon, never an error.
+
+### Store release (2026-11-15): where the app differs from the mockups
+
+- **Acceso:** "¿Has olvidado tu contraseña?" as drawn; tapping it unfolds a short note under it (the
+  builder sets a new password; there is no reset email), muted 13 pt, centred. Tapping again folds it.
+- **Perfil:** the three notification toggles as drawn; "Mensajes del equipo" covers a change to approve
+  and the answer to a warranty claim. "Ayuda y preguntas frecuentes" and "Privacidad y datos" are drawn as in the
+  mockup (52 pt rows, no icon, above "Cerrar sesión") but each shows only when the build sets its page.
+- **Perfil, foot (not drawn):** below "Cerrar sesión", a quiet row "Solicitar la baja de mi cuenta"
+  (14 pt, `muted`). Once asked: "Baja solicitada el 12 nov 2026" (15 pt), a meta line, and "Retirar
+  la solicitud" in `verdeOlivaLight`.
+- **Solicitar la baja (not drawn):** a pushed screen like the others: back link "Perfil", title
+  (30/300), an intro and three points with a small `verdeOlivaLight` dot (the builder is told and will
+  get in touch; the account stays active and the request can be withdrawn; contract documents may
+  have to be kept by law), and "Solicitar la baja" as the primary button in the bottom bar.
 
 ## Visual language
 
@@ -124,5 +183,6 @@ feature is built:
 - Photo updates: date, week, phase, caption, author, photos.
 - Documents: category, type, size, date, "new" flag, locked-until-handover flag, download URL.
 - Warranty claims: type, room, description, photos, urgent flag, status list ("Mis solicitudes").
-- Assigned site manager (name, phone, email, availability), office info, visit slots and requests.
+- Assigned site manager (name, phone, email, availability), office info, visit slots and requests. *Built: site
+  manager (name, phone, email) and office info (`GET /api/mobile/contact`); not yet: availability, visits.*
 - Client profile (name, email), password change, notification preferences, language preference.

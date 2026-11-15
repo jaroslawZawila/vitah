@@ -1,6 +1,7 @@
 // Part of @repo/core/contract (../contract.ts re-exports it): shared with the
 // mobile app and browser code, so it never imports server-only code or zod.
 
+import type { BudgetApproval, LinkedChange } from "./budget-approvals";
 import type { BudgetRevisionStatus, ProgressStatus } from "./obra";
 
 // ─── Budget in the FRAMER model (features/budget/TECH_DESIGN.md) ─────────────
@@ -228,7 +229,13 @@ export type BudgetRevision = BudgetRevisionSummary & {
   acceptedByUser: { id: string; name: string } | null;
   /** The client's signed copy among the project's documents, if one was filed. */
   signedDocumentId: string | null;
+  /** The client's approval in the app registered as proof of the acceptance (beside the signed copy). */
+  acceptedApprovalId: string | null;
   rejectedOn: string | null;
+  /** The changes (CAM-) it prices: from Rev.1 on. */
+  changes: LinkedChange[];
+  /** Its requests to the client to approve it in the app, newest first. */
+  approvals: BudgetApproval[];
   /** The PDFs stored when it was issued (document ids). */
   pdfs: Record<BudgetPdfKind, string | null>;
   checks: BudgetCheck[];

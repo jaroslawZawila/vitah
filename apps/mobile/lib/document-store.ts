@@ -5,8 +5,16 @@ import { downloadWithToken } from "./download";
 
 // Offline copies of the client's documents, one folder per home (project):
 // each PDF plus a manifest (the last list from the server and which documents
-// were opened) in the app's private document directory. Every home's copies
-// stay until it is no longer the client's; everything is wiped on sign-out.
+// were opened). Every home's copies stay until it is no longer the client's;
+// everything is wiped on sign-out.
+//
+// They live in the app's cache directory, which device backups leave out
+// (iOS: Library/Caches, never in iCloud or computer backups; Android: the
+// cache dir, never in Auto Backup or a device transfer): contracts and
+// invoices must not travel unencrypted in a backup. The OS may empty it when
+// the phone runs short of space; the next sync (app open, foreground, pull to
+// refresh) downloads them again. Builds before this kept them in the document
+// directory, which iOS backs up: the first run moves them here.
 
 export type LocalDocument = MobileDocument & {
   /** The PDF is on the phone. */
@@ -17,7 +25,37 @@ export type LocalDocument = MobileDocument & {
 
 type Manifest = { documents: MobileDocument[]; seen: string[] };
 
-const root = () => new Directory(Paths.document, "documents");
+const place = () => new Directory(Paths.cache, "documents");
+/** Where earlier builds kept them: backed up on iOS. */
+const formerPlace = () => new Directory(Paths.document, "documents");
+
+let moved = false;
+/**
+ * Takes the copies out of the backed-up document directory, once per run:
+ * moved whole when there is nothing here yet (the manifests keep which were
+ * opened), else dropped. Should moving fail they are dropped too, and the
+ * next sync downloads them again.
+ */
+function leaveBackups() {
+  moved = true;
+  try {
+    if (!formerPlace().exists) return;
+    try {
+      if (!place().exists) formerPlace().moveSync(place());
+    } finally {
+      // A fresh handle: a moved one points at its new place.
+      const left = formerPlace();
+      if (left.exists) left.delete();
+    }
+  } catch {
+    // Never worth stopping the app for: tried again on its next run.
+  }
+}
+
+const root = () => {
+  if (!moved) leaveBackups();
+  return place();
+};
 const folder = (projectId: string) => new Directory(root(), projectId);
 
 // Bumped on sign-out, so a sync still running for the previous client knows

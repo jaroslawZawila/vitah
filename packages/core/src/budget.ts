@@ -24,6 +24,7 @@ import {
 } from "./budget-template";
 import {
   chapterInProject,
+  chosenOptions,
   draftLine,
   inDraft,
   linesInProject,
@@ -33,6 +34,7 @@ import {
   revisionInProject,
   syncDraft,
 } from "./budget-draft";
+import { approvalAsProof, lapseApprovals, lockProjectRow, revisionApprovals } from "./budget-approvals";
 import { compareIdentity, projectIdentity, withProjectIdentity } from "./budget-identity";
 import { computeChecks, reviewedKeys, tenantRatios } from "./budget-review";
 import { markChanged } from "./changes";
@@ -261,7 +263,7 @@ export async function revisionView(
   previous: RevisionRow | undefined,
   totals: Map<string, number>,
 ): Promise<BudgetRevision> {
-  const [loaded, before, hitoOf, pdfs, ratios, names, project] = await Promise.all([
+  const [loaded, before, hitoOf, pdfs, ratios, names, project, consent] = await Promise.all([
     loadChapters(row.id),
     previous ? loadChapters(previous.id) : null,
     hitoByChapter(row.projectId),
@@ -269,6 +271,7 @@ export async function revisionView(
     row.model === BUDGET_MODEL ? tenantRatios(row.tenantId, row.projectId) : {},
     userNamesById(row.tenantId, [row.acceptedByUserId]),
     row.model === BUDGET_MODEL ? projectIdentity(row.tenantId, row.projectId) : null,
+    revisionApprovals(row.tenantId, row.id),
   ]);
   const registrar = row.acceptedByUserId === null ? undefined : names.get(row.acceptedByUserId);
   const priced = withPrices(loaded, row);
@@ -319,7 +322,10 @@ export async function revisionView(
     acceptedBy: row.acceptedBy,
     acceptedByUser: registrar === undefined ? null : { id: row.acceptedByUserId!, name: registrar },
     signedDocumentId: row.acceptedDocumentId,
+    acceptedApprovalId: row.acceptedApprovalId,
     rejectedOn: row.rejectedOn,
+    changes: consent.changes,
+    approvals: consent.approvals,
     pdfs,
     checks: framer
       ? computeChecks({ texts, chapters: budgetChapters, ratios, done: reviewedKeys(row.review) })
@@ -609,24 +615,6 @@ export async function updateRevision(
   return { revisionId };
 }
 
-/** The options chosen (`chosenOptionIds`): options of this revision. */
-async function chosenOptions(revisionId: string, chosenIds: string[]): Promise<Set<string>> {
-  const ids = new Set(chosenIds);
-  if (ids.size === 0) return ids;
-  const found = await db
-    .select({ id: budgetChapters.id })
-    .from(budgetChapters)
-    .where(
-      and(
-        eq(budgetChapters.revisionId, revisionId),
-        eq(budgetChapters.kind, "option"),
-        inArray(budgetChapters.id, [...ids]),
-      ),
-    );
-  if (found.length !== ids.size) fail("not_found");
-  return ids;
-}
-
 /**
  * Makes an issued revision the contract, and keeps the proof of it: the day
  * the client accepted (`acceptedOn`: today unless given, never after today nor
@@ -672,6 +660,8 @@ export async function acceptRevision(
         });
 
   const accept = () => db.transaction(async (tx) => {
+    // The project, then the revision, as every write on the client's requests (budget-approvals.ts).
+    await lockProjectRow(tx, ctx.tenantId, projectId);
     const [locked] = await tx
       .select({ status: budgetRevisions.status, issuedOn: budgetRevisions.issuedOn })
       .from(budgetRevisions)
@@ -726,8 +716,12 @@ export async function acceptRevision(
         acceptedBy,
         acceptedByUserId: ctx.userId,
         acceptedDocumentId: signed?.row.id ?? null,
+        // The client's approval in the app of exactly these options, if any, is proof too.
+        acceptedApprovalId: await approvalAsProof(tx, revisionId, chosen),
       })
       .where(eq(budgetRevisions.id, revisionId));
+    // Staff decided: no request to the client stays open on the project (the obra is marked below).
+    await lapseApprovals(tx, projectId, ctx.userId);
   });
   if (signed) {
     await storeFiles([signed.file], accept);
@@ -741,7 +735,10 @@ export async function acceptRevision(
   return { revisionId };
 }
 
-/** The client turned an issued revision down. Body: { rejectedOn? } */
+/**
+ * The client turned an issued revision down (registered by staff). A request
+ * to approve it in the app still waiting lapses. Body: { rejectedOn? }
+ */
 export async function rejectRevision(
   ctx: Ctx,
   projectId: string,
@@ -751,12 +748,18 @@ export async function rejectRevision(
   const revision = await revisionInProject(ctx, projectId, revisionId, { draft: false });
   if (revision.status !== "issued") fail("not_issued");
   const rejectedOn = parse(rejectSchema, input).rejectedOn ?? todayInSpain();
-  const [updated] = await db
-    .update(budgetRevisions)
-    .set({ status: "rejected", rejectedOn })
-    .where(and(eq(budgetRevisions.id, revisionId), eq(budgetRevisions.status, "issued")))
-    .returning({ id: budgetRevisions.id });
-  if (!updated) fail("not_issued");
+  const lapsed = await db.transaction(async (tx) => {
+    await lockProjectRow(tx, ctx.tenantId, projectId);
+    const [updated] = await tx
+      .update(budgetRevisions)
+      .set({ status: "rejected", rejectedOn })
+      .where(and(eq(budgetRevisions.id, revisionId), eq(budgetRevisions.status, "issued")))
+      .returning({ id: budgetRevisions.id });
+    if (!updated) fail("not_issued");
+    return lapseApprovals(tx, projectId, ctx.userId, { only: revisionId });
+  });
+  // The client's app stops showing the request.
+  if (lapsed > 0) await markChanged(ctx.tenantId, projectId, ["obra"]);
   return { revisionId };
 }
 

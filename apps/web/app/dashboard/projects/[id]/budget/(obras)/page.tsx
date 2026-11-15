@@ -1,4 +1,5 @@
 import { notFound, redirect } from "next/navigation";
+import { getConstructionIssues } from "../../../../../actions/construction";
 import { getProjectDocuments } from "../../../../../actions/documents";
 import { getProjectObra } from "../../../../../actions/obra";
 import { getProject } from "../../../../../actions/projects";
@@ -21,11 +22,14 @@ export async function budgetPage({ params, searchParams }: PageProps, tab: Budge
   const [{ id }, { revision, chapter }] = await Promise.all([params, searchParams]);
   // The hitos: the Conditions tab's plan, and the Accept dialog's first payment.
   const hitos = async () => (await getProjectObra(id))?.obra.hitos ?? [];
-  const [project, result, { documents }, conditionsHitos] = await Promise.all([
+  // The changes (CAM-) a revision from Rev.1 on may be linked to, on the Summary tab.
+  const changes = async () => (await getConstructionIssues(id))?.issues.filter((i) => i.kind === "change") ?? [];
+  const [project, result, { documents }, conditionsHitos, projectChanges] = await Promise.all([
     getProject(id),
     getProjectBudget(id, revision),
     getProjectDocuments(id),
     tab === "conditions" ? hitos() : null,
+    tab === "summary" ? changes() : [],
   ]);
   if (!result) {
     // A stale `?revision=`: the same tab without it, which is the newest revision. Not an error.
@@ -65,6 +69,7 @@ export async function budgetPage({ params, searchParams }: PageProps, tab: Budge
       chapterCode={chapter}
       inputs={inputs}
       hitos={planHitos}
+      changes={projectChanges.map(({ id: issueId, number, description }) => ({ id: issueId, number, description }))}
     />
   );
 }

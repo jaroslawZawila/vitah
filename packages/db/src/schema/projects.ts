@@ -31,6 +31,9 @@ export const projects = pgTable(
     // Homeowner with mobile app access. A client may have several projects
     // (packages/core/src/client-projects.ts).
     clientUserId: text("client_user_id").references(() => users.id, { onDelete: "set null" }),
+    // The site manager (jefe de obra) the client's app shows on Contacto: one
+    // of the tenant's staff users, while active (packages/core/src/contact.ts).
+    siteManagerUserId: text("site_manager_user_id").references(() => users.id, { onDelete: "set null" }),
     // Change counters the client's open app polls (packages/core/src/changes.ts):
     // each goes up after a write to that part of the app.
     projectRev: integer("project_rev").default(0).notNull(),

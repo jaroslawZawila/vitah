@@ -1,6 +1,8 @@
 import * as SecureStore from "expo-secure-store";
 import React, { createContext, use, useCallback, useEffect, useMemo, useState } from "react";
 import { api, type Project, type Result } from "./api";
+import { useAuth } from "./auth";
+import { pruneOffline } from "./offline-cache";
 import { CHOSEN_KEY, SHOWN_KEY } from "./project-choice";
 import { useClientData } from "./use-client-data";
 
@@ -41,7 +43,15 @@ const ProjectContext = createContext<ProjectValue | null>(null);
 
 /** One list of the client's homes, and the one shown, for every screen. */
 export function ProjectProvider({ children }: { children: React.ReactNode }) {
-  const { data, ...state } = useClientData(listProjects);
+  const userId = useAuth().user?.id;
+  // The list says which homes are still theirs: what is kept for any other goes.
+  const dropGone = useCallback(
+    ({ projects }: { projects: Project[] }) => {
+      if (userId) pruneOffline(userId, projects.map((p) => p.id));
+    },
+    [userId],
+  );
+  const { data, ...state } = useClientData(listProjects, { cache: { name: "projects" }, onFresh: dropGone });
   const [stored, setStored] = useState<Stored | undefined>(undefined);
 
   useEffect(() => {
@@ -85,13 +95,17 @@ export function useProject(): ProjectValue {
 /**
  * `useClientData` for the home shown: waits until it is known, and drops what
  * it loaded for another home when the client switches. Keep `fetch` stable
- * (a module-level function).
+ * (a module-level function). With `cacheName` the last answer is kept on the
+ * phone for that home (`useClientData`'s offline copy).
  */
-export function useProjectData<T>(fetch: (token: string, projectId: string | null) => Promise<Result<T>>) {
+export function useProjectData<T>(
+  fetch: (token: string, projectId: string | null) => Promise<Result<T>>,
+  cacheName?: string,
+) {
   const { projectId } = useProject();
   const load = useMemo(
     () => (projectId === undefined ? null : (token: string) => fetch(token, projectId)),
     [fetch, projectId],
   );
-  return useClientData(load);
+  return useClientData(load, cacheName ? { cache: { name: cacheName, projectId } } : undefined);
 }

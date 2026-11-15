@@ -225,6 +225,7 @@ export function issue(overrides: Partial<ObraIssue> = {}): ObraIssue {
     scheduleImpactDays: 3,
     status: "review",
     files: [{ id: "file-1", filename: "albaran.pdf", contentType: "application/pdf", sizeBytes: 1200 }],
+    revisions: [],
     createdBy: "Rubén García",
     createdAt: "2026-10-08T10:00:00.000Z",
     updatedAt: "2026-10-08T10:00:00.000Z",

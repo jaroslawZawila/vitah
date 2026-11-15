@@ -102,6 +102,24 @@ export async function draftLine(ctx: Ctx, projectId: string, lineId: string) {
   return row!;
 }
 
+/** The options chosen (`chosenOptionIds`, accepting or asking the client): options of this revision, else `not_found`. */
+export async function chosenOptions(revisionId: string, chosenIds: string[]): Promise<Set<string>> {
+  const ids = new Set(chosenIds);
+  if (ids.size === 0) return ids;
+  const found = await db
+    .select({ id: budgetChapters.id })
+    .from(budgetChapters)
+    .where(
+      and(
+        eq(budgetChapters.revisionId, revisionId),
+        eq(budgetChapters.kind, "option"),
+        inArray(budgetChapters.id, [...ids]),
+      ),
+    );
+  if (found.length !== ids.size) fail("not_found");
+  return ids;
+}
+
 /**
  * Serialises revision creation within a project (the checks read, then
  * insert). `project_not_found` if it was deleted since the caller looked.

@@ -102,6 +102,11 @@ describe("text columns hold one of their words", () => {
     ["planning_versions", "status", "planningStatus"],
     ["planning_versions", "region", "planningRegion"],
     ["subcontractors", "cae_status", "caeStatus"],
+    ["budget_approvals", "status", "budgetApprovalStatus"],
+    ["warranty_claims", "kind", "warrantyKind"],
+    ["warranty_claims", "room", "warrantyRoom"],
+    ["warranty_claims", "status", "warrantyStatus"],
+    ["warranty_claim_events", "action", "warrantyEventAction"],
   ];
 
   it("lists exactly the words of COLUMN_VALUES, for every list there is", async () => {
@@ -164,6 +169,8 @@ describe("amounts, shares and counts in range", () => {
     ["planning_items", "duration_days = 0", "plan_item_a"],
     ["planning_items", "lead_days = -1", "plan_item_a"],
     ["project_documents", "size_bytes = -1", "document_a"],
+    ["warranty_claims", "number = 0", "claim_a"],
+    ["warranty_claim_photos", "thumb_size_bytes = -1", "claim_photo_a"],
   ])("refuses %s with %s", async (table, change, id) => {
     expect(await attempt(TREE, `update ${table} set ${change} where id = '${id}'`)).toBe(CHECK);
   });
@@ -180,12 +187,37 @@ describe("amounts, shares and counts in range", () => {
     expect(await attempt(TREE, "update obra_hitos set paid_on = null, paid_amount_cents = null where id = 'hito_a'")).toBeNull();
   });
 
+  it("schedules a warranty visit for a day, and rejects a claim with a reason", async () => {
+    expect(await attempt(TREE, "update warranty_claims set visit_on = null where id = 'claim_a'")).toBe(CHECK);
+    expect(await attempt(TREE, "update warranty_claims set status = 'resolved', visit_on = null where id = 'claim_a'")).toBeNull();
+    expect(await attempt(TREE, "update warranty_claims set status = 'rejected' where id = 'claim_a'")).toBe(CHECK);
+    expect(await attempt(TREE, "update warranty_claims set status = 'rejected', answer = 'Fuera de garantía' where id = 'claim_a'")).toBeNull();
+  });
+
   it("tells an invoice from a credit note by its sign, what it rectifies and its due day", async () => {
     expect(await attempt(TREE, "update purchase_invoices set base_cents = -1000 where id = 'invoice_a'")).toBe(CHECK);
     expect(await attempt(TREE, "update purchase_invoices set rectifies_id = 'credit_a' where id = 'invoice_a'")).toBe(CHECK);
     expect(await attempt(TREE, "update purchase_invoices set base_cents = 100 where id = 'credit_a'")).toBe(CHECK);
     expect(await attempt(TREE, "update purchase_invoices set rectifies_id = null where id = 'credit_a'")).toBe(CHECK);
     expect(await attempt(TREE, "update purchase_invoices set due_on = '2026-06-01' where id = 'credit_a'")).toBe(CHECK);
+  });
+
+  it("keeps a client's answer to what answered it: when, a reason only to reject, closed only by staff", async () => {
+    const approval = (change: string) => `update budget_approvals set ${change} where id = 'approval_a'`;
+    expect(await attempt(TREE, approval("decided_at = null"))).toBe(CHECK);
+    expect(await attempt(TREE, approval("reject_reason = 'Caro'"))).toBe(CHECK);
+    expect(await attempt(TREE, approval("status = 'rejected'"))).toBe(CHECK);
+    expect(await attempt(TREE, approval("status = 'rejected', reject_reason = 'Caro'"))).toBeNull();
+    expect(await attempt(TREE, approval("status = 'withdrawn'"))).toBe(CHECK);
+    expect(await attempt(TREE, approval("status = 'withdrawn', decided_at = null, closed_at = now()"))).toBeNull();
+    expect(await attempt(TREE, approval("status = 'pending', decided_at = null"))).toBeNull();
+    // One open request per revision.
+    expect(
+      await attempt(
+        TREE + approval("status = 'pending', decided_at = null") + ";",
+        "insert into budget_approvals (id, tenant_id, project_id, revision_id, before_cents, after_cents, vat_rate_bp) values ('x', 'a', 'project_a', 'revision1_a', 1, 1, 0)",
+      ),
+    ).toBe("23505");
   });
 
   it("reviews exactly one file per document check", async () => {
@@ -210,6 +242,13 @@ describe("dates in order", () => {
   it("takes a period with either end missing", async () => {
     expect(await attempt(TREE, "update subcontractor_assignments set planned_start = null where id = 'assignment_a'")).toBeNull();
     expect(await attempt(TREE, "update obra_chapter_progress set actual_end = null where id = 'progress_a'")).toBeNull();
+  });
+});
+
+describe("asking for an account to be deleted", () => {
+  it("is a client's: taken on a client, refused on staff", async () => {
+    expect(await attempt(TREE, "update users set deletion_requested_at = now() where id = 'client_a'")).toBeNull();
+    expect(await attempt(TREE, "update users set deletion_requested_at = now() where id = 'admin_a'")).toBe(CHECK);
   });
 });
 
@@ -246,6 +285,9 @@ describe("a row and its parent belong to the same tenant", () => {
     ["budget_lines", "chapter_id = 'chapter_b'", "line_a"],
     ["obra_hito_checks", "hito_id = 'hito_b'", "check_a"],
     ["obra_issue_files", "issue_id = 'issue_b'", "issue_file_a"],
+    ["warranty_claims", "project_id = 'project_b', number = 2", "claim_a"],
+    ["warranty_claim_photos", "claim_id = 'claim_b'", "claim_photo_a"],
+    ["warranty_claim_events", "claim_id = 'claim_b'", "claim_event_a"],
     ["subcontractor_documents", "worker_id = 'worker_b'", "cae_a"],
     ["purchase_orders", "subcontractor_id = 'company_b'", "order_a"],
     ["purchase_invoices", "milestone_id = 'milestone_b'", "invoice_a"],
@@ -253,6 +295,7 @@ describe("a row and its parent belong to the same tenant", () => {
     ["purchase_payments", "invoice_id = 'invoice_b'", "payment_a"],
     ["purchase_document_checks", "order_id = 'order_b'", "payment_check_a"],
     ["planning_items", "version_id = 'plan_b', chapter_code = '06'", "plan_item_a"],
+    ["budget_approvals", "revision_id = 'revision1_b'", "approval_a"],
   ])("refuses %s pointing at another tenant's parent (%s)", async (table, change, id) => {
     expect(await attempt(TREE, `update ${table} set ${change} where id = '${id}'`)).toBe(FOREIGN_KEY);
   });
@@ -272,6 +315,7 @@ describe("a row and its parent belong to the same tenant", () => {
   it("refuses another tenant's photo on a hito, and another tenant's user's two-step secret", async () => {
     expect(await attempt(TREE, "insert into obra_hito_photos (hito_id, photo_id, tenant_id) values ('hito_a', 'photo_b', 'a')")).toBe(FOREIGN_KEY);
     expect(await attempt(TREE, "update user_mfa set tenant_id = 'b' where user_id = 'admin_a'")).toBe(FOREIGN_KEY);
+    expect(await attempt(TREE, "update budget_revision_changes set issue_id = 'issue_b' where revision_id = 'revision1_a'")).toBe(FOREIGN_KEY);
   });
 });
 

@@ -16,13 +16,18 @@ import {
 } from "@/components/ui/table";
 import { displayName } from "./display";
 
-/** Presentational: the clients table. */
+/**
+ * Presentational: the clients table. A client who asked in the app for their
+ * account to be deleted carries a pill with the date, and a way to mark it handled.
+ */
 export default function ClientList({
   clients,
   onSetPassword,
+  onClearDeletionRequest,
 }: {
   clients: ClientListItem[];
   onSetPassword: (client: ClientListItem) => void;
+  onClearDeletionRequest: (client: ClientListItem) => void;
 }) {
   const t = useTranslations("clientsPage");
   const format = useFormat();
@@ -60,9 +65,27 @@ export default function ClientList({
                 {client.address ?? dash}
               </TableCell>
               <TableCell>
-                <Badge variant={client.active ? "good" : "outline"}>
-                  {client.active ? t("statuses.active") : t("statuses.inactive")}
-                </Badge>
+                <div className="flex flex-col items-start gap-1.5">
+                  <Badge variant={client.active ? "good" : "outline"}>
+                    {client.active ? t("statuses.active") : t("statuses.inactive")}
+                  </Badge>
+                  {client.deletionRequestedAt && (
+                    <>
+                      <Badge variant="warn">
+                        {t("deletionRequested", { date: format.date(client.deletionRequestedAt) })}
+                      </Badge>
+                      <Button
+                        type="button"
+                        variant="link"
+                        size="sm"
+                        onClick={() => onClearDeletionRequest(client)}
+                        aria-label={t("clearDeletion.buttonFor", { name: displayName(client) })}
+                      >
+                        {t("clearDeletion.button")}
+                      </Button>
+                    </>
+                  )}
+                </div>
               </TableCell>
               <TableCell>
                 <Button

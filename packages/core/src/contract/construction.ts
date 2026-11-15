@@ -133,6 +133,8 @@ export type ObraIssue = {
   scheduleImpactDays: number | null;
   status: IssueStatus;
   files: IssueFile[];
+  /** A change's budget revisions that price it (core budget-approvals.ts), by number. */
+  revisions: { id: string; number: number }[];
   createdBy: string | null;
   createdAt: string;
   updatedAt: string;

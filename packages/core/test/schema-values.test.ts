@@ -9,6 +9,7 @@ import { GROUPS } from "../src/budget-ai/prompts";
 import { STAFF_ROLE_WORDS } from "../src/inputs/accounts";
 import {
   APP_LANGUAGES,
+  BUDGET_APPROVAL_STATUSES,
   BUDGET_INPUTS,
   BUDGET_MODEL,
   BUDGET_PDF_KINDS,
@@ -33,6 +34,10 @@ import {
   type PlanningStatus,
   type ProgressEvent,
   type PurchaseDocumentCheck,
+  WARRANTY_EVENT_ACTIONS,
+  WARRANTY_KINDS,
+  WARRANTY_ROOMS,
+  WARRANTY_STATUSES,
 } from "../src/contract";
 
 type Words<K extends keyof typeof COLUMN_VALUES> = (typeof COLUMN_VALUES)[K][number];
@@ -70,6 +75,11 @@ const listed: Record<Exclude<keyof typeof COLUMN_VALUES, keyof typeof typed>, re
   purchaseRequestStatus: PURCHASE_REQUEST_STATUSES,
   purchasePaymentMethod: PURCHASE_PAYMENT_METHODS,
   planningRegion: PLANNING_REGIONS,
+  budgetApprovalStatus: BUDGET_APPROVAL_STATUSES,
+  warrantyKind: WARRANTY_KINDS,
+  warrantyRoom: WARRANTY_ROOMS,
+  warrantyStatus: WARRANTY_STATUSES,
+  warrantyEventAction: WARRANTY_EVENT_ACTIONS,
 };
 
 const sorted = (words: readonly string[]) => [...words].sort();

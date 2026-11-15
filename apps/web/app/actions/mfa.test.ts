@@ -202,7 +202,7 @@ describe("removeUserMfaAction", () => {
     const list = await getUsers();
     expect(list.find((u) => u.id === marcos.user.id)).toMatchObject({ mfaEnabled: false });
     // On or off, and nothing else of it.
-    expect(Object.keys(list[0]!).sort()).toEqual(["active", "createdAt", "email", "id", "mfaEnabled", "name", "role"]);
+    expect(Object.keys(list[0]!).sort()).toEqual(["active", "createdAt", "email", "id", "mfaEnabled", "name", "phone", "role"]);
   });
 
   it.each(["manager", "viewer"] as const)("is forbidden to a %s", async (role) => {

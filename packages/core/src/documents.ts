@@ -13,6 +13,7 @@ import {
   sql,
   users,
 } from "@repo/db";
+import { documentInApproval } from "./budget-approvals";
 import { markChanged } from "./changes";
 import { clientProjectsWhere, resolveClientProject } from "./client-projects";
 import { requireEditor, type Ctx } from "./context";
@@ -217,8 +218,9 @@ export async function deleteDocument(ctx: Ctx, projectId: string, documentId: st
 /**
  * Shows a document to the project's client, or hides it. The app only opens
  * PDFs it can download, so a budget input that isn't one (a spreadsheet, a
- * BC3, an image) or is over 4 MB stays staff-only. The client is pushed the
- * first time it is shown, never again. Body: { visibleToClient }
+ * BC3, an image) or is over 4 MB stays staff-only. A revision's PDF the client
+ * is asked to approve (or approved) stays shown: `approval_document`. The
+ * client is pushed the first time it is shown, never again. Body: { visibleToClient }
  */
 export async function setDocumentVisibility(
   ctx: Ctx,
@@ -236,12 +238,19 @@ export async function setDocumentVisibility(
     if (found.contentType !== "application/pdf") fail("invalid_file_type");
     if (found.sizeBytes > MAX_DOCUMENT_BYTES) fail("file_too_large");
   }
-  const [doc] = await db
-    .update(projectDocuments)
-    .set({ visibleToClient, updatedAt: new Date() })
-    .where(where)
-    .returning({ title: projectDocuments.title });
-  if (!doc) fail("not_found");
+  const doc = await db.transaction(async (tx) => {
+    // The document locked first: asking the client locks it too, so a request
+    // and hiding what it shows never cross.
+    const [locked] = await tx.select({ id: projectDocuments.id }).from(projectDocuments).where(where).for("update");
+    if (!locked) fail("not_found");
+    if (!visibleToClient && (await documentInApproval(tx, documentId))) fail("approval_document");
+    const [updated] = await tx
+      .update(projectDocuments)
+      .set({ visibleToClient, updatedAt: new Date() })
+      .where(where)
+      .returning({ title: projectDocuments.title });
+    return updated!;
+  });
   await markChanged(ctx.tenantId, projectId, ["documents"]);
   if (visibleToClient && (await claimFirstShown(projectDocuments, where))) {
     await notifyProjectClient(ctx.tenantId, projectId, { kind: "document", title: doc.title });

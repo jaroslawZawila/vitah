@@ -12,11 +12,12 @@ vi.mock("../../actions/users", () => ({
   toggleUserActive: vi.fn(async () => ({})),
   resetUserPasswordAction: vi.fn(async () => ({})),
   removeUserMfaAction: vi.fn(async () => ({})),
+  updateUserPhoneAction: vi.fn(async () => ({})),
 }));
 const actions = await import("../../actions/users");
 
-const laura = { id: "u-admin", name: "Laura", email: "laura@vitah.es", role: "admin", active: true, mfaEnabled: false, createdAt: "2026-09-01T10:00:00.000Z" } as const;
-const marcos = { id: "u-marcos", name: "Marcos", email: "marcos@vitah.es", role: "viewer", active: true, mfaEnabled: false, createdAt: "2026-09-02T10:00:00.000Z" } as const;
+const laura = { id: "u-admin", name: "Laura", email: "laura@vitah.es", phone: null, role: "admin", active: true, mfaEnabled: false, createdAt: "2026-09-01T10:00:00.000Z" } as const;
+const marcos = { id: "u-marcos", name: "Marcos", email: "marcos@vitah.es", phone: "+34 600 111 222", role: "viewer", active: true, mfaEnabled: false, createdAt: "2026-09-02T10:00:00.000Z" } as const;
 
 type Row = Parameters<typeof UsersClient>[0]["users"][number];
 
@@ -118,7 +119,7 @@ describe("the Users page: two-step verification", () => {
   const withMfa = [
     { ...laura, mfaEnabled: true },
     { ...marcos, mfaEnabled: true },
-    { id: "u-ines", name: "Inés", email: "ines@vitah.es", role: "manager", active: true, mfaEnabled: false, createdAt: "2026-09-03T10:00:00.000Z" },
+    { id: "u-ines", name: "Inés", email: "ines@vitah.es", phone: null, role: "manager", active: true, mfaEnabled: false, createdAt: "2026-09-03T10:00:00.000Z" },
   ] satisfies Row[];
   const rowOf = (name: string) => within(screen.getByRole("cell", { name }).closest("tr")!);
   const openRemove = async () => {
@@ -231,5 +232,42 @@ describe("the Users page: deactivating a user", () => {
     await userEvent.click(screen.getByRole("button", { name: "Activar" }));
     expect(actions.toggleUserActive).toHaveBeenCalledWith(marcos.id, true);
     expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+  });
+});
+
+describe("the Users page: a staff user's phone", () => {
+  beforeEach(() => {
+    vi.mocked(actions.updateUserPhoneAction).mockReset().mockResolvedValue({});
+  });
+
+  it("shows each one's phone and saves the one the admin types", async () => {
+    renderUsers();
+    expect(screen.getByText("+34 600 111 222")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Cambiar el teléfono de Marcos" }));
+    const dialog = within(await screen.findByRole("dialog", { name: "Teléfono de Marcos" }));
+    const input = dialog.getByLabelText("Teléfono");
+    expect(input).toHaveValue("+34 600 111 222");
+    await userEvent.clear(input);
+    await userEvent.type(input, "942 000 000");
+    await userEvent.click(dialog.getByRole("button", { name: "Guardar" }));
+
+    await waitFor(() => expect(actions.updateUserPhoneAction).toHaveBeenCalledTimes(1));
+    const [userId, form] = vi.mocked(actions.updateUserPhoneAction).mock.calls[0]!;
+    expect(userId).toBe(marcos.id);
+    expect(Object.fromEntries(form)).toEqual({ phone: "942 000 000" });
+    expect(await screen.findByRole("status")).toHaveTextContent("Teléfono de Marcos guardado.");
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  });
+
+  it("keeps the dialog open with the refusal", async () => {
+    vi.mocked(actions.updateUserPhoneAction).mockResolvedValue({ error: "invalid_phone" });
+    renderUsers();
+    await userEvent.click(screen.getByRole("button", { name: "Cambiar el teléfono de Laura" }));
+    const dialog = within(await screen.findByRole("dialog", { name: "Teléfono de Laura" }));
+    await userEvent.type(dialog.getByLabelText("Teléfono"), "abc");
+    await userEvent.click(dialog.getByRole("button", { name: "Guardar" }));
+
+    expect(await dialog.findByRole("alert")).toHaveTextContent("Introduce un teléfono válido.");
   });
 });

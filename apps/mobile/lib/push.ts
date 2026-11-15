@@ -159,7 +159,8 @@ export async function notificationsAllowed() {
   return status === "granted";
 }
 
-const SCREENS = { photos: "/photos", documents: "/documents", obra: "/obra" } as const;
+// `approval`: a change to the contract to approve, pushed over the tabs.
+const SCREENS = { photos: "/photos", documents: "/documents", obra: "/obra", approval: "/aprobacion" } as const;
 
 /**
  * The last tapped notification stays "last" until another is tapped; this
@@ -192,8 +193,12 @@ export function usePushNotifications(
     const { identifier, content } = response.notification.request;
     if (identifier === handledNotification) return;
     handledNotification = identifier;
-    const { screen, projectId } = content.data ?? {};
+    const { screen, projectId, claimId } = content.data ?? {};
     if (typeof projectId === "string") showProject?.(projectId);
-    if (screen === "photos" || screen === "documents" || screen === "obra") router.navigate(SCREENS[screen]);
+    if (screen === "photos" || screen === "documents" || screen === "obra" || screen === "approval") {
+      router.navigate(SCREENS[screen]);
+    }
+    // A warranty claim's answer or new status: that claim.
+    if (screen === "warranty") router.navigate(typeof claimId === "string" ? `/warranty/${claimId}` : "/warranty");
   }, [authToken, response, router, showProject]);
 }

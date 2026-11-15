@@ -1,4 +1,5 @@
 import { and, db, desc, eq, projects } from "@repo/db";
+import { lapseApprovals } from "./budget-approvals";
 import { markChanged } from "./changes";
 import { requireAdmin, requireEditor, type Ctx } from "./context";
 import { invalid, notFound } from "./errors";
@@ -17,8 +18,10 @@ const clientColumns = { columns: { id: true, name: true, email: true } } as cons
 
 // The change counters are the app's business (./changes), and the reviewed
 // revision the Obra tab's (./construction): not part of the project. Nor is
-// the deletion mark: a project that can be read has none.
+// the deletion mark: a project that can be read has none. The site manager
+// has its own read (./contact: `getProjectSiteManager`).
 const projectColumns = {
+  siteManagerUserId: false,
   deletedAt: false,
   deletedById: false,
   obraReviewedRevisionId: false,
@@ -128,15 +131,20 @@ export async function updateProject(ctx: Ctx, id: string, input: Record<string, 
  * (`deleted_at`, and who did it): its row, everything under it and its stored
  * files stay as they are, and from then on nothing lists or reaches it, in the
  * portal, the API or the client's app. Its ref is free for a new project.
- * `not_found` if it isn't the tenant's, or is deleted already.
+ * A change its client was asked to approve stops waiting (it must not come
+ * back, weeks old, with a restore). `not_found` if it isn't the tenant's, or
+ * is deleted already.
  */
 export async function deleteProject(ctx: Ctx, id: string) {
   requireAdmin(ctx);
-  const [deleted] = await db
-    .update(projects)
-    .set(softDeleted(ctx))
-    .where(projectInTenant(ctx.tenantId, id))
-    .returning({ id: projects.id });
-  if (!deleted) throw notFound();
+  await db.transaction(async (tx) => {
+    const [deleted] = await tx
+      .update(projects)
+      .set(softDeleted(ctx))
+      .where(projectInTenant(ctx.tenantId, id))
+      .returning({ id: projects.id });
+    if (!deleted) throw notFound();
+    await lapseApprovals(tx, id, ctx.userId);
+  });
   return { projectId: id };
 }

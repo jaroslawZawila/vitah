@@ -26,6 +26,7 @@ export const CLIENT_MESSAGES = {
   "dashboard/clients": ["clientsPage"],
   "dashboard/users": ["usersPage"],
   "dashboard/eliminados": ["deletedPage"],
+  "dashboard/contacto": ["officeContactPage"],
   // The project list (its budget and stage pills) and a new project; every project's tabs below.
   "dashboard/projects": ["budget.revisionPill", "budgetsOverview.pill", "construction.scheduleStatus", "newProjectPage", "obra", "projectsPage"],
   "dashboard/projects/[id]": ["construction.photos", "projectDetailPage"],
@@ -37,6 +38,7 @@ export const CLIENT_MESSAGES = {
     "subcontractors.requirements",
   ],
   "dashboard/projects/[id]/obra/planificacion": ["planning"],
+  "dashboard/projects/[id]/garantia": ["warranty"],
   // The chapter's orders (their pills).
   "dashboard/projects/[id]/obra/avance/[code]": ["purchasing.chapter", "purchasing.latePill", "purchasing.status"],
   "dashboard/projects/[id]/compras": [

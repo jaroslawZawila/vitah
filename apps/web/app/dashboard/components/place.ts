@@ -13,6 +13,7 @@ export type PlaceTitle =
   | "subcontractors"
   | "purchases"
   | "deleted"
+  | "officeContact"
   | "forbidden";
 
 /** A project's tabs in the rail's order, by their path under the project ("" is General). */
@@ -23,6 +24,7 @@ export const PROJECT_TABS = [
   { key: "purchases", path: "/compras" },
   { key: "payments", path: "/payments" },
   { key: "documents", path: "/documents" },
+  { key: "warranty", path: "/garantia" },
 ] as const;
 
 type ProjectTab = (typeof PROJECT_TABS)[number]["key"];
@@ -60,6 +62,7 @@ const SECTIONS: Record<string, PlaceTitle> = {
   clients: "clients",
   users: "users",
   eliminados: "deleted",
+  contacto: "officeContact",
   forbidden: "forbidden",
 };
 

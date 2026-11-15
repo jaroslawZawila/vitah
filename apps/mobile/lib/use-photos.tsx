@@ -20,7 +20,7 @@ const PhotosContext = createContext<PhotosValue | null>(null);
 
 /** One copy of the photos of the home shown, for every screen (Inicio and Fotos). */
 export function PhotosProvider({ children }: { children: React.ReactNode }) {
-  const { data, ...state } = useProjectData(listPhotos);
+  const { data, ...state } = useProjectData(listPhotos, "photos");
   const photos = data?.photos;
   const weeks = useMemo(() => groupByWeek(photos ?? []), [photos]);
   const byId = useMemo(() => new Map((photos ?? []).map((p) => [p.id, p])), [photos]);

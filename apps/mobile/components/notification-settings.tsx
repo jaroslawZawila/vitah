@@ -1,14 +1,15 @@
 import { useEffect, useState } from "react";
 import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
-import type { NotificationPrefs } from "@repo/core/contract";
+import type { MobileSettings, NotificationPrefs } from "@repo/core/contract";
 import { colors, spacing, type } from "../constants/theme";
 import { api } from "../lib/api";
 import { useI18n, type MessageKey } from "../lib/i18n";
 import { notificationsAllowed, registerForPush } from "../lib/push";
-import { useClientData } from "../lib/use-client-data";
 import { ToggleRow } from "./toggle-row";
 
-// Perfil's "Notificaciones" section (A-Settings.dc.html).
+// Perfil's "Notificaciones" section (A-Settings.dc.html). "Mensajes del equipo"
+// is the team writing to the client: a change to approve, the answer to a
+// warranty claim (`TOGGLE` in core's notifications.ts).
 
 const NOTIFICATIONS: { id: keyof NotificationPrefs; label: MessageKey; hint: MessageKey }[] = [
   { id: "progress", label: "profile.progress", hint: "profile.progressHint" },
@@ -16,15 +17,21 @@ const NOTIFICATIONS: { id: keyof NotificationPrefs; label: MessageKey; hint: Mes
   { id: "messages", label: "profile.messages", hint: "profile.messagesHint" },
 ];
 
-const getSettings = (token: string) => api.getSettings(token);
-
 /**
- * The three notification toggles, saved to the server as they change.
+ * The notification toggles, saved to the server as they change. `saved`: the
+ * client's settings as Perfil loaded them (undefined until then).
  * `allHomes`: the client has several homes, and the toggles apply to all.
  */
-export function NotificationSettings({ token, allHomes = false }: { token: string; allHomes?: boolean }) {
+export function NotificationSettings({
+  token,
+  saved,
+  allHomes = false,
+}: {
+  token: string;
+  saved: MobileSettings | undefined;
+  allHomes?: boolean;
+}) {
   const { t, language } = useI18n();
-  const { data: saved } = useClientData(getSettings);
   // What the client last set here, else what the server has.
   const [edited, setEdited] = useState<NotificationPrefs>();
   const prefs = edited ?? saved?.notifications;

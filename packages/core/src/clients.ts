@@ -1,5 +1,6 @@
-import { and, asc, clientProfiles, db, eq, isClientUser, users } from "@repo/db";
+import { and, asc, clientProfiles, db, eq, isClientUser, isNotNull, users } from "@repo/db";
 import { EMAIL_PATTERN, hashPassword, isUniqueViolation, replacePassword } from "./accounts";
+import { logDeletionRequest } from "./client-account";
 import { requireAdmin, type Ctx } from "./context";
 import type { ClientError, ClientListItem } from "./contract";
 import { CoreError } from "./errors";
@@ -38,6 +39,7 @@ export async function listClients(ctx: Ctx): Promise<ClientListItem[]> {
       email: users.email,
       active: users.active,
       createdAt: users.createdAt,
+      deletionRequestedAt: users.deletionRequestedAt,
       firstName: clientProfiles.firstName,
       surnames: clientProfiles.surnames,
       dateOfBirth: clientProfiles.dateOfBirth,
@@ -49,7 +51,34 @@ export async function listClients(ctx: Ctx): Promise<ClientListItem[]> {
     .where(and(eq(users.tenantId, ctx.tenantId), isClientUser))
     .orderBy(asc(clientProfiles.surnames), asc(clientProfiles.firstName), asc(users.email));
 
-  return rows.map((row) => ({ ...row, createdAt: row.createdAt.toISOString() }));
+  return rows.map((row) => ({
+    ...row,
+    createdAt: row.createdAt.toISOString(),
+    deletionRequestedAt: row.deletionRequestedAt?.toISOString() ?? null,
+  }));
+}
+
+/**
+ * Marks a client's request for their account to be deleted as handled: the
+ * pill on Clientes goes. What the admin did about it (deactivating the
+ * account, keeping it) is done by hand elsewhere; nothing is deleted here.
+ * A client with no request is left as is.
+ */
+export async function clearDeletionRequest(ctx: Ctx, clientId: string) {
+  requireAdmin(ctx);
+
+  const client = and(eq(users.id, clientId), eq(users.tenantId, ctx.tenantId), isClientUser);
+  const [cleared] = await db
+    .update(users)
+    .set({ deletionRequestedAt: null })
+    .where(and(client, isNotNull(users.deletionRequestedAt)))
+    .returning({ id: users.id });
+  if (cleared) {
+    logDeletionRequest("cleared", ctx.tenantId, clientId);
+  } else if (!(await db.query.users.findFirst({ where: client, columns: { id: true } }))) {
+    fail("not_found");
+  }
+  return { id: clientId };
 }
 
 /**

@@ -28,6 +28,17 @@ export function formatShortDate(iso: string, language: AppLanguage = "es"): stri
   });
 }
 
+/** An ISO timestamp as the day and the time in Spain: "22 sept, 14:05" / "22 Sept, 14:05" (24 hours). */
+export function formatShortDateTime(iso: string, language: AppLanguage = "es"): string {
+  const time = new Date(iso).toLocaleTimeString(LOCALES[language], {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: SPAIN_TZ,
+  });
+  return `${formatShortDate(iso, language)}, ${time}`;
+}
+
 /** Formats a byte count as "180 KB" or "3,1 MB" / "3.1 MB". */
 export function formatFileSize(bytes: number, language: AppLanguage = "es"): string {
   const kb = bytes / 1024;

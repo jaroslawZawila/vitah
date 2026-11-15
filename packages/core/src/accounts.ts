@@ -100,18 +100,26 @@ export async function changeOwnPassword(
   { refuseSame = false } = {},
 ) {
   const { currentPassword, newPassword: next } = parse(passwordChangeSchema, input);
+  await checkOwnPassword(where, userId, currentPassword);
+  if (refuseSame && next === currentPassword) throw invalid("same_password");
 
+  await replacePassword(where, next);
+}
+
+/**
+ * The signed-in user matching `where` proves it is them with their password:
+ * `wrong_password` (400) otherwise, and past PASSWORD_ATTEMPTS wrong ones per
+ * window `too_many_attempts` (429), on the same counter as changing it.
+ */
+export async function checkOwnPassword(where: SQL | undefined, userId: string, password: string) {
   const throttle = [passwordThrottle(userId)];
   if (await overLimit(throttle)) throw new CoreError("too_many_attempts", 429);
 
   const [user] = await db.select({ passwordHash: users.passwordHash }).from(users).where(where).limit(1);
   if (!user) throw notFound();
-  if (!user.passwordHash || !(await bcrypt.compare(currentPassword, user.passwordHash))) {
+  if (!user.passwordHash || !(await bcrypt.compare(password, user.passwordHash))) {
     // Not 401: the app treats 401 as "signed out".
     throw invalid("wrong_password");
   }
   await clearAttempts(throttle);
-  if (refuseSame && next === currentPassword) throw invalid("same_password");
-
-  await replacePassword(where, next);
 }

@@ -25,27 +25,33 @@ import {
   acceptRevisionAction,
   addLineAction,
   addOptionAction,
+  askApprovalAction,
   createRevisionAction,
   deleteLineAction,
   deleteOptionAction,
   deleteRevisionAction,
   issueRevisionAction,
+  linkChangeAction,
   optionFromLineAction,
   rejectRevisionAction,
   searchPriceBaseAction,
   takeProjectDataAction,
+  unlinkChangeAction,
   updateChapterAction,
   updateLineAction,
   updateOptionAction,
   updateRevisionAction,
+  withdrawApprovalAction,
 } from "../../../../actions/budget";
 import { savePlanAction } from "../../../../actions/obra";
 import FormError from "../../../components/FormError";
 import { useConfirm, type ConfirmRequest } from "../../../components/useConfirm";
 import AcceptDialog, { type AcceptInput } from "../components/budget/AcceptDialog";
 import AcceptedBanner from "../components/budget/AcceptedBanner";
+import AskApprovalDialog from "../components/budget/AskApprovalDialog";
 import BudgetFrame from "../components/budget/BudgetFrame";
 import { budgetHref, type BudgetTab } from "../components/budget/links";
+import ChangeApprovalCard, { type ChangeOption } from "../components/budget/ChangeApprovalCard";
 import ChapterSummary from "../components/budget/ChapterSummary";
 import ConditionsView from "../components/budget/ConditionsView";
 import IdentityNotice from "../components/budget/IdentityNotice";
@@ -66,6 +72,7 @@ import { useObraAction } from "../components/obra/useObraAction";
 type Dialog =
   | { kind: "issue" }
   | { kind: "accept" }
+  | { kind: "askApproval" }
   | { kind: "plan" }
   | { kind: "newLine"; parent: LineParent }
   | { kind: "editLine"; parent: LineParent; line: BudgetLine }
@@ -84,9 +91,11 @@ type Props = {
   chapterCode?: string;
   inputs: ProjectDocument[];
   hitos: Hito[];
+  /** The project's changes (CAM-), to link to a revision from Rev.1 on (the Summary tab). */
+  changes?: ChangeOption[];
 };
 
-export default function BudgetScreen({ projectId, projectRef, site, clientName, budget, canManage, tab, chapterCode, inputs, hitos }: Props) {
+export default function BudgetScreen({ projectId, projectRef, site, clientName, budget, canManage, tab, chapterCode, inputs, hitos, changes = [] }: Props) {
   const t = useTranslations("budget");
   const f = useObraFormat();
   const router = useRouter();
@@ -123,6 +132,13 @@ export default function BudgetScreen({ projectId, projectRef, site, clientName, 
   const updateRevision = (input: BudgetRevisionChangesInput) => updateRevisionAction(projectId, revision.id, input);
   const saveRevision = (input: BudgetRevisionChangesInput) => run(() => updateRevision(input));
   const nextNumber = revisions[0]!.number + 1;
+  const documentHref = (documentId: string) => `/api/v1/projects/${projectId}/documents/${documentId}`;
+  // The client's approval in the app: one waiting or given holds the revision's links as they were shown.
+  const approved = revision.approvals.find((a) => a.status === "approved") ?? null;
+  const held = approved !== null || revision.approvals.some((a) => a.status === "pending");
+  const linkable = canManage && !held && (revision.status === "draft" || revision.status === "issued");
+  const newestIssued = !revisions.some((r) => r.number > revision.number && r.status === "issued");
+  const askable = canManage && !held && revision.status === "issued" && newestIssued && clientName !== null;
 
   // ─── Header actions and the banner for where the revision stands ──────────
   let actions: React.ReactNode = null;
@@ -175,7 +191,8 @@ export default function BudgetScreen({ projectId, projectRef, site, clientName, 
     banner = (
       <AcceptedBanner
         revision={revision}
-        signedHref={revision.signedDocumentId && `/api/v1/projects/${projectId}/documents/${revision.signedDocumentId}`}
+        signedHref={revision.signedDocumentId && documentHref(revision.signedDocumentId)}
+        approval={revision.approvals.find((a) => a.id === revision.acceptedApprovalId) ?? null}
       />
     );
   } else if (revision.status === "rejected") {
@@ -255,6 +272,21 @@ export default function BudgetScreen({ projectId, projectRef, site, clientName, 
         <>
           <IdentityNotice revision={revision} textsHref={href("/texts")} />
           <SummaryKpis revision={revision} onMargins={editable ? saveRevision : undefined} />
+          {revision.number > 0 && (
+            <ChangeApprovalCard
+              revision={revision}
+              changes={changes}
+              hasClient={clientName !== null}
+              pending={pending || confirm.pending}
+              documentHref={documentHref}
+              onLink={linkable ? (issueId) => run(() => linkChangeAction(projectId, revision.id, issueId)) : undefined}
+              onUnlink={linkable ? (issueId) => run(() => unlinkChangeAction(projectId, revision.id, issueId)) : undefined}
+              onAsk={askable ? () => open({ kind: "askApproval" }) : undefined}
+              onWithdraw={
+                canManage ? () => ask("approval.withdrawDialog", { number: revision.number }, () => withdrawApprovalAction(projectId, revision.id)) : undefined
+              }
+            />
+          )}
           <ChapterSummary revision={revision} hrefOf={chapterHref} onContingency={editable ? (contingencyPct) => saveRevision({ contingencyPct }) : undefined} />
           {revision.model && <OptionSummary options={revision.options} href={href("/options")} />}
           {revision.model && (
@@ -327,7 +359,16 @@ export default function BudgetScreen({ projectId, projectRef, site, clientName, 
               onCancel={close}
             />
           ) : dialog.kind === "accept" ? (
-            <AcceptDialog revision={revision} firstHitoBp={hitos[0]?.pctBp ?? 500} pending={pending} error={state?.error} onSubmit={accept} onCancel={close} />
+            <AcceptDialog revision={revision} approval={approved} firstHitoBp={hitos[0]?.pctBp ?? 500} pending={pending} error={state?.error} onSubmit={accept} onCancel={close} />
+          ) : dialog.kind === "askApproval" ? (
+            <AskApprovalDialog
+              revision={revision}
+              clientName={clientName}
+              pending={pending}
+              error={state?.error}
+              onSubmit={(input) => run(() => askApprovalAction(projectId, revision.id, input), close)}
+              onCancel={close}
+            />
           ) : dialog.kind === "plan" ? (
             <PlanForm hitos={hitos} pending={pending} error={state?.error} onCancel={close} onSubmit={(changes) => run(() => savePlanAction(projectId, changes), close)} />
           ) : dialog.kind === "move" ? (
@@ -400,6 +441,8 @@ function dialogTitle(dialog: Dialog, t: T, revision: BudgetRevision) {
       return t("issue.title", { number: revision.number });
     case "accept":
       return t("accept.title", { number: revision.number });
+    case "askApproval":
+      return t("approval.dialog.title", { number: revision.number });
     case "plan":
       return t("conditions.editPlan");
     case "newLine":

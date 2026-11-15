@@ -208,7 +208,7 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
   `requireSession`, every server action via `getSessionContext()`), and the API routes authenticate per request: a new page or action must too
 - User roles: `admin`, `manager`, `viewer` (staff, portal only) and `client` (homeowner, mobile app only) — Postgres enum. Use `isStaffUser` / `isClientUser` / `STAFF_ROLES` from `@repo/db`. `Ctx` is staff-only: client tokens are rejected by `/api/v1`
 - Clients are created on the **Clients** tab (`/dashboard/clients`, admin only): first name, surnames, date of birth, address, phone, email and app password. Personal details live in `client_profiles`; login data stays on `users`. Client emails are unique across tenants. A project has at most one client, picked from the existing clients on the project page ("Client app access" card); removing them only detaches, the account stays. A client may have **several projects** (homes): see "Several homes" below
-- Mobile client API: `POST /api/mobile/auth` (clients only, returns a 30d JWT), `GET /api/mobile/projects` (all their homes, the default first), `GET /api/mobile/project`, `GET /api/mobile/documents` and `GET /api/mobile/documents/:id` (the PDF), `GET /api/mobile/photos` and `GET /api/mobile/photos/:id` (`?size=thumb`), `POST /api/mobile/password`, `GET`/`PUT /api/mobile/settings` (notification toggles), `POST`/`DELETE /api/mobile/push-token` (the phone's Expo push token + app language), `GET /api/mobile/obra` (the Obra tab: stage, progress, phases, payment hitos), `GET /api/mobile/obra/hitos/:id/:kind` (a hito's signed `acta` or `invoice` PDF) and `GET /api/mobile/changes` (change counters, see "Live updates") — all `Authorization: Bearer`, via `withMobileClient` in `apps/web/lib/api.ts`. Each request re-checks the client is still active. `project`, `obra`, `photos`, `documents` and `changes` take `?projectId=` (`projectParam`), else the default home
+- Mobile client API: `POST /api/mobile/auth` (clients only, returns a 30d JWT), `GET /api/mobile/projects` (all their homes, the default first), `GET /api/mobile/project`, `GET /api/mobile/documents` and `GET /api/mobile/documents/:id` (the PDF), `GET /api/mobile/photos` and `GET /api/mobile/photos/:id` (`?size=thumb`), `POST /api/mobile/password`, `GET`/`PUT /api/mobile/settings` (notification toggles, `deletionRequestedAt`), `POST`/`DELETE /api/mobile/account/deletion-request`, `POST`/`DELETE /api/mobile/push-token` (the phone's Expo push token + app language), `GET /api/mobile/obra` (the Obra tab: stage, progress, phases, payment hitos), `GET /api/mobile/obra/hitos/:id/:kind` (a hito's signed `acta` or `invoice` PDF), `GET /api/mobile/contact` (site manager + office, see "Contact"), `GET /api/mobile/approvals` and `POST /api/mobile/approvals/:id/decision` (a change to approve: see Budget) and `GET /api/mobile/changes` (change counters, see "Live updates") — all `Authorization: Bearer`, via `withMobileClient` in `apps/web/lib/api.ts`. Each request re-checks the client is still active. `project`, `obra`, `photos`, `documents`, `contact` and `changes` take `?projectId=` (`projectParam`), else the default home
 - Several homes: core `client-projects.ts` (`clientProjectsService`): `resolveClientProject` picks the one asked for (404
   `project_not_found` if not theirs) or the default, the newest not handed over (stage < 8, by start date, else created),
   else the newest of all. A file (photo, document, hito PDF) opens for any of the client's homes. The app
@@ -238,12 +238,12 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
 ### Database
 
 - **Driver:** `postgres` (postgres.js) — works with any PostgreSQL (local Docker, Vercel Postgres, AWS RDS, etc.)
-- Schema in `packages/db/src/schema/` by module (`tenants`, `users`, `projects`, `project-files`, `budget`, `hitos`, `construction`, `ai`, `subcontractors`, `purchasing`, `purchase-requests`, `purchase-invoices`, `purchase-checks`, `planning`, `idempotency`, `relations`; `checks.ts` holds `COLUMN_VALUES`, `COLUMN_RANGES` and the CHECK helpers), re-exported by `packages/db/src/schema.ts`, the entry that drizzle-kit, the client, the test databases and `db:drift` read: a new module must be re-exported there — tables: `tenants`, `users`, `client_profiles`, `client_settings`, `push_tokens`, `accounts`, `sessions`, `verification_tokens`, `projects`, `project_documents`, `project_photos`, the construction control's `obra_chapter_progress`, `obra_progress_events`,
-  `obra_invoice_requests`, `obra_issues`, `obra_issue_files`, and the obra's `budget_revisions`, `budget_chapters`, `budget_lines`, `obra_hitos`, `obra_hito_chapters`, `obra_hito_checks`, `obra_hito_photos`, `obra_hito_events`, plus `budget_generations` (AI runs) and `ai_usage` (one row per Claude call, with its cost), and the
+- Schema in `packages/db/src/schema/` by module (`tenants`, `users`, `projects`, `project-files`, `budget`, `budget-approvals`, `hitos`, `construction`, `ai`, `subcontractors`, `purchasing`, `purchase-requests`, `purchase-invoices`, `purchase-checks`, `planning`, `idempotency`, `warranty`, `relations`; `checks.ts` holds `COLUMN_VALUES`, `COLUMN_RANGES` and the CHECK helpers), re-exported by `packages/db/src/schema.ts`, the entry that drizzle-kit, the client, the test databases and `db:drift` read: a new module must be re-exported there — tables: `tenants`, `users`, `client_profiles`, `client_settings`, `push_tokens`, `accounts`, `sessions`, `verification_tokens`, `projects`, `project_documents`, `project_photos`, the construction control's `obra_chapter_progress`, `obra_progress_events`,
+  `obra_invoice_requests`, `obra_issues`, `obra_issue_files`, and the obra's `budget_revisions`, `budget_chapters`, `budget_lines`, `obra_hitos`, `obra_hito_chapters`, `obra_hito_checks`, `obra_hito_photos`, `obra_hito_events`, `budget_revision_changes`, `budget_approvals`, plus `budget_generations` (AI runs) and `ai_usage` (one row per Claude call, with its cost), and the
   Subcontratas tables `subcontractors`, `subcontractor_workers`, `subcontractor_documents`, `subcontractor_document_versions`,
   `subcontractor_assignments`, `subcontractor_audit`, Compras' `purchase_orders`, `purchase_order_lines`,
   `purchase_order_events`, `purchase_order_documents`, `purchase_order_document_versions`, `purchase_order_milestones`, `purchase_invoices`, `purchase_invoice_lines`, `purchase_invoice_files`,
-  `purchase_payments`, `purchase_requests`, `purchase_request_lines`, `purchase_request_events`, `purchase_order_amendments`, `purchase_document_checks`, Planning's `planning_versions`, `planning_items`, and `idempotency_keys`, `user_mfa` (`schema_migrations` is the migration runner's, not in `schema.ts`). A project is deliberately minimal — exactly what the mobile app shows: `ref`, `address`, `start_date`, `completion_date`, plus `client_user_id` linking it to its mobile app client (a client may have several)
+  `purchase_payments`, `purchase_requests`, `purchase_request_lines`, `purchase_request_events`, `purchase_order_amendments`, `purchase_document_checks`, Planning's `planning_versions`, `planning_items`, Garantía's `warranty_claims`, `warranty_claim_photos`, `warranty_claim_events`, and `idempotency_keys`, `user_mfa` (`schema_migrations` is the migration runner's, not in `schema.ts`). A project is deliberately minimal — exactly what the mobile app shows: `ref`, `address`, `start_date`, `completion_date`, plus `client_user_id` linking it to its mobile app client (a client may have several)
 - **Deletes are soft.** What a user deletes is never erased: a project (admins; it leaves the portal and the client's
   app, whatever it holds), a project document or photo, an incident's file, a subcontractor's assignment to an obra
   (assigning again takes the same row back, and an obra's CAE document counts only while the company is assigned to
@@ -558,13 +558,38 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
   writes to the project
 - Portal: Budget tab pages under `dashboard/projects/[id]/budget/` (summary, lines, options, texts, conditions,
   pdf; `?revision=` shows an older one, picked from the menu on the revision pill); `BudgetScreen` / `BudgetStartScreen` are the containers, views in
-  `components/budget/`. Web-only: the app only sees the general PDF (Documentos) and the contract via the obra
+  `components/budget/`. Web-only: the app only sees the general PDF (Documentos), the contract via the obra and a
+  change it is asked to approve (below)
 - Every obra's budget: core `budget-overview.ts` (`listBudgets`: each obra's newest revision at its price, what it
   waits for and the totals; pure rules in `budget-overview-rules.ts` via `@repo/core/contract`), served only by
   `GET /api/v1/budgets` now; the portal's project list filters by the budget instead (below). No obra switcher beside a
   budget (removed: too much space); the budget pages (route group `budget/(obras)/`, no layout of its own) go back with
   the project's "Volver a proyectos". The old Proyectos › Presupuestos page (`dashboard/projects/presupuestos`)
   redirects to the project list. Staff-only, read-only, web-only
+- Changes to the contract and the client's consent (core `budget-approvals.ts`, `budgetApprovalsService`): staff link
+  the changes (CAM-, `obra_issues` of kind change) a revision from Rev.1 on prices (`budget_revision_changes`, a link
+  table: a change may be priced again by the revision reworked from a rejected one), seen on the Budget's summary and
+  on the change (Obra › Incidencias, `ObraIssue.revisions`). On the newest issued revision of a project with an
+  accepted contract and an app client, admins/managers ask the client to approve it in the app (`budget_approvals`:
+  one pending per revision; message, options proposed as chosen, the contract before and after without VAT, VAT rate,
+  the general PDF and a copy of the linked changes (`changes`), all fixed when asked: the portal and the app read the
+  copy while a request waits or stands approved; the PDF is shown to the client if it wasn't and can't be hidden
+  meanwhile (`approval_document`); push `approval` on the "Mensajes del equipo" toggle; links frozen from then on).
+  The client approves with their password (`checkOwnPassword` in `accounts.ts`, the password-change throttle) or
+  rejects with a reason, once (the same answer sent again gets what was recorded); the answer is written once with
+  who and when, never edited, no IP or device. **It is evidence, not the acceptance**: the revision stays issued until
+  staff register it; the accept dialog starts from the approval's day and options, and `acceptRevision` files it as
+  proof (`budget_revisions.accepted_approval_id`) when the options accepted are the ones approved by the project's
+  client now. A pending request closes (`withdrawn` by staff, or `lapsed`) when a later revision is issued, staff
+  accept/reject one by hand, the project's client changes (`project-client.ts`) or the project is deleted; an answered
+  one stays. Asking, issuing, accepting, rejecting and changing the client lock the project's row (`lockProjectRow`),
+  first, then the revision; only issuing takes it last, for its writes alone, never while the PDFs render and upload. Code from before this does not lapse requests: after a rollback past it, close the waiting ones
+  (`doc/ops/rollback.md`). Every write the app sees marks `obra` (the app reloads the card with the obra). Portal: the
+  Budget summary's "Cambios de obra y aprobación del cliente" card (`ChangeApprovalCard`, `AskApprovalDialog`). API:
+  `/api/v1/projects/:id/budget/revisions/:revisionId/approval` (POST ask, DELETE withdraw),
+  `…/revisions/:revisionId/changes/:issueId` (PUT link, DELETE unlink); app: `GET /api/mobile/approvals`
+  (`?projectId=`), `POST /api/mobile/approvals/:id/decision`, Inicio's card and `app/(app)/aprobacion.tsx`. Prod
+  SQL: `packages/db/sql/2026-11-15-1430-budget-approvals.sql`
 
 ### Project list (Proyectos)
 
@@ -633,7 +658,24 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
   `server_error` | `unauthorized`; screens show the matching message, never "wrong password" for a network failure. A
   status the app doesn't know (from a newer server) is left out, never shown as "undefined"
 - `expo-updates` is configured (`runtimeVersion` policy `appVersion`: raise `version` with any native change) so a
-  store build can take a JS-only fix; not yet proven on a device. Releases: `doc/ops/mobile-release.md`
+  store build can take a JS-only fix; not yet proven on a device. `version` is 1.1.0 since `expo-image-picker` (native)
+  came in with Garantía: that release needs a new store build, never an update to 1.0.0. Releases: `doc/ops/mobile-release.md`
+- Store-release bits (web + app): Perfil's "Ayuda" and "Privacidad" rows show only when the build sets
+  `EXPO_PUBLIC_HELP_URL` / `EXPO_PUBLIC_PRIVACY_URL` (https, `eas.json` env; `constants/links.ts`), opened in the
+  browser (`Linking`). Sign-in's "¿Has olvidado tu contraseña?" unfolds a note: the builder sets a new password on
+  Clientes (no reset email). "Mensajes del equipo" (Perfil's third toggle) lets through the pushes of a change to approve and of a warranty answer
+- Asking for the account to be deleted (the stores want it in-app; accounts are the builder's, so it is only a
+  request): `users.deletion_requested_at` (clients only, `users_deletion_request_check`; on `users`, not
+  `client_profiles`, because every client has a `users` row and the request is about the login). Core
+  `clientAccountService.requestDeletion` (idempotent: the first date stays) / `withdrawDeletion`, only for an active
+  client; `POST`/`DELETE /api/mobile/account/deletion-request`, and `deletionRequestedAt` on `GET /api/mobile/settings`
+  (absent from older servers: the app then shows nothing). App: a quiet row at the foot of Perfil → pushed screen
+  `app/account-deletion.tsx`; once asked, Perfil says since when and offers to withdraw. Portal: Clientes shows a
+  "Baja solicitada · date" pill (`GET /api/v1/clients` › `deletionRequestedAt`); "Marcar como atendida"
+  (`clientsService.clearDeletionRequest`, admin, `DELETE /api/v1/clients/:id/deletion-request`) only clears it.
+  Nothing is deleted or deactivated automatically (the portal has no client deactivation yet). One
+  `client.deletion_request` warn line (`action` requested | withdrawn | cleared, ids only). Prod SQL (before the
+  code): `packages/db/sql/2026-11-15-1400-client-deletion-request.sql`
 
 ### Live updates (app open)
 
@@ -647,13 +689,77 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
   core write must call it and get a case in `packages/core/test/changes.test.ts` (a test fails otherwise); budget
   drafts don't, the app only sees the accepted revision. Mobile-only: staff don't need it, so no `/api/v1` route
 
+### Offline (apps/mobile)
+
+- Inicio, Obra (with Fase, Pagos, Hito) and Fotos keep the last successful answer on the phone: the list of homes, and
+  per home the obra and the photo list (`lib/offline-cache.ts`: one JSON file per user / part / home in `Paths.cache`,
+  which backups leave out; versioned with `OFFLINE_FORMAT`, an older or broken file is ignored and deleted). It is
+  opt-in in `useClientData(fetch, { cache: { name, projectId }, onFresh })` (`useProjectData(fetch, name)` for a home's
+  part): the copy shows at once, a server answer replaces it and is stored, and a network failure (`network_error` /
+  `timeout`) keeps it with `offline` + `updatedAt`, shown by `components/offline-note.tsx` ("Sin conexión · datos del …").
+  A key change (another home or user) drops what was shown. The list of homes prunes the files of homes no longer
+  theirs; `signOut` (also the forced one on `unauthorized`) wipes everything (`clearOffline`, which also stops a load in
+  flight from writing). A photo is cached by expo-image's disk cache (thumbnails seen show offline; one never loaded
+  shows a placeholder). No writes offline, no outbox. App-only: no server or database change
+
+### Contact (the app's Contacto)
+
+- Design `doc/mobile-app-design/A-Contact.dc.html` without its "Mensaje" action and site-visit booking (the platform
+  has neither). Service `packages/core/src/contact.ts` (`contactService`); app screen `app/(app)/contact.tsx`, pushed
+  from Inicio's "Contactar" and a payment hito's "Contactar"; it loads each time it opens, so no change counter
+- A project's **site manager** is one of the tenant's staff users (`projects.site_manager_user_id`, `ON DELETE SET
+  NULL`), picked by admins/managers on the project's General tab ("Jefe de obra" card, `SiteManagerCard`); shown only
+  while that user is active staff of the tenant (deactivated: gone from the app at once). The client sees their name,
+  `users.phone` (staff only; set by an admin on Usuarios) and email; call/email open the dialer and the mail app
+  (`Linking`), an action without its data isn't drawn. No availability line (no honest source)
+- The **office** is the tenant's (`tenants.office_address|office_phone|office_email|office_hours`, free text), set by
+  an admin on **Contacto para clientes** (`/dashboard/contacto`, in the rail's settings menu); the app heads it
+  "Oficina {tenant name}" and leaves it out when all four are blank. Nothing given at all: an honest empty state
+- API: `GET /api/mobile/contact` (`?projectId=`, `MobileContact`), `GET`/`PUT /api/v1/projects/:id/site-manager`
+  (`{ userId }`, null for none), `GET`/`PUT /api/v1/tenant/contact`, `phone` on `GET`/`POST /api/v1/users` and
+  `PATCH /api/v1/users/:id`. Prod SQL (before the code: every read of those tables names the columns):
+  `packages/db/sql/2026-11-15-1410-client-contact.sql`
+
+### Garantía (warranty claims)
+
+- The first thing the client writes. Service `packages/core/src/warranty.ts` (`warrantyService`), types and limits in
+  `@repo/core/contract` (`contract/warranty.ts`), bodies in `inputs/warranty.ts`. A handed-over home's client (stage ≥ 8,
+  else 409 `not_handed_over`) sends a claim from the app: kind (`WARRANTY_KINDS`, the mockup's chips), room
+  (`WARRANTY_ROOMS`), description (≤ 2000), urgent; numbered per home GAR-001 (`warrantyRef`), with an idempotency key.
+  Then each photo in its own request (JPEG/PNG/WebP by its bytes, ≤ 4 MB, 4 per claim, with a WebP thumbnail:
+  `photo-image.ts`, shared with project photos), only while it is `received`. Caps per home: 5 waiting at once (409
+  `too_many_open_claims`), 3 a day (429 `too_many_claims_today`). Status received → in_review → scheduled (needs
+  `visit_on`) → resolved, or rejected (needs the answer, its reason), or cancelled by the client while still `received`
+  (else 409 `claim_closed`; staff can't change a cancelled one). A client reads only the claims they sent, on a home
+  still theirs. Nothing is deleted; every step goes to `warranty_claim_events` (the client sees them without staff names)
+- Coverage (LOE art. 17: 1 year finishes, 3 habitability, 10 structure) runs from the hand-over day: H9's
+  `acta_signed_on`, else H9's `paid_on`, else the hand-over date the client was told (`clientDates`); `handoverSource`
+  says which
+- The client is told: staff's change of status, of a scheduled visit's day or a new answer pushes (`notifications.ts`,
+  kind `warranty`, the Perfil toggle "messages": the site manager answering; it opens the claim). Every write either
+  side makes bumps the home's `project` counter (no counter of its own: claims are rare and part of the home's record),
+  and the app's warranty screens reload with the list of homes (`useReloadWithHome` in `apps/mobile/lib/warranty.ts`)
+- App: `app/(app)/warranty/` (`index` the form, A-Warranty; `claims` Mis solicitudes; `[id]` one claim, with cancel),
+  reached from Inicio's Garantía shortcut and from a push. Photos with `expo-image-picker` (camera or library, JPEG at
+  0.6 quality; iOS asked for a compatible JPEG, never HEIC). API `/api/mobile/warranty` (GET coverage + claims, POST
+  create, `?projectId=`), `…/warranty/:id` (GET), `…/:id/cancel` (POST), `…/:id/photos` (POST multipart `file`),
+  `…/:id/photos/:photoId` (GET, `?size=thumb`)
+- Portal: project tab Garantía (`dashboard/projects/[id]/garantia/`: coverage + list, `[claimId]` the claim with its
+  photos, the status / visit / answer form (admins, managers) and its history); views in `components/warranty/`;
+  actions `app/actions/warranty.ts`. API `/api/v1/projects/:id/warranty` (GET), `…/warranty/:claimId` (GET, PATCH),
+  `…/:claimId/photos/:photoId` (GET). No tenant-wide list and no project-list signal yet. Prod SQL:
+  `packages/db/sql/2026-11-15-1420-warranty-claims.sql`
+
 ### Project documents
 
 - PDFs (≤ 4 MB, `MAX_DOCUMENT_BYTES`) shared with a project's client. Admins/managers upload and delete (soft: see Database) on the project page; all staff can download. Service: `packages/core/src/documents.ts`
 - `visible_to_client` decides whether the app shows a document (staff switch it on the Documents tab); budget inputs
   start staff-only. Budget documents (`budget_input`, `budget_pdf`) are grouped first; issued PDFs can't be deleted
 - Files live in a **private Vercel Blob store** (`packages/core/src/storage.ts`) and are only ever streamed through our API after an auth check — no public or presigned URLs. Uploads go through our functions, hence the 4 MB cap (Vercel's 4.5 MB body limit)
-- The mobile app keeps offline copies (`apps/mobile/lib/document-store.ts`), syncs on app open / foreground / pull-to-refresh, and wipes them on sign-out
+- The mobile app keeps offline copies (`apps/mobile/lib/document-store.ts`), syncs on app open / foreground / pull-to-refresh, and wipes them on sign-out.
+  They live in the app's cache directory (`Paths.cache`), which device backups leave out (iOS iCloud, Android Auto
+  Backup); the OS may empty it and the next sync downloads them again. Copies an older build kept in `Paths.document`
+  are moved there on first run. Never keep a client's file in `Paths.document`
 - Photos are visible to the client by default too; staff hide or show each on Obra › Fotos (`project_photos.visible_to_client`,
   `setPhotoVisibility`, `PATCH /api/v1/projects/:id/photos/:photoId`). Prod SQL: `packages/db/sql/2026-10-client-visibility.sql`
 - A photo or document the client can see pushes a notification to the project's client (`packages/core/src/notifications.ts`, via Expo's push service) when uploaded visible or first shown, **once only** (`client_notified_at`: hiding and showing it again pushes nothing; photos one push per 10-minute batch), if their Perfil toggle is on; a failed push never fails the upload. Push needs an EAS project id (`npx eas init`) and a development/store build (not Expo Go); Android sends through

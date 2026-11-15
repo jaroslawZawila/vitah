@@ -4,11 +4,13 @@
 // budget*.ts), behind the project's Budget tab.
 
 import {
+  budgetApprovalsService as approvals,
   budgetGenerationsService as generations,
   budgetIssueService as issue,
   budgetOptionsService as options,
   budgetService as svc,
   searchPriceBase,
+  type AskApprovalInput,
   type BudgetChapterChangesInput,
   type BudgetGenerationInput,
   type BudgetLineChangesInput,
@@ -128,4 +130,25 @@ export async function deleteOptionAction(projectId: string, optionId: string): P
 
 export async function optionFromLineAction(projectId: string, lineId: string, input: OptionFromLineInput): Promise<ObraState> {
   return mutate(projectId, (ctx) => options.optionFromLine(ctx, projectId, lineId, input));
+}
+
+// ─── Changes to the contract and the client's consent (budget-approvals.ts) ──
+
+/** Links a change (CAM-) of the project to the revision that prices it. */
+export async function linkChangeAction(projectId: string, revisionId: string, issueId: string): Promise<ObraState> {
+  return mutate(projectId, (ctx) => approvals.linkChange(ctx, projectId, revisionId, issueId));
+}
+
+export async function unlinkChangeAction(projectId: string, revisionId: string, issueId: string): Promise<ObraState> {
+  return mutate(projectId, (ctx) => approvals.unlinkChange(ctx, projectId, revisionId, issueId));
+}
+
+/** Asks the project's client to approve the issued revision in the app. */
+export async function askApprovalAction(projectId: string, revisionId: string, input: AskApprovalInput): Promise<ObraState> {
+  return mutate(projectId, (ctx) => approvals.askApproval(ctx, projectId, revisionId, input));
+}
+
+/** Takes back the request waiting for the client. */
+export async function withdrawApprovalAction(projectId: string, revisionId: string): Promise<ObraState> {
+  return mutate(projectId, (ctx) => approvals.withdrawApproval(ctx, projectId, revisionId));
 }

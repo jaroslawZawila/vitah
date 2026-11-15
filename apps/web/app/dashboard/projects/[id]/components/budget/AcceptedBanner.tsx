@@ -1,24 +1,28 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import type { BudgetRevision } from "@repo/core/contract";
+import type { BudgetApproval, BudgetRevision } from "@repo/core/contract";
 import { textLink } from "../obra/classes";
 import { useObraFormat } from "../obra/format";
 
 /**
  * Presentational: the accepted revision is the contract, and what proves it:
  * the day the client accepted and who they are, the staff user who registered
- * it and when, and the client's signed copy. A revision accepted before the
+ * it and when, the client's approval in the app filed as proof (if any) and the
+ * client's signed copy. A revision accepted before the
  * registrar was kept shows neither them nor a note about the copy (one may
  * be among the documents, not linked).
  */
 export default function AcceptedBanner({
   revision,
   signedHref,
+  approval = null,
 }: {
   revision: BudgetRevision;
   /** Where the signed copy downloads from; null when none is linked. */
   signedHref: string | null;
+  /** The client's approval in the app filed as proof with it, if any. */
+  approval?: BudgetApproval | null;
 }) {
   const t = useTranslations("budget");
   const f = useObraFormat();
@@ -29,7 +33,7 @@ export default function AcceptedBanner({
         <b>{t("acceptedBanner", { date: f.date(revision.acceptedOn) })}</b>
         {revision.acceptedBy && ` ${t("acceptedBy", { by: revision.acceptedBy })}`}
       </p>
-      {(registrar || signedHref) && (
+      {(registrar || signedHref || approval) && (
         <p className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-meta text-muted-foreground">
           {registrar && acceptedAt && (
             <span>
@@ -38,6 +42,9 @@ export default function AcceptedBanner({
                 date: f.dateTime(acceptedAt),
               })}
             </span>
+          )}
+          {approval?.decidedAt && (
+            <span>{t("acceptedApproval", { by: approval.decidedBy ?? "—", date: f.dateTime(approval.decidedAt) })}</span>
           )}
           {signedHref ? (
             <a href={signedHref} target="_blank" rel="noreferrer" className={textLink}>

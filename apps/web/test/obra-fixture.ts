@@ -209,7 +209,10 @@ export const budget: ProjectBudget = {
     acceptedBy: null,
     acceptedByUser: null,
     signedDocumentId: null,
+    acceptedApprovalId: null,
     rejectedOn: null,
+    changes: [],
+    approvals: [],
     pdfs: { general: null, detailed: null },
     checks: [
       { key: "annex:i1", kind: "inconsistency", title: "Carga de nieve", detail: "E1 frente a E4", ref: null, chapterCode: null, done: false },

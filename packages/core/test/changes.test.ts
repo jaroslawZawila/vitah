@@ -9,12 +9,14 @@ import {
 } from "@repo/db/testing";
 import { db, eq, projects } from "@repo/db";
 import {
+  budgetApprovalsService,
   budgetGenerationsService,
   budgetIssueService,
   budgetOptionsService,
   budgetService,
   changesService as svc,
   constructionService,
+  contactService,
   CHANGE_AREAS,
   deletedService,
   documentsService,
@@ -25,6 +27,7 @@ import {
   projectClientService,
   clientProjectsService,
   projectsService,
+  warrantyService,
   type ChangeArea,
   type Ctx,
 } from "../src";
@@ -50,6 +53,13 @@ async function setup() {
 }
 
 type Setup = Awaited<ReturnType<typeof setup>>;
+
+/** Rev.1, issued: a change to the accepted contract. */
+async function issuedChange({ ctx, project }: Setup, body: Record<string, unknown> = {}) {
+  const { revisionId } = await budgetService.createRevision(ctx, project.id);
+  await budgetIssueService.issueRevision(ctx, project.id, revisionId, { changeReason: "Piscina", ...body });
+  return revisionId;
+}
 
 async function counters(projectId: string) {
   const [row] = await db
@@ -78,6 +88,10 @@ beforeEach(async () => {
 });
 
 afterEach(() => vi.restoreAllMocks());
+
+const CLAIM = { kind: "damp", room: "kitchen", description: "Humedad bajo el fregadero" };
+/** Stage 8: the home is handed over, and its client may send warranty claims. */
+const handOver = (projectId: string) => db.update(projects).set({ obraStage: 8 }).where(eq(projects.id, projectId));
 
 // Each case prepares what it needs, then returns the write to measure.
 type Case = [string, readonly ChangeArea[], (s: Setup) => Promise<() => Promise<unknown>>];
@@ -194,6 +208,60 @@ const cases: Case[] = [
     async ({ ctx, project }) => {
       const { revisionId } = await budgetService.createRevision(ctx, project.id);
       return () => budgetService.acceptRevision(ctx, project.id, revisionId, {}, { unissued: true });
+    },
+  ],
+  // Asking the client to approve a change (budget-approvals.ts): the app shows the request on Inicio.
+  [
+    "askApproval",
+    ["obra", "documents"],
+    async (s) => {
+      const revisionId = await issuedChange(s, { shareWithClient: false });
+      return () => budgetApprovalsService.askApproval(s.ctx, s.project.id, revisionId, {});
+    },
+  ],
+  [
+    "askApproval of a PDF already shown",
+    ["obra"],
+    async (s) => {
+      const revisionId = await issuedChange(s);
+      return () => budgetApprovalsService.askApproval(s.ctx, s.project.id, revisionId, {});
+    },
+  ],
+  [
+    "withdrawApproval",
+    ["obra"],
+    async (s) => {
+      const revisionId = await issuedChange(s);
+      await budgetApprovalsService.askApproval(s.ctx, s.project.id, revisionId, {});
+      return () => budgetApprovalsService.withdrawApproval(s.ctx, s.project.id, revisionId);
+    },
+  ],
+  [
+    "decideApproval",
+    ["obra"],
+    async (s) => {
+      const revisionId = await issuedChange(s);
+      const { approvalId } = await budgetApprovalsService.askApproval(s.ctx, s.project.id, revisionId, {});
+      return () => budgetApprovalsService.decideApproval(s.tenant.id, s.client.id, approvalId, { decision: "reject", reason: "No" });
+    },
+  ],
+  [
+    "rejectRevision with a request waiting",
+    ["obra"],
+    async (s) => {
+      const revisionId = await issuedChange(s);
+      await budgetApprovalsService.askApproval(s.ctx, s.project.id, revisionId, {});
+      return () => budgetService.rejectRevision(s.ctx, s.project.id, revisionId);
+    },
+  ],
+  [
+    "issueRevision after a request",
+    ["obra", "documents"],
+    async (s) => {
+      const asked = await issuedChange(s);
+      await budgetApprovalsService.askApproval(s.ctx, s.project.id, asked, {});
+      const { revisionId } = await budgetService.createRevision(s.ctx, s.project.id);
+      return () => budgetIssueService.issueRevision(s.ctx, s.project.id, revisionId, { changeReason: "Otra" });
     },
   ],
   [
@@ -322,6 +390,43 @@ const cases: Case[] = [
       return () => planningService.approvePlanningDraft(ctx, project.id, {});
     },
   ],
+  // Warranty claims (warranty.ts): the claim screen reloads with the home (`project`), whoever wrote.
+  [
+    "createClientClaim",
+    ["project"],
+    async ({ tenant, client, project }) => {
+      await handOver(project.id);
+      return () => warrantyService.createClientClaim(tenant.id, client.id, project.id, CLAIM);
+    },
+  ],
+  [
+    "addClientClaimPhoto",
+    ["project"],
+    async ({ tenant, client, project }) => {
+      await handOver(project.id);
+      const { claimId } = await warrantyService.createClientClaim(tenant.id, client.id, project.id, CLAIM);
+      const file = await testImage();
+      return () => warrantyService.addClientClaimPhoto(tenant.id, client.id, claimId, { file });
+    },
+  ],
+  [
+    "cancelClientClaim",
+    ["project"],
+    async ({ tenant, client, project }) => {
+      await handOver(project.id);
+      const { claimId } = await warrantyService.createClientClaim(tenant.id, client.id, project.id, CLAIM);
+      return () => warrantyService.cancelClientClaim(tenant.id, client.id, claimId);
+    },
+  ],
+  [
+    "updateClaim",
+    ["project"],
+    async ({ ctx, tenant, client, project }) => {
+      await handOver(project.id);
+      const { claimId } = await warrantyService.createClientClaim(tenant.id, client.id, project.id, CLAIM);
+      return () => warrantyService.updateClaim(ctx, project.id, claimId, { status: "in_review" });
+    },
+  ],
   // Bringing back what a user deleted (deleted.ts): the client sees it again.
   [
     "restoreDeleted",
@@ -430,6 +535,9 @@ describe("writes the client sees", () => {
     "updateIssue",
     "addIssueFile",
     "deleteIssueFile",
+    // The app's Contacto is a pushed screen that loads each time it opens: no counter (contact.ts).
+    "setSiteManager",
+    "updateOfficeContact",
     // Helpers, not writes.
     "requirePdf",
     "newPdfDocument",
@@ -452,6 +560,16 @@ describe("writes the client sees", () => {
     // Reads behind Proyectos › Presupuestos (budget-overview.ts).
     "toSummary",
     "revisionChecks",
+    // Linking changes to a revision: staff-only until the client is asked, and frozen from then on.
+    "linkChange",
+    "unlinkChange",
+    // Helpers of budget-approvals.ts: their callers mark (lapseApprovals: issue, accept, reject, a client change).
+    "lapseApprovals",
+    "approvalAsProof",
+    "lockProjectRow",
+    "documentInApproval",
+    "revisionApprovals",
+    "revisionsOfChanges",
   ]);
 
   it("covers every write of the services the app shows", () => {
@@ -466,10 +584,13 @@ describe("writes the client sees", () => {
       budgetOptionsService,
       budgetIssueService,
       budgetGenerationsService,
+      budgetApprovalsService,
       hitosService,
       constructionService,
       planningService,
       deletedService,
+      contactService,
+      warrantyService,
     ];
     const covered = new Set([...cases.map(([name]) => name), "createBudget"]);
     const unchecked = services

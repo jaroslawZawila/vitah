@@ -6,18 +6,22 @@ import {
   eq,
   inArray,
   isClientUser,
+  isNotNull,
+  isNull,
   pushTokens,
   users,
 } from "@repo/db";
 import { changeOwnPassword } from "./accounts";
-import type { AccountError, MobileSettings } from "./contract";
+import type { AccountError, DeletionRequest, MobileSettings } from "./contract";
 import { CoreError } from "./errors";
+import { logWarn } from "./log";
 import { clientErrorReportSchema, clientSettingsSchema, pushTokenRemovalSchema, pushTokenSchema } from "./inputs/clients";
 import { parse } from "./inputs/fields";
 
 // ─── Client account ──────────────────────────────────────────────────────────
 // What a signed-in client manages themselves in the app's Perfil tab: their
-// password and notifications, and the phones that get pushes.
+// password and notifications, the phones that get pushes, and asking for the
+// account to be deleted.
 // Called with the client's own identity (from their mobile token).
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -36,7 +40,8 @@ function fail(code: AccountError): never {
   throw new CoreError(code, STATUS[code]);
 }
 
-const clientUser = (tenantId: string, clientUserId: string) =>
+/** The mobile-app client `clientUserId` of the tenant. */
+export const clientUser = (tenantId: string, clientUserId: string) =>
   and(eq(users.id, clientUserId), eq(users.tenantId, tenantId), isClientUser);
 
 /**
@@ -54,9 +59,10 @@ export async function changePassword(
   return { success: true };
 }
 
-/** A client's settings; no settings row means these. */
+/** A client's settings; no settings row (and no deletion request) means these. */
 export const DEFAULT_SETTINGS: MobileSettings = {
   notifications: { progress: true, documents: true, messages: true },
+  deletionRequestedAt: null,
 };
 
 type Flags = {
@@ -77,11 +83,19 @@ export function settingsOf(row: Flags | undefined): MobileSettings {
   };
 }
 
-export async function getSettings(tenantId: string, clientUserId: string) {
-  const row = await db.query.clientSettings.findFirst({
-    where: and(eq(clientSettings.userId, clientUserId), eq(clientSettings.tenantId, tenantId)),
-  });
-  return settingsOf(row);
+const iso = (date: Date | null) => date?.toISOString() ?? null;
+
+export async function getSettings(tenantId: string, clientUserId: string): Promise<MobileSettings> {
+  const [row, user] = await Promise.all([
+    db.query.clientSettings.findFirst({
+      where: and(eq(clientSettings.userId, clientUserId), eq(clientSettings.tenantId, tenantId)),
+    }),
+    db.query.users.findFirst({
+      where: clientUser(tenantId, clientUserId),
+      columns: { deletionRequestedAt: true },
+    }),
+  ]);
+  return { ...settingsOf(row), deletionRequestedAt: iso(user?.deletionRequestedAt ?? null) };
 }
 
 const COLUMNS = {
@@ -105,7 +119,7 @@ export async function updateSettings(
 
   const user = await db.query.users.findFirst({
     where: clientUser(tenantId, clientUserId),
-    columns: { id: true },
+    columns: { deletionRequestedAt: true },
   });
   if (!user) fail("not_found");
 
@@ -118,7 +132,57 @@ export async function updateSettings(
       set: { ...changes, updatedAt: new Date() },
     })
     .returning();
-  return settingsOf(row);
+  return { ...settingsOf(row), deletionRequestedAt: iso(user.deletionRequestedAt) };
+}
+
+// ─── Asking for the account to be deleted ────────────────────────────────────
+// Accounts are the builder's: the client only asks, and staff handle it by
+// hand (the request shows on Clientes). Nothing is deleted or deactivated here.
+
+const activeClient = (tenantId: string, clientUserId: string) =>
+  and(clientUser(tenantId, clientUserId), eq(users.active, true));
+
+/** One log line per request made, withdrawn or cleared by staff: ids only. */
+export function logDeletionRequest(action: "requested" | "withdrawn" | "cleared", tenantId: string, userId: string) {
+  logWarn("client.deletion_request", undefined, { action, tenantId, userId });
+}
+
+/**
+ * The client asks for their account to be deleted. Asking again keeps the
+ * first date. A client no longer active (or not theirs) is `not_found`.
+ */
+export async function requestDeletion(tenantId: string, clientUserId: string): Promise<DeletionRequest> {
+  const [made] = await db
+    .update(users)
+    .set({ deletionRequestedAt: new Date() })
+    .where(and(activeClient(tenantId, clientUserId), isNull(users.deletionRequestedAt)))
+    .returning({ deletionRequestedAt: users.deletionRequestedAt });
+  if (made) {
+    logDeletionRequest("requested", tenantId, clientUserId);
+    return { deletionRequestedAt: iso(made.deletionRequestedAt) };
+  }
+  const user = await db.query.users.findFirst({
+    where: activeClient(tenantId, clientUserId),
+    columns: { deletionRequestedAt: true },
+  });
+  if (!user) fail("not_found");
+  return { deletionRequestedAt: iso(user.deletionRequestedAt) };
+}
+
+/** The client withdraws their request; withdrawing none is fine. */
+export async function withdrawDeletion(tenantId: string, clientUserId: string): Promise<DeletionRequest> {
+  const [withdrawn] = await db
+    .update(users)
+    .set({ deletionRequestedAt: null })
+    .where(and(activeClient(tenantId, clientUserId), isNotNull(users.deletionRequestedAt)))
+    .returning({ id: users.id });
+  if (withdrawn) {
+    logDeletionRequest("withdrawn", tenantId, clientUserId);
+  } else {
+    const user = await db.query.users.findFirst({ where: activeClient(tenantId, clientUserId), columns: { id: true } });
+    if (!user) fail("not_found");
+  }
+  return { deletionRequestedAt: null };
 }
 
 /** Phones a client may get pushes on; registering another forgets the least recent. */

@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { db, eq, users } from "@repo/db";
 import { createTestTenant, createTestUser, resetDatabase } from "@repo/db/testing";
 import { signInAs } from "../../test/session";
-import { changePasswordAction, getUsers, resetUserPasswordAction, setLanguageAction } from "./users";
+import { changePasswordAction, getUsers, resetUserPasswordAction, setLanguageAction, updateUserPhoneAction } from "./users";
 import { TO_FORBIDDEN, TO_LOGIN } from "../../test/navigation";
 
 vi.mock("@repo/auth/context", async () => (await import("../../test/session")).sessionMock);
@@ -265,6 +265,39 @@ describe("resetUserPasswordAction", () => {
     signInAs(null);
 
     await expect(resetUserPasswordAction("u-1", form({ password: NEXT }))).rejects.toEqual(TO_LOGIN);
+  });
+});
+
+describe("updateUserPhoneAction", () => {
+  async function setup() {
+    const tenant = await createTestTenant();
+    const admin = await createTestUser(tenant.id, { role: "admin" });
+    const manager = await createTestUser(tenant.id, { role: "manager" });
+    signInAs({ tenantId: tenant.id, userId: admin.id, role: "admin" });
+    return { tenant, admin, manager };
+  }
+
+  it("lets an admin set and clear a staff user's phone", async () => {
+    const { manager } = await setup();
+
+    expect(await updateUserPhoneAction(manager.id, form({ phone: "+34 600 111 222" }))).toEqual({});
+    expect((await reload(manager.id)).phone).toBe("+34 600 111 222");
+    expect(revalidatePath).toHaveBeenCalledWith("/dashboard/users");
+    expect(await updateUserPhoneAction(manager.id, form({ phone: " " }))).toEqual({});
+    expect((await reload(manager.id)).phone).toBeNull();
+  });
+
+  it("refuses a bad phone, another tenant's user and anyone but an admin", async () => {
+    const { tenant, admin, manager } = await setup();
+    const other = await createTestTenant();
+    const stranger = await createTestUser(other.id, { role: "manager" });
+
+    expect(await updateUserPhoneAction(manager.id, form({ phone: "call me" }))).toEqual({ error: "invalid_phone" });
+    expect(await updateUserPhoneAction(stranger.id, form({ phone: "600 111 222" }))).toEqual({ error: "not_found" });
+    signInAs({ tenantId: tenant.id, userId: admin.id, role: "manager" });
+    expect(await updateUserPhoneAction(manager.id, form({ phone: "600 111 222" }))).toEqual({ error: "forbidden" });
+    expect((await reload(manager.id)).phone).toBeNull();
+    expect((await reload(stranger.id)).phone).toBeNull();
   });
 });
 

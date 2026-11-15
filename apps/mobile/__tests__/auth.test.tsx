@@ -4,6 +4,7 @@ import * as LocalAuthentication from "expo-local-authentication";
 import { api } from "../lib/api";
 import { AuthProvider, useAuth } from "../lib/auth";
 import { Image } from "expo-image";
+import { clearOffline } from "../lib/offline-cache";
 import { clearDocuments } from "../lib/document-store";
 import { clearHitoFiles } from "../lib/hito-files";
 import { secureStore } from "../test-utils/secure-store";
@@ -11,6 +12,7 @@ import { secureStore } from "../test-utils/secure-store";
 jest.mock("../lib/api", () => ({ api: { signIn: jest.fn(), getChanges: jest.fn(), removePushToken: jest.fn() } }));
 jest.mock("../lib/document-store", () => ({ clearDocuments: jest.fn() }));
 jest.mock("../lib/hito-files", () => ({ clearHitoFiles: jest.fn() }));
+jest.mock("../lib/offline-cache", () => ({ clearOffline: jest.fn() }));
 jest.mock("expo-image", () => ({
   Image: { clearDiskCache: jest.fn(async () => true), clearMemoryCache: jest.fn(async () => true) },
 }));
@@ -26,6 +28,7 @@ beforeEach(() => {
   jest.mocked(api.removePushToken).mockReset().mockResolvedValue({ ok: true, data: { success: true } });
   jest.mocked(clearDocuments).mockReset();
   jest.mocked(clearHitoFiles).mockReset();
+  jest.mocked(clearOffline).mockReset();
   jest.mocked(Image.clearDiskCache).mockReset().mockResolvedValue(true);
 });
 
@@ -93,6 +96,7 @@ describe("AuthProvider", () => {
     expect(store.size).toBe(0);
     expect(clearDocuments).toHaveBeenCalled();
     expect(clearHitoFiles).toHaveBeenCalled();
+    expect(clearOffline).toHaveBeenCalled();
     // Cached site photos go too.
     expect(Image.clearDiskCache).toHaveBeenCalled();
     expect(Image.clearMemoryCache).toHaveBeenCalled();
@@ -155,6 +159,20 @@ describe("sign-out", () => {
     expect(api.removePushToken).toHaveBeenLastCalledWith("stored-token", "ExponentPushToken[x]");
   });
 
+  it("wipes the offline copies again once signed out, after any load still holding the token", async () => {
+    const result = await signedIn();
+    const tokenAtWipe: (string | null)[] = [];
+    jest.mocked(clearOffline).mockImplementation(async () => void tokenAtWipe.push(result.current.token));
+
+    await act(() => result.current.signOut());
+
+    // Last of the steps (the screens still had the token), then once the token is gone everywhere.
+    expect(tokenAtWipe).toEqual(["stored-token", null]);
+    expect(jest.mocked(clearOffline).mock.invocationCallOrder[0]).toBeGreaterThan(
+      jest.mocked(Image.clearMemoryCache).mock.invocationCallOrder[0]!,
+    );
+  });
+
   it("still signs out when a step on the phone fails", async () => {
     jest.mocked(clearDocuments).mockImplementation(() => {
       throw new Error("disk error");
@@ -169,6 +187,7 @@ describe("sign-out", () => {
     expect(store.has("vitah_token")).toBe(false);
     // The steps after the failed ones ran too.
     expect(clearHitoFiles).toHaveBeenCalled();
+    expect(clearOffline).toHaveBeenCalled();
     expect(Image.clearMemoryCache).toHaveBeenCalled();
   });
 });

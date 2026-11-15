@@ -2,7 +2,6 @@ import Feather, { type FeatherIconName } from "@react-native-vector-icons/feathe
 import { useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import {
-  Alert,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -11,7 +10,9 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { ApprovalCard } from "../../../components/approval-card";
 import { LoadState } from "../../../components/load-state";
+import { OfflineNote, offlineSince } from "../../../components/offline-note";
 import { BigPct, Marker, SectionHeader, SegmentedBar } from "../../../components/obra-parts";
 import { PhotoImage } from "../../../components/photo-image";
 import { HomeText, ProjectSheet } from "../../../components/project-switch";
@@ -29,8 +30,7 @@ import { usePhotos } from "../../../lib/use-photos";
 import { useProject } from "../../../lib/use-project";
 
 // Tab "Inicio" — doc/mobile-app-design/A-Home.dc.html. The notifications
-// bell is left out until push is on; Garantía and Contactar say they're
-// coming soon. A client with several homes sees the one shown, a pill to
+// bell is left out until push is on. A client with several homes sees the one shown, a pill to
 // switch and their other homes below (A-Viviendas.dc.html).
 
 /** "Buenos días" until noon, "Buenas tardes" until 8 pm, then "Buenas noches". */
@@ -50,9 +50,10 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const { t } = useI18n();
-  const { project, projects, error, refreshing, refresh, retry, select } = useProject();
+  const { project, projects, error, refreshing, refresh, retry, select, ...projectState } = useProject();
   const photos = usePhotos();
   const obra = useObra();
+  const offlineAt = offlineSince(projectState, photos, obra);
   const loaded = project !== undefined;
   const firstName = user?.name?.split(" ")[0];
   const others = projects?.filter((p) => p.id !== project?.id) ?? [];
@@ -113,13 +114,15 @@ export default function HomeScreen() {
         </View>
       )}
 
-      {loaded && (error || photos.error || obra.error) && (
+      {loaded && offlineAt && <OfflineNote offline updatedAt={offlineAt} />}
+      {loaded && !offlineAt && (error || photos.error || obra.error) && (
         <Text selectable accessibilityRole="alert" style={[type.subhead, { color: colors.error }]}>
           {t("home.refreshFailed")}
         </Text>
       )}
 
       {project && <ProjectCard project={project} homes={others.length + 1} />}
+      {project && <ApprovalCard />}
       {project && <LatestUpdate weeks={photos.weeks} />}
       {project && <Shortcuts />}
       {project && others.length > 0 && <OtherHomes homes={others} onPick={select} />}
@@ -286,14 +289,14 @@ function OtherHomes({ homes, onPick }: { homes: Project[]; onPick: (id: string) 
 type Shortcut = {
   label: MessageKey;
   icon: FeatherIconName;
-  /** A tab, or nothing yet ("Próximamente"). */
-  href?: "/documents" | "/profile";
+  /** A tab or a pushed screen. */
+  href: "/documents" | "/profile" | "/contact" | "/warranty";
 };
 
 const SHORTCUTS: Shortcut[] = [
   { label: "tabs.documents", icon: "file-text", href: "/documents" },
-  { label: "home.warranty", icon: "shield" },
-  { label: "home.contact", icon: "message-circle" },
+  { label: "home.warranty", icon: "shield", href: "/warranty" },
+  { label: "home.contact", icon: "message-circle", href: "/contact" },
   { label: "home.settings", icon: "settings", href: "/profile" },
 ];
 
@@ -306,9 +309,7 @@ function Shortcuts() {
       {SHORTCUTS.map(({ label, icon, href }) => (
         <Pressable
           key={label}
-          onPress={() =>
-            href ? router.navigate(href) : Alert.alert(t("home.comingSoon"), t("home.comingSoonText"))
-          }
+          onPress={() => router.navigate(href)}
           accessibilityRole="button"
           accessibilityLabel={t(label)}
           style={({ pressed }) => [styles.shortcut, pressed && { opacity: 0.6 }]}

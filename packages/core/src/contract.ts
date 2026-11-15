@@ -8,6 +8,7 @@ export * from "./contract/clients";
 export * from "./contract/files";
 export * from "./contract/obra";
 export * from "./contract/budget";
+export * from "./contract/budget-approvals";
 export * from "./contract/budget-overview";
 export * from "./budget-overview-rules";
 export * from "./project-filters";
@@ -24,6 +25,8 @@ export { lateToFinishDays, lateToStartDays, projectSchedule, scheduleStatus, typ
 export * from "./contract/subcontractors";
 export * from "./subcontractor-rules";
 export * from "./contract/deleted";
+export * from "./contract/contact";
+export * from "./contract/warranty";
 
 // ─── Write inputs ────────────────────────────────────────────────────────────
 // What the writes take, inferred from their zod schemas (./inputs). Types only:
@@ -37,6 +40,7 @@ export type {
 } from "./inputs/purchase-invoices";
 export { MAX_AMOUNT_CENTS } from "./money";
 export type { AcceptRevisionInput, BudgetChapterChangesInput, BudgetGenerationInput, BudgetLineChangesInput, BudgetOptionChangesInput, BudgetProgressInput, BudgetRevisionChangesInput, IssueRevisionInput, NewBudgetChapterInput, NewBudgetInput, NewBudgetLineInput, NewBudgetOptionInput, OptionFromLineInput, RejectRevisionInput } from "./inputs/budget";
+export type { ApprovalDecisionInput, AskApprovalInput } from "./inputs/budget-approvals";
 export type { ActaPhotosInput, HitoChangesInput, HitoCheckChangesInput, HitoFileInput, HitoPaymentInput, HitoPlanInput, NewHitoCheckInput } from "./inputs/hitos";
 export type { ObraStageInput } from "./inputs/obra";
 
@@ -50,4 +54,6 @@ export type { PlanningApproveInput, PlanningDraftInput, PlanningDraftNewInput, P
 export type { MeChangesInput, MfaCodeInput, MfaDisableInput, MobileSignInInput, PasswordChangeInput, PasswordInput, StaffUserChangesInput, StaffUserInput } from "./inputs/accounts";
 export type { ClientErrorReportInput, ClientInput, ClientSettingsInput, ProjectClientInput, PushTokenInput, PushTokenRemovalInput } from "./inputs/clients";
 export type { BudgetInputRegistrationInput, ProjectChangesInput, ProjectDocumentInput, ProjectInput, ProjectPhotoInput, VisibilityInput } from "./inputs/projects";
+export type { OfficeContactInput, SiteManagerInput } from "./inputs/contact";
+export type { WarrantyClaimChangesInput, WarrantyClaimInput } from "./inputs/warranty";
 export type { AccessCheckInput, AssignmentInput, DocumentRejectionInput, DocumentRequestInput, NotApplicableInput, SubcontractorChangesInput, SubcontractorDocumentInput, SubcontractorInput, WorkerChangesInput, WorkerInput } from "./inputs/subcontractors";

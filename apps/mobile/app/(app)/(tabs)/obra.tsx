@@ -4,6 +4,7 @@ import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "r
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { AppLanguage, MobileObra, MobilePhase } from "@repo/core/contract";
 import { LoadState } from "../../../components/load-state";
+import { OfflineNote } from "../../../components/offline-note";
 import { ProjectEyebrow } from "../../../components/project-switch";
 import { Bar, BigPct, Figure, Marker } from "../../../components/obra-parts";
 import { card, colors, radius, spacing, type } from "../../../constants/theme";
@@ -25,7 +26,7 @@ import { usePhotos } from "../../../lib/use-photos";
 export default function ObraScreen() {
   const insets = useSafeAreaInsets();
   const { t } = useI18n();
-  const { obra, error, refreshing, refresh, retry } = useObra();
+  const { obra, error, refreshing, refresh, retry, offline, updatedAt } = useObra();
   const photos = usePhotos();
   const loaded = obra !== undefined;
 
@@ -69,7 +70,12 @@ export default function ObraScreen() {
         failedText={t("obra.loadFailed")}
         onRetry={retry}
       />
-      {loaded && error && (
+      {loaded && offline && updatedAt && (
+        <View style={styles.gap}>
+          <OfflineNote offline updatedAt={updatedAt} />
+        </View>
+      )}
+      {loaded && error && !(offline && updatedAt) && (
         <Text accessibilityRole="alert" style={[type.subhead, styles.gap, { color: colors.error }]}>
           {t("home.refreshFailed")}
         </Text>

@@ -57,6 +57,8 @@ export type ProjectDocument = MobileDocument & {
 /** Error codes of the documents service (`{ error: code }` in the API). */
 export type DocumentError =
   | "budget_document"
+  /** Hiding a revision's PDF the client is asked to approve, or approved. */
+  | "approval_document"
   | "generation_running"
   | "missing_fields"
   | "missing_file"

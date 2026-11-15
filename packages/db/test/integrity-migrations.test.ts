@@ -1,7 +1,7 @@
 // The production SQL files take a database in the schema from before them
 // (test/fixtures/schema-before-2026-11-15.sql) to exactly what schema.ts
 // builds, through the real runner, also when production's key names differ,
-// when they run twice, and when existing rows break a new constraint.
+// when every one of them runs twice, and when existing rows break a new constraint.
 
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -61,7 +61,7 @@ const drift = async (db: Scratch) =>
 describe("the integrity migrations", () => {
   it("are new files the runner takes: after the fixture, no transaction control of their own", async () => {
     expect(newer).toEqual(expect.arrayContaining(INTEGRITY));
-    for (const name of INTEGRITY) expect(transactionControl(await readFile(join(SQL_DIR, name), "utf8")), name).toBeNull();
+    for (const name of newer) expect(transactionControl(await readFile(join(SQL_DIR, name), "utf8")), name).toBeNull();
   });
 
   it("take the schema from before them to exactly what schema.ts builds", async () => {
@@ -89,14 +89,15 @@ describe("the integrity migrations", () => {
       { n: 1 }, // ai_usage.project_id: ON DELETE SET NULL, kept as it was.
     ]);
 
-    for (const name of INTEGRITY) await db.query(await readFile(join(SQL_DIR, name), "utf8"));
+    // Every file after the fixture, once more: each says it is safe to run twice.
+    for (const name of newer) await db.query(await readFile(join(SQL_DIR, name), "utf8"));
     expect(await drift(db)).toEqual([]);
   });
 
   it("leave a constraint that existing rows break NOT VALID, say so, and still check every new write", async () => {
     const db = await before(
-      tenantTree("a") +
-        tenantTree("b") +
+      tenantTree("a", { fixtureOnly: true }) +
+        tenantTree("b", { fixtureOnly: true }) +
         // Legacy rows the new constraints would refuse: a stage out of range, and a document under another tenant's project.
         "update projects set obra_stage = 9 where id = 'project_a';" +
         "update project_documents set project_id = 'project_b' where id = 'document_a';",

@@ -19,6 +19,19 @@ export async function openHitoFile(token: string, hitoId: string, kind: HitoFile
   await openPdf(file);
 }
 
+/**
+ * A project document the client must see now and that isn't on the phone yet
+ * (the budget a change to approve comes with): downloaded and opened the same
+ * way, wiped with them on sign-out.
+ */
+export async function openDocumentCopy(token: string, documentId: string) {
+  const dir = folder();
+  if (!dir.exists) dir.create({ intermediates: true });
+  const file = new File(dir, `document-${documentId}-${Date.now()}.pdf`);
+  await downloadWithToken(api.documentUrl(documentId), file, token);
+  await openPdf(file);
+}
+
 /** Deletes every downloaded acta and invoice (sign-out). */
 export function clearHitoFiles() {
   const dir = folder();

@@ -13,6 +13,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { AppLanguage, MobilePhoto } from "@repo/core/contract";
 import { Button } from "../../../components/button";
+import { OfflineNote } from "../../../components/offline-note";
 import { PhotoImage } from "../../../components/photo-image";
 import { ProjectEyebrow } from "../../../components/project-switch";
 import { colors, spacing, type } from "../../../constants/theme";
@@ -28,7 +29,7 @@ import { usePhotos } from "../../../lib/use-photos";
 
 export default function PhotosScreen() {
   const insets = useSafeAreaInsets();
-  const { photos, weeks, error, refreshing, refresh, retry } = usePhotos();
+  const { photos, weeks, error, refreshing, refresh, retry, offline, updatedAt } = usePhotos();
   const { t } = useI18n();
   const [viewing, setViewing] = useState<MobilePhoto | null>(null);
 
@@ -38,8 +39,10 @@ export default function PhotosScreen() {
       <Text accessibilityRole="header" style={type.display}>
         {t("photos.title")}
       </Text>
-      {error && photos && photos.length > 0 && (
-        <Text style={type.subhead}>{t("photos.offline")}</Text>
+      {offline && updatedAt ? (
+        <OfflineNote offline updatedAt={updatedAt} />
+      ) : (
+        error && photos && photos.length > 0 && <Text style={type.subhead}>{t("photos.offline")}</Text>
       )}
     </View>
   );

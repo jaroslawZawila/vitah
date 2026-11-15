@@ -15,7 +15,7 @@ const ObraContext = createContext<ObraValue | null>(null);
 
 /** One copy of the obra of the home shown, for the Obra tab, Inicio and the screens pushed from them. */
 export function ObraProvider({ children }: { children: React.ReactNode }) {
-  const { data, ...state } = useProjectData(getObra);
+  const { data, ...state } = useProjectData(getObra, "obra");
   const obra = data?.obra;
   const value = useMemo(() => ({ ...state, obra }), [state, obra]);
   return <ObraContext value={value}>{children}</ObraContext>;

@@ -1,8 +1,8 @@
 import bcrypt from "bcryptjs";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { clientProfiles, db, eq, pushTokens, users } from "@repo/db";
 import { createTestTenant, createTestUser, resetDatabase } from "@repo/db/testing";
-import { clientsService as svc, type Ctx } from "../src";
+import { clientAccountService, clientsService as svc, type Ctx } from "../src";
 
 const validInput = {
   firstName: "Ana",
@@ -155,9 +155,19 @@ describe("listClients", () => {
         phone: "+34 600 123 456",
         active: true,
         createdAt: expect.any(String),
+        deletionRequestedAt: null,
       },
       expect.objectContaining({ id: legacy.id, firstName: null, surnames: null }),
     ]);
+  });
+
+  it("says when a client asked in the app for their account to be deleted", async () => {
+    const { tenant, ctx } = await setup();
+    const { id } = await svc.createClient(ctx, validInput);
+
+    const { deletionRequestedAt } = await clientAccountService.requestDeletion(tenant.id, id);
+
+    expect(await svc.listClients(ctx)).toEqual([expect.objectContaining({ id, deletionRequestedAt })]);
   });
 
   it("does not list staff", async () => {
@@ -172,6 +182,52 @@ describe("listClients", () => {
     await expect(svc.listClients({ ...ctx, role: "manager" })).rejects.toMatchObject({
       code: "forbidden",
     });
+  });
+});
+
+describe("clearDeletionRequest", () => {
+  async function asked() {
+    const { tenant, ctx } = await setup();
+    const { id } = await svc.createClient(ctx, validInput);
+    await clientAccountService.requestDeletion(tenant.id, id);
+    return { ctx, id };
+  }
+  let warn: ReturnType<typeof vi.spyOn>;
+  beforeEach(() => {
+    warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+  });
+  afterEach(() => warn.mockRestore());
+
+  it("marks it handled, deleting and deactivating nothing", async () => {
+    const { ctx, id } = await asked();
+
+    expect(await svc.clearDeletionRequest(ctx, id)).toEqual({ id });
+
+    expect(await findUser(validInput.email)).toMatchObject({ id, active: true, deletionRequestedAt: null });
+    expect(await findProfile(id)).toBeDefined();
+    const actions = warn.mock.calls.map((call: unknown[]) => JSON.parse(String(call[0])).action);
+    expect(actions).toEqual(["requested", "cleared"]);
+    // Nothing to clear: fine, and nothing logged.
+    expect(await svc.clearDeletionRequest(ctx, id)).toEqual({ id });
+    expect(warn).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not touch staff or other tenants' clients", async () => {
+    const { ctx, id } = await asked();
+    const other = await setup();
+
+    await expect(svc.clearDeletionRequest(other.ctx, id)).rejects.toMatchObject({ code: "not_found", status: 404 });
+    await expect(svc.clearDeletionRequest(ctx, ctx.userId)).rejects.toMatchObject({ code: "not_found" });
+    expect((await findUser(validInput.email))!.deletionRequestedAt).toBeInstanceOf(Date);
+  });
+
+  it("is admin only", async () => {
+    const { ctx, id } = await asked();
+
+    await expect(svc.clearDeletionRequest({ ...ctx, role: "manager" }, id)).rejects.toMatchObject({
+      code: "forbidden",
+    });
+    expect((await findUser(validInput.email))!.deletionRequestedAt).toBeInstanceOf(Date);
   });
 });
 

@@ -288,6 +288,14 @@ describe("PagoScreen", () => {
     expect(screen.getAllByText("34.511,79 €")).toHaveLength(2);
   });
 
+  it("opens Contacto from Contactar", async () => {
+    mockParams = { id: "h3" };
+    render(wrap(<PagoScreen />));
+
+    fireEvent.press(await screen.findByRole("button", { name: "Contactar" }));
+    expect(mockPush).toHaveBeenCalledWith("/contact");
+  });
+
   it("has no documents before the acta", async () => {
     mockParams = { id: "h4" };
     render(wrap(<PagoScreen />));

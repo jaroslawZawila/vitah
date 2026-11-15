@@ -1,5 +1,5 @@
 import bcrypt from "bcryptjs";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { db, eq, pushTokens, users } from "@repo/db";
 import { createTestTenant, createTestUser, resetDatabase } from "@repo/db/testing";
 import { clientAccountService as svc, isStrongPassword } from "../src";
@@ -96,6 +96,7 @@ describe("settings", () => {
 
     expect(await svc.getSettings(tenant.id, client.id)).toEqual({
       notifications: { progress: true, documents: true, messages: true },
+      deletionRequestedAt: null,
     });
   });
 
@@ -109,6 +110,7 @@ describe("settings", () => {
 
     expect(settings).toEqual({
       notifications: { progress: true, documents: false, messages: false },
+      deletionRequestedAt: null,
     });
     expect(await svc.getSettings(tenant.id, client.id)).toEqual(settings);
   });
@@ -139,6 +141,96 @@ describe("settings", () => {
     await expect(svc.updateSettings(other.tenant.id, client.id, off)).rejects.toMatchObject({
       code: "not_found",
     });
+  });
+});
+
+describe("asking for the account to be deleted", () => {
+  const requestedAt = async (userId: string) =>
+    (await db.query.users.findFirst({ where: eq(users.id, userId) }))!.deletionRequestedAt;
+  const logged = (spy: { mock: { calls: unknown[][] } }) =>
+    spy.mock.calls
+      .map(([line]) => JSON.parse(String(line)) as Record<string, unknown>)
+      .filter((line) => line.event === "client.deletion_request");
+  let warn: ReturnType<typeof vi.spyOn>;
+  beforeEach(() => {
+    warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+  });
+  afterEach(() => warn.mockRestore());
+
+  it("records when the client asked, shows it in their settings, and keeps the first date", async () => {
+    const { tenant, client } = await setup();
+
+    const first = await svc.requestDeletion(tenant.id, client.id);
+
+    expect(first.deletionRequestedAt).toEqual(expect.any(String));
+    expect((await requestedAt(client.id))!.toISOString()).toBe(first.deletionRequestedAt);
+    expect(await svc.getSettings(tenant.id, client.id)).toMatchObject({ deletionRequestedAt: first.deletionRequestedAt });
+    expect(await svc.updateSettings(tenant.id, client.id, { notifications: { progress: false } })).toMatchObject({
+      deletionRequestedAt: first.deletionRequestedAt,
+    });
+
+    // Asking again changes nothing, and logs nothing more.
+    expect(await svc.requestDeletion(tenant.id, client.id)).toEqual(first);
+    expect(logged(warn)).toEqual([
+      expect.objectContaining({ level: "warn", action: "requested", tenantId: tenant.id, userId: client.id }),
+    ]);
+    // Only a request: the account stays as it was.
+    expect(await db.query.users.findFirst({ where: eq(users.id, client.id) })).toMatchObject({ active: true });
+  });
+
+  it("logs ids only: no email, no name", async () => {
+    const { tenant, client } = await setup();
+
+    await svc.requestDeletion(tenant.id, client.id);
+
+    const [line] = warn.mock.calls.map((call: unknown[]) => String(call[0]));
+    expect(line).not.toContain(client.email);
+    expect(Object.keys(JSON.parse(line!)).sort()).toEqual(["action", "event", "level", "tenantId", "time", "userId"]);
+  });
+
+  it("withdraws it; withdrawing none is fine", async () => {
+    const { tenant, client } = await setup();
+    await svc.requestDeletion(tenant.id, client.id);
+
+    expect(await svc.withdrawDeletion(tenant.id, client.id)).toEqual({ deletionRequestedAt: null });
+    expect(await requestedAt(client.id)).toBeNull();
+    expect(await svc.withdrawDeletion(tenant.id, client.id)).toEqual({ deletionRequestedAt: null });
+    expect(logged(warn).map((line) => line.action)).toEqual(["requested", "withdrawn"]);
+
+    // Asked again later: a new date.
+    expect((await svc.requestDeletion(tenant.id, client.id)).deletionRequestedAt).toEqual(expect.any(String));
+  });
+
+  it("touches only the caller's own account", async () => {
+    const { tenant, client } = await setup();
+    const neighbour = await createTestUser(tenant.id, { role: "client" });
+    const other = await setup();
+    await svc.requestDeletion(tenant.id, client.id);
+
+    // Another client of the same builder, and of another one.
+    await svc.withdrawDeletion(tenant.id, neighbour.id);
+    await svc.withdrawDeletion(other.tenant.id, other.client.id);
+    expect(await requestedAt(client.id)).not.toBeNull();
+    expect(await requestedAt(neighbour.id)).toBeNull();
+
+    // This client's id under another tenant is not theirs.
+    await expect(svc.withdrawDeletion(other.tenant.id, client.id)).rejects.toMatchObject({ code: "not_found", status: 404 });
+    await expect(svc.requestDeletion(other.tenant.id, neighbour.id)).rejects.toMatchObject({ code: "not_found" });
+    expect(await requestedAt(neighbour.id)).toBeNull();
+    expect((await svc.getSettings(other.tenant.id, client.id)).deletionRequestedAt).toBeNull();
+  });
+
+  it("is refused to a deactivated client and to staff", async () => {
+    const { tenant } = await setup();
+    const gone = await createTestUser(tenant.id, { role: "client", active: false });
+    const staff = await createTestUser(tenant.id, { role: "admin" });
+
+    await expect(svc.requestDeletion(tenant.id, gone.id)).rejects.toMatchObject({ code: "not_found", status: 404 });
+    await expect(svc.requestDeletion(tenant.id, staff.id)).rejects.toMatchObject({ code: "not_found" });
+    await expect(svc.withdrawDeletion(tenant.id, gone.id)).rejects.toMatchObject({ code: "not_found" });
+    expect(await requestedAt(gone.id)).toBeNull();
+    expect(await requestedAt(staff.id)).toBeNull();
+    expect(logged(warn)).toEqual([]);
   });
 });
 
@@ -238,7 +330,7 @@ describe("input boundaries (schemas in src/inputs/clients.ts and accounts.ts)", 
     expect(await svc.updateSettings(tenant.id, client.id, { notifications: [] })).toEqual(svc.DEFAULT_SETTINGS);
     expect(
       await svc.updateSettings(tenant.id, client.id, { notifications: { progress: false, sound: true }, language: "en" }),
-    ).toEqual({ notifications: { progress: false, documents: true, messages: true } });
+    ).toEqual({ notifications: { progress: false, documents: true, messages: true }, deletionRequestedAt: null });
   });
 
   it.each([

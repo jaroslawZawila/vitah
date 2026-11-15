@@ -1,5 +1,5 @@
 import Feather from "@react-native-vector-icons/feather";
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import type { HitoFileKind } from "@repo/core/contract";
 import { Button } from "../../../../components/button";
@@ -21,6 +21,7 @@ import { usePhotos } from "../../../../lib/use-photos";
 
 export default function PagoScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const router = useRouter();
   const { token } = useAuth();
   const { t, language } = useI18n();
   const { obra } = useObra();
@@ -60,7 +61,7 @@ export default function PagoScreen() {
             <Button
               title={t("pago.contact")}
               variant="secondary"
-              onPress={() => Alert.alert(t("home.comingSoon"), t("home.comingSoonText"))}
+              onPress={() => router.push("/contact")}
             />
           </View>
           {hito.invoicedOn && (

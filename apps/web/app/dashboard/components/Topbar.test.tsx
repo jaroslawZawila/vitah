@@ -41,6 +41,7 @@ describe("Topbar", () => {
     ["/dashboard/compras/pagos", "Compras — Pagos"],
     ["/dashboard/compras/proveedores/s-1", "Compras — Proveedores"],
     ["/dashboard/eliminados", "Elementos eliminados"],
+    ["/dashboard/contacto", "Contacto para clientes"],
     ["/dashboard/forbidden", "No tienes permiso"],
     ["/dashboard/nothing-here", "Portal"],
   ])("names %s", (pathname, title) => {

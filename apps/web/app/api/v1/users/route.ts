@@ -3,7 +3,7 @@ import { readJson, withContext } from "../../../../lib/api";
 
 // Admin only (403 otherwise).
 // GET  /api/v1/users → UserListItem[]
-// POST /api/v1/users → { id }
+// POST /api/v1/users  body { email, name, password, role, phone? } → { id }
 
 export function GET(request: Request) {
   return withContext(request, (ctx) => usersService.listUsers(ctx));

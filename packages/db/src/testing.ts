@@ -92,6 +92,7 @@ export async function createTestUser(
     password?: string;
     role?: UserRole;
     active?: boolean;
+    phone?: string | null;
   } = {},
 ) {
   const { password = "password123", ...rest } = overrides;

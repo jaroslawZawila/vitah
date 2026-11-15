@@ -5,6 +5,7 @@ import * as SecureStore from "expo-secure-store";
 import { api, type AuthUser } from "./api";
 import { clearDocuments } from "./document-store";
 import { clearHitoFiles } from "./hito-files";
+import { clearOffline } from "./offline-cache";
 import { clearProjectChoice } from "./project-choice";
 import { retryPendingRemoval, unregisterPush } from "./push";
 import { setReportSession } from "./report-error";
@@ -122,6 +123,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // So an error report can say whose phone it was: the token goes as its Authorization header.
   useEffect(() => setReportSession(state.token), [state.token]);
 
+  // Once signed out on screen (no part holds the token any more), wiped again:
+  // a load that started before that, and answered, wrote nothing that stays.
+  const signedOutNow = state.signedOut === true && !state.token;
+  useEffect(() => {
+    if (signedOutNow) void quietly(clearOffline);
+  }, [signedOutNow]);
+
   const signInWithBiometrics = useCallback(async (promptMessage: string) => {
     const saved = await readSession(BIOMETRIC_KEY).catch(() => null);
     if (!saved) return { error: "unavailable" as const };
@@ -181,6 +189,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await quietly(clearProjectChoice);
       await quietly(() => Image.clearDiskCache());
       await quietly(() => Image.clearMemoryCache());
+      // Last: a load the screens start meanwhile (they still have the token) is dropped by it.
+      await quietly(clearOffline);
     } finally {
       // Biometric sign-in stays on: it's how the client gets back in.
       setState((s) => ({ ...s, token: null, user: null, isLoading: false, signedOut: true }));

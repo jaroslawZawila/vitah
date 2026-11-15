@@ -27,11 +27,13 @@ import {
   createUser,
   removeUserMfaAction,
   resetUserPasswordAction,
+  updateUserPhoneAction,
   updateUserRole,
   toggleUserActive,
 } from "../../actions/users";
 import NewPasswordField from "../components/NewPasswordField";
 import { useConfirm } from "../components/useConfirm";
+import PhoneDialog from "./components/PhoneDialog";
 import ResetPasswordDialog from "./components/ResetPasswordDialog";
 
 const ROLES = ["admin", "manager", "viewer"] as const;
@@ -41,6 +43,8 @@ type UserRow = {
   id: string;
   name: string | null;
   email: string;
+  /** Shown to the clients of the projects they are site manager of. */
+  phone: string | null;
   role: Role;
   active: boolean;
   /** Signing in asks them for a two-step verification code. */
@@ -71,6 +75,9 @@ export function UsersClient({
   const [resetDone, setResetDone] = useState<string | null>(null);
   // Whose two-step verification was just removed.
   const [mfaRemoved, setMfaRemoved] = useState<string | null>(null);
+  // Whose phone the admin is setting, and whose was just saved.
+  const [phoneFor, setPhoneFor] = useState<UserRow | null>(null);
+  const [phoneSaved, setPhoneSaved] = useState<string | null>(null);
   const confirm = useConfirm("usersPage.errors");
   const label = (user: UserRow) => user.name || user.email;
 
@@ -78,6 +85,7 @@ export function UsersClient({
   function clearDone() {
     setResetDone(null);
     setMfaRemoved(null);
+    setPhoneSaved(null);
   }
 
   async function runRowAction(action: Promise<{ error?: string }>) {
@@ -149,6 +157,23 @@ export function UsersClient({
           {t("success.twoStepRemoved", { name: mfaRemoved })}
         </FormMessage>
       )}
+      {phoneSaved && (
+        <FormMessage tone="success" role="status">
+          {t("success.phoneSaved", { name: phoneSaved })}
+        </FormMessage>
+      )}
+
+      <PhoneDialog
+        key={`phone-${phoneFor?.id}`}
+        user={phoneFor ? { name: label(phoneFor), phone: phoneFor.phone } : null}
+        onSubmit={(form) => updateUserPhoneAction(phoneFor!.id, form)}
+        onDone={() => {
+          setRowError(null);
+          setPhoneSaved(phoneFor ? label(phoneFor) : null);
+          setPhoneFor(null);
+        }}
+        onClose={() => setPhoneFor(null)}
+      />
 
       <ResetPasswordDialog
         key={resetFor?.id}
@@ -201,6 +226,16 @@ export function UsersClient({
                 </Field>
                 <NewPasswordField label={t("inviteForm.passwordLabel")} />
                 <Field>
+                  <Label htmlFor="phone">{t("inviteForm.phoneLabel")}</Label>
+                  <Input
+                    id="phone"
+                    name="phone"
+                    type="tel"
+                    maxLength={200}
+                    placeholder={t("inviteForm.phonePlaceholder")}
+                  />
+                </Field>
+                <Field>
                   <Label htmlFor="role">{t("inviteForm.roleLabel")}</Label>
                   <NativeSelect
                     id="role"
@@ -236,6 +271,7 @@ export function UsersClient({
             <TableRow>
               <TableHead>{t("table.name")}</TableHead>
               <TableHead>{t("table.email")}</TableHead>
+              <TableHead>{t("table.phone")}</TableHead>
               <TableHead>{t("table.role")}</TableHead>
               <TableHead>{t("table.status")}</TableHead>
               <TableHead>{t("table.twoStep")}</TableHead>
@@ -249,6 +285,23 @@ export function UsersClient({
                 <TableCell className="font-medium">{user.name ?? "—"}</TableCell>
                 <TableCell className="text-muted-foreground">
                   {user.email}
+                </TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-1.5">
+                    <span className="num whitespace-nowrap text-muted-foreground">{user.phone ?? "—"}</span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      aria-label={t("actions.editPhoneFor", { name: label(user) })}
+                      onClick={() => {
+                        clearDone();
+                        setPhoneFor(user);
+                      }}
+                    >
+                      {t("actions.editPhone")}
+                    </Button>
+                  </div>
                 </TableCell>
                 <TableCell>
                   <Badge variant={ROLE_BADGE[user.role]}>

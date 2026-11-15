@@ -18,6 +18,7 @@ import { useIdempotencyKey } from "../../../../components/useIdempotencyKey";
 import EmptyState from "../../components/EmptyState";
 import { SleepingCamera } from "../../components/illustrations";
 import { FilterSelect } from "../../components/construction/Filters";
+import { budgetHref } from "../../components/budget/links";
 import { IssueCard, IssueForm, type IssueValues } from "../../components/construction/IssueViews";
 import ObraFrame, { type ObraHeader } from "../../components/construction/ObraFrame";
 import Segmented from "../../components/construction/Segmented";
@@ -224,6 +225,7 @@ export default function IssuesScreen({
                 issue={issue}
                 chapterName={names.get(issue.chapterCode)}
                 fileUrl={(i, file) => issueFileUrl(projectId, i.id, file.id)}
+                revisionHref={(revisionId) => budgetHref(projectId, "", revisionId)}
                 onEdit={canManage ? () => edit(issue) : undefined}
               />
             ))

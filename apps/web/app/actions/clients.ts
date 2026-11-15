@@ -41,3 +41,8 @@ export async function setClientPasswordAction(
 ): Promise<ClientFormState> {
   return mutate((ctx) => svc.setClientPassword(ctx, clientId, Object.fromEntries(formData)));
 }
+
+/** The client's request for their account to be deleted is handled: its pill goes. */
+export async function clearDeletionRequestAction(clientId: string): Promise<ClientFormState> {
+  return mutate((ctx) => svc.clearDeletionRequest(ctx, clientId));
+}

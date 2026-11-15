@@ -44,7 +44,8 @@
       "budget": "Presupuesto",
       "payments": "Pagos",
       "documents": "Documentos",
-      "purchases": "Compras"
+      "purchases": "Compras",
+      "warranty": "Garantía"
     },
     "network": "Red",
     "subcontractors": "Subcontratas",
@@ -74,7 +75,8 @@
       "dueCount": "{count, plural, one {# factura vencida o por vencer} other {# facturas vencidas o por vencer}}",
       "requests": "Solicitudes",
       "suppliers": "Proveedores"
-    }
+    },
+    "officeContact": "Contacto para clientes"
   },
   "account": {
     "passwordPolicy": "Mínimo {min} caracteres, con al menos una mayúscula y un número.",
@@ -177,7 +179,8 @@
       "purchases": "Compras",
       "deleted": "Elementos eliminados",
       "forbidden": "No tienes permiso",
-      "portal": "Portal"
+      "portal": "Portal",
+      "officeContact": "Contacto para clientes"
     },
     "withPart": "{section} — {part}",
     "documentTitle": "{label} · ViTAH"
@@ -331,7 +334,8 @@
         "not_found": "Documento no encontrado.",
         "forbidden": "Solo administradores y gestores pueden gestionar documentos.",
         "budget_document": "Este documento es del presupuesto: no se puede borrar.",
-        "generation_running": "La IA está leyendo este documento: espera a que termine o cancélala."
+        "generation_running": "La IA está leyendo este documento: espera a que termine o cancélala.",
+        "approval_document": "Se ha pedido al cliente que apruebe este PDF: tiene que seguir viéndolo en la app."
       },
       "visibleCount": "{count, plural, =0 {ninguno en la app del cliente} one {# en la app del cliente} other {# en la app del cliente}}",
       "groups": {
@@ -346,7 +350,25 @@
       "visible": "En la app",
       "hidden": "Solo equipo"
     },
-    "close": "Cerrar"
+    "close": "Cerrar",
+    "siteManager": {
+      "title": "Jefe de obra",
+      "intro": "El cliente ve su nombre, teléfono y email en la app, en Contacto, para llamarle o escribirle.",
+      "label": "Persona del equipo",
+      "none": "Sin jefe de obra",
+      "phone": "Teléfono que verá el cliente: {phone}",
+      "noPhone": "No tiene teléfono: el cliente solo verá su email. Un administrador puede añadirlo en Usuarios.",
+      "save": "Guardar",
+      "saving": "Guardando…",
+      "saved": "Jefe de obra guardado.",
+      "errors": {
+        "missing_fields": "Elige un jefe de obra.",
+        "user_not_found": "Ese usuario ya no está activo. Elige otro.",
+        "project_not_found": "Proyecto no encontrado.",
+        "forbidden": "Solo administradores y gestores pueden elegir el jefe de obra.",
+        "generic": "No se ha podido guardar. Inténtalo de nuevo."
+      }
+    }
   },
   "usersPage": {
     "title": "Usuarios del Sistema",
@@ -358,7 +380,8 @@
       "status": "Estado",
       "twoStep": "2 pasos",
       "created": "Fecha alta",
-      "actions": "Acciones"
+      "actions": "Acciones",
+      "phone": "Teléfono"
     },
     "roles": {
       "admin": "Administrador",
@@ -376,7 +399,9 @@
       "resetPassword": "Restablecer contraseña",
       "resetPasswordFor": "Restablecer contraseña de {name}",
       "removeTwoStep": "Quitar",
-      "removeTwoStepFor": "Quitar verificación en dos pasos de {name}"
+      "removeTwoStepFor": "Quitar verificación en dos pasos de {name}",
+      "editPhone": "Teléfono",
+      "editPhoneFor": "Cambiar el teléfono de {name}"
     },
     "twoStep": {
       "on": "Activada",
@@ -392,7 +417,9 @@
       "roleLabel": "Rol",
       "submit": "Crear usuario",
       "submitting": "Creando…",
-      "cancel": "Cancelar"
+      "cancel": "Cancelar",
+      "phoneLabel": "Teléfono (opcional)",
+      "phonePlaceholder": "+34 600 000 000"
     },
     "errors": {
       "missing_fields": "Todos los campos son obligatorios.",
@@ -408,12 +435,14 @@
       "too_long": "El nombre o el correo son demasiado largos.",
       "cannot_remove_own_mfa": "Tu propia verificación en dos pasos se desactiva desde Ajustes › Verificación en dos pasos.",
       "mfa_not_enabled": "Este usuario no tiene activada la verificación en dos pasos.",
-      "mfa_unavailable": "La verificación en dos pasos todavía no está disponible. Inténtalo más tarde."
+      "mfa_unavailable": "La verificación en dos pasos todavía no está disponible. Inténtalo más tarde.",
+      "invalid_phone": "Introduce un teléfono válido."
     },
     "success": {
       "created": "Usuario creado correctamente.",
       "passwordReset": "Contraseña de {name} restablecida. Sus sesiones se han cerrado.",
-      "twoStepRemoved": "Verificación en dos pasos de {name} quitada. Sus sesiones se han cerrado."
+      "twoStepRemoved": "Verificación en dos pasos de {name} quitada. Sus sesiones se han cerrado.",
+      "phoneSaved": "Teléfono de {name} guardado."
     },
     "deactivateDialog": {
       "title": "¿Desactivar a {name}?",
@@ -430,6 +459,15 @@
       "description": "Se cerrarán todas sus sesiones. Compártela de forma segura: no se volverá a mostrar.",
       "password": "Nueva contraseña",
       "save": "Restablecer contraseña",
+      "saving": "Guardando…",
+      "cancel": "Cancelar",
+      "close": "Cerrar"
+    },
+    "phone": {
+      "title": "Teléfono de {name}",
+      "description": "Si es jefe de obra de algún proyecto, su cliente lo verá en la app para llamarle. Déjalo en blanco para quitarlo.",
+      "label": "Teléfono",
+      "save": "Guardar",
       "saving": "Guardando…",
       "cancel": "Cancelar",
       "close": "Cerrar"
@@ -455,6 +493,14 @@
     },
     "setPassword": "Cambiar contraseña",
     "setPasswordFor": "Cambiar contraseña de {name}",
+    "deletionRequested": "Baja solicitada · {date}",
+    "clearDeletion": {
+      "button": "Marcar como atendida",
+      "buttonFor": "Marcar como atendida la baja de {name}",
+      "title": "¿Marcar como atendida la baja de {name}?",
+      "description": "La solicitud deja de mostrarse. Esto no borra ni desactiva la cuenta.",
+      "confirm": "Marcar como atendida"
+    },
     "form": {
       "title": "Nuevo cliente",
       "firstName": "Nombre",
@@ -748,7 +794,16 @@
       "invalid_state": "El capítulo ya no está en ese estado. Recarga la página.",
       "unknown_line": "Una de las partidas ya no está en el presupuesto aceptado. Recarga la página.",
       "unknown_supplier": "Ese proveedor ya no está en Subcontratas.",
-      "supplies_only": "Un proveedor de material solo recibe pedidos de material, no subcontratos."
+      "supplies_only": "Un proveedor de material solo recibe pedidos de material, no subcontratos.",
+      "no_contract": "No hay un contrato aceptado que cambiar: la aprobación en la app es para las revisiones posteriores.",
+      "no_client": "El proyecto no tiene cliente de la app.",
+      "no_pdf": "La revisión no tiene su PDF general.",
+      "not_newest": "Ya se ha emitido una revisión posterior.",
+      "approval_pending": "Ya hay una petición esperando al cliente.",
+      "already_approved": "El cliente ya la aprobó: registra la aceptación.",
+      "approval_closed": "La petición ya no está abierta.",
+      "not_a_change": "Solo se vinculan cambios (CAM-), no incidencias.",
+      "links_frozen": "Los cambios vinculados no se pueden tocar: el cliente ya la tiene para aprobar, o la revisión ya está decidida."
     }
   },
   "construction": {
@@ -1293,7 +1348,9 @@
         "not_found": "No se ha encontrado el registro. Recarga la página.",
         "idempotency_key_reused": "Este envío ya se había registrado con otros datos. Recarga la página y comprueba si ya está guardado antes de repetirlo.",
         "forbidden": "Solo administradores y gestores pueden hacer cambios."
-      }
+      },
+      "pricedIn": "Valorado en",
+      "revision": "Rev.{number}"
     },
     "photos": {
       "title": "Fotos de obra",
@@ -1983,7 +2040,10 @@
       "effectHint": "Las opciones elegidas entran en el contrato como partidas OP, debajo de los 20 capítulos; las demás quedan descartadas. Con eso se alimentan la Obra, los Pagos (H0 = {first}) y las fases de la app del cliente.",
       "cancel": "Cancelar",
       "accepting": "Guardando…",
-      "submit": "Aceptar como contrato"
+      "submit": "Aceptar como contrato",
+      "approvalProof": "{by} aprobó esta revisión en la app el {date}.",
+      "approvalProofHint": "Se guarda como prueba junto a la copia firmada.",
+      "approvalDiffers": "Las opciones no son las que aprobó: su aprobación no constará como prueba."
     },
     "start": {
       "summary": "Todavía no hay presupuesto. El primero lo prepara la IA con la documentación del proyecto; después lo revisas y lo editas.",
@@ -2149,7 +2209,70 @@
       "draftHint": "Borrador: lleva la marca «BORRADOR» hasta que se emite",
       "issuedHint": "Lo que se envió al cliente",
       "download": "Descargar PDF"
-    }
+    },
+    "approval": {
+      "title": "Cambios de obra y aprobación del cliente",
+      "changes": "Cambios que valora esta revisión",
+      "noChanges": "Ningún cambio vinculado.",
+      "noneLogged": "No hay cambios registrados en Obra › Incidencias.",
+      "ref": "CAM-{number}",
+      "estimate": "{amount} est.",
+      "pick": "Cambio para vincular",
+      "link": "Vincular",
+      "unlink": "Quitar",
+      "unlinkLabel": "Quitar {ref}",
+      "consent": "Aprobación en la app",
+      "ask": "Pedir aprobación en la app",
+      "notAsked": "Todavía no se ha pedido al cliente.",
+      "noClient": "El proyecto no tiene cliente de la app: asígnalo en el proyecto para pedirle la aprobación.",
+      "status": {
+        "pending": "Esperando al cliente",
+        "approved": "Aprobada en la app",
+        "rejected": "Rechazada en la app",
+        "withdrawn": "Retirada",
+        "lapsed": "Cerrada"
+      },
+      "state": {
+        "pending": "Pedida el {asked} por {by}.",
+        "approved": "{by} la aprobó el {date}.",
+        "rejected": "{by} la rechazó el {date}.",
+        "withdrawn": "{by} la retiró el {date}.",
+        "lapsed": "Se cerró el {date}: la revisión dejó de estar sobre la mesa (se emitió otra, o se aceptó o rechazó a mano)."
+      },
+      "history": {
+        "pending": "Pedida el {date}: esperando al cliente",
+        "approved": "Pedida el {date}: aprobada",
+        "rejected": "Pedida el {date}: rechazada",
+        "withdrawn": "Pedida el {date}: retirada",
+        "lapsed": "Pedida el {date}: cerrada"
+      },
+      "reason": "Motivo del cliente: «{reason}»",
+      "amounts": "Contrato {before} → {after} (diferencia {difference}), sin IVA",
+      "pdf": "PDF que vio",
+      "message": "Mensaje: «{message}»",
+      "withdraw": "Retirar",
+      "evidence": "La respuesta del cliente es una prueba de su conformidad, no la aceptación: la aceptación la registra el equipo con «Aceptar como contrato».",
+      "withdrawDialog": {
+        "title": "¿Retirar la petición de aprobación de la Rev.{number}?",
+        "description": "El cliente deja de verla en la app. Podrás pedirla de nuevo.",
+        "confirm": "Retirar la petición"
+      },
+      "dialog": {
+        "title": "Pedir al cliente que apruebe la Rev.{number}",
+        "intro": "{client} verá en la app el motivo de la revisión, los cambios vinculados, el precio del contrato antes y después y el PDF general, y podrá aprobarla con su contraseña o rechazarla.",
+        "message": "Mensaje al cliente",
+        "optional": "opcional",
+        "messagePlaceholder": "Por ejemplo: te enviamos la revisión con la piscina que hablamos.",
+        "messageHint": "Hasta 1.000 caracteres.",
+        "options": "Opciones que se le proponen como elegidas",
+        "contract": "Contrato con la Rev.{number} (sin IVA)",
+        "shows": "Lo que vea el cliente queda fijado al pedirlo. Si emites una revisión posterior o registras la aceptación o el rechazo a mano, la petición se cierra.",
+        "cancel": "Cancelar",
+        "sending": "Enviando…",
+        "submit": "Pedir aprobación"
+      }
+    },
+    "acceptedApproval": "Aprobada en la app por {by} el {date}."
   },
   "subcontractors": {
     "status": {
@@ -4206,6 +4329,32 @@
       "supplies_only": "La empresa es ahora un proveedor de material, y esos no se asignan a obras."
     }
   },
+  "officeContactPage": {
+    "title": "Contacto para clientes",
+    "intro": "La oficina que tus clientes ven en la app, en Contacto, junto a su jefe de obra. Rellena solo lo que quieras mostrar.",
+    "fields": {
+      "address": "Dirección",
+      "phone": "Teléfono",
+      "email": "Email",
+      "hours": "Horario"
+    },
+    "placeholders": {
+      "address": "Camargo, Cantabria",
+      "phone": "+34 942 000 000",
+      "email": "hola@vitah.es",
+      "hours": "Lunes a viernes · 9:00 – 18:00"
+    },
+    "hint": "Un campo en blanco no aparece en la app. Si los dejas todos en blanco, la app no muestra la oficina.",
+    "save": "Guardar",
+    "saving": "Guardando…",
+    "saved": "Datos de contacto guardados.",
+    "errors": {
+      "invalid_phone": "Introduce un teléfono válido.",
+      "invalid_email": "Introduce un email válido.",
+      "forbidden": "Solo los administradores pueden cambiar estos datos.",
+      "generic": "No se ha podido guardar. Inténtalo de nuevo."
+    }
+  },
   "errorPages": {
     "error": {
       "eyebrow": "Error",
@@ -4234,5 +4383,117 @@
     "previous": "Anterior",
     "next": "Siguiente",
     "page": "Página {page} de {pages}"
+  },
+  "warranty": {
+    "title": "Garantía",
+    "summary": "Las solicitudes de garantía que el cliente envía desde la app, una vez entregada la vivienda.",
+    "coverage": {
+      "title": "Cobertura (LOE)",
+      "handover": "Entregada el {date} ({source})",
+      "source": {
+        "acta": "acta de H9",
+        "payment": "pago de H9",
+        "planned": "fecha de entrega prevista"
+      },
+      "noDate": "Sin fecha de entrega",
+      "notHandedOver": "La garantía empieza con la entrega de la vivienda (etapa 8). Hasta entonces el cliente no puede enviar solicitudes.",
+      "years": "{count, plural, one {# año} other {# años}}",
+      "scope": {
+        "finishes": "Acabados",
+        "habitability": "Habitabilidad e instalaciones",
+        "structure": "Estructura"
+      },
+      "until": "Hasta el {date}",
+      "expired": "Venció el {date}"
+    },
+    "list": {
+      "title": "Solicitudes",
+      "filter": "Mostrar",
+      "open": "Abiertas ({count})",
+      "all": "Todas ({count})",
+      "sent": "Enviada el {date}",
+      "visit": "Visita el {date}",
+      "photos": "{count, plural, one {# foto} other {# fotos}}",
+      "emptyTitle": "Sin solicitudes de garantía",
+      "emptyText": "Cuando el cliente envíe una desde la app, aparecerá aquí.",
+      "noneOpen": "No hay solicitudes abiertas."
+    },
+    "kind": {
+      "finishes": "Acabados",
+      "plumbing": "Fontanería",
+      "electrical": "Electricidad",
+      "carpentry": "Carpintería",
+      "damp": "Humedades",
+      "other": "Otro"
+    },
+    "room": {
+      "bathroom": "Baño",
+      "kitchen": "Cocina",
+      "living_room": "Salón",
+      "bedroom": "Dormitorio",
+      "hall": "Entrada y pasillos",
+      "exterior": "Exterior",
+      "other": "Otra estancia"
+    },
+    "status": {
+      "received": "Recibida",
+      "in_review": "En revisión",
+      "scheduled": "Visita programada",
+      "resolved": "Resuelta",
+      "rejected": "No aceptada",
+      "cancelled": "Cancelada"
+    },
+    "claim": {
+      "label": "{ref} · Garantía",
+      "title": "Lo que nos cuenta el cliente",
+      "sentBy": "Enviada por {name} el {date}",
+      "client": "el cliente",
+      "urgent": "Urgente",
+      "kind": "Tipo",
+      "room": "Estancia",
+      "photo": "Foto {number}",
+      "noPhotos": "Sin fotos.",
+      "answer": "Respuesta al cliente"
+    },
+    "reject": {
+      "title": "¿No aceptar la solicitud {ref}?",
+      "description": "Se avisará al cliente en la app y verá tu respuesta.",
+      "confirm": "No aceptar solicitud",
+      "keep": "Volver"
+    },
+    "form": {
+      "title": "Gestionar",
+      "status": "Estado",
+      "visitOn": "Día de la visita",
+      "visitHint": "Obligatorio para programar la visita.",
+      "answer": "Respuesta al cliente",
+      "answerHint": "El cliente la lee en la app. Obligatoria para no aceptar la solicitud: explica por qué.",
+      "save": "Guardar",
+      "saved": "Solicitud guardada.",
+      "cancelled": "El cliente canceló esta solicitud: ya no se puede cambiar."
+    },
+    "history": {
+      "title": "Historial",
+      "created": "Solicitud enviada",
+      "photo_added": "Foto añadida",
+      "cancelled": "Cancelada por el cliente",
+      "status": "Estado: {from} → {to}",
+      "visit": "Visita el {date}",
+      "visitCleared": "Visita quitada",
+      "answer": "Respuesta: «{text}»",
+      "answerCleared": "Respuesta quitada",
+      "client": "El cliente",
+      "someone": "Usuario eliminado"
+    },
+    "errors": {
+      "generic": "No se ha podido guardar. Inténtalo de nuevo.",
+      "visit_required": "Indica el día de la visita para programarla.",
+      "reason_required": "Escribe al cliente por qué no se acepta la solicitud.",
+      "claim_cancelled": "El cliente canceló esta solicitud: ya no se puede cambiar.",
+      "invalid_date": "La fecha de la visita no es válida.",
+      "invalid_input": "Revisa los datos: alguno no es válido.",
+      "not_found": "Esta solicitud ya no existe.",
+      "forbidden": "No tienes permiso para gestionar solicitudes de garantía."
+    }
   }
 }

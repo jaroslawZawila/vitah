@@ -26,6 +26,8 @@ describe("placeOf", () => {
     [`${P}/payments`, { title: "project", part: "projectTabs.payments" }],
     [`${P}/payments/h-1`, { title: "project", part: "projectTabs.payments" }],
     [`${P}/documents`, { title: "project", part: "projectTabs.documents" }],
+    [`${P}/garantia`, { title: "project", part: "projectTabs.warranty" }],
+    [`${P}/garantia/c-1`, { title: "project", part: "projectTabs.warranty" }],
     [`${P}/unknown`, { title: "project", part: undefined }],
     ["/dashboard/compras", { title: "purchases", part: "purchaseTabs.orders" }],
     ["/dashboard/compras/solicitudes", { title: "purchases", part: "purchaseTabs.requests" }],
@@ -41,6 +43,7 @@ describe("placeOf", () => {
     ["/dashboard/clients", { title: "clients" }],
     ["/dashboard/users", { title: "users" }],
     ["/dashboard/eliminados", { title: "deleted" }],
+    ["/dashboard/contacto", { title: "officeContact" }],
     ["/dashboard/forbidden", { title: "forbidden" }],
     // An address no page answers: neutral, never another section's name.
     ["/dashboard/nothing-here", { title: "portal" }],

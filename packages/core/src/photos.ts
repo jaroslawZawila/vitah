@@ -2,20 +2,14 @@ import { and, db, desc, eq, gt, isNotNull, isNull, ne, projectPhotos, projects, 
 import { markChanged } from "./changes";
 import { clientProjectsWhere, resolveClientProject } from "./client-projects";
 import { requireEditor, type Ctx } from "./context";
-import {
-  MAX_PHOTO_BYTES,
-  PHOTO_TYPES,
-  type MobilePhoto,
-  type PhotoSize,
-  type PhotoType,
-  type ProjectPhoto,
-} from "./contract";
+import { MAX_PHOTO_BYTES, type MobilePhoto, type PhotoSize, type ProjectPhoto } from "./contract";
 import { parse } from "./inputs/fields";
 import { photoSchema, visibilitySchema } from "./inputs/projects";
 import { notifyProjectClient } from "./notifications";
 import type { PhotosByChapter } from "./obra-calc";
+import { openPhotoFile, PHOTO_EXTENSIONS, readImage, THUMBNAIL, thumbPath } from "./photo-image";
 import { inLiveProject, softDeleted } from "./project-client";
-import { claimFirstShown, fail, openStoredFile, projectFolder, requireProject, storeFiles } from "./project-files";
+import { claimFirstShown, fail, projectFolder, requireProject, storeFiles } from "./project-files";
 
 // ─── Project photos ───────────────────────────────────────────────────────────
 // Site photos staff share with a project's client (see ./project-files for who
@@ -25,52 +19,8 @@ import { claimFirstShown, fail, openStoredFile, projectFolder, requireProject, s
 // it were gone.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const EXTENSIONS: Record<PhotoType, string> = {
-  "image/jpeg": "jpg",
-  "image/png": "png",
-  "image/webp": "webp",
-};
-
-/** The small copy grids show. `px` is its longest side: sharp on a 3× phone's grid tile. */
-const THUMBNAIL = { px: 800, contentType: "image/webp", extension: "webp" } as const;
-
-const MAX_PIXELS = 50_000_000;
-
 /** After a photo push, more photos of the project shown within this time send none. */
 const PHOTO_PUSH_QUIET_MS = 10 * 60 * 1000;
-
-/** A photo's thumbnail sits next to it: "<id>.jpg" → "<id>.thumb.webp". */
-const thumbPath = (pathname: string) =>
-  pathname.replace(/\.[^./]+$/, `.thumb.${THUMBNAIL.extension}`);
-
-/**
- * Decodes the upload — the browser-supplied type can't be trusted — and makes
- * its thumbnail: upright (EXIF orientation applied), no metadata.
- */
-async function readImage(file: Blob) {
-  // Loaded on first upload, not with the module: @repo/core is imported by
-  // every route (and the proxy), and sharp is a native library. If it can't
-  // load, uploads fail with a server error; nothing else is affected.
-  const { default: sharp } = await import("sharp");
-  try {
-    // A small file can decode to gigabytes (a "decompression bomb"): refuse
-    // anything larger than a 48-megapixel camera's photo.
-    const image = sharp(Buffer.from(await file.arrayBuffer()), { limitInputPixels: MAX_PIXELS });
-    const { format } = await image.metadata();
-    const contentType = PHOTO_TYPES.find((type) => type === `image/${format}`);
-    if (!contentType) return null;
-    const thumbnail = await image
-      .rotate()
-      .resize(THUMBNAIL.px, THUMBNAIL.px, { fit: "inside", withoutEnlargement: true })
-      .webp({ quality: 70 })
-      .toBuffer();
-    // A view of the Buffer's bytes, not a copy.
-    const bytes = new Uint8Array(thumbnail.buffer, thumbnail.byteOffset, thumbnail.length);
-    return { contentType, thumbnail: new Blob([bytes]) };
-  } catch {
-    return null; // Not an image sharp can decode.
-  }
-}
 
 /** The day a photo was taken: as staff set it, else the day (in Spain) it was uploaded. */
 const photoDay = sql<string>`coalesce(${projectPhotos.takenOn}, (${projectPhotos.createdAt} at time zone 'UTC' at time zone 'Europe/Madrid')::date)::text`;
@@ -122,7 +72,7 @@ export async function addPhoto(ctx: Ctx, projectId: string, input: Record<string
 
   const id = crypto.randomUUID();
   const folder = `${projectFolder(ctx.tenantId, projectId)}photos/`;
-  const pathname = `${folder}${id}.${EXTENSIONS[contentType]}`;
+  const pathname = `${folder}${id}.${PHOTO_EXTENSIONS[contentType]}`;
   await storeFiles(
     [
       { pathname, body: file, contentType },
@@ -262,31 +212,6 @@ const fileColumns = {
   thumbSizeBytes: projectPhotos.thumbSizeBytes,
 };
 
-type FileRow = Pick<
-  typeof projectPhotos.$inferSelect,
-  "contentType" | "sizeBytes" | "pathname" | "thumbSizeBytes"
->;
-
-/**
- * Opens the photo or its thumbnail. Photos uploaded before thumbnails existed
- * (null `thumbSizeBytes`) have none, so grids get the original for those.
- */
-function openFile(photo: FileRow | undefined, size: PhotoSize) {
-  if (!photo) fail("not_found");
-  const { pathname, contentType, sizeBytes, thumbSizeBytes } = photo;
-  const file =
-    size === "thumb" && thumbSizeBytes !== null
-      ? {
-          pathname: thumbPath(pathname),
-          contentType: THUMBNAIL.contentType,
-          sizeBytes: thumbSizeBytes,
-        }
-      : { pathname, contentType, sizeBytes };
-  // The stored name: "<photo id>.<ext>" or "<photo id>.thumb.webp".
-  const filename = file.pathname.slice(file.pathname.lastIndexOf("/") + 1);
-  return openStoredFile({ ...file, filename });
-}
-
 /** A photo's image (or its thumbnail), for staff of the project's tenant. */
 export async function openPhoto(
   ctx: Ctx,
@@ -298,7 +223,7 @@ export async function openPhoto(
     .select(fileColumns)
     .from(projectPhotos)
     .where(photoInProject(ctx, projectId, photoId));
-  return openFile(photo, size);
+  return openPhotoFile(photo, size);
 }
 
 // ─── Mobile app ──────────────────────────────────────────────────────────────
@@ -341,7 +266,7 @@ export async function openClientPhoto(
     .from(projectPhotos)
     .innerJoin(projects, clientProject(tenantId, clientUserId))
     .where(eq(projectPhotos.id, photoId));
-  return openFile(photo, size);
+  return openPhotoFile(photo, size);
 }
 
 /** A project's visible photos tagged with a budget chapter, by chapter (for the client's obra). */

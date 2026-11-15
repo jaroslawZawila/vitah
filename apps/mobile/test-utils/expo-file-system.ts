@@ -53,7 +53,7 @@ export class File {
 }
 
 export class Directory {
-  readonly uri: string;
+  uri: string;
   constructor(parent: string | Directory, name?: string) {
     this.uri = join(parent, name);
   }
@@ -75,5 +75,15 @@ export class Directory {
   }
   delete() {
     for (const uri of [...disk.keys()]) if (uri.startsWith(`${this.uri}/`)) disk.delete(uri);
+  }
+  /** As the real one: into `destination` when it exists, else renamed to it; this then points there. */
+  moveSync(destination: Directory) {
+    const target = destination.exists ? `${destination.uri}/${this.name}` : destination.uri;
+    for (const [uri, content] of [...disk.entries()]) {
+      if (!uri.startsWith(`${this.uri}/`)) continue;
+      disk.delete(uri);
+      disk.set(target + uri.slice(this.uri.length), content);
+    }
+    this.uri = target;
   }
 }

@@ -2,8 +2,14 @@ import {
   DOCUMENT_CATEGORIES,
   photoSizeQuery,
   type AccountError,
+  type ApprovalDecisionInput,
+  type ApprovalError,
   type ClientSettingsInput,
+  type DeletionRequest,
+  type MobileApproval,
+  type MobileApprovalDecisionReply,
   type MobileChangesReply,
+  type MobileContact,
   type HitoFileKind,
   type MobileObra,
   type AppLanguage,
@@ -18,8 +24,12 @@ import {
   type PhotoSize,
   type PushTokenInput,
   type PushTokenRemovalInput,
+  type MobileWarranty,
+  type MobileWarrantyClaim,
+  type WarrantyClaimInput,
+  type WarrantyError,
 } from "@repo/core/contract";
-import { API_BASE, REQUEST_TIMEOUT_MS } from "./api-config";
+import { API_BASE, DOWNLOAD_TIMEOUT_MS, REQUEST_TIMEOUT_MS } from "./api-config";
 
 export type AuthUser = MobileSession["user"];
 export type Project = MobileProject;
@@ -39,7 +49,9 @@ export type ApiError =
   | "timeout"
   | "server_error"
   // The code of another 4xx, e.g. "wrong_password" from /password.
-  | AccountError;
+  | AccountError
+  | ApprovalError
+  | WarrantyError;
 
 export type Result<T> = { ok: true; data: T } | { ok: false; error: ApiError };
 
@@ -61,7 +73,7 @@ function forProject(path: string, projectId: string | null | undefined) {
   return `${path}${path.includes("?") ? "&" : "?"}projectId=${encodeURIComponent(projectId)}`;
 }
 
-async function request<T>(path: string, init: RequestInit = {}): Promise<Result<T>> {
+async function request<T>(path: string, init: RequestInit = {}, timeoutMs = REQUEST_TIMEOUT_MS): Promise<Result<T>> {
   // Nothing may hang: past the timeout the call is aborted, whether it was
   // still connecting or half-way through the answer.
   const controller = new AbortController();
@@ -69,7 +81,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<Result<
   const timer = setTimeout(() => {
     timedOut = true;
     controller.abort();
-  }, REQUEST_TIMEOUT_MS);
+  }, timeoutMs);
   const failed = (): Result<T> => ({ ok: false, error: timedOut ? "timeout" : "network_error" });
 
   try {
@@ -93,7 +105,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<Result<
       const body = (await res.json().catch(() => null)) as { error?: unknown } | null;
       if (timedOut) return failed();
       const code = res.status < 500 && typeof body?.error === "string" ? body.error : null;
-      return { ok: false, error: (code as AccountError | null) ?? "server_error" };
+      return { ok: false, error: (code as ApiError | null) ?? "server_error" };
     }
 
     try {
@@ -169,6 +181,11 @@ export const api = {
     return `${API_BASE}/api/mobile/photos/${encodeURIComponent(id)}${photoSizeQuery(size)}`;
   },
 
+  /** Contacto: the home's site manager and the builder's office (each null when not given). */
+  getContact(token: string, projectId?: string | null) {
+    return authed<MobileContact>(forProject("/api/mobile/contact", projectId), token);
+  },
+
   getSettings(token: string) {
     return authed<MobileSettings>("/api/mobile/settings", token);
   },
@@ -176,6 +193,16 @@ export const api = {
   /** Saves the given notification flags; returns all settings. */
   updateSettings(token: string, notifications: Partial<NotificationPrefs>) {
     return authed<MobileSettings>("/api/mobile/settings", token, "PUT", { notifications } satisfies ClientSettingsInput);
+  },
+
+  /** Asks the builder to delete the client's account (asking again keeps the first date). */
+  requestDeletion(token: string) {
+    return authed<DeletionRequest>("/api/mobile/account/deletion-request", token, "POST");
+  },
+
+  /** Withdraws that request. */
+  withdrawDeletion(token: string) {
+    return authed<DeletionRequest>("/api/mobile/account/deletion-request", token, "DELETE");
   },
 
   /**
@@ -187,6 +214,24 @@ export const api = {
       currentPassword,
       newPassword,
     } satisfies PasswordChangeInput);
+  },
+
+  /**
+   * The change to the contract waiting for the client's answer on the home
+   * shown (null: none). A server from before it answers 404: no request.
+   */
+  getApproval(token: string, projectId?: string | null) {
+    return authed<{ approval: MobileApproval | null }>(forProject("/api/mobile/approvals", projectId), token);
+  },
+
+  /** The client's answer: approving needs their password, rejecting a reason. */
+  decideApproval(token: string, approvalId: string, body: ApprovalDecisionInput) {
+    return authed<MobileApprovalDecisionReply>(
+      `/api/mobile/approvals/${encodeURIComponent(approvalId)}/decision`,
+      token,
+      "POST",
+      body,
+    );
   },
 
   /** Registers this phone for pushes, written in its app `language`. */
@@ -201,5 +246,46 @@ export const api = {
     return authed<{ success: true }>("/api/mobile/push-token", token, "DELETE", {
       token: pushToken,
     } satisfies PushTokenRemovalInput);
+  },
+
+  // ─── Garantía (warranty claims) ──────────────────────────────────────────────
+
+  /** The home's hand-over, its LOE periods and the client's claims, newest first; null without a home. */
+  getWarranty(token: string, projectId?: string | null) {
+    return authed<{ warranty: MobileWarranty | null }>(forProject("/api/mobile/warranty", projectId), token);
+  },
+
+  getWarrantyClaim(token: string, claimId: string) {
+    return authed<MobileWarrantyClaim>(`/api/mobile/warranty/${encodeURIComponent(claimId)}`, token);
+  },
+
+  /** A new claim; `key` makes a retry of the same claim answer the first one instead of sending another. */
+  createWarrantyClaim(token: string, projectId: string | null | undefined, claim: WarrantyClaimInput, key: string) {
+    return request<{ claimId: string; number: number }>(forProject("/api/mobile/warranty", projectId), {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", "Idempotency-Key": key },
+      body: JSON.stringify(claim),
+    });
+  },
+
+  /** One photo of a claim (one request each: the server takes at most 4.5 MB a request); slow networks get longer. */
+  addWarrantyPhoto(token: string, claimId: string, photo: { uri: string; name: string; type: string }, key: string) {
+    const form = new FormData();
+    // React Native's FormData sends the file at `uri`.
+    form.append("file", photo as unknown as Blob);
+    return request<{ photoId: string }>(
+      `/api/mobile/warranty/${encodeURIComponent(claimId)}/photos`,
+      { method: "POST", headers: { Authorization: `Bearer ${token}`, "Idempotency-Key": key }, body: form },
+      DOWNLOAD_TIMEOUT_MS,
+    );
+  },
+
+  cancelWarrantyClaim(token: string, claimId: string) {
+    return authed<{ claimId: string }>(`/api/mobile/warranty/${encodeURIComponent(claimId)}/cancel`, token, "POST");
+  },
+
+  /** A claim's photo (or its thumbnail); load it with the same Bearer token. */
+  warrantyPhotoUrl(claimId: string, photoId: string, size: PhotoSize = "full") {
+    return `${API_BASE}/api/mobile/warranty/${encodeURIComponent(claimId)}/photos/${encodeURIComponent(photoId)}${photoSizeQuery(size)}`;
   },
 };

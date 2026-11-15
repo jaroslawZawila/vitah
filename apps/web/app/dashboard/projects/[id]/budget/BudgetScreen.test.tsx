@@ -3,7 +3,7 @@ import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { BudgetRevision, ProjectBudget } from "@repo/core/contract";
+import type { BudgetApproval, BudgetRevision, ProjectBudget } from "@repo/core/contract";
 import { todayInSpain } from "@repo/core/obra-calc";
 import messages from "../../../../../messages/es.json";
 import { budget, hitos } from "../../../../../test/obra-fixture";
@@ -13,6 +13,10 @@ vi.mock("../../../../actions/budget", () => ({
   acceptRevisionAction: vi.fn(),
   addLineAction: vi.fn(),
   addOptionAction: vi.fn(),
+  askApprovalAction: vi.fn(),
+  linkChangeAction: vi.fn(),
+  unlinkChangeAction: vi.fn(),
+  withdrawApprovalAction: vi.fn(),
   createRevisionAction: vi.fn(),
   deleteLineAction: vi.fn(),
   deleteOptionAction: vi.fn(),
@@ -569,5 +573,100 @@ describe("the project's client and address", () => {
 
     expect(screen.queryByRole("status", { name: /no nombra al cliente/ })).not.toBeInTheDocument();
     expect(screen.queryByText(/no coinciden/)).not.toBeInTheDocument();
+  });
+});
+
+describe("BudgetScreen: a change to the contract and the client's approval in the app", () => {
+  const approval = (changes: Partial<BudgetApproval> = {}): BudgetApproval => ({
+    id: "approval-1",
+    status: "pending",
+    message: "La piscina que hablamos",
+    chosenOptionIds: ["option-1"],
+    beforeCents: 3_680_883,
+    afterCents: 8_452_978,
+    vatRateBp: 1000,
+    documentId: "doc-7",
+    askedAt: "2026-11-02T09:00:00.000Z",
+    askedBy: "Marta Ruiz",
+    decidedAt: null,
+    decidedOn: null,
+    decidedBy: null,
+    rejectReason: null,
+    closedAt: null,
+    closedBy: null,
+    ...changes,
+  });
+  /** Rev.1 issued: it changes the contract. */
+  const issuedChange = (revision: Partial<BudgetRevision> = {}): Budget => ({
+    ...draft,
+    revisions: [{ ...draft.revisions[0]!, status: "issued", issuedOn: "2026-11-02" }, ...draft.revisions.slice(1)],
+    revision: { ...draft.revision, status: "issued", issuedOn: "2026-11-02", validUntil: "2027-01-31", changeReason: "Piscina", ...revision },
+  });
+  const cam4 = { id: "cam-4", number: 4, description: "Piscina en el jardín" };
+  const card = () => within(screen.getByRole("region", { name: "Cambios de obra y aprobación del cliente" }));
+
+  it("links a change and asks the client, with a message and the options proposed", async () => {
+    renderScreen({ budget: issuedChange(), changes: [cam4] });
+
+    expect(card().getByText("Todavía no se ha pedido al cliente.")).toBeInTheDocument();
+    await userEvent.click(card().getByRole("button", { name: "Vincular" }));
+    expect(actions.linkChangeAction).toHaveBeenCalledWith("p-1", "rev-1", "cam-4");
+
+    await userEvent.click(card().getByRole("button", { name: "Pedir aprobación en la app" }));
+    const dialog = await openedDialog("Pedir al cliente que apruebe la Rev.1");
+    await userEvent.type(dialog.getByLabelText(/Mensaje al cliente/), "La piscina que hablamos");
+    await userEvent.click(dialog.getByRole("button", { name: /Piscina desbordante/ }));
+    await userEvent.click(dialog.getByRole("button", { name: "Pedir aprobación" }));
+
+    await waitFor(() =>
+      expect(actions.askApprovalAction).toHaveBeenCalledWith("p-1", "rev-1", { message: "La piscina que hablamos", chosenOptionIds: ["option-1"] }),
+    );
+  });
+
+  it("shows the request waiting, holds the links as shown, and withdraws it after asking", async () => {
+    const linked = [{ ...cam4, occurredOn: "2026-10-01", costImpactCents: 4_597_500 }];
+    renderScreen({ budget: issuedChange({ approvals: [approval()], changes: linked }), changes: [cam4] });
+
+    expect(card().getByText("CAM-004")).toBeInTheDocument();
+    expect(card().getByText("Esperando al cliente")).toBeInTheDocument();
+    expect(card().getByRole("link", { name: "PDF que vio" })).toHaveAttribute("href", "/api/v1/projects/p-1/documents/doc-7");
+    expect(card().queryByRole("button", { name: "Pedir aprobación en la app" })).not.toBeInTheDocument();
+    expect(card().queryByRole("button", { name: "Quitar CAM-004" })).not.toBeInTheDocument();
+
+    await userEvent.click(card().getByRole("button", { name: "Retirar" }));
+    const confirm = await confirmation("¿Retirar la petición de aprobación de la Rev.1?");
+    await userEvent.click(confirm.getByRole("button", { name: "Retirar la petición" }));
+    await waitFor(() => expect(actions.withdrawApprovalAction).toHaveBeenCalledWith("p-1", "rev-1"));
+  });
+
+  it("shows a rejection with the client's reason", () => {
+    const rejected = approval({ status: "rejected", decidedAt: "2026-11-03T10:00:00.000Z", decidedOn: "2026-11-03", decidedBy: "Elena Ruiz", rejectReason: "Muy cara" });
+    renderScreen({ budget: issuedChange({ approvals: [rejected] }) });
+
+    expect(card().getByText("Rechazada en la app")).toBeInTheDocument();
+    expect(card().getByText("Motivo del cliente: «Muy cara»")).toBeInTheDocument();
+  });
+
+  it("starts the acceptance from the client's approval, which counts as proof with the options approved", async () => {
+    const approved = approval({ status: "approved", decidedAt: "2026-11-03T10:00:00.000Z", decidedOn: "2026-11-03", decidedBy: "Elena Ruiz" });
+    renderScreen({ budget: issuedChange({ approvals: [approved] }) });
+
+    await userEvent.click(screen.getByRole("button", { name: "Registrar aceptación" }));
+    const dialog = await openedDialog("Registrar la aceptación de la Rev.1");
+    expect(dialog.getByLabelText("Fecha de aceptación")).toHaveValue("2026-11-03");
+    const pool = dialog.getByRole("button", { name: /Piscina desbordante/ });
+    expect(pool).toHaveAttribute("aria-pressed", "true");
+    expect(dialog.getByText(/Elena Ruiz aprobó esta revisión en la app/)).toBeInTheDocument();
+    expect(dialog.getByText("Se guarda como prueba junto a la copia firmada.")).toBeInTheDocument();
+
+    await userEvent.click(pool);
+    expect(dialog.getByText("Las opciones no son las que aprobó: su aprobación no constará como prueba.")).toBeInTheDocument();
+  });
+
+  it("without an app client, says so instead of asking", () => {
+    renderScreen({ budget: issuedChange(), clientName: null });
+
+    expect(card().getByText(/El proyecto no tiene cliente de la app/)).toBeInTheDocument();
+    expect(card().queryByRole("button", { name: "Pedir aprobación en la app" })).not.toBeInTheDocument();
   });
 });

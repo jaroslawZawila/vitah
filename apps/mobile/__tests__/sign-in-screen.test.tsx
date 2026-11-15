@@ -114,4 +114,19 @@ describe("SignInScreen", () => {
 
     expect(await screen.findByText(/Tu sesión ha caducado/)).toBeOnTheScreen();
   });
+
+  it("explains, on asking, that the builder sets a new password", () => {
+    render(<SignInScreen />);
+    const help = /Tu equipo de ViTAH puede asignarte una contraseña nueva/;
+    const link = screen.getByRole("button", { name: "¿Has olvidado tu contraseña?" });
+    expect(screen.queryByText(help)).toBeNull();
+
+    fireEvent.press(link);
+    expect(screen.getByText(help)).toBeOnTheScreen();
+    expect(link).toBeExpanded();
+
+    fireEvent.press(link);
+    expect(screen.queryByText(help)).toBeNull();
+    expect(mockAuth.signIn).not.toHaveBeenCalled();
+  });
 });

@@ -58,6 +58,11 @@ export async function toggleUserActive(userId: string, active: boolean) {
   return mutate((ctx) => svc.updateUser(ctx, userId, { active }));
 }
 
+/** A staff user's contact phone (`phone` in the form; blank clears it): what a client sees of their site manager. */
+export async function updateUserPhoneAction(userId: string, formData: FormData) {
+  return mutate((ctx) => svc.updateUser(ctx, userId, { phone: formData.get("phone") }));
+}
+
 /**
  * An admin sets another staff user's password (`password` in the form, so it
  * stays out of the action's logged arguments); that user is signed out everywhere.

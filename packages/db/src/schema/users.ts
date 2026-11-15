@@ -1,7 +1,7 @@
 // Part of @repo/db/schema (../schema.ts re-exports it; drizzle-kit reads the tables from there).
 
 import { and, eq, ne, sql } from "drizzle-orm";
-import { boolean, date, foreignKey, index, integer, jsonb, pgTable, text, timestamp, unique, uniqueIndex } from "drizzle-orm/pg-core";
+import { boolean, check, date, foreignKey, index, integer, jsonb, pgTable, text, timestamp, unique, uniqueIndex } from "drizzle-orm/pg-core";
 import { COLUMN_VALUES, notNegative, oneOf } from "./checks";
 import { userRoleEnum } from "./enums";
 import { tenants } from "./tenants";
@@ -27,8 +27,15 @@ export const users = pgTable(
     // The portal's language for staff ("es" | "en"), picked in the rail; null
     // follows the browser. The mobile app keeps its own, on the phone.
     language: text("language").$type<(typeof COLUMN_VALUES.language)[number]>(),
+    // A staff user's contact phone, set by an admin on Usuarios. Shown to a
+    // client only when this user is their project's site manager (../contact).
+    phone: text("phone"),
     // Mobile tokens issued before this are revoked (password changed or reset).
     passwordChangedAt: timestamp("password_changed_at", { mode: "date" }),
+    // When a client asked, in the app's Perfil, for their account to be
+    // deleted (null: never asked, or withdrawn). Only a request: the builder
+    // handles it by hand; nothing is deleted or deactivated because of it.
+    deletionRequestedAt: timestamp("deletion_requested_at", { mode: "date" }),
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
   },
@@ -45,6 +52,11 @@ export const users = pgTable(
     // What the rows that carry a user's tenant reference: (tenant_id, user_id).
     tenantIdUnique: unique("users_id_tenant_id_unique").on(table.id, table.tenantId),
     languageCheck: oneOf("users_language_check", table.language, COLUMN_VALUES.language),
+    // Only a client (the app) asks for that.
+    deletionRequestCheck: check(
+      "users_deletion_request_check",
+      sql`${table.deletionRequestedAt} IS NULL OR ${table.role} = 'client'`,
+    ),
   }),
 );
 

@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react-native";
-import { Alert, ScrollView } from "react-native";
+import { ScrollView } from "react-native";
 import HomeScreen, { greetingKey } from "../app/(app)/(tabs)/index";
 import { api, type Project } from "../lib/api";
 import { PhotosProvider } from "../lib/use-photos";
@@ -20,6 +20,8 @@ jest.mock("../lib/api", () => ({
     listProjects: jest.fn(),
     listPhotos: jest.fn(),
     getObra: jest.fn(),
+    // No change to approve unless a test says so (__tests__/approval.test.tsx covers the card).
+    getApproval: jest.fn(async () => ({ ok: true, data: { approval: null } })),
     photoUrl: (id: string) => `/photos/${id}`,
   },
 }));
@@ -101,6 +103,33 @@ describe("HomeScreen", () => {
     expect(mockNavigate).toHaveBeenCalledWith("/obra");
   });
 
+  it("shows a change waiting for the client's approval below the project card", async () => {
+    jest.mocked(api.getApproval).mockResolvedValue({
+      ok: true,
+      data: {
+        approval: {
+          id: "a1",
+          revisionNumber: 2,
+          reference: null,
+          changeReason: "Piscina",
+          message: null,
+          askedAt: "2026-09-24T10:00:00.000Z",
+          beforeCents: 100_000,
+          afterCents: 150_000,
+          differenceCents: 50_000,
+          vatRateBp: 1000,
+          documentId: null,
+          changes: [],
+          options: [],
+        },
+      },
+    });
+    render(<Home />);
+
+    expect(await screen.findByRole("button", { name: "Cambio para aprobar · Rev.2. Piscina" })).toBeOnTheScreen();
+    expect(api.getApproval).toHaveBeenCalledWith("tok", "p1");
+  });
+
   it("leaves out the countdown once the date has passed or isn't set", async () => {
     listProjects.mockResolvedValue({
       ok: true,
@@ -139,19 +168,15 @@ describe("HomeScreen", () => {
     expect(screen.queryByText("Última actualización")).toBeNull();
   });
 
-  it("opens Documentos and Ajustes, and says Garantía and Contactar are coming", async () => {
-    const alert = jest.spyOn(Alert, "alert").mockImplementation(() => {});
+  it("opens Documentos, Garantía, Contacto and Ajustes", async () => {
     render(<Home />);
     await screen.findByText("VTH-2026-014");
 
     fireEvent.press(screen.getByRole("button", { name: "Documentos" }));
-    fireEvent.press(screen.getByRole("button", { name: "Ajustes" }));
-    expect(mockNavigate.mock.calls).toEqual([["/documents"], ["/profile"]]);
-
     fireEvent.press(screen.getByRole("button", { name: "Garantía" }));
     fireEvent.press(screen.getByRole("button", { name: "Contactar" }));
-    expect(alert).toHaveBeenCalledTimes(2);
-    expect(alert).toHaveBeenCalledWith("Próximamente", expect.any(String));
+    fireEvent.press(screen.getByRole("button", { name: "Ajustes" }));
+    expect(mockNavigate.mock.calls).toEqual([["/documents"], ["/warranty"], ["/contact"], ["/profile"]]);
   });
 
   it("explains when no project is assigned yet", async () => {
@@ -172,6 +197,18 @@ describe("HomeScreen", () => {
     expect(await screen.findByText("VTH-2026-014")).toBeOnTheScreen();
   });
 
+  it("says it could not refresh, not that there is no connection, after a server error", async () => {
+    const view = render(<Home />);
+    await screen.findByText("VTH-2026-014");
+    listProjects.mockResolvedValueOnce({ ok: false, error: "server_error" });
+
+    const scroll = view.UNSAFE_getByType(ScrollView);
+    await act(async () => scroll.props.refreshControl.props.onRefresh());
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/No se ha podido actualizar/);
+    expect(screen.queryByText(/Sin conexión/)).toBeNull();
+  });
+
   it("keeps the project visible when a refresh fails", async () => {
     const view = render(<Home />);
     await screen.findByText("VTH-2026-014");
@@ -180,7 +217,7 @@ describe("HomeScreen", () => {
     const scroll = view.UNSAFE_getByType(ScrollView);
     await act(async () => scroll.props.refreshControl.props.onRefresh());
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(/No se ha podido actualizar/);
+    expect(await screen.findByText(/^Sin conexión · datos del/)).toBeOnTheScreen();
     expect(screen.getByText("VTH-2026-014")).toBeOnTheScreen();
   });
 

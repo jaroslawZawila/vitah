@@ -223,6 +223,18 @@ describe("usePushNotifications", () => {
     expect(mockNavigate).toHaveBeenCalledWith("/obra");
   });
 
+  it("opens the warranty claim a notification is about, else the Garantía screen", () => {
+    jest.mocked(Notifications.useLastNotificationResponse).mockReturnValue({
+      notification: { request: { identifier: "n-claim", content: { data: { screen: "warranty", claimId: "c-1" } } } },
+    } as never);
+    renderHook(() => usePushNotifications("tok", "es"));
+    expect(mockNavigate).toHaveBeenCalledWith("/warranty/c-1");
+
+    jest.mocked(Notifications.useLastNotificationResponse).mockReturnValue(tapped("n-warranty", "warranty"));
+    renderHook(() => usePushNotifications("tok", "es"));
+    expect(mockNavigate).toHaveBeenLastCalledWith("/warranty");
+  });
+
   it("shows the home a notification is about before opening its tab", () => {
     const showProject = jest.fn();
     jest.mocked(Notifications.useLastNotificationResponse).mockReturnValue({

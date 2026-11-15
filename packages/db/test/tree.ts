@@ -1,11 +1,16 @@
 // One tenant with a row in every table under it, as the application writes
 // them: for the constraint tests and the migration test. Ids end in `_<t>`.
 
-/** SQL inserting tenant `t`'s whole tree. */
-export function tenantTree(t: string): string {
+/**
+ * SQL inserting tenant `t`'s whole tree; with `fixtureOnly`, only the tables
+ * and columns test/fixtures/schema-before-2026-11-15.sql has (the migration
+ * test's database before the newer files run). A table newer than the fixture
+ * goes in the second part.
+ */
+export function tenantTree(t: string, { fixtureOnly = false } = {}): string {
   const id = (name: string) => `'${name}_${t}'`;
   const T = `'${t}'`;
-  return `
+  const tree = `
     insert into tenants (id, name, slug) values (${T}, 'Tenant ${t}', 'tenant-${t}');
     insert into users (id, tenant_id, email, role) values
       (${id("admin")}, ${T}, 'admin-${t}@example.com', 'admin'),
@@ -107,6 +112,22 @@ export function tenantTree(t: string): string {
     insert into planning_items (id, tenant_id, version_id, chapter_code, position, duration_days, lag_days, planned_start, planned_end)
       values (${id("plan_item")}, ${T}, ${id("plan")}, '05', 5, 20, -3, '2026-03-01', '2026-03-27');
   `;
+  if (fixtureOnly) return tree;
+  return `${tree}
+    insert into warranty_claims (id, tenant_id, project_id, number, kind, room, description, urgent, status, visit_on, created_by_id)
+      values (${id("claim")}, ${T}, ${id("project")}, 1, 'plumbing', 'bathroom', 'Gotea el grifo', true, 'scheduled', '2027-02-01', ${id("client")});
+    insert into warranty_claim_photos (id, tenant_id, claim_id, pathname, content_type, size_bytes, thumb_size_bytes, uploaded_by_id)
+      values (${id("claim_photo")}, ${T}, ${id("claim")}, 'warranty/${t}/1.jpg', 'image/jpeg', 2048, 512, ${id("client")});
+    insert into warranty_claim_events (id, tenant_id, claim_id, user_id, action)
+      values (${id("claim_event")}, ${T}, ${id("claim")}, ${id("client")}, 'created');
+
+    insert into budget_revisions (id, tenant_id, project_id, number, status, model, change_reason)
+      values (${id("revision1")}, ${T}, ${id("project")}, 1, 'issued', 'framer20', 'Cambio');
+    insert into budget_revision_changes (tenant_id, revision_id, issue_id, linked_by_id)
+      values (${T}, ${id("revision1")}, ${id("issue")}, ${id("admin")});
+    insert into budget_approvals (id, tenant_id, project_id, revision_id, status, client_user_id, document_id, before_cents, after_cents, vat_rate_bp, asked_by_id, decided_by_id, decided_at)
+      values (${id("approval")}, ${T}, ${id("project")}, ${id("revision1")}, 'approved', ${id("client")}, ${id("document")}, 1000, 1200, 1000, ${id("admin")}, ${id("client")}, now());
+  `;
 }
 
 /** Every table of the tree that carries tenant_id. */
@@ -133,6 +154,8 @@ export const TENANT_TABLES = [
   "obra_progress_events",
   "obra_issues",
   "obra_issue_files",
+  "budget_revision_changes",
+  "budget_approvals",
   "budget_generations",
   "ai_usage",
   "subcontractors",
@@ -158,4 +181,7 @@ export const TENANT_TABLES = [
   "purchase_request_events",
   "planning_versions",
   "planning_items",
+  "warranty_claims",
+  "warranty_claim_photos",
+  "warranty_claim_events",
 ];

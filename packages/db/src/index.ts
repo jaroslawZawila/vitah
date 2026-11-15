@@ -24,6 +24,8 @@ export {
   budgetRevisions,
   budgetChapters,
   budgetLines,
+  budgetApprovals,
+  budgetRevisionChanges,
   obraHitos,
   obraHitoChapters,
   obraHitoChecks,
@@ -67,6 +69,9 @@ export {
   planningItems,
   type PlanningVersionStatus,
   idempotencyKeys,
+  warrantyClaims,
+  warrantyClaimPhotos,
+  warrantyClaimEvents,
 } from "./schema";
 export { seedConfig, seedPassword } from "./seed-config";
 export type { AnyColumn } from "drizzle-orm";

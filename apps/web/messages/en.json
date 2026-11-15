@@ -44,7 +44,8 @@
       "budget": "Budget",
       "payments": "Payments",
       "documents": "Documents",
-      "purchases": "Purchasing"
+      "purchases": "Purchasing",
+      "warranty": "Warranty"
     },
     "network": "Network",
     "subcontractors": "Subcontractors",
@@ -74,7 +75,8 @@
       "dueCount": "{count, plural, one {# invoice overdue or due soon} other {# invoices overdue or due soon}}",
       "requests": "Requests",
       "suppliers": "Suppliers"
-    }
+    },
+    "officeContact": "Client contact"
   },
   "account": {
     "passwordPolicy": "At least {min} characters, with an uppercase letter and a number.",
@@ -177,7 +179,8 @@
       "purchases": "Purchasing",
       "deleted": "Deleted items",
       "forbidden": "No permission",
-      "portal": "Portal"
+      "portal": "Portal",
+      "officeContact": "Client contact"
     },
     "withPart": "{section} — {part}",
     "documentTitle": "{label} · ViTAH"
@@ -331,7 +334,8 @@
         "not_found": "Document not found.",
         "forbidden": "Only admins and managers can manage documents.",
         "budget_document": "This document belongs to the budget and can't be deleted.",
-        "generation_running": "The AI is reading this document: wait for it to finish or cancel it."
+        "generation_running": "The AI is reading this document: wait for it to finish or cancel it.",
+        "approval_document": "The client was asked to approve this PDF: it must stay in their app."
       },
       "visibleCount": "{count, plural, =0 {none in the client's app} one {# in the client's app} other {# in the client's app}}",
       "groups": {
@@ -346,7 +350,25 @@
       "visible": "In the app",
       "hidden": "Staff only"
     },
-    "close": "Close"
+    "close": "Close",
+    "siteManager": {
+      "title": "Site manager",
+      "intro": "The client sees their name, phone and email in the app, under Contact, to call or write to them.",
+      "label": "Team member",
+      "none": "No site manager",
+      "phone": "Phone the client will see: {phone}",
+      "noPhone": "No phone: the client will only see their email. An admin can add one in Users.",
+      "save": "Save",
+      "saving": "Saving…",
+      "saved": "Site manager saved.",
+      "errors": {
+        "missing_fields": "Choose a site manager.",
+        "user_not_found": "That user is no longer active. Choose another.",
+        "project_not_found": "Project not found.",
+        "forbidden": "Only admins and managers can choose the site manager.",
+        "generic": "It couldn't be saved. Please try again."
+      }
+    }
   },
   "usersPage": {
     "title": "System Users",
@@ -358,7 +380,8 @@
       "status": "Status",
       "twoStep": "2-step",
       "created": "Created",
-      "actions": "Actions"
+      "actions": "Actions",
+      "phone": "Phone"
     },
     "roles": {
       "admin": "Administrator",
@@ -376,7 +399,9 @@
       "resetPassword": "Reset password",
       "resetPasswordFor": "Reset the password of {name}",
       "removeTwoStep": "Remove",
-      "removeTwoStepFor": "Remove the two-step verification of {name}"
+      "removeTwoStepFor": "Remove the two-step verification of {name}",
+      "editPhone": "Phone",
+      "editPhoneFor": "Change {name}'s phone"
     },
     "twoStep": {
       "on": "On",
@@ -392,7 +417,9 @@
       "roleLabel": "Role",
       "submit": "Create user",
       "submitting": "Creating…",
-      "cancel": "Cancel"
+      "cancel": "Cancel",
+      "phoneLabel": "Phone (optional)",
+      "phonePlaceholder": "+34 600 000 000"
     },
     "errors": {
       "missing_fields": "All fields are required.",
@@ -408,12 +435,14 @@
       "too_long": "The name or email is too long.",
       "cannot_remove_own_mfa": "Your own two-step verification is turned off in Settings › Two-step verification.",
       "mfa_not_enabled": "This user does not have two-step verification on.",
-      "mfa_unavailable": "Two-step verification is not available yet. Try again later."
+      "mfa_unavailable": "Two-step verification is not available yet. Try again later.",
+      "invalid_phone": "Enter a valid phone number."
     },
     "success": {
       "created": "User created successfully.",
       "passwordReset": "Password of {name} reset. Their sessions were closed.",
-      "twoStepRemoved": "Two-step verification of {name} removed. Their sessions were closed."
+      "twoStepRemoved": "Two-step verification of {name} removed. Their sessions were closed.",
+      "phoneSaved": "{name}'s phone saved."
     },
     "deactivateDialog": {
       "title": "Deactivate {name}?",
@@ -430,6 +459,15 @@
       "description": "All their sessions will be closed. Share it securely: it won't be shown again.",
       "password": "New password",
       "save": "Reset password",
+      "saving": "Saving…",
+      "cancel": "Cancel",
+      "close": "Close"
+    },
+    "phone": {
+      "title": "{name}'s phone",
+      "description": "If they are the site manager of a project, its client sees it in the app to call them. Leave it blank to remove it.",
+      "label": "Phone",
+      "save": "Save",
       "saving": "Saving…",
       "cancel": "Cancel",
       "close": "Close"
@@ -455,6 +493,14 @@
     },
     "setPassword": "Set password",
     "setPasswordFor": "Set password for {name}",
+    "deletionRequested": "Deletion requested · {date}",
+    "clearDeletion": {
+      "button": "Mark as handled",
+      "buttonFor": "Mark {name}'s account deletion request as handled",
+      "title": "Mark {name}'s request as handled?",
+      "description": "The request stops showing. This does not delete or deactivate the account.",
+      "confirm": "Mark as handled"
+    },
     "form": {
       "title": "New client",
       "firstName": "First name",
@@ -748,7 +794,16 @@
       "invalid_state": "The chapter is no longer in that state. Reload the page.",
       "unknown_line": "One of the lines is no longer in the accepted budget. Reload the page.",
       "unknown_supplier": "That supplier is no longer in Subcontractors.",
-      "supplies_only": "A material supplier only takes material orders, not subcontracts."
+      "supplies_only": "A material supplier only takes material orders, not subcontracts.",
+      "no_contract": "There is no accepted contract to change: approval in the app is for the later revisions.",
+      "no_client": "The project has no app client.",
+      "no_pdf": "The revision has no general PDF.",
+      "not_newest": "A later revision has been issued.",
+      "approval_pending": "A request is already waiting for the client.",
+      "already_approved": "The client already approved it: register the acceptance.",
+      "approval_closed": "The request is no longer open.",
+      "not_a_change": "Only changes (CAM-) can be linked, not issues.",
+      "links_frozen": "The linked changes can't be touched: the client has it to approve, or the revision is decided."
     }
   },
   "construction": {
@@ -1293,7 +1348,9 @@
         "not_found": "The record wasn't found. Reload the page.",
         "idempotency_key_reused": "This was already submitted with different details. Reload the page and check whether it was saved before sending it again.",
         "forbidden": "Only admins and managers can make changes."
-      }
+      },
+      "pricedIn": "Priced in",
+      "revision": "Rev.{number}"
     },
     "photos": {
       "title": "Site photos",
@@ -1983,7 +2040,10 @@
       "effectHint": "The chosen options enter the contract as OP line items, below the 20 chapters; the others are discarded. This feeds the Works, the Payments (H0 = {first}) and the phases of the client's app.",
       "cancel": "Cancel",
       "accepting": "Saving…",
-      "submit": "Accept as contract"
+      "submit": "Accept as contract",
+      "approvalProof": "{by} approved this revision in the app on {date}.",
+      "approvalProofHint": "It is kept as proof beside the signed copy.",
+      "approvalDiffers": "These are not the options they approved: their approval won't count as proof."
     },
     "start": {
       "summary": "There is no budget yet. The AI prepares the first one from the project documentation; then you review and edit it.",
@@ -2149,7 +2209,70 @@
       "draftHint": "Draft: it carries the “BORRADOR” (draft) mark until it is issued",
       "issuedHint": "What was sent to the client",
       "download": "Download PDF"
-    }
+    },
+    "approval": {
+      "title": "Site changes and the client's approval",
+      "changes": "Changes this revision prices",
+      "noChanges": "No change linked.",
+      "noneLogged": "No changes logged in Obra › Issues.",
+      "ref": "CAM-{number}",
+      "estimate": "{amount} est.",
+      "pick": "Change to link",
+      "link": "Link",
+      "unlink": "Remove",
+      "unlinkLabel": "Remove {ref}",
+      "consent": "Approval in the app",
+      "ask": "Ask for approval in the app",
+      "notAsked": "The client hasn't been asked yet.",
+      "noClient": "The project has no app client: assign one on the project to ask for their approval.",
+      "status": {
+        "pending": "Waiting for the client",
+        "approved": "Approved in the app",
+        "rejected": "Rejected in the app",
+        "withdrawn": "Withdrawn",
+        "lapsed": "Closed"
+      },
+      "state": {
+        "pending": "Asked on {asked} by {by}.",
+        "approved": "{by} approved it on {date}.",
+        "rejected": "{by} rejected it on {date}.",
+        "withdrawn": "{by} withdrew it on {date}.",
+        "lapsed": "Closed on {date}: the revision is no longer on the table (a later one was issued, or one was accepted or rejected by hand)."
+      },
+      "history": {
+        "pending": "Asked on {date}: waiting for the client",
+        "approved": "Asked on {date}: approved",
+        "rejected": "Asked on {date}: rejected",
+        "withdrawn": "Asked on {date}: withdrawn",
+        "lapsed": "Asked on {date}: closed"
+      },
+      "reason": "The client's reason: “{reason}”",
+      "amounts": "Contract {before} → {after} (difference {difference}), excl. VAT",
+      "pdf": "PDF they saw",
+      "message": "Message: “{message}”",
+      "withdraw": "Withdraw",
+      "evidence": "The client's answer is evidence of their consent, not the acceptance: the team registers the acceptance with “Accept as contract”.",
+      "withdrawDialog": {
+        "title": "Withdraw the request to approve Rev.{number}?",
+        "description": "The client no longer sees it in the app. You can ask again.",
+        "confirm": "Withdraw the request"
+      },
+      "dialog": {
+        "title": "Ask the client to approve Rev.{number}",
+        "intro": "{client} will see in the app the reason for the revision, the linked changes, the contract price before and after and the general PDF, and can approve it with their password or reject it.",
+        "message": "Message to the client",
+        "optional": "optional",
+        "messagePlaceholder": "For example: here is the revision with the pool we talked about.",
+        "messageHint": "Up to 1,000 characters.",
+        "options": "Options proposed as chosen",
+        "contract": "Contract with Rev.{number} (excl. VAT)",
+        "shows": "What the client sees is fixed when you ask. Issuing a later revision, or registering the acceptance or the rejection by hand, closes the request.",
+        "cancel": "Cancel",
+        "sending": "Sending…",
+        "submit": "Ask for approval"
+      }
+    },
+    "acceptedApproval": "Approved in the app by {by} on {date}."
   },
   "subcontractors": {
     "status": {
@@ -4206,6 +4329,32 @@
       "supplies_only": "The company is now a material supplier, and those are not assigned to sites."
     }
   },
+  "officeContactPage": {
+    "title": "Client contact",
+    "intro": "The office your clients see in the app, under Contact, next to their site manager. Fill in only what you want to show.",
+    "fields": {
+      "address": "Address",
+      "phone": "Phone",
+      "email": "Email",
+      "hours": "Opening hours"
+    },
+    "placeholders": {
+      "address": "Camargo, Cantabria",
+      "phone": "+34 942 000 000",
+      "email": "hola@vitah.es",
+      "hours": "Monday to Friday · 9:00 – 18:00"
+    },
+    "hint": "A blank field doesn't show in the app. With all of them blank, the app doesn't show the office.",
+    "save": "Save",
+    "saving": "Saving…",
+    "saved": "Contact details saved.",
+    "errors": {
+      "invalid_phone": "Enter a valid phone number.",
+      "invalid_email": "Enter a valid email.",
+      "forbidden": "Only admins can change these details.",
+      "generic": "It couldn't be saved. Please try again."
+    }
+  },
   "errorPages": {
     "error": {
       "eyebrow": "Error",
@@ -4234,5 +4383,117 @@
     "previous": "Previous",
     "next": "Next",
     "page": "Page {page} of {pages}"
+  },
+  "warranty": {
+    "title": "Warranty",
+    "summary": "The warranty claims the client sends from the app once the home is handed over.",
+    "coverage": {
+      "title": "Cover (LOE)",
+      "handover": "Handed over on {date} ({source})",
+      "source": {
+        "acta": "H9 acta",
+        "payment": "H9 payment",
+        "planned": "planned handover date"
+      },
+      "noDate": "No handover date",
+      "notHandedOver": "The warranty starts when the home is handed over (stage 8). Until then the client cannot send claims.",
+      "years": "{count, plural, one {# year} other {# years}}",
+      "scope": {
+        "finishes": "Finishes",
+        "habitability": "Habitability and systems",
+        "structure": "Structure"
+      },
+      "until": "Until {date}",
+      "expired": "Ended on {date}"
+    },
+    "list": {
+      "title": "Claims",
+      "filter": "Show",
+      "open": "Open ({count})",
+      "all": "All ({count})",
+      "sent": "Sent on {date}",
+      "visit": "Visit on {date}",
+      "photos": "{count, plural, one {# photo} other {# photos}}",
+      "emptyTitle": "No warranty claims",
+      "emptyText": "When the client sends one from the app, it shows here.",
+      "noneOpen": "No open claims."
+    },
+    "kind": {
+      "finishes": "Finishes",
+      "plumbing": "Plumbing",
+      "electrical": "Electrical",
+      "carpentry": "Carpentry",
+      "damp": "Damp",
+      "other": "Other"
+    },
+    "room": {
+      "bathroom": "Bathroom",
+      "kitchen": "Kitchen",
+      "living_room": "Living room",
+      "bedroom": "Bedroom",
+      "hall": "Hall and corridors",
+      "exterior": "Outside",
+      "other": "Elsewhere"
+    },
+    "status": {
+      "received": "Received",
+      "in_review": "Under review",
+      "scheduled": "Visit scheduled",
+      "resolved": "Resolved",
+      "rejected": "Not accepted",
+      "cancelled": "Cancelled"
+    },
+    "claim": {
+      "label": "{ref} · Warranty",
+      "title": "What the client tells us",
+      "sentBy": "Sent by {name} on {date}",
+      "client": "the client",
+      "urgent": "Urgent",
+      "kind": "Type",
+      "room": "Room",
+      "photo": "Photo {number}",
+      "noPhotos": "No photos.",
+      "answer": "Answer to the client"
+    },
+    "reject": {
+      "title": "Turn down claim {ref}?",
+      "description": "The client is told in the app and will read your answer.",
+      "confirm": "Turn down claim",
+      "keep": "Go back"
+    },
+    "form": {
+      "title": "Handle",
+      "status": "Status",
+      "visitOn": "Visit day",
+      "visitHint": "Needed to schedule the visit.",
+      "answer": "Answer to the client",
+      "answerHint": "The client reads it in the app. Needed to turn the claim down: say why.",
+      "save": "Save",
+      "saved": "Claim saved.",
+      "cancelled": "The client cancelled this claim: it can no longer be changed."
+    },
+    "history": {
+      "title": "History",
+      "created": "Claim sent",
+      "photo_added": "Photo added",
+      "cancelled": "Cancelled by the client",
+      "status": "Status: {from} → {to}",
+      "visit": "Visit on {date}",
+      "visitCleared": "Visit removed",
+      "answer": "Answer: “{text}”",
+      "answerCleared": "Answer removed",
+      "client": "The client",
+      "someone": "Deleted user"
+    },
+    "errors": {
+      "generic": "It could not be saved. Please try again.",
+      "visit_required": "Give the visit day to schedule it.",
+      "reason_required": "Tell the client why the claim is not accepted.",
+      "claim_cancelled": "The client cancelled this claim: it can no longer be changed.",
+      "invalid_date": "The visit date is not valid.",
+      "invalid_input": "Check the details: one of them is not valid.",
+      "not_found": "This claim no longer exists.",
+      "forbidden": "You may not handle warranty claims."
+    }
   }
 }

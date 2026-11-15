@@ -8,7 +8,9 @@ import {
   readDocuments,
   syncDocuments,
 } from "../lib/document-store";
-import { disk, downloads } from "../test-utils/expo-file-system";
+import * as fileSystem from "../test-utils/expo-file-system";
+
+const { disk, downloads } = fileSystem;
 
 jest.mock("expo-file-system", () => require("../test-utils/expo-file-system"));
 jest.mock("../lib/api", () => ({
@@ -180,14 +182,14 @@ describe("several homes", () => {
     serverHas(doc("a"));
     await syncDocuments("tok", "p1");
     await syncDocuments("tok", "p2");
-    disk.set("file:///documents-dir/documents/manifest.json", "{}");
-    disk.set("file:///documents-dir/documents/old.pdf", "%PDF-");
+    disk.set("file:///cache-dir/documents/manifest.json", "{}");
+    disk.set("file:///cache-dir/documents/old.pdf", "%PDF-");
 
     pruneDocuments(["p2"]);
 
     expect([...disk.keys()].sort()).toEqual([
-      "file:///documents-dir/documents/p2/a.pdf",
-      "file:///documents-dir/documents/p2/manifest.json",
+      "file:///cache-dir/documents/p2/a.pdf",
+      "file:///cache-dir/documents/p2/manifest.json",
     ]);
   });
 
@@ -196,10 +198,74 @@ describe("several homes", () => {
   });
 });
 
+describe("out of device backups", () => {
+  const BACKED_UP = "file:///documents-dir/";
+
+  /** The module as a new app run loads it: it has not looked for earlier copies yet. */
+  function freshStore(): typeof import("../lib/document-store") {
+    let store!: typeof import("../lib/document-store");
+    jest.isolateModules(() => {
+      // The same in-memory disk as the rest of the file.
+      jest.doMock("expo-file-system", () => fileSystem);
+      store = jest.requireActual<typeof import("../lib/document-store")>("../lib/document-store");
+    });
+    return store;
+  }
+
+  it("keeps every copy in the cache directory, which backups leave out", async () => {
+    serverHas(doc("a"));
+    await syncDocuments("tok", P);
+    await markSeen(P, "a");
+
+    expect([...disk.keys()].sort()).toEqual([
+      "file:///cache-dir/documents/p1/a.pdf",
+      "file:///cache-dir/documents/p1/manifest.json",
+    ]);
+  });
+
+  it("moves the copies an earlier build kept in the backed-up document directory", async () => {
+    disk.set(`${BACKED_UP}documents/p1/a.pdf`, "%PDF-a");
+    disk.set(`${BACKED_UP}documents/p1/manifest.json`, JSON.stringify({ documents: [doc("a")], seen: ["a"] }));
+
+    const store = freshStore();
+
+    // Offline, opened before: as they were.
+    expect(await store.readDocuments(P)).toEqual([{ ...doc("a"), downloaded: true, isNew: false }]);
+    expect(await store.documentFile(P, "a").text()).toBe("%PDF-a");
+    expect([...disk.keys()].filter((uri) => uri.startsWith(BACKED_UP))).toEqual([]);
+  });
+
+  it("drops the earlier copies when the cache already holds some", async () => {
+    disk.set(`${BACKED_UP}documents/p1/old.pdf`, "%PDF-");
+    disk.set("file:///cache-dir/documents/p1/a.pdf", "%PDF-a");
+
+    const store = freshStore();
+    await store.readDocuments(P);
+
+    expect([...disk.keys()]).toEqual(["file:///cache-dir/documents/p1/a.pdf"]);
+  });
+
+  it("downloads them again after the phone emptied its cache", async () => {
+    serverHas(doc("a"), doc("b"));
+    await syncDocuments("tok", P);
+    // The OS reclaims the cache when the phone runs short of space.
+    for (const uri of [...disk.keys()]) if (uri.startsWith("file:///cache-dir/")) disk.delete(uri);
+    expect(await readDocuments(P)).toEqual([]);
+
+    await syncDocuments("tok", P);
+
+    expect((await readDocuments(P)).map((d) => [d.id, d.downloaded])).toEqual([
+      ["a", true],
+      ["b", true],
+    ]);
+    expect(documentFile(P, "b").exists).toBe(true);
+  });
+});
+
 describe("readDocuments", () => {
   it("is empty before the first sync and survives a corrupt list", async () => {
     expect(await readDocuments(P)).toEqual([]);
-    disk.set("file:///documents-dir/documents/p1/manifest.json", "{not json");
+    disk.set("file:///cache-dir/documents/p1/manifest.json", "{not json");
     expect(await readDocuments(P)).toEqual([]);
   });
 });

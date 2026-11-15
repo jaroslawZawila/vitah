@@ -76,7 +76,10 @@ async function canonical(value: unknown): Promise<unknown> {
 /** What tells one request from another: the same fields give the same hash, in whatever order they came. */
 export const requestHash = async (request: unknown) => sha256(new TextEncoder().encode(JSON.stringify(await canonical(request))));
 
-type Claim = { ctx: Ctx; scope: string; key: string; hash: string };
+/** Whose key it is: a staff member's `Ctx`, or a mobile-app client's own identity (tenant and user). */
+type Caller = Pick<Ctx, "tenantId" | "userId">;
+
+type Claim = { ctx: Caller; scope: string; key: string; hash: string };
 
 const rowOf = ({ ctx, scope, key }: Claim) =>
   and(eq(idempotencyKeys.tenantId, ctx.tenantId), eq(idempotencyKeys.scope, scope), eq(idempotencyKeys.key, key));
@@ -155,7 +158,7 @@ class Replayed extends Error {
  * - No key: `create` runs as without any of this.
  */
 export async function idempotent<T>(
-  ctx: Ctx,
+  ctx: Caller,
   scope: string,
   target: Record<string, string>,
   input: Record<string, unknown>,

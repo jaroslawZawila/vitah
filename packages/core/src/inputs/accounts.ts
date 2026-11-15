@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { APP_LANGUAGES, isStrongPassword } from "../contract";
 import { MAX_TEXT } from "../input";
-import { sentText, strongPassword, text } from "./fields";
+import { optionalPhone, sentText, strongPassword, text } from "./fields";
 
 // The bodies of signing in and of the accounts themselves: the portal's and
 // the app's sign-in (@repo/auth, /api/mobile/auth), a password changed by its
@@ -71,10 +71,14 @@ export const staffUserSchema = z.object({
   role: staffRole,
 });
 
-/** A staff user's changes: each optional. */
+/** A staff user's contact phone (shown to the clients of the projects they are site manager of), null when blank. */
+export const staffPhoneSchema = z.object({ phone: optionalPhone });
+
+/** A staff user's changes: each optional (`phone` null or blank clears it). */
 export const staffUserChangesSchema = z.object({
   role: z.enum(STAFF, { error: "invalid_role" }).optional(),
   active: z.boolean({ error: "invalid_active" }).optional(),
+  phone: z.undefined().or(optionalPhone),
 });
 
 /** The caller's own settings: the portal's language, null to follow the browser again. */
@@ -105,7 +109,7 @@ export type PasswordChangeInput = z.input<typeof passwordChangeSchema>;
 /** PUT /api/v1/users/:id/password, PUT /api/v1/clients/:id/password. */
 export type PasswordInput = z.input<typeof passwordSchema>;
 /** POST /api/v1/users. */
-export type StaffUserInput = z.input<typeof staffUserSchema>;
+export type StaffUserInput = z.input<typeof staffUserSchema> & z.input<typeof staffPhoneSchema>;
 /** PATCH /api/v1/users/:id. */
 export type StaffUserChangesInput = z.input<typeof staffUserChangesSchema>;
 /** PATCH /api/v1/me, setLanguageAction. */

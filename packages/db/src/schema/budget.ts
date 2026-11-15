@@ -2,6 +2,7 @@
 
 import { sql } from "drizzle-orm";
 import { type AnyPgColumn, boolean, check, date, foreignKey, index, integer, jsonb, pgTable, text, timestamp, unique } from "drizzle-orm/pg-core";
+import { budgetApprovals } from "./budget-approvals";
 import { basisPoints, COLUMN_VALUES, notNegative, oneOf } from "./checks";
 import { budgetRevisionStatusEnum } from "./enums";
 import { projectDocuments } from "./project-files";
@@ -68,6 +69,12 @@ export const budgetRevisions = pgTable(
     }),
     acceptedDocumentId: text("accepted_document_id").references(
       (): AnyPgColumn => projectDocuments.id,
+      { onDelete: "set null" },
+    ),
+    // The client's approval in the app (budget_approvals) registered as proof
+    // beside the signed copy: set when the options accepted are the ones approved.
+    acceptedApprovalId: text("accepted_approval_id").references(
+      (): AnyPgColumn => budgetApprovals.id,
       { onDelete: "set null" },
     ),
     rejectedOn: date("rejected_on", { mode: "string" }),

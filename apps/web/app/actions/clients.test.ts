@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createTestTenant, createTestUser, resetDatabase } from "@repo/db/testing";
 import { signInAs } from "../../test/session";
 import { TO_FORBIDDEN, TO_LOGIN } from "../../test/navigation";
-import { createClientAction, getClients, setClientPasswordAction } from "./clients";
+import { clientAccountService } from "@repo/core";
+import { clearDeletionRequestAction, createClientAction, getClients, setClientPasswordAction } from "./clients";
 
 // The service itself is covered in packages/core; these tests cover the
 // adapter: session → core → `{ error }` / revalidation.
@@ -68,11 +69,27 @@ describe("client actions", () => {
     ).toEqual({ success: true });
   });
 
+  it("marks a client's deletion request as handled", async () => {
+    const { tenant } = await setup();
+    await createClientAction(null, clientForm());
+    const [client] = await getClients();
+    await clientAccountService.requestDeletion(tenant.id, client!.id);
+    expect((await getClients())[0]!.deletionRequestedAt).toEqual(expect.any(String));
+    vi.mocked(revalidatePath).mockClear();
+
+    expect(await clearDeletionRequestAction(client!.id)).toEqual({ success: true });
+
+    expect((await getClients())[0]!.deletionRequestedAt).toBeNull();
+    expect(revalidatePath).toHaveBeenCalledWith("/dashboard/clients");
+    expect(await clearDeletionRequestAction("no-such-client")).toEqual({ error: "not_found" });
+  });
+
   it("returns forbidden for non-admins, and shows them the no-permission page instead of the list", async () => {
     const { tenant, admin } = await setup();
     signInAs({ tenantId: tenant.id, userId: admin.id, role: "manager" });
 
     expect(await createClientAction(null, clientForm())).toEqual({ error: "forbidden" });
+    expect(await clearDeletionRequestAction(admin.id)).toEqual({ error: "forbidden" });
     await expect(getClients()).rejects.toEqual(TO_FORBIDDEN);
   });
 
@@ -80,6 +97,7 @@ describe("client actions", () => {
     signInAs(null);
 
     await expect(createClientAction(null, clientForm())).rejects.toEqual(TO_LOGIN);
+    await expect(clearDeletionRequestAction("x")).rejects.toEqual(TO_LOGIN);
     await expect(getClients()).rejects.toEqual(TO_LOGIN);
   });
 });

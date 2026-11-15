@@ -44,12 +44,15 @@ describe("/api/mobile/settings", () => {
     const initial = await GET(request(token));
     expect(await initial.json()).toEqual({
       notifications: { progress: true, documents: true, messages: true },
+      deletionRequestedAt: null,
     });
 
+    // Older builds still send the team-messages flag: kept.
     const updated = await PUT(request(token, "PUT", { notifications: { messages: false } }));
     expect(updated.status).toBe(200);
     expect(await updated.json()).toEqual({
       notifications: { progress: true, documents: true, messages: false },
+      deletionRequestedAt: null,
     });
   });
 

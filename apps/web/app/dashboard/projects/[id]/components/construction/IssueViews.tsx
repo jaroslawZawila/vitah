@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { Paperclip, X } from "lucide-react";
@@ -39,11 +40,14 @@ export function IssueCard({
   issue,
   chapterName,
   fileUrl,
+  revisionHref,
   onEdit,
 }: {
   issue: ObraIssue;
   chapterName?: string;
   fileUrl: (issue: ObraIssue, file: IssueFile) => string;
+  /** A budget revision pricing a change (its Budget page); without it, the revisions are named only. */
+  revisionHref?: (revisionId: string) => string;
   /** Omitted for viewers. */
   onEdit?: () => void;
 }) {
@@ -94,6 +98,20 @@ export function IssueCard({
                 {file.filename}
               </a>
             ))}
+          </span>
+        )}
+        {issue.revisions.length > 0 && (
+          <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
+            {t("pricedIn")}
+            {issue.revisions.map((revision) =>
+              revisionHref ? (
+                <Link key={revision.id} href={revisionHref(revision.id)} className="font-medium text-info hover:underline">
+                  {t("revision", { number: revision.number })}
+                </Link>
+              ) : (
+                <span key={revision.id}>{t("revision", { number: revision.number })}</span>
+              ),
+            )}
           </span>
         )}
         {onEdit && (

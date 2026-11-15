@@ -5,6 +5,7 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -12,7 +13,7 @@ import { useEffect, useRef, useState } from "react";
 import { Redirect } from "expo-router";
 import { useAuth } from "../lib/auth";
 import { useI18n, type MessageKey } from "../lib/i18n";
-import { colors } from "../constants/theme";
+import { colors, type } from "../constants/theme";
 import { Button } from "../components/button";
 
 /**
@@ -42,6 +43,7 @@ export default function SignInScreen() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [forgotOpen, setForgotOpen] = useState(false);
 
   // With biometric sign-in on, ask straight away (once) when the app opens
   // signed out, but not right after the client signs out themselves.
@@ -143,6 +145,21 @@ export default function SignInScreen() {
                 onPress={() => void handleBiometricSignIn()}
               />
             )}
+
+            {/* A-Login.dc.html. The platform sends no reset emails: the builder sets a new password. */}
+            <Pressable
+              onPress={() => setForgotOpen((open) => !open)}
+              accessibilityRole="button"
+              accessibilityState={{ expanded: forgotOpen }}
+              style={({ pressed }) => [styles.forgot, pressed && { opacity: 0.6 }]}
+            >
+              <Text style={styles.forgotText}>{t("account.forgotPassword")}</Text>
+            </Pressable>
+            {forgotOpen && (
+              <Text accessibilityLiveRegion="polite" style={styles.forgotHelp}>
+                {t("account.forgotPasswordHelp")}
+              </Text>
+            )}
           </View>
         </View>
       </KeyboardAvoidingView>
@@ -202,6 +219,19 @@ const styles = StyleSheet.create({
   errorText: {
     color: colors.error,
     fontSize: 13,
+    textAlign: "center",
+  },
+  forgot: {
+    minHeight: 44,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  forgotText: {
+    color: colors.verdeOlivaLight,
+    fontSize: 14,
+  },
+  forgotHelp: {
+    ...type.meta,
     textAlign: "center",
   },
 });

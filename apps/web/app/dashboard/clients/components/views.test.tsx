@@ -29,6 +29,7 @@ const ana: ClientListItem = {
   phone: "+34 600 123 456",
   active: true,
   createdAt: "2026-09-01T10:00:00.000Z",
+  deletionRequestedAt: null,
 };
 
 describe("ClientForm", () => {
@@ -66,7 +67,7 @@ describe("ClientForm", () => {
 
 describe("ClientList", () => {
   it("shows the client's details", () => {
-    wrap(<ClientList clients={[ana]} onSetPassword={() => {}} />);
+    wrap(<ClientList clients={[ana]} onSetPassword={() => {}} onClearDeletionRequest={() => {}} />);
 
     expect(screen.getByText("Ana García López")).toBeInTheDocument();
     expect(screen.getByText("+34 600 123 456")).toBeInTheDocument();
@@ -76,7 +77,7 @@ describe("ClientList", () => {
 
   it("asks to set the password of the chosen client", async () => {
     const onSetPassword = vi.fn();
-    wrap(<ClientList clients={[ana]} onSetPassword={onSetPassword} />);
+    wrap(<ClientList clients={[ana]} onSetPassword={onSetPassword} onClearDeletionRequest={() => {}} />);
 
     await userEvent.click(
       screen.getByRole("button", { name: "Cambiar contraseña de Ana García López" }),
@@ -85,8 +86,22 @@ describe("ClientList", () => {
     expect(onSetPassword).toHaveBeenCalledWith(ana);
   });
 
+  it("marks a client who asked for their account to be deleted, with the date, and offers to mark it handled", async () => {
+    const onClear = vi.fn();
+    const luis = { ...ana, id: "client-2", firstName: "Luis", deletionRequestedAt: "2026-11-12T09:30:00.000Z" };
+    wrap(<ClientList clients={[ana, luis]} onSetPassword={() => {}} onClearDeletionRequest={onClear} />);
+
+    expect(screen.getAllByText(/^Baja solicitada · /)).toHaveLength(1);
+    expect(screen.getByText("Baja solicitada · 12 nov 2026")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Marcar como atendida la baja de Ana García López" })).toBeNull();
+
+    await userEvent.click(screen.getByRole("button", { name: "Marcar como atendida la baja de Luis García López" }));
+
+    expect(onClear).toHaveBeenCalledWith(luis);
+  });
+
   it("shows an empty state", () => {
-    wrap(<ClientList clients={[]} onSetPassword={() => {}} />);
+    wrap(<ClientList clients={[]} onSetPassword={() => {}} onClearDeletionRequest={() => {}} />);
 
     expect(screen.getByText("Todavía no hay clientes.")).toBeInTheDocument();
   });

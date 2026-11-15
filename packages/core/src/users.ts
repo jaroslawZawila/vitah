@@ -2,7 +2,7 @@ import { db, users, userMfa, and, asc, eq, isStaffUser, sql } from "@repo/db";
 import { changeOwnPassword, EMAIL_PATTERN, hashPassword, isUniqueViolation, replacePassword } from "./accounts";
 import { requireAdmin, type Ctx, type UserRole } from "./context";
 import { invalid, notFound } from "./errors";
-import { meChangesSchema, passwordSchema, staffUserChangesSchema, staffUserSchema } from "./inputs/accounts";
+import { meChangesSchema, passwordSchema, staffPhoneSchema, staffUserChangesSchema, staffUserSchema } from "./inputs/accounts";
 import { parse } from "./inputs/fields";
 import { mfaTableMissing } from "./mfa";
 
@@ -12,7 +12,7 @@ import { mfaTableMissing } from "./mfa";
 
 export async function listUsers(ctx: Ctx) {
   requireAdmin(ctx);
-  const columns = { id: users.id, name: users.name, email: users.email, role: users.role, active: users.active, createdAt: users.createdAt };
+  const columns = { id: users.id, name: users.name, email: users.email, phone: users.phone, role: users.role, active: users.active, createdAt: users.createdAt };
   const ofTenant = and(eq(users.tenantId, ctx.tenantId), isStaffUser);
   const staff = await db
     // Whether signing in asks them for a code too (./mfa.ts): on or off, nothing else of it.
@@ -34,7 +34,7 @@ export async function listUsers(ctx: Ctx) {
 export type UserListItem = Awaited<ReturnType<typeof listUsers>>[number];
 
 /**
- * Body: { email, name, password, role }. The portal login finds staff by
+ * Body: { email, name, password, role, phone? }. The portal login finds staff by
  * email alone, so a staff email is unique across tenants (any case). The
  * password must meet the policy (`weak_password` otherwise).
  */
@@ -48,6 +48,7 @@ export async function createUser(ctx: Ctx, input: Record<string, unknown>) {
     throw invalid("missing_fields");
   if (!EMAIL_PATTERN.test(email)) throw invalid("invalid_email");
   parse(passwordSchema, input);
+  const { phone } = parse(staffPhoneSchema, input);
 
   try {
     const [created] = await db
@@ -58,6 +59,7 @@ export async function createUser(ctx: Ctx, input: Record<string, unknown>) {
         name,
         passwordHash: await hashPassword(password),
         role: userRole,
+        phone,
       })
       .returning({ id: users.id });
 
@@ -70,7 +72,7 @@ export async function createUser(ctx: Ctx, input: Record<string, unknown>) {
   }
 }
 
-/** Body: { role?, active? } */
+/** Body: { role?, active?, phone? } (`phone` null or blank clears it). */
 export async function updateUser(
   ctx: Ctx,
   userId: string,
@@ -81,6 +83,7 @@ export async function updateUser(
   const body = parse(staffUserChangesSchema, input);
   const set: Partial<typeof users.$inferInsert> = { updatedAt: new Date() };
   if (body.role !== undefined) set.role = body.role;
+  if (body.phone !== undefined) set.phone = body.phone;
   if (body.active !== undefined) {
     set.active = body.active;
     // Deactivating signs the user out for good: the sessions they had don't

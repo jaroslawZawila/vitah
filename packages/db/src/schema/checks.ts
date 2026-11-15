@@ -44,6 +44,11 @@ export const COLUMN_VALUES = {
   planningStatus: ["draft", "approved", "superseded"],
   planningRegion: ["as", "cb", "cl", "ga", "md"],
   caeStatus: ["apta", "pendiente", "bloqueada"],
+  budgetApprovalStatus: ["pending", "approved", "rejected", "withdrawn", "lapsed"],
+  warrantyKind: ["finishes", "plumbing", "electrical", "carpentry", "damp", "other"],
+  warrantyRoom: ["bathroom", "kitchen", "living_room", "bedroom", "hall", "exterior", "other"],
+  warrantyStatus: ["received", "in_review", "scheduled", "resolved", "rejected", "cancelled"],
+  warrantyEventAction: ["created", "photo_added", "updated", "cancelled"],
 } as const satisfies Record<string, readonly string[]>;
 
 /** `values` as an SQL list of literals; they are plain words, never input. */

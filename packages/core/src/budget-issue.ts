@@ -1,6 +1,7 @@
 import { createElement } from "react";
 import { and, asc, budgetRevisions, db, eq, isNull, lte, obraHitos, projectDocuments, projects, tenants } from "@repo/db";
 import { getBudget } from "./budget";
+import { lapseApprovals, lockProjectRow } from "./budget-approvals";
 import { revisionInProject } from "./budget-draft";
 import { money, monthLabel, type BudgetPdfData, type Letterhead } from "./budget-pdf/format";
 import { markChanged } from "./changes";
@@ -181,7 +182,7 @@ export async function issueRevision(ctx: Ctx, projectId: string, revisionId: str
   // All under the revision's row lock, which every draft edit takes (inDraft):
   // the PDFs are of exactly what gets frozen, and if storing them fails the
   // revision stays a draft and can be issued again.
-  const title = await db.transaction(async (tx) => {
+  const { title, lapsed } = await db.transaction(async (tx) => {
     const [locked] = await tx
       .select({ status: budgetRevisions.status })
       .from(budgetRevisions)
@@ -210,6 +211,12 @@ export async function issueRevision(ctx: Ctx, projectId: string, revisionId: str
     await storeFiles(
       docs.map((d) => d.file),
       async () => {
+        // The project's row, as asking the client takes it: a request asked
+        // meanwhile on an older revision is in before this lapses them, or
+        // waits and sees this one issued. Only now, for the writes: held while
+        // the PDFs render and upload, it would queue every other write of the
+        // project (markChanged, the stage, a claim) for seconds.
+        await lockProjectRow(tx, ctx.tenantId, projectId);
         await tx.insert(projectDocuments).values(docs.map((d) => d.row));
         await tx
           .update(budgetRevisions)
@@ -217,11 +224,11 @@ export async function issueRevision(ctx: Ctx, projectId: string, revisionId: str
           .where(eq(budgetRevisions.id, revisionId));
       },
     );
-    return pdfTitle(revision, "general");
+    // This one replaces what the client was asked to approve before.
+    return { title: pdfTitle(revision, "general"), lapsed: await lapseApprovals(tx, projectId, ctx.userId, { except: revisionId }) };
   });
-  if (shareWithClient) {
-    await markChanged(ctx.tenantId, projectId, ["documents"]);
-    await notifyProjectClient(ctx.tenantId, projectId, { kind: "document", title });
-  }
+  const areas = [...(shareWithClient ? (["documents"] as const) : []), ...(lapsed > 0 ? (["obra"] as const) : [])];
+  if (areas.length > 0) await markChanged(ctx.tenantId, projectId, areas);
+  if (shareWithClient) await notifyProjectClient(ctx.tenantId, projectId, { kind: "document", title });
   return { revisionId };
 }

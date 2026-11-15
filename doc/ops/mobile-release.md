@@ -32,8 +32,9 @@ eas submit --profile production --platform ios        # upload to App Store Conn
 - `submit.production` in `eas.json` is empty, so `eas submit` asks for everything it needs each time
   (the Play service-account key, the App Store Connect app). **Not verified:** whether either store
   listing exists yet, and which credentials EAS already holds.
-- The version users see is `version` in `app.json` (`1.0.0`). Raise it by hand for a release with
-  native changes (see §2); the build number is EAS's.
+- The version users see is `version` in `app.json` (`1.1.0`). Raise it by hand for a release with
+  native changes (see §2); the build number is EAS's. `1.1.0` added `expo-image-picker` (Garantía's
+  photos), a native module: it reaches phones only in a new store build, never as an update to `1.0.0`.
 - Both profiles point at production. A build against a local or preview portal needs
   `EXPO_PUBLIC_API_URL` set in a profile of its own.
 - Before a release: `pnpm test`, `pnpm exec turbo check-types`, `pnpm exec turbo lint` (the commit gate
@@ -57,7 +58,7 @@ What is configured (`apps/mobile/app.json`):
 - A build asks that URL for updates on its **channel**, which comes from its build profile
   (`preview` or `production`, already in `eas.json`).
 - It only takes an update with the same **runtime version**. With the `appVersion` policy that is the
-  app's `version` (`1.0.0` today, on both platforms).
+  app's `version` (`1.1.0` today, on both platforms; the checks below were made at `1.0.0`).
 - Defaults are kept: the app checks when it opens, downloads in the background and runs the update
   the next time it is opened. So a fix reaches a phone after **up to two cold starts** (fully closed
   and reopened, not just sent to the background).
@@ -180,17 +181,77 @@ What limits it:
 - Failed API calls are not reported either: the app shows its own message (no connection, timeout,
   server error) and the portal already logs its own 5xx.
 
-## 4. Open items for the owner
+## 4. Help and privacy pages (build settings)
 
-1. **Privacy policy URL.** Both stores ask for one, and the app has no link to one (Perfil leaves
-   "help and privacy" out until the pages exist, see `app/(app)/(tabs)/profile.tsx`). The policy
-   should now also mention that the app sends error reports (what broke, the screen, app and OS
-   version, phone locale, and the account when signed in) to ViTAH's own servers.
+Perfil shows "Ayuda y preguntas frecuentes" and "Privacidad y datos" (`A-Settings.dc.html`) only when
+the build says where those pages are. Each opens in the phone's browser. A row whose address is not
+set, or not `https://`, is left out (`apps/mobile/constants/links.ts`).
+
+| Variable | Row in Perfil |
+|----------|---------------|
+| `EXPO_PUBLIC_HELP_URL` | Ayuda y preguntas frecuentes |
+| `EXPO_PUBLIC_PRIVACY_URL` | Privacidad y datos (the privacy policy the stores ask for) |
+
+Set them in each build profile's `env` in `apps/mobile/eas.json`, next to `EXPO_PUBLIC_API_URL`:
+
+```json
+"production": {
+  "channel": "production",
+  "autoIncrement": true,
+  "env": {
+    "EXPO_PUBLIC_API_URL": "https://portal.vitah.es",
+    "EXPO_PUBLIC_PRIVACY_URL": "https://…",
+    "EXPO_PUBLIC_HELP_URL": "https://…"
+  }
+}
+```
+
+Expo writes `EXPO_PUBLIC_*` values into the JavaScript bundle when it is built, so a change reaches
+phones with the next build **or** the next update published with the same values (`eas update`
+reads the profile's environment; **not verified** how this project's EAS environments are set up, so
+check the value in the published update). For `expo start`, put them in `apps/mobile/.env`
+(`.env.example`). The pages and their text are the owner's; the repository holds no URL for them.
+
+## 5. Offline copies and device backups
+
+The app keeps an offline copy of each document PDF (and of the list) to open them without a
+connection (`apps/mobile/lib/document-store.ts`); acta and invoice PDFs opened from Obra are
+downloaded on each open (`lib/hito-files.ts`). Both sit in the app's **cache directory**:
+
+- **iOS:** `Library/Caches` is never in iCloud or computer backups. The OS may empty it when the
+  phone runs short of space (never while the app is running); the app downloads the documents again
+  on its next sync (opening the app, coming back to it, pulling to refresh).
+- **Android:** the cache directory is never in Auto Backup nor in a device-to-device transfer.
+  Besides, `expo-secure-store`'s config plugin already limits Auto Backup to shared preferences
+  (without its own `SecureStore` file), so files were never in Android backups.
+
+Builds before this change kept the copies in the document directory, which iOS backs up. The first
+run of the new code moves them to the cache (or drops them and downloads them again); nothing else
+to do. This is JavaScript only: it can ship in an update, no new build needed.
+
+`android.allowBackup: false` in `app.json` was **not** set: the files are already out of Android's
+backups, and turning backup off would also drop what the plugin keeps on purpose (other shared
+preferences) for nothing in return. It would be a native change (new build, raise `version`).
+
+## 6. Open items for the owner
+
+1. **Privacy policy URL.** Both stores ask for one. Perfil links to it once
+   `EXPO_PUBLIC_PRIVACY_URL` is set (§4); the policy's text is the owner's. It should mention that
+   the app sends error reports (what broke, the screen, app and OS version, phone locale, and the
+   account when signed in) to ViTAH's own servers, and how to ask for the account to be deleted
+   (Perfil › "Solicitar la baja de mi cuenta": the builder is told and handles it; nothing is erased
+   on its own). The help page (`EXPO_PUBLIC_HELP_URL`) is optional.
 2. **Bundle id mismatch, to decide before the first store registration.** `app.json` has iOS
    `bundleIdentifier` `vitah.app` and Android `package` `app.vitah`. Either can never change once an
-   app is registered in its store. Android is already tied to `app.vitah` in Firebase
-   (`google-services.json`, project `vitah-es`), so the cheaper alignment is iOS → `app.vitah`.
-   Not changed here.
+   app is registered in its store. Where each is used in the repository:
+   - `app.vitah`: `apps/mobile/app.json` (`android.package`), `apps/mobile/google-services.json`
+     (`client_info.android_client_info.package_name`, Firebase project `vitah-es`), and the API key
+     restriction noted in `.github/.gitleaksignore` (Android app `app.vitah` in Google Cloud).
+   - `vitah.app`: `apps/mobile/app.json` (`ios.bundleIdentifier`) only. No `GoogleService-Info.plist`,
+     no APNs key and no App Store Connect app in the repository (`eas.json`'s `submit.production` is
+     empty), so nothing else ties iOS to it yet; **not verified** what EAS or Apple already hold.
+   - Neither appears in `eas.json` or the code.
+   So the cheaper alignment is iOS → `app.vitah`. Not changed here.
 3. **iOS push.** An APNs key has to be uploaded to EAS (`eas credentials -p ios`); until then iOS
    builds get no push notifications. Android sends through Firebase project `vitah-es`.
    **Not verified:** what EAS holds today.

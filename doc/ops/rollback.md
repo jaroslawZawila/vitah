@@ -28,6 +28,12 @@ Then fix forward: revert or correct the commit on `main` and push. A rollback le
   (`cae_*` columns, `packages/db/sql/2026-11-15-0900-cae-stored-status.sql`): after running code from before that
   file, forget them once the current code is back (`UPDATE subcontractors SET cae_status = NULL, cae_valid_until =
   NULL; UPDATE subcontractor_assignments SET cae_warnings = NULL, cae_valid_until = NULL;`); the next reads work them out again.
+- Requests to the client to approve a budget revision (`budget_approvals`, `packages/db/sql/2026-11-15-1430-budget-approvals.sql`)
+  lapse only in the current code (issuing a later revision, accepting or rejecting one by hand, changing the project's
+  client). After running code from before that file (a rollback past it, or an older branch's Preview acting on
+  budgets: Preview shares production's database), close the waiting ones once the current code is back (`UPDATE
+  budget_approvals SET status = 'lapsed', closed_at = now() WHERE status = 'pending';`); staff ask again where they still
+  want an answer. The current code never shows nor takes an answer to a request whose revision a later one replaced.
 - The client app is not rolled back by this: installed builds keep calling the API they know. `/api/mobile/*` and `/api/v1` stay backwards compatible for that reason.
 
 ## Not rehearsed yet

@@ -60,6 +60,8 @@ export type ClientListItem = {
   active: boolean;
   /** ISO timestamp. */
   createdAt: string;
+  /** When the client asked in the app for their account to be deleted (ISO), else null. */
+  deletionRequestedAt: string | null;
 };
 
 /** Error codes of the clients service (`{ error: code }` in the API). */
@@ -98,7 +100,18 @@ export type NotificationPrefs = {
 };
 
 /** GET/PUT /api/mobile/settings. (The language belongs to the phone: see /push-token.) */
-export type MobileSettings = { notifications: NotificationPrefs };
+export type MobileSettings = {
+  notifications: NotificationPrefs;
+  /** When the client asked for their account to be deleted (ISO), else null. Missing from older servers. */
+  deletionRequestedAt?: string | null;
+};
+
+/**
+ * POST / DELETE /api/mobile/account/deletion-request: the client's request
+ * for their account to be deleted, after asking (the first date is kept) or
+ * withdrawing (null). Only a request: the builder handles it.
+ */
+export type DeletionRequest = { deletionRequestedAt: string | null };
 
 /** Error codes of the client account service (`{ error: code }` in the API). */
 export type AccountError =

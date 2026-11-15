@@ -206,6 +206,21 @@ describe("account endpoints", () => {
       ["/api/mobile/push-token", "DELETE", JSON.stringify({ token: "ExponentPushToken[x]" })],
     ]);
   });
+
+  it("asks for the account to be deleted, and withdraws it", async () => {
+    respond(200, { deletionRequestedAt: "2026-11-15T08:00:00.000Z" });
+    respond(200, { deletionRequestedAt: null });
+
+    expect(await api.requestDeletion("tok")).toEqual({
+      ok: true,
+      data: { deletionRequestedAt: "2026-11-15T08:00:00.000Z" },
+    });
+    expect(await api.withdrawDeletion("tok")).toEqual({ ok: true, data: { deletionRequestedAt: null } });
+    expect(fetchMock.mock.calls.map(([url, init]) => [url.replace(/^.*\/api/, "/api"), init.method, init.headers])).toEqual([
+      ["/api/mobile/account/deletion-request", "POST", { Authorization: "Bearer tok" }],
+      ["/api/mobile/account/deletion-request", "DELETE", { Authorization: "Bearer tok" }],
+    ]);
+  });
 });
 
 describe("api.getChanges", () => {
@@ -307,5 +322,52 @@ describe("error mapping", () => {
     respond(status, body);
 
     expect(await api.signIn("a@b.c", "pw")).toEqual({ ok: false, error });
+  });
+});
+
+describe("warranty endpoints", () => {
+  it("sends a claim for the home shown, with its key", async () => {
+    respond(200, { claimId: "c", number: 1 });
+    const claim = { kind: "damp" as const, room: "kitchen" as const, description: "Humedad", urgent: false };
+
+    expect(await api.createWarrantyClaim("tok", "p2", claim, "key-0123456789abcdef")).toEqual({ ok: true, data: { claimId: "c", number: 1 } });
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toMatch(/\/api\/mobile\/warranty\?projectId=p2$/);
+    expect(init).toMatchObject({
+      method: "POST",
+      headers: { Authorization: "Bearer tok", "Content-Type": "application/json", "Idempotency-Key": "key-0123456789abcdef" },
+      body: JSON.stringify(claim),
+    });
+  });
+
+  it("uploads one photo per request, as a file part, with its own key", async () => {
+    respond(200, { photoId: "ph" });
+
+    await api.addWarrantyPhoto("tok", "c 1", { uri: "file:///a.jpg", name: "a.jpg", type: "image/jpeg" }, "key-photo-0123456789");
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toMatch(/\/api\/mobile\/warranty\/c%201\/photos$/);
+    expect(init.headers).toEqual({ Authorization: "Bearer tok", "Idempotency-Key": "key-photo-0123456789" });
+    expect(init.body).toBeInstanceOf(FormData);
+  });
+
+  it("passes the server's reasons through, e.g. too many claims today", async () => {
+    respond(429, { error: "too_many_claims_today" });
+    expect(await api.createWarrantyClaim("tok", null, { kind: "other", room: "other", description: "x" }, "k".repeat(16))).toEqual({
+      ok: false,
+      error: "too_many_claims_today",
+    });
+  });
+
+  it("reads and cancels a claim, and points at its photos", async () => {
+    respond(200, { id: "c" });
+    respond(200, { claimId: "c" });
+
+    await api.getWarrantyClaim("tok", "c");
+    await api.cancelWarrantyClaim("tok", "c");
+    expect(fetchMock.mock.calls.map(([url, init]) => [url.replace(/^.*\/api/, "/api"), init.method])).toEqual([
+      ["/api/mobile/warranty/c", "GET"],
+      ["/api/mobile/warranty/c/cancel", "POST"],
+    ]);
+    expect(api.warrantyPhotoUrl("c", "ph", "thumb")).toMatch(/\/api\/mobile\/warranty\/c\/photos\/ph\?size=thumb$/);
   });
 });

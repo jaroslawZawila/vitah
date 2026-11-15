@@ -114,13 +114,13 @@ describe("ObraScreen", () => {
     fireEvent.press(await screen.findByRole("button", { name: "Reintentar" }));
     expect(await screen.findByText("52%")).toBeOnTheScreen();
 
-    // A pull refreshes the photos too; a failed refresh keeps the data and says so.
+    // A pull refreshes the photos too; a failed refresh keeps the data and says it is from before.
     getObra.mockResolvedValueOnce({ ok: false, error: "network_error" });
     const scroll = view.UNSAFE_getByType(ScrollView);
     await act(async () => scroll.props.refreshControl.props.onRefresh());
     await waitFor(() => expect(getObra).toHaveBeenCalledTimes(3));
     expect(api.listPhotos).toHaveBeenCalledTimes(2);
-    expect(await screen.findByRole("alert")).toHaveTextContent(/No se ha podido actualizar/);
+    expect(await screen.findByText(/^Sin conexión · datos del/)).toBeOnTheScreen();
     expect(screen.getByText("52%")).toBeOnTheScreen();
   });
 });
