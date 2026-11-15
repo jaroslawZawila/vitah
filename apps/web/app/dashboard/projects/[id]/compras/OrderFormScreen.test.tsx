@@ -208,8 +208,11 @@ describe("OrderFormScreen", () => {
     renderScreen();
     await fillSubcontract();
     const save = screen.getByRole("button", { name: "Guardar y marcar contratado" });
+    // The button is disabled while a save is on its way: wait for it, or a slow run drops the next click.
     await userEvent.click(save);
+    await waitFor(() => expect(save).toBeEnabled());
     await userEvent.click(save);
+    await waitFor(() => expect(save).toBeEnabled());
     await userEvent.type(screen.getByLabelText("Concepto"), " y falsos techos");
     await userEvent.click(save);
 
