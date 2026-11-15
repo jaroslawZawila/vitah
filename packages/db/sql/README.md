@@ -101,6 +101,14 @@ the files cannot rebuild a database and nobody should try. Each new file is chec
 constraints, foreign keys (by columns, referenced table and on-delete/on-update rule, never by name) and
 enum values. The target is opened read-only (`default_transaction_read_only`), so give it a direct URL,
 not a pooled one. `schema_migrations` is ignored by design: it is the runner's table, not in `schema.ts`.
+A check or foreign key that is there but `NOT VALID` (added so, and its validation failed or never ran:
+the rows from before it were never checked) is reported as different, with the `VALIDATE CONSTRAINT` to
+run once those rows are fixed.
+
+A new constraint on a table that already has rows goes in `NOT VALID` and is validated on its own, in
+a `BEGIN … EXCEPTION … END` block that turns a failure into a `NOTICE` naming it: the file never fails
+on old rows, new writes are checked at once, and the drift check lists what is left to validate (see
+`2026-11-15-1000-check-constraints.sql`).
 
 Exit code 0: no drift. 1: drift. 2: it could not run.
 

@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 import FormError from "../../../../components/FormError";
 import type { ParseAmount } from "./draft";
 import { usePurchaseFormat } from "./format";
-import { KindAndSupplier, Lines } from "./OrderForm";
+import { KindAndSupplier, Lines } from "./OrderSteps";
 import { requestTotal, type RequestDraft } from "./request-draft";
 
 /**

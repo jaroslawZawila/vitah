@@ -185,7 +185,7 @@ export async function syncDraft(tx: Tx, revisionId: string, { tenantId, continge
       ),
     );
   if (contingency) {
-    const [{ base } = { base: "0" }] = await tx
+    const [{ base } = { base: 0 }] = await tx
       .select({ base: linesTotalSql() })
       .from(budgetLines)
       .innerJoin(budgetChapters, eq(budgetChapters.id, budgetLines.chapterId))
@@ -201,7 +201,7 @@ export async function syncDraft(tx: Tx, revisionId: string, { tenantId, continge
       description: contingencyDescription(contingencyBp),
       unit: "pa",
       quantityMilli: 1000,
-      unitPriceCents: ofBp(Number(base), contingencyBp),
+      unitPriceCents: ofBp(base, contingencyBp),
       source: "computed" as const,
     };
     const updated = await tx

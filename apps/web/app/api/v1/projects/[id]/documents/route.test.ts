@@ -73,6 +73,10 @@ describe("/api/v1/projects/:id/documents", () => {
       "inline; filename*=UTF-8''Planos.pdf",
     );
     expect(file.headers.get("cache-control")).toBe("private, no-store");
+    // A PDF: framed by the portal only, its viewer left alone (lib/security-headers.js).
+    expect(file.headers.get("content-security-policy")).toBe("frame-ancestors 'self'");
+    expect(file.headers.get("x-frame-options")).toBe("SAMEORIGIN");
+    expect(file.headers.get("x-content-type-options")).toBe("nosniff");
     expect(await file.text()).toBe("%PDF-1.7\nplanos");
 
     const deleted = await DELETE(request(token, { method: "DELETE" }), params(project.id, documentId));

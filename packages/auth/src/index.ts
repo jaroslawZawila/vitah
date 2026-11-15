@@ -1,6 +1,7 @@
 import "./types";
 import NextAuth, { AuthError, CredentialsSignin } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
+import { portalCredentials } from "@repo/core";
 import { logError } from "@repo/core/log";
 import { attemptSignIn, clientIp } from "./credentials";
 import { refreshSessionToken, signedInToken } from "./session";
@@ -39,9 +40,7 @@ const result = NextAuth({
         code: { label: "Code", type: "text" },
       },
       async authorize(credentials, request) {
-        const email = credentials?.email as string | undefined;
-        const password = credentials?.password as string | undefined;
-        const code = typeof credentials?.code === "string" ? credentials.code : undefined;
+        const { email, password, code } = portalCredentials(credentials);
         if (!email || !password) return null;
 
         const user = await attemptSignIn(email, password, "portal", clientIp(request), code);

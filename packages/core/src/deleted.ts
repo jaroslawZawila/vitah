@@ -36,9 +36,10 @@ import {
   type DeletedProjectOption,
 } from "./contract";
 import { CoreError } from "./errors";
+import { deletedListSchema } from "./inputs/deleted";
+import { parse } from "./inputs/fields";
 import { logWarn } from "./log";
 import { fail } from "./obra-data";
-import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from "./paging";
 import { projectInTenant, projectsInTenant, type Tx } from "./project-client";
 import { checkInvoiceRestorable, checkPaymentRestorable } from "./purchase-invoices";
 import { logEvent } from "./purchasing";
@@ -102,6 +103,7 @@ const naming = ({ detail, number, day, amount, block, parent }: Naming = {}) => 
 function deletedRows(tenantId: string): Record<DeletedKind, SQL> {
   return {
     // Its ref taken by another project since stands in the way.
+    // soft-delete-ok(projects): Elementos eliminados lists the deleted projects.
     project: sql`
       select 'project' as kind, p.id, p.deleted_at, p.deleted_by_id, p.id as project_id, p.ref as label,
         ${naming({
@@ -112,12 +114,14 @@ function deletedRows(tenantId: string): Record<DeletedKind, SQL> {
         })}
       from ${projects} p
       where p.tenant_id = ${tenantId} and p.deleted_at is not null`,
+    // soft-delete-ok(projectDocuments): Elementos eliminados lists the deleted documents, a deleted obra's too.
     document: sql`
       select 'document' as kind, d.id, d.deleted_at, d.deleted_by_id, d.project_id, d.title as label,
         ${naming({ detail: sql`d.filename` })}
       from ${projectDocuments} d
       where d.tenant_id = ${tenantId} and d.deleted_at is not null`,
     // Its caption, else the day it was taken (its upload day in Spain without one, as the photos' own lists have it).
+    // soft-delete-ok(projectPhotos): Elementos eliminados lists the deleted photos, a deleted obra's too.
     photo: sql`
       select 'photo' as kind, f.id, f.deleted_at, f.deleted_by_id, f.project_id,
         coalesce(nullif(btrim(f.caption), ''), f.day) as label, ${naming({ day: sql`f.day` })}
@@ -127,18 +131,21 @@ function deletedRows(tenantId: string): Record<DeletedKind, SQL> {
       ) f
       where f.tenant_id = ${tenantId} and f.deleted_at is not null`,
     // `detail` and `number` are its incident's kind and number (INC-003).
+    // soft-delete-ok(obraIssueFiles): Elementos eliminados lists the deleted incident files, a deleted obra's too.
     issue_file: sql`
       select 'issue_file' as kind, f.id, f.deleted_at, f.deleted_by_id, i.project_id, f.filename as label,
         ${naming({ detail: sql`i.kind`, number: sql`i.number` })}
       from ${obraIssueFiles} f
       join ${obraIssues} i on i.id = f.issue_id
       where f.tenant_id = ${tenantId} and f.deleted_at is not null`,
+    // soft-delete-ok(subcontractorAssignments): Elementos eliminados lists the deleted assignments, a deleted obra's too.
     assignment: sql`
       select 'assignment' as kind, a.id, a.deleted_at, a.deleted_by_id, a.project_id, s.legal_name as label, ${naming()}
       from ${subcontractorAssignments} a
       join ${subcontractors} s on s.id = a.subcontractor_id
       where a.tenant_id = ${tenantId} and a.deleted_at is not null`,
     // `detail` and `number` are its order's description and number (PED-001).
+    // soft-delete-ok(purchaseOrderDocuments): Elementos eliminados lists the deleted order documents, a deleted obra's too.
     order_document: sql`
       select 'order_document' as kind, d.id, d.deleted_at, d.deleted_by_id, o.project_id, d.title as label,
         ${naming({ detail: sql`o.description`, number: sql`o.number` })}
@@ -146,12 +153,14 @@ function deletedRows(tenantId: string): Record<DeletedKind, SQL> {
       join ${purchaseOrders} o on o.id = d.order_id
       where d.tenant_id = ${tenantId} and d.deleted_at is not null`,
     // A credit note of a deleted invoice waits for it; a number used again since stands in the way.
+    // soft-delete-ok(purchaseInvoices): Elementos eliminados lists the deleted invoices, and joins the deleted invoice a credit note rectifies.
     invoice: sql`
       select 'invoice' as kind, i.id, i.deleted_at, i.deleted_by_id, o.project_id, i.number as label,
         ${naming({
           detail: sql`s.legal_name`,
           day: sql`i.issued_on::text`,
-          amount: sql`(i.base_cents + i.vat_cents - i.irpf_cents)::bigint`,
+          amount: sql`i.base_cents::bigint + i.vat_cents - i.irpf_cents`,
+          // soft-delete-ok(purchaseInvoices): the number is unique per supplier across every obra, a deleted one's too (as on create).
           block: sql`case
             when r.deleted_at is not null then 'parent_deleted'
             when exists (
@@ -167,6 +176,7 @@ function deletedRows(tenantId: string): Record<DeletedKind, SQL> {
       left join ${purchaseInvoices} r on r.id = i.rectifies_id
       where i.tenant_id = ${tenantId} and i.deleted_at is not null`,
     // A payment of a deleted invoice waits for it.
+    // soft-delete-ok(purchasePayments, purchaseInvoices): Elementos eliminados lists the deleted payments, and joins their invoice even if it is deleted.
     payment: sql`
       select 'payment' as kind, p.id, p.deleted_at, p.deleted_by_id, o.project_id, i.number as label,
         ${naming({
@@ -218,29 +228,6 @@ function toItem(row: Row): DeletedItem {
   };
 }
 
-/** `<deleted_at to the microsecond>_<id>`: where a page ended. */
-const CURSOR = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6})_([\w-]{1,64})$/;
-
-/** A moment that exists (not the 30th of February), so the database never has to say so. */
-function isMoment(at: string) {
-  const time = Date.parse(`${at}Z`);
-  return !Number.isNaN(time) && new Date(time).toISOString().slice(0, 23) === at.slice(0, 23);
-}
-
-function parseFilters(input: Record<string, unknown>) {
-  const given = (value: unknown) => value !== undefined && value !== null && value !== "";
-  const kind = given(input.kind) ? input.kind : undefined;
-  if (kind !== undefined && !isDeletedKind(kind)) fail("invalid_input");
-  const projectId = given(input.projectId) ? input.projectId : undefined;
-  if (projectId !== undefined && typeof projectId !== "string") fail("invalid_input");
-  // The lists' one policy for a page's size (./paging): 50 unless asked, never more than 200.
-  const limit = given(input.limit) ? Number(input.limit) : DEFAULT_PAGE_SIZE;
-  if (!Number.isInteger(limit) || limit < 1) fail("invalid_input");
-  const cursor = given(input.cursor) ? CURSOR.exec(String(input.cursor)) : undefined;
-  if (cursor === null || (cursor && !isMoment(cursor[1]!))) fail("invalid_input");
-  return { kind, projectId, limit: Math.min(limit, MAX_PAGE_SIZE), after: cursor ? { at: cursor[1]!, id: cursor[2]! } : null };
-}
-
 const union = (parts: SQL[]) => sql.join(parts, sql` union all `);
 
 /**
@@ -253,10 +240,11 @@ const union = (parts: SQL[]) => sql.join(parts, sql` union all `);
  */
 export async function listDeleted(ctx: Ctx, input: Record<string, unknown> = {}): Promise<DeletedList> {
   requireAdmin(ctx);
-  const { kind, projectId, limit, after } = parseFilters(input);
+  const { kind, projectId, limit, cursor: after = null } = parse(deletedListSchema, input);
   const byKind = deletedRows(ctx.tenantId);
   const kinds = kind ? [kind] : DELETED_KINDS;
   const [rows, projectRows] = await Promise.all([
+    // soft-delete-ok(projects): each deleted record's obra, deleted or not (`project_deleted`).
     db.execute<Row>(sql`
       select d.kind, d.id, to_char(d.deleted_at, 'YYYY-MM-DD"T"HH24:MI:SS.US') as at,
         d.deleted_by_id, coalesce(u.name, u.email) as deleted_by_name,
@@ -271,6 +259,7 @@ export async function listDeleted(ctx: Ctx, input: Record<string, unknown> = {})
       order by d.deleted_at desc, d.id desc
       limit ${limit + 1}`),
     // The filter's obras: whatever is filtered, asked once per list.
+    // soft-delete-ok(projects): the obras of deleted records, the deleted ones among them.
     after
       ? null
       : db.execute<DeletedProjectOption>(sql`
@@ -320,6 +309,7 @@ type Restored = { projectId: string };
 async function restoreProject(ctx: Ctx, id: string): Promise<Restored> {
   try {
     await db.transaction(async (tx) => {
+      // soft-delete-ok(projects): a restore locks the deleted row it brings back.
       const [row] = await tx.select({ ref: projects.ref }).from(projects).where(deletedRow(projects, ctx, id)).for("update");
       if (!row) fail("not_found");
       const [taken] = await tx
@@ -345,6 +335,7 @@ async function restoreProject(ctx: Ctx, id: string): Promise<Restored> {
 async function restoreProjectFile(ctx: Ctx, kind: "document" | "photo", id: string): Promise<Restored> {
   const table = kind === "document" ? projectDocuments : projectPhotos;
   const projectId = await db.transaction(async (tx) => {
+    // soft-delete-ok(projectDocuments, projectPhotos): a restore locks the deleted row it brings back; its obra is checked next.
     const [row] = await tx.select({ projectId: table.projectId }).from(table).where(deletedRow(table, ctx, id)).for("update");
     if (!row) fail("not_found");
     await requireLiveProject(tx, ctx, row.projectId);
@@ -359,6 +350,7 @@ async function restoreProjectFile(ctx: Ctx, kind: "document" | "photo", id: stri
 /** An incident's file: its incident (never deleted) and the obra are there. */
 async function restoreIssueFile(ctx: Ctx, id: string): Promise<Restored> {
   const projectId = await db.transaction(async (tx) => {
+    // soft-delete-ok(obraIssueFiles): a restore locks the deleted row it brings back; its obra is checked next.
     const [row] = await tx
       .select({ issueId: obraIssueFiles.issueId })
       .from(obraIssueFiles)
@@ -383,6 +375,7 @@ async function restoreIssueFile(ctx: Ctx, id: string): Promise<Restored> {
  */
 async function restoreAssignment(ctx: Ctx, id: string): Promise<Restored> {
   return db.transaction(async (tx) => {
+    // soft-delete-ok(subcontractorAssignments): a restore locks the deleted row it brings back; its obra is checked next.
     const [row] = await tx
       .select({ subcontractorId: subcontractorAssignments.subcontractorId, projectId: subcontractorAssignments.projectId })
       .from(subcontractorAssignments)
@@ -416,6 +409,7 @@ async function requireLiveOrder(tx: Tx, ctx: Ctx, orderId: string) {
 /** An order's document, with all its versions: its order's obra is there. */
 async function restoreOrderDocument(ctx: Ctx, id: string): Promise<Restored> {
   return db.transaction(async (tx) => {
+    // soft-delete-ok(purchaseOrderDocuments): a restore locks the deleted row it brings back; its order's obra is checked next.
     const [row] = await tx
       .select({ orderId: purchaseOrderDocuments.orderId, title: purchaseOrderDocuments.title })
       .from(purchaseOrderDocuments)
@@ -442,6 +436,7 @@ async function restoreOrderDocument(ctx: Ctx, id: string): Promise<Restored> {
 async function restoreInvoice(ctx: Ctx, id: string): Promise<Restored> {
   try {
     return await db.transaction(async (tx) => {
+      // soft-delete-ok(purchaseInvoices): a restore locks the deleted row it brings back; its order's obra is checked next.
       const [invoice] = await tx.select().from(purchaseInvoices).where(deletedRow(purchaseInvoices, ctx, id)).for("update");
       if (!invoice) fail("not_found");
       const order = await requireLiveOrder(tx, ctx, invoice.orderId);
@@ -452,6 +447,7 @@ async function restoreInvoice(ctx: Ctx, id: string): Promise<Restored> {
           .where(and(eq(purchaseInvoices.id, invoice.rectifiesId), isNull(purchaseInvoices.deletedAt)));
         if (!rectified) blocked("parent_deleted");
       }
+      // soft-delete-ok(purchaseInvoices): the number is unique per supplier across every obra, a deleted one's too (as on create).
       const [taken] = await tx
         .select({ id: purchaseInvoices.id })
         .from(purchaseInvoices)
@@ -484,8 +480,10 @@ async function restoreInvoice(ctx: Ctx, id: string): Promise<Restored> {
  */
 async function restorePayment(ctx: Ctx, id: string): Promise<Restored> {
   return db.transaction(async (tx) => {
+    // soft-delete-ok(purchasePayments): a restore locks the deleted row it brings back; its invoice and obra are checked next.
     const [payment] = await tx.select().from(purchasePayments).where(deletedRow(purchasePayments, ctx, id)).for("update");
     if (!payment) fail("not_found");
+    // soft-delete-ok(purchaseInvoices): the payment's invoice even if deleted, to refuse with `parent_deleted`; its obra is checked next.
     const [invoice] = await tx.select().from(purchaseInvoices).where(eq(purchaseInvoices.id, payment.invoiceId));
     if (!invoice) fail("not_found");
     const order = await requireLiveOrder(tx, ctx, invoice.orderId);

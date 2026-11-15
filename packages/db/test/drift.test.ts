@@ -109,6 +109,21 @@ describe("drift check", () => {
     ]);
   });
 
+  it("reports a check or a foreign key left NOT VALID: the rows from before it were never checked", async () => {
+    const report = await drift(`
+      alter table projects drop constraint projects_budget_check;
+      alter table projects add constraint projects_budget_check check (budget_cents >= 0) not valid;
+      alter table projects drop constraint projects_tenant_fk;
+      alter table projects add constraint legacy_fk foreign key (tenant_id) references tenants (id) on delete cascade not valid;
+    `);
+    expect(summary(report)).toEqual([
+      "different: constraint projects.projects_budget_check — NOT VALID: the rows from before it was added were never " +
+        "checked. Fix those that break it, then ALTER TABLE projects VALIDATE CONSTRAINT projects_budget_check",
+      "different: foreign key projects(tenant_id) -> tenants(id) — NOT VALID: the rows from before it was added were never " +
+        "checked. Fix those that break it, then ALTER TABLE projects VALIDATE CONSTRAINT legacy_fk",
+    ]);
+  });
+
   it("does not mind a foreign key under another name, but reports a missing, an extra and a doubled one", async () => {
     const renamed = await drift("alter table projects rename constraint projects_tenant_fk to fk_rails_1234;");
     expect(renamed.drift).toEqual([]);

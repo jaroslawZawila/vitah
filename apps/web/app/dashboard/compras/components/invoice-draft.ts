@@ -1,4 +1,5 @@
 import type {
+  PurchaseInvoiceChangesInput,
   PurchaseInvoiceDetail,
   PurchaseInvoiceForm,
   PurchaseInvoiceKind,
@@ -152,8 +153,16 @@ export function invoiceComplete(draft: InvoiceDraft, order: Order, parse: Parse)
   );
 }
 
-/** The body for createInvoiceAction (without its file) or, with `locked`, the fields updateInvoiceAction may still change. */
-export function invoiceInput(draft: InvoiceDraft, order: Order, parse: Parse, { locked = false } = {}): Record<string, unknown> {
+/**
+ * The body for createInvoiceAction (without its file) or, with `locked`, the
+ * fields updateInvoiceAction may still change (an edit ignores `kind` and `rectifiesId`).
+ */
+export function invoiceInput(
+  draft: InvoiceDraft,
+  order: Order,
+  parse: Parse,
+  { locked = false } = {},
+): PurchaseInvoiceChangesInput & { kind?: PurchaseInvoiceKind; rectifiesId?: string } {
   const credit = draft.kind === "credit_note";
   const always = {
     number: draft.number.trim(),

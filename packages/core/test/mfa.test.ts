@@ -733,3 +733,18 @@ describe("what is never answered or logged", () => {
     expect(JSON.stringify(results.slice(5))).not.toMatch(/[A-HJ-NP-Z2-9]{5}-[A-HJ-NP-Z2-9]{5}/);
   });
 });
+
+describe("input boundaries (schemas in src/inputs/accounts.ts)", () => {
+  it("asks for what is missing before anything else, as before; extra keys are ignored", async () => {
+    const nobody: Ctx = { tenantId: (await createTestTenant()).id, userId: crypto.randomUUID(), role: "manager" };
+    for (const input of [{ code: null }, { code: ["123456"] }]) {
+      await expect(svc.confirmEnrolment(nobody, input, NOW)).rejects.toMatchObject({ code: "missing_fields", status: 400 });
+      await expect(svc.regenerateRecoveryCodes(nobody, input, NOW)).rejects.toMatchObject({ code: "missing_fields" });
+      await expect(svc.disable(nobody, { ...input, password: PASSWORD }, NOW)).rejects.toMatchObject({ code: "missing_fields" });
+    }
+
+    const { ctx, secret } = await enrolled();
+    await svc.disable(ctx, { password: PASSWORD, code: appCode(secret), userId: "someone-else", enabled: true }, NOW);
+    expect((await svc.getStatus(ctx)).enabled).toBe(false);
+  });
+});

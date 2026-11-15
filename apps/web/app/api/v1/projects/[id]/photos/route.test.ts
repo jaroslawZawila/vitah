@@ -75,11 +75,15 @@ describe("/api/v1/projects/:id/photos", () => {
       `inline; filename*=UTF-8''${photoId}.png`,
     );
     expect(file.headers.get("cache-control")).toBe("private, max-age=86400, immutable");
+    // An image loads nothing and only the portal may frame it (lib/security-headers.js).
+    expect(file.headers.get("content-security-policy")).toBe("default-src 'none'; frame-ancestors 'self'");
+    expect(file.headers.get("x-frame-options")).toBe("SAMEORIGIN");
     expect(new Uint8Array(await file.arrayBuffer()).slice(0, 8)).toEqual(PNG);
 
     const thumb = await download(request(token, { query: "?size=thumb" }), params(project.id, photoId));
     expect(thumb.status).toBe(200);
     expect(thumb.headers.get("content-type")).toBe("image/webp");
+    expect(thumb.headers.get("content-security-policy")).toBe("default-src 'none'; frame-ancestors 'self'");
     expect(Number(thumb.headers.get("content-length"))).toBeLessThan(png.size);
 
     const deleted = await DELETE(request(token, { method: "DELETE" }), params(project.id, photoId));

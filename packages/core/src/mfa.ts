@@ -5,6 +5,8 @@ import { passwordThrottle } from "./accounts";
 import { requireAdmin, type Ctx } from "./context";
 import { MFA_RECOVERY_CODES, type MfaEnrolment, type MfaRecoveryCodes, type MfaStatus } from "./contract";
 import { CoreError, invalid, notFound } from "./errors";
+import { mfaCodeSchema, mfaDisableSchema } from "./inputs/accounts";
+import { parse } from "./inputs/fields";
 import { logWarn } from "./log";
 import { qrDataUrl } from "./mfa-qr";
 import { isMissingTable } from "./pg-errors";
@@ -255,10 +257,6 @@ export async function beginEnrolment(ctx: Ctx): Promise<MfaEnrolment> {
   return { secret: base32Encode(secret), uri, qr: qrDataUrl(uri) };
 }
 
-/** The `code` of a request body, if one was typed. */
-const typedCode = (input: Record<string, unknown>) =>
-  typeof input.code === "string" && input.code.trim() ? input.code : undefined;
-
 /**
  * Body: { code } — the six digits the app shows for the secret `beginEnrolment`
  * gave. Right: two-step verification is on from the next sign-in, and the
@@ -266,8 +264,7 @@ const typedCode = (input: Record<string, unknown>) =>
  * `too_many_attempts` (429) after ten wrong codes.
  */
 export async function confirmEnrolment(ctx: Ctx, input: Record<string, unknown>, now = new Date()): Promise<MfaRecoveryCodes> {
-  const code = typedCode(input);
-  if (!code) throw invalid("missing_fields");
+  const { code } = parse(mfaCodeSchema, input);
   await me(ctx);
   const throttle = [codeThrottle(ctx.userId)];
   if (await overLimit(throttle)) throw tooManyAttempts();
@@ -302,9 +299,7 @@ async function requireEnabled(ctx: Ctx) {
  * recovery one (`wrong_code`). `too_many_attempts` (429) after ten wrong ones.
  */
 export async function disable(ctx: Ctx, input: Record<string, unknown>, now = new Date()) {
-  const code = typedCode(input);
-  const { password } = input;
-  if (!code || typeof password !== "string" || !password) throw invalid("missing_fields");
+  const { code, password } = parse(mfaDisableSchema, input);
   const user = await me(ctx);
   await requireEnabled(ctx);
   // A wrong password here counts with those of "change my password": one allowance for both.
@@ -328,8 +323,7 @@ export async function disable(ctx: Ctx, input: Record<string, unknown>, now = ne
  * ones (`wrong_code`).
  */
 export async function regenerateRecoveryCodes(ctx: Ctx, input: Record<string, unknown>, now = new Date()): Promise<MfaRecoveryCodes> {
-  const code = typedCode(input);
-  if (!code) throw invalid("missing_fields");
+  const { code } = parse(mfaCodeSchema, input);
   await me(ctx);
   await requireEnabled(ctx);
   const throttle = [codeThrottle(ctx.userId)];

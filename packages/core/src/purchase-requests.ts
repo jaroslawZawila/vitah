@@ -18,7 +18,6 @@ import {
 } from "@repo/db";
 import { canDecideRequest, requireEditor, type Ctx } from "./context";
 import {
-  PURCHASE_KINDS,
   isOpenRequest,
   type PurchaseKind,
   type PurchaseRequestDetail,
@@ -28,33 +27,21 @@ import {
 import { daysPast } from "./control-calc";
 import { forbidden } from "./errors";
 import { idempotent, type Once } from "./idempotency";
+import { changesOf, parse } from "./inputs/fields";
+import { newRequestSchema, requestCancelSchema, requestChangesSchema, requestDecisionSchema } from "./inputs/purchase-requests";
+import type { OrderLines } from "./inputs/purchasing";
 import { todayInSpain } from "./obra-calc";
-import {
-  calendarDate,
-  fail,
-  groupBy,
-  optionalText,
-  orNull,
-  pick,
-  pickChanges,
-  requiredText,
-  requireProject,
-  userName,
-  userNamesById,
-} from "./obra-data";
+import { fail, groupBy, requireProject, userName, userNamesById } from "./obra-data";
 import { projectNotDeleted } from "./project-client";
 import { lockRequest, logRequestEvent } from "./purchase-request-data";
 import {
-  MAX_DESCRIPTION,
   MAX_EVENTS,
-  MAX_NOTE,
-  MAX_NOTES,
   contractLines,
+  contractedLines,
   contractsOf,
   diffLines,
   loadOrders,
   ofProject,
-  parseLines,
   projectList,
   requireSupplier,
 } from "./purchasing";
@@ -217,18 +204,12 @@ export async function getRequest(ctx: Ctx, requestId: string): Promise<PurchaseR
 // ─── Writes ──────────────────────────────────────────────────────────────────
 
 /** The order form's lines without closing anything: each a contract line once, with an estimate. */
-const parseRequestLines = (value: unknown, contract: Awaited<ReturnType<typeof contractLines>>) =>
-  parseLines(value, contract).map(({ lineageId, chapterCode, amountCents }) => ({ lineageId, chapterCode, amountCents }));
+const requestLines = (given: OrderLines, contract: Awaited<ReturnType<typeof contractLines>>) =>
+  contractedLines(given, contract).map(({ lineageId, chapterCode, amountCents }) => ({ lineageId, chapterCode, amountCents }));
 
 /** The suggested supplier, if any: the tenant's, able to take this kind. */
-const optionalSupplier = (ctx: Ctx, value: unknown, kind: PurchaseKind) =>
-  value === undefined || value === null || value === "" ? null : requireSupplier(ctx, value, kind);
-
-const FIELD_PARSERS = {
-  description: (value: unknown) => requiredText(value, MAX_DESCRIPTION),
-  neededBy: orNull(calendarDate),
-  notes: (value: unknown) => optionalText(value, MAX_NOTES),
-};
+const optionalSupplier = (ctx: Ctx, subcontractorId: string | null, kind: PurchaseKind) =>
+  subcontractorId === null ? null : requireSupplier(ctx, subcontractorId, kind);
 
 /**
  * Body: { kind, description, lines: [{ lineageId, amountCents }], neededBy?,
@@ -242,16 +223,15 @@ export async function createRequest(ctx: Ctx, projectId: string, input: Record<s
 }
 
 async function makeRequest(ctx: Ctx, projectId: string, input: Record<string, unknown>, once: Once<{ requestId: string; number: number }>) {
-  const kind = pick(PURCHASE_KINDS)(input.kind);
+  // The kind and the supplier first, looked up with the project; then the rest.
+  const { kind, subcontractorId: supplierId } = parse(newRequestSchema.pick({ kind: true, subcontractorId: true }), input);
   const [, contract, subcontractorId] = await Promise.all([
     requireProject(ctx.tenantId, projectId),
     contractLines(ctx.tenantId, projectId),
-    optionalSupplier(ctx, input.subcontractorId, kind),
+    optionalSupplier(ctx, supplierId, kind),
   ]);
-  const lines = parseRequestLines(input.lines, contract);
-  const parsed = pickChanges(input, FIELD_PARSERS);
-  if (parsed.description === undefined) fail("missing_fields");
-  const description = parsed.description;
+  const { description, neededBy, notes, ...body } = parse(newRequestSchema.omit({ kind: true, subcontractorId: true }), input);
+  const lines = requestLines(body.lines, contract);
   const sameProject = and(eq(purchaseRequests.projectId, projectId), eq(purchaseRequests.tenantId, ctx.tenantId));
   return db.transaction((tx) =>
     once(tx, async () => {
@@ -266,9 +246,9 @@ async function makeRequest(ctx: Ctx, projectId: string, input: Record<string, un
             number: sql`(select coalesce(max(${purchaseRequests.number}), 0) + 1 from ${purchaseRequests} where ${sameProject})`,
             kind,
             description,
-            neededBy: parsed.neededBy ?? null,
+            neededBy,
             subcontractorId,
-            notes: parsed.notes ?? null,
+            notes,
             createdById: ctx.userId,
           })
           .onConflictDoNothing()
@@ -297,18 +277,17 @@ export async function updateRequest(ctx: Ctx, requestId: string, input: Record<s
   if (!request) fail("not_found");
   if (request.status !== "pending") fail("invalid_state");
   // What was sent, checked before the lock; compared with the row as it is under it.
-  const kind = input.kind === undefined ? undefined : pick(PURCHASE_KINDS)(input.kind);
-  const parsed = pickChanges(input, FIELD_PARSERS);
-  const contract = "lines" in input ? await contractLines(ctx.tenantId, request.projectId) : null;
-  const lines = contract ? parseRequestLines(input.lines, contract) : null;
+  const { kind, lines: given, subcontractorId: supplierId, ...parsed } = changesOf(parse(requestChangesSchema, input));
+  const contract = given ? await contractLines(ctx.tenantId, request.projectId) : null;
+  const lines = given && contract ? requestLines(given, contract) : null;
   await db.transaction(async (tx) => {
     const locked = await lockRequest(tx, ctx, requestId, ["pending"]);
     const nextKind = kind ?? locked.kind;
     // The supplier, sent or kept, must take the kind it ends up with.
-    const supplierSent = "subcontractorId" in input;
+    const supplierSent = supplierId !== undefined;
     const subcontractorId =
       supplierSent || nextKind !== locked.kind
-        ? await optionalSupplier(ctx, supplierSent ? input.subcontractorId : locked.subcontractorId, nextKind)
+        ? await optionalSupplier(ctx, supplierSent ? supplierId : locked.subcontractorId, nextKind)
         : locked.subcontractorId;
     const next = { ...parsed, kind: nextKind, subcontractorId };
     const keys = (Object.keys(next) as (keyof typeof next)[]).filter((key) => next[key] !== undefined && next[key] !== locked[key]);
@@ -341,8 +320,7 @@ export async function updateRequest(ctx: Ctx, requestId: string, input: Record<s
 /** Body: { decision: "approve" | "reject", note? (required to reject) }. Admins only, while pending. → { requestId, status } */
 export async function decideRequest(ctx: Ctx, requestId: string, input: Record<string, unknown>) {
   if (!canDecideRequest(ctx.role)) throw forbidden();
-  const decision = pick(["approve", "reject"] as const)(input.decision);
-  const note = optionalText(input.note, MAX_NOTE);
+  const { decision, note } = parse(requestDecisionSchema, input);
   if (decision === "reject" && !note) fail("missing_fields");
   const status = decision === "approve" ? "approved" : "rejected";
   await db.transaction(async (tx) => {
@@ -359,7 +337,7 @@ export async function decideRequest(ctx: Ctx, requestId: string, input: Record<s
 /** Body: { note? }: withdraws a request still open (pending or approved, not ordered). → { requestId } */
 export async function cancelRequest(ctx: Ctx, requestId: string, input: Record<string, unknown> = {}) {
   requireEditor(ctx);
-  const note = optionalText(input.note, MAX_NOTE);
+  const { note } = parse(requestCancelSchema, input);
   await db.transaction(async (tx) => {
     const request = await lockRequest(tx, ctx, requestId, ["pending", "approved"]);
     await tx.update(purchaseRequests).set({ status: "cancelled" }).where(eq(purchaseRequests.id, requestId));

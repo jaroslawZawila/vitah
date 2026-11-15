@@ -27,19 +27,11 @@ import { isUniqueViolation } from "./accounts";
 import { requireEditor, type Ctx } from "./context";
 import {
   DUE_SOON_DAYS,
-  MAX_IRPF_BP,
-  MAX_MILESTONES,
-  MAX_RETENTION_BP,
-  PURCHASE_INVOICE_GROUPS,
-  PURCHASE_INVOICE_KINDS,
-  PURCHASE_PAYMENT_METHODS,
-  PURCHASE_VAT_KINDS,
   countsAsContracted,
   type PurchaseInvoiceDetail,
   type InvoiceListQuery,
   type PurchaseInvoiceForm,
   type PurchaseInvoiceGroup,
-  type PurchaseInvoiceKind,
   type PurchaseInvoiceListItem,
   type PurchasingCounts,
   type TenantInvoices,
@@ -47,23 +39,20 @@ import {
 } from "./contract";
 import { requirePdf } from "./documents";
 import { idempotent, type Once } from "./idempotency";
+import { changesOf, parse } from "./inputs/fields";
+import {
+  invoiceChangesSchemas,
+  invoiceFileSchema,
+  invoiceKindSchema,
+  invoiceListSchema,
+  milestonesSchema,
+  newInvoiceSchemas,
+  paymentSchema,
+} from "./inputs/purchase-invoices";
 import { addDays, todayInSpain } from "./obra-calc";
 import { filterText, pageWindow, pagingOf, searchPattern, type PageQuery } from "./paging";
 import { orderLabelSql } from "./sql-labels";
-import {
-  calendarDate,
-  fail,
-  integer,
-  isObject,
-  loadBudget,
-  optionalText,
-  orNull,
-  pick,
-  pickChanges,
-  requiredText,
-  userName,
-  workDate,
-} from "./obra-data";
+import { fail, loadBudget, userName } from "./obra-data";
 import { inLiveOrder, projectNotDeleted, softDeleted, type Tx } from "./project-client";
 import { openStoredFile, projectFolder, storeFiles, uploadedName, type StoredFile } from "./project-files";
 import {
@@ -107,12 +96,6 @@ import { contractLines, loadOrders, logEvent, projectList, releaseMilestones, re
 // leaves it out as if it were gone (so do the rows of a deleted obra).
 // ─────────────────────────────────────────────────────────────────────────────
 
-const MAX_NUMBER = 60;
-const MAX_NOTES = 2000;
-const MAX_CONCEPT = 200;
-const MAX_REFERENCE = 120;
-const MAX_FILE_NOTE = 300;
-const MAX_AMOUNT_CENTS = 2_000_000_000;
 const MAX_EVENTS = 500;
 
 type InvoiceRow = typeof purchaseInvoices.$inferSelect;
@@ -168,8 +151,10 @@ const OWED = sql`('pending', 'partial', 'overdue')`;
 /**
  * What the invoice or credit note `row` (a table alias) leaves to pay by its
  * due date: its total less the retention held, as `withTotals`' `payableCents`.
+ * In bigint: each amount fits an integer, their sum may not (nor what is summed from it).
  */
-const payableOf = (row: string) => sql.raw(`(${row}.base_cents + ${row}.vat_cents - ${row}.irpf_cents - ${row}.retention_cents)`);
+const payableOf = (row: string) =>
+  sql.raw(`(${row}.base_cents::bigint + ${row}.vat_cents - ${row}.irpf_cents - ${row}.retention_cents)`);
 
 /**
  * Every invoice and credit note of the tenant (or of a project or supplier)
@@ -231,7 +216,7 @@ async function buildOrders(tenantId: string, orderIds: string[], today: string) 
 export async function listInvoices(ctx: Ctx, filters: Filters = {}, query: InvoiceListQuery = {}): Promise<TenantInvoices> {
   const today = todayInSpain();
   const window = pageWindow(query);
-  const group = orNull(pick(["all", ...PURCHASE_INVOICE_GROUPS] as const))(query.group) ?? "all";
+  const group = parse(invoiceListSchema, query).group ?? "all";
   const pattern = searchPattern(query.q);
   const projectId = filterText(query.projectId);
   const supplierId = filterText(query.supplierId);
@@ -632,17 +617,17 @@ const orderLines = (tenantId: string, orderId: string) =>
 
 /**
  * How `baseCents` splits across the order's lines: as given (each an order
- * line once, adding up to the base, of its sign), else in proportion to
+ * line once, adding up to the base, of its sign), else (null) in proportion to
  * `weights` (the order's lines, or the rectified invoice's).
  */
 function splitLines(
-  value: unknown,
+  given: { lineageId: string; amountCents: number }[] | null,
   baseCents: number,
   lines: NewInvoiceLine[],
   weights: { lineageId: string; amountCents: number }[],
 ): NewInvoiceLine[] {
   const byLineage = new Map(lines.map((l) => [l.lineageId, l]));
-  if (value === undefined || value === null) {
+  if (!given) {
     const shares = weights.filter((w) => byLineage.has(w.lineageId));
     const parts = splitProportional(
       baseCents,
@@ -652,27 +637,18 @@ function splitLines(
       .map((w, i) => ({ lineageId: w.lineageId, chapterCode: byLineage.get(w.lineageId)!.chapterCode, amountCents: parts[i]! }))
       .filter((l) => l.amountCents !== 0);
   }
-  if (!Array.isArray(value) || value.length === 0) fail("invalid_input");
   const seen = new Set<string>();
-  const parsed = value.map((entry) => {
-    if (!isObject(entry) || typeof entry.lineageId !== "string") fail("invalid_input");
-    const line = byLineage.get(entry.lineageId);
+  const parsed = given.map(({ lineageId, amountCents }) => {
+    const line = byLineage.get(lineageId);
     if (!line) fail("unknown_line");
-    if (seen.has(entry.lineageId)) fail("invalid_input");
-    seen.add(entry.lineageId);
-    const amountCents = integer(entry.amountCents, -MAX_AMOUNT_CENTS, MAX_AMOUNT_CENTS);
+    if (seen.has(lineageId)) fail("invalid_input");
+    seen.add(lineageId);
     if (amountCents === 0 || Math.sign(amountCents) !== Math.sign(baseCents)) fail("invalid_input");
     return { lineageId: line.lineageId, chapterCode: line.chapterCode, amountCents };
   });
   if (parsed.reduce((sum, l) => sum + l.amountCents, 0) !== baseCents) fail("invalid_input");
   return parsed;
 }
-
-const basePoints = (max: number) => (value: unknown) => integer(value, 0, max);
-
-/** An invoice's base: positive; a credit note's, negative. */
-const baseOf = (kind: PurchaseInvoiceKind) => (value: unknown) =>
-  kind === "invoice" ? integer(value, 1, MAX_AMOUNT_CENTS) : integer(value, -MAX_AMOUNT_CENTS, -1);
 
 /** The order locked for this transaction, still placed: invoices only go to a contracted order. */
 async function lockPlacedOrder(tx: Tx, orderId: string) {
@@ -703,7 +679,14 @@ export async function createInvoice(ctx: Ctx, orderId: string, input: Record<str
 async function registerInvoice(ctx: Ctx, orderId: string, input: Record<string, unknown>, once: Once<{ invoiceId: string }>) {
   const order = await requireOrder(ctx, orderId);
   if (!countsAsContracted(order.status)) fail("invalid_state");
-  const kind = input.kind === undefined ? "invoice" : pick(PURCHASE_INVOICE_KINDS)(input.kind);
+  const { kind } = parse(invoiceKindSchema, input);
+  // A credit note's invoice first, as before: one not found answers before its fields are read.
+  let rectified: InvoiceRow | null = null;
+  if (kind === "credit_note") {
+    rectified = await requireInvoice(ctx, parse(newInvoiceSchemas.credit_note.pick({ rectifiesId: true }), input).rectifiesId);
+    if (rectified.orderId !== orderId || rectified.kind !== "invoice") fail("invalid_input");
+  }
+  const body = kind === "invoice" ? parse(newInvoiceSchemas.invoice, input) : parse(newInvoiceSchemas.credit_note, input);
   const terms = termsOf(order);
   const [lines, milestones] = await Promise.all([
     orderLines(ctx.tenantId, orderId),
@@ -711,33 +694,29 @@ async function registerInvoice(ctx: Ctx, orderId: string, input: Record<string, 
   ]);
   const schedule = milestones.get(orderId) ?? [];
 
-  let rectified: InvoiceRow | null = null;
+  // An invoice goes to a milestone of the schedule, if the order has one (a credit note settles against its invoice).
   let milestoneId: string | null = null;
-  if (kind === "credit_note") {
-    if (typeof input.rectifiesId !== "string") fail("missing_fields");
-    rectified = await requireInvoice(ctx, input.rectifiesId);
-    if (rectified.orderId !== orderId || rectified.kind !== "invoice") fail("invalid_input");
-  } else if (input.milestoneId !== undefined && input.milestoneId !== null) {
-    milestoneId = schedule.find((m) => m.id === input.milestoneId)?.id ?? fail("invalid_input");
-  } else if (schedule.length > 0) {
-    fail("missing_fields");
+  if (!("rectifiesId" in body)) {
+    if (body.milestoneId !== undefined && body.milestoneId !== null) {
+      milestoneId = schedule.find((m) => m.id === body.milestoneId)?.id ?? fail("invalid_input");
+    } else if (schedule.length > 0) {
+      fail("missing_fields");
+    }
   }
 
-  const issuedOn = workDate(input.issuedOn);
-  const dueOn = kind === "credit_note" ? null : (orNull(calendarDate)(input.dueOn) ?? defaultDueOn(issuedOn, terms.paymentDays));
+  const { issuedOn, number, notes } = body;
+  // A credit note has no due date of its own.
+  const dueOn = "rectifiesId" in body ? null : (body.dueOn ?? defaultDueOn(issuedOn, terms.paymentDays));
   if (dueOn && dueOn < issuedOn) fail("invalid_date");
   const amounts = invoiceAmounts({
-    baseCents: baseOf(kind)(input.baseCents),
-    vatKind: input.vatKind === undefined ? (rectified?.vatKind ?? terms.vatKind) : pick(PURCHASE_VAT_KINDS)(input.vatKind),
-    irpfBp: input.irpfBp === undefined ? (rectified?.irpfBp ?? 0) : basePoints(MAX_IRPF_BP)(input.irpfBp),
-    retentionBp:
-      input.retentionBp === undefined ? (rectified?.retentionBp ?? terms.retentionBp) : basePoints(MAX_RETENTION_BP)(input.retentionBp),
+    baseCents: body.baseCents,
+    vatKind: body.vatKind ?? rectified?.vatKind ?? terms.vatKind,
+    irpfBp: body.irpfBp ?? rectified?.irpfBp ?? 0,
+    retentionBp: body.retentionBp ?? rectified?.retentionBp ?? terms.retentionBp,
   });
   const weights = rectified ? await rectifiedLines(ctx, rectified.id) : lines;
-  const split = splitLines(input.lines, amounts.baseCents, lines, weights);
-  const number = requiredText(input.number, MAX_NUMBER);
-  const notes = optionalText(input.notes, MAX_NOTES);
-  const file = await optionalPdf(input.file);
+  const split = splitLines(body.lines ?? null, amounts.baseCents, lines, weights);
+  const file = await optionalPdf(body.file);
 
   const invoiceId = crypto.randomUUID();
   const folder = invoiceFolder(ctx, order.projectId, orderId, invoiceId);
@@ -857,17 +836,17 @@ async function lockInvoice(tx: Tx, invoiceId: string) {
 }
 
 /** An invoice and its credit notes. */
-const inGroup = (invoiceId: string) => sql`(${purchaseInvoices.id} = ${invoiceId} or ${purchaseInvoices.rectifiesId} = ${invoiceId})`;
+const inGroup = (invoiceId: string) => or(eq(purchaseInvoices.id, invoiceId), eq(purchaseInvoices.rectifiesId, invoiceId));
 
 /** A credit note never takes off more than its invoice and the invoice's other credit notes (deleted ones aside) leave. */
 async function checkCreditRoom(tx: Tx, invoiceId: string, addedCents: number) {
   // Locked: two credit notes at once can't both fit in what is left.
   await lockInvoice(tx, invoiceId);
   const [left] = await tx
-    .select({ base: sql<string>`sum(${purchaseInvoices.baseCents})` })
+    .select({ base: sql<number>`sum(${purchaseInvoices.baseCents})`.mapWith(Number) })
     .from(purchaseInvoices)
     .where(and(inGroup(invoiceId), isNull(purchaseInvoices.deletedAt)));
-  if (Number(left?.base ?? 0) + addedCents < 0) fail("exceeds_amount");
+  if ((left?.base ?? 0) + addedCents < 0) fail("exceeds_amount");
 }
 
 /** The lines of the invoice a credit note rectifies: its split is the credit note's. */
@@ -880,10 +859,10 @@ const rectifiedLines = (ctx: Ctx, invoiceId: string) =>
 /** What was paid on the invoice an invoice or credit note settles against (deleted payments aside). */
 async function paidAgainst(run: Tx | typeof db, invoice: InvoiceRow) {
   const [row] = await run
-    .select({ paid: sql<string>`coalesce(sum(${purchasePayments.amountCents}), 0)` })
+    .select({ paid: sql<number>`coalesce(sum(${purchasePayments.amountCents}), 0)`.mapWith(Number) })
     .from(purchasePayments)
     .where(and(eq(purchasePayments.invoiceId, payerOf(invoice)), isNull(purchasePayments.deletedAt)));
-  return Number(row?.paid ?? 0);
+  return row?.paid ?? 0;
 }
 
 /**
@@ -895,21 +874,10 @@ async function paidAgainst(run: Tx | typeof db, invoice: InvoiceRow) {
 export async function updateInvoice(ctx: Ctx, invoiceId: string, input: Record<string, unknown>) {
   requireEditor(ctx);
   const invoice = await requireInvoice(ctx, invoiceId);
-  const parsed = pickChanges<Pick<InvoiceRow, "number" | "issuedOn" | "dueOn" | "notes" | "baseCents" | "vatKind" | "irpfBp" | "retentionBp" | "milestoneId">>(
-    input,
-    {
-      number: (value) => requiredText(value, MAX_NUMBER),
-      issuedOn: (value) => workDate(value),
-      dueOn: invoice.kind === "invoice" ? (value) => calendarDate(value) : () => fail("invalid_input"),
-      notes: (value) => optionalText(value, MAX_NOTES),
-      baseCents: baseOf(invoice.kind),
-      vatKind: pick(PURCHASE_VAT_KINDS),
-      irpfBp: basePoints(MAX_IRPF_BP),
-      retentionBp: basePoints(MAX_RETENTION_BP),
-      milestoneId: invoice.kind === "invoice" ? (value) => (typeof value === "string" ? value : fail("invalid_input")) : () => fail("invalid_input"),
-    },
-  );
-  const money = (["baseCents", "vatKind", "irpfBp", "retentionBp", "milestoneId"] as const).some((k) => k in parsed) || "lines" in input;
+  const { lines: givenLines, ...parsed } = changesOf(parse(invoiceChangesSchemas[invoice.kind], input));
+  // Sent: an array, or null (back to the order's proportions).
+  const linesSent = givenLines !== undefined;
+  const money = (["baseCents", "vatKind", "irpfBp", "retentionBp", "milestoneId"] as const).some((k) => k in parsed) || linesSent;
   const next = { ...invoice, ...parsed };
   if (next.dueOn && next.dueOn < next.issuedOn) fail("invalid_date");
   const amounts = invoiceAmounts(next);
@@ -920,9 +888,7 @@ export async function updateInvoice(ctx: Ctx, invoiceId: string, input: Record<s
   ]);
   if (milestones && !milestones.get(invoice.orderId)?.some((m) => m.id === parsed.milestoneId)) fail("invalid_input");
   const split =
-    "lines" in input || amounts.baseCents !== invoice.baseCents
-      ? splitLines("lines" in input ? input.lines : undefined, amounts.baseCents, lines, current)
-      : null;
+    linesSent || amounts.baseCents !== invoice.baseCents ? splitLines(givenLines ?? null, amounts.baseCents, lines, current) : null;
   const changed = Object.fromEntries(
     (Object.keys(parsed) as (keyof typeof parsed)[])
       .filter((key) => parsed[key] !== invoice[key])
@@ -997,7 +963,7 @@ export async function addInvoiceFile(ctx: Ctx, invoiceId: string, input: Record<
   requireEditor(ctx);
   const invoice = await requireInvoice(ctx, invoiceId);
   const file = await requirePdf(input.file);
-  const note = optionalText(input.note, MAX_FILE_NOTE);
+  const { note } = parse(invoiceFileSchema, input);
   const [order] = await db.select({ projectId: purchaseOrders.projectId }).from(purchaseOrders).where(eq(purchaseOrders.id, invoice.orderId));
   const pathname = `${invoiceFolder(ctx, order!.projectId, invoice.orderId, invoiceId)}${crypto.randomUUID()}.pdf`;
   const filename = uploadedName(file, `${invoice.number}.pdf`);
@@ -1100,12 +1066,12 @@ async function recordPayment(ctx: Ctx, invoiceId: string, input: Record<string, 
   const invoice = await requireInvoice(ctx, invoiceId);
   // A credit note is settled through its invoice.
   if (invoice.kind !== "invoice") fail("invalid_state");
-  const paidOn = input.paidOn === undefined ? todayInSpain() : workDate(input.paidOn);
+  const body = parse(paymentSchema, input);
+  const paidOn = body.paidOn ?? todayInSpain();
   if (paidOn < invoice.issuedOn) fail("invalid_date");
-  const amountCents = integer(input.amountCents, 1, MAX_AMOUNT_CENTS);
-  const method = input.method === undefined ? "transfer" : pick(PURCHASE_PAYMENT_METHODS)(input.method);
-  const reference = optionalText(input.reference, MAX_REFERENCE);
-  const file = await optionalPdf(input.file);
+  const { amountCents, reference } = body;
+  const method = body.method ?? "transfer";
+  const file = await optionalPdf(body.file);
   const [order] = await db.select({ projectId: purchaseOrders.projectId }).from(purchaseOrders).where(eq(purchaseOrders.id, invoice.orderId));
   const paymentId = crypto.randomUUID();
   const pathname = `${projectFolder(ctx.tenantId, order!.projectId)}purchases/${invoice.orderId}/payments/${paymentId}.pdf`;
@@ -1176,18 +1142,7 @@ export async function setOrderMilestones(ctx: Ctx, orderId: string, input: Recor
   requireEditor(ctx);
   const order = await requireOrder(ctx, orderId);
   if (order.status === "cancelled") fail("invalid_state");
-  const value = input.milestones;
-  if (!Array.isArray(value)) fail("missing_fields");
-  if (value.length > MAX_MILESTONES) fail("invalid_input");
-  const wanted = value.map((entry) => {
-    if (!isObject(entry)) fail("invalid_input");
-    if (entry.id !== undefined && typeof entry.id !== "string") fail("invalid_input");
-    return {
-      id: entry.id as string | undefined,
-      concept: requiredText(entry.concept, MAX_CONCEPT),
-      amountCents: integer(entry.amountCents, 1, MAX_AMOUNT_CENTS),
-    };
-  });
+  const wanted = parse(milestonesSchema, input).milestones;
   if (new Set(wanted.flatMap((m) => (m.id ? [m.id] : []))).size !== wanted.filter((m) => m.id).length) fail("invalid_input");
 
   await db.transaction(async (tx) => {

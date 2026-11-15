@@ -31,6 +31,7 @@ describe("POST /api/mobile/auth", () => {
     const res = await post({ email: "ana@example.com", password: "client-pass" });
 
     expect(res.status).toBe(200);
+    expect(res.headers.get("content-security-policy")).toBe("default-src 'none'; frame-ancestors 'none'");
     const body = await res.json();
     expect(body.user).toEqual({
       id: client.id,
@@ -54,6 +55,7 @@ describe("POST /api/mobile/auth", () => {
 
     expect(res.status).toBe(401);
     expect(await res.json()).toEqual({ error: "invalid_credentials" });
+    expect(res.headers.get("content-security-policy")).toBe("default-src 'none'; frame-ancestors 'none'");
   });
 
   it("rejects a wrong password", async () => {
@@ -117,5 +119,32 @@ describe("POST /api/mobile/auth", () => {
 
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: "invalid_body" });
+  });
+});
+
+describe("POST /api/mobile/auth: what it reads of the body (mobileCredentials in @repo/core)", () => {
+  // Installed app builds can't be updated: every body answers exactly as before.
+  it.each([
+    ["null", 400, "invalid_body"],
+    ["[]", 400, "email_and_password_required"],
+    ['"ana@example.com"', 400, "email_and_password_required"],
+    ["42", 400, "email_and_password_required"],
+    [JSON.stringify({ email: "   ", password: "client-pass" }), 400, "email_and_password_required"],
+    [JSON.stringify({ email: "ana@example.com", password: "" }), 400, "email_and_password_required"],
+    [JSON.stringify({ email: ["ana@example.com"], password: "client-pass" }), 400, "email_and_password_required"],
+  ])("answers %s with %i %s", async (body, status, error) => {
+    const res = await post(body);
+    expect(res.status).toBe(status);
+    expect(await res.json()).toEqual({ error });
+  });
+
+  it("trims the email, never the password, and ignores other keys", async () => {
+    const tenant = await createTestTenant();
+    await createTestUser(tenant.id, { email: "ana@example.com", role: "client", password: " client-pass " });
+
+    expect((await post({ email: "  ana@example.com ", password: "client-pass", role: "admin" })).status).toBe(401);
+    const res = await post({ email: "  ana@example.com ", password: " client-pass ", tenantId: "other" });
+    expect(res.status).toBe(200);
+    expect((await res.json()).user).toMatchObject({ role: "client", tenantId: tenant.id });
   });
 });

@@ -1,4 +1,11 @@
-import type { PurchaseForm, PurchaseFormLine, PurchaseKind, PurchaseRequestDetail, PurchaseVatKind } from "@repo/core/contract";
+import type {
+  PurchaseForm,
+  PurchaseFormLine,
+  PurchaseKind,
+  PurchaseOrderInput,
+  PurchaseRequestDetail,
+  PurchaseVatKind,
+} from "@repo/core/contract";
 
 // What the order form holds (amounts as typed, dates as "" when empty), and
 // how it turns into the body of createPurchaseAction / updatePurchaseAction.
@@ -174,7 +181,7 @@ export const linesInput = (draft: Pick<OrderDraft, "lines">, parse: ParseAmount)
  * The body for createPurchaseAction / updatePurchaseAction. The order date is
  * sent once the order is placed (`placed`); a pending one gets it when marked.
  */
-export function orderInput(draft: OrderDraft, parse: ParseAmount, placed: boolean): Record<string, unknown> {
+export function orderInput(draft: OrderDraft, parse: ParseAmount, placed: boolean): PurchaseOrderInput {
   const material = draft.kind === "material";
   return {
     kind: draft.kind,

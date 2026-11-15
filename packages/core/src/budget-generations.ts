@@ -14,7 +14,6 @@ import {
 import { requireEditor, type Ctx } from "./context";
 import {
   ACTIVE_GENERATION_STATUSES,
-  BUDGET_QUALITIES,
   type BudgetFacts,
   type BudgetGeneration,
   type BudgetGenerationLogEntry,
@@ -22,7 +21,9 @@ import {
 } from "./contract";
 import { lockForFirstBudget } from "./budget-draft";
 import { budgetInputs } from "./documents";
-import { fail, integer, optionalText, requireProject } from "./obra-data";
+import { generationSchema } from "./inputs/budget";
+import { parse } from "./inputs/fields";
+import { fail, requireProject } from "./obra-data";
 import type { ProjectExtraction } from "./budget-ai/schemas";
 
 // ─── Budget generations ───────────────────────────────────────────────────────
@@ -121,14 +122,9 @@ export async function getGeneration(ctx: Ctx, projectId: string, generationId: s
 export async function startGeneration(ctx: Ctx, projectId: string, input: Record<string, unknown>) {
   requireEditor(ctx);
   await requireProject(ctx.tenantId, projectId);
-  if (!Array.isArray(input.documentIds) || input.documentIds.length === 0) fail("no_documents");
-  if (input.documentIds.some((id) => typeof id !== "string")) fail("invalid_input");
-  const documentIds = [...new Set(input.documentIds as string[])];
-  const options: GenerationOptions = {
-    reference: optionalText(input.reference, 200),
-    quality: input.quality === undefined ? "framer" : (BUDGET_QUALITIES.find((q) => q === input.quality) ?? fail("invalid_input")),
-    vatRateBp: input.vatRateBp === undefined ? 1000 : integer(input.vatRateBp, 0, 10_000),
-  };
+  const { documentIds: ids, ...fields } = parse(generationSchema, input);
+  const options: GenerationOptions = fields;
+  const documentIds = [...new Set(ids)];
 
   const docs = await budgetInputs(ctx.tenantId, projectId, documentIds);
   if (docs.length !== documentIds.length) fail("not_found");

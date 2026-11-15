@@ -1,7 +1,8 @@
 import bcrypt from "bcryptjs";
 import { db, inArray, pushTokens, users, type SQL } from "@repo/db";
-import { isStrongPassword } from "./contract";
 import { CoreError, invalid, notFound } from "./errors";
+import { mobileSignInSchema, passwordChangeSchema, portalSignInSchema } from "./inputs/accounts";
+import { parse } from "./inputs/fields";
 import { clearAttempts, overLimit, type ThrottleKey } from "./throttle";
 
 // Helpers shared by everything that creates or authenticates user accounts.
@@ -20,23 +21,35 @@ export function bcryptCost(raw: string | undefined, nodeEnv: string | undefined)
   return nodeEnv === "test" ? cost : Math.max(cost, 12);
 }
 
-export const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+// Where it always was for its callers; it lives with the other patterns in ./input (no database there).
+export { EMAIL_PATTERN } from "./input";
 
 export function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
 }
 
-export function hashPassword(password: string): Promise<string> {
-  return bcrypt.hash(password, BCRYPT_COST);
+/**
+ * The portal's sign-in form (@repo/auth's `authorize`): email and password as
+ * they came, none trimmed (a blank email still counts as a failed sign-in);
+ * the two-step code as typed, undefined when it isn't text.
+ */
+export function portalCredentials(credentials: Partial<Record<string, unknown>> | undefined) {
+  return parse(portalSignInSchema, credentials ?? {});
 }
 
 /**
- * A password being set, for anyone (not trimmed): it must meet the one policy,
- * `isStrongPassword`. Passwords already in the database are never re-checked.
+ * The app's sign-in body (POST /api/mobile/auth), parsed JSON: the email
+ * trimmed, the password as typed, undefined what isn't text (an array or a
+ * number has neither). Null for JSON's `null`, which the route always refused
+ * as no body at all (`invalid_body`).
  */
-export function newPassword(value: unknown): string {
-  if (typeof value !== "string" || !isStrongPassword(value)) throw invalid("weak_password");
-  return value;
+export function mobileCredentials(body: unknown) {
+  if (body === null) return null;
+  return parse(mobileSignInSchema, typeof body === "object" && !Array.isArray(body) ? body : {});
+}
+
+export function hashPassword(password: string): Promise<string> {
+  return bcrypt.hash(password, BCRYPT_COST);
 }
 
 /**
@@ -86,11 +99,7 @@ export async function changeOwnPassword(
   input: Record<string, unknown>,
   { refuseSame = false } = {},
 ) {
-  const { currentPassword, newPassword: next } = input;
-  if (typeof currentPassword !== "string" || typeof next !== "string" || !currentPassword) {
-    throw invalid("missing_fields");
-  }
-  newPassword(next);
+  const { currentPassword, newPassword: next } = parse(passwordChangeSchema, input);
 
   const throttle = [passwordThrottle(userId)];
   if (await overLimit(throttle)) throw new CoreError("too_many_attempts", 429);

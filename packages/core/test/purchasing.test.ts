@@ -1,12 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createTestProject, createTestTenant, createTestUser, resetDatabase } from "@repo/db/testing";
 import { db, eq, purchaseOrders, sql } from "@repo/db";
-import { MAX_UNPAGED, orderLabel } from "../src/contract";
+import { MAX_AMOUNT_CENTS, MAX_UNPAGED, orderLabel } from "../src/contract";
 import {
   budgetService,
   constructionService,
   planningService,
   projectsService,
+  purchaseInvoicesService,
   purchasingService as svc,
   subcontractorsService,
   type Ctx,
@@ -799,5 +800,130 @@ describe("code review fixes", () => {
     await expect(subcontractorsService.updateSubcontractor(s.admin, s.subcontractorId, { suppliesOnly: true })).rejects.toMatchObject({
       code: "supplies_only",
     });
+  });
+});
+
+describe("input boundaries (schemas in src/inputs/purchasing.ts)", () => {
+  const OVER = MAX_AMOUNT_CENTS + 1;
+  /** The code a write is refused with, or "ok". */
+  const outcome = (write: Promise<unknown>) => write.then(() => "ok", (error: { code?: string }) => error.code ?? String(error));
+
+  it("answers over-maximum amounts and wrong types with each field's code, as before, writing nothing", async () => {
+    const s = await setup();
+    const line = (overrides: Record<string, unknown>) => [{ lineageId: s.lineage("01"), amountCents: 1_000, ...overrides }];
+    const create: [Record<string, unknown>, string][] = [
+      [{ lines: line({ amountCents: OVER }) }, "invalid_input"],
+      [{ lines: line({ amountCents: 2 ** 31 }) }, "invalid_input"],
+      [{ lines: line({ amountCents: "1000" }) }, "invalid_input"],
+      [{ lines: line({ amountCents: 10.5 }) }, "invalid_input"],
+      [{ lines: line({ closesLine: "yes" }) }, "invalid_input"],
+      [{ lines: line({ lineageId: 1 }) }, "invalid_input"],
+      [{ lines: ["x"] }, "invalid_input"],
+      [{ lines: "all" }, "missing_fields"],
+      [{ lines: undefined }, "missing_fields"],
+      [{ lines: Array.from({ length: 201 }, (_, i) => ({ lineageId: `l${i}`, amountCents: 1 })) }, "invalid_input"],
+      [{ kind: null }, "invalid_input"],
+      [{ kind: "service" }, "invalid_input"],
+      [{ subcontractorId: 5 }, "missing_fields"],
+      [{ subcontractorId: "" }, "missing_fields"],
+      [{ requestId: "" }, "invalid_input"],
+      [{ requestId: 5 }, "invalid_input"],
+      [{ status: null }, "invalid_input"],
+      [{ status: "delivered" }, "invalid_input"],
+      [{ description: 5 }, "missing_fields"],
+      [{ description: "x".repeat(501) }, "invalid_input"],
+      [{ orderedOn: 20261001 }, "invalid_date"],
+      [{ expectedOn: "2026-02-31" }, "invalid_date"],
+      [{ notes: 5 }, "invalid_input"],
+      [{ paymentDays: "30" }, "invalid_input"],
+      [{ paymentDays: Number.NaN }, "invalid_input"],
+      [{ retentionBp: -1 }, "invalid_input"],
+      [{ vatKind: "vat4" }, "invalid_input"],
+    ];
+    for (const [overrides, code] of create) {
+      expect([overrides, await outcome(svc.createPurchase(s.ctx, s.project.id, material(s, overrides)))]).toEqual([overrides, code]);
+    }
+    expect(await db.select().from(purchaseOrders)).toHaveLength(0);
+
+    const { orderId } = await svc.createPurchase(s.ctx, s.project.id, material(s, { status: "ordered" }));
+    const edit: [Record<string, unknown>, string][] = [
+      [{ lines: line({ amountCents: OVER }) }, "invalid_input"],
+      [{ lines: null }, "missing_fields"],
+      [{ kind: null }, "invalid_input"],
+      [{ subcontractorId: 5 }, "missing_fields"],
+      [{ description: null }, "missing_fields"],
+      [{ workStart: 5 }, "invalid_date"],
+      [{ retentionBp: 1.5 }, "invalid_input"],
+      // The kind first: a placed order keeps it, whatever else is wrong.
+      [{ kind: "subcontract", description: null }, "invalid_state"],
+    ];
+    for (const [input, code] of edit) {
+      expect([input, await outcome(svc.updatePurchase(s.ctx, orderId, input))]).toEqual([input, code]);
+    }
+    const status: [Record<string, unknown>, string][] = [
+      [{ status: "contracted" }, "invalid_input"],
+      [{ status: null }, "invalid_input"],
+      [{ status: "delivered", date: 5 }, "invalid_date"],
+      [{ status: "delivered", date: "2026-10-18" }, "invalid_date"],
+      [{ status: "delivered", note: 5 }, "invalid_input"],
+      // The status first: the one it has is refused, whatever else is wrong.
+      [{ status: "ordered", date: "nope" }, "invalid_state"],
+    ];
+    for (const [input, code] of status) {
+      expect([input, await outcome(svc.setPurchaseStatus(s.ctx, orderId, input))]).toEqual([input, code]);
+    }
+    const order = await svc.getPurchase(s.ctx, orderId);
+    expect(order).toMatchObject({ status: "ordered", amountCents: 95_000, description: "Mampostería de piedra natural" });
+    expect(order.events.map((e) => e.action)).toEqual(["created"]);
+
+    await expect(svc.listPurchases(s.ctx, { group: "nope" })).rejects.toMatchObject({ code: "invalid_input" });
+    await expect(svc.listPurchases(s.ctx, { kind: 5 })).rejects.toMatchObject({ code: "invalid_input" });
+    await expect(svc.listPurchases(s.ctx, { from: "2026-13-01" })).rejects.toMatchObject({ code: "invalid_date" });
+    expect((await svc.listPurchases(s.ctx, { group: "", kind: "", to: null, late: "no" })).orders).toHaveLength(1);
+  });
+
+  it("ignores keys it doesn't take, as before", async () => {
+    const s = await setup();
+    const extra = { tenantId: "other", projectId: "other", number: 42, createdById: "someone", completedOn: "2026-01-01", extra: true };
+    const { orderId, number } = await svc.createPurchase(s.ctx, s.project.id, material(s, extra));
+    expect(number).toBe(1);
+    const [row] = await db.select().from(purchaseOrders).where(eq(purchaseOrders.id, orderId));
+    expect(row).toMatchObject({ tenantId: s.tenant.id, projectId: s.project.id, number: 1, createdById: s.ctx.userId, completedOn: null });
+
+    await svc.updatePurchase(s.ctx, orderId, { ...extra, status: "delivered", notes: " Revisado " });
+    await svc.setPurchaseStatus(s.ctx, orderId, { ...extra, status: "ordered", kind: "subcontract" });
+    expect(await svc.getPurchase(s.ctx, orderId)).toMatchObject({ kind: "material", status: "ordered", notes: "Revisado", number: 1 });
+  });
+
+  it("looks the supplier up before the lines and the order's fields, as before", async () => {
+    const s = await setup();
+    // A material supplier can't take a subcontract (409), whatever else is wrong.
+    expect(await outcome(svc.createPurchase(s.ctx, s.project.id, material(s, { kind: "subcontract", description: "", lines: [] })))).toBe(
+      "supplies_only",
+    );
+    expect(await outcome(svc.createPurchase(s.ctx, s.project.id, material(s, { subcontractorId: "nope", description: "" })))).toBe(
+      "unknown_supplier",
+    );
+    const { orderId } = await svc.createPurchase(s.ctx, s.project.id, material(s));
+    expect(await outcome(svc.updatePurchase(s.ctx, orderId, { kind: "subcontract", description: null }))).toBe("supplies_only");
+    expect(await outcome(svc.updatePurchase(s.ctx, orderId, { subcontractorId: "nope", lines: [] }))).toBe("unknown_supplier");
+    expect(await db.select().from(purchaseOrders)).toHaveLength(1);
+  });
+
+  it("refuses an edit whose rise its payment schedule can't store as one milestone (400, not a database error)", async () => {
+    const s = await setup();
+    const { orderId } = await svc.createPurchase(s.ctx, s.project.id, material(s, { status: "ordered", lines: [{ lineageId: s.lineage("01"), amountCents: 1_000 }] }));
+    await purchaseInvoicesService.setOrderMilestones(s.ctx, orderId, { milestones: [{ concept: "Todo", amountCents: 1_000 }] });
+    const lines = [
+      { lineageId: s.lineage("01"), amountCents: MAX_AMOUNT_CENTS },
+      { lineageId: s.lineage("02"), amountCents: MAX_AMOUNT_CENTS },
+    ];
+    expect(await outcome(svc.updatePurchase(s.ctx, orderId, { lines, notes: "Ampliado" }))).toBe("invalid_input");
+    const order = await svc.getPurchase(s.ctx, orderId);
+    expect(order).toMatchObject({ amountCents: 1_000, notes: null, milestones: [{ concept: "Todo", amountCents: 1_000 }] });
+    // Without a schedule the same order may be that large, as before.
+    await purchaseInvoicesService.setOrderMilestones(s.ctx, orderId, { milestones: [] });
+    await svc.updatePurchase(s.ctx, orderId, { lines });
+    expect((await svc.getPurchase(s.ctx, orderId)).amountCents).toBe(2 * MAX_AMOUNT_CENTS);
   });
 });

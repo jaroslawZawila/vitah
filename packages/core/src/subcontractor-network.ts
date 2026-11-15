@@ -25,7 +25,6 @@ import {
 } from "@repo/db";
 import { TEMPLATE_CHAPTERS } from "./budget-template";
 import { todayInSpain } from "./obra-calc";
-import { isCalendarDate } from "./calendar";
 import type { Ctx } from "./context";
 import {
   companyStatus,
@@ -45,8 +44,7 @@ import {
 } from "./contract";
 import { CoreError } from "./errors";
 import { userNamesById } from "./obra-data";
-import { clippedText, MAX_TEXT, PHONE_PATTERN } from "./input";
-import { projectIdsInTenant, projectInTenant, projectsInTenant } from "./project-client";
+import { projectIdsInTenant, projectInTenant, projectsInTenant, type Tx } from "./project-client";
 
 // ─── Subcontractor network ────────────────────────────────────────────────────
 // What the subcontractor services share: error codes, input parsing, the audit
@@ -88,58 +86,6 @@ const STATUS: Record<SubcontractorError, number> = {
 
 export function fail(code: SubcontractorError): never {
   throw new CoreError(code, STATUS[code]);
-}
-
-// ─── Input parsing ───────────────────────────────────────────────────────────
-// Bodies come as JSON (API, the portal's wizard) or form values (strings).
-
-/** Trimmed, cut at MAX_TEXT. */
-export const str = (value: unknown) => clippedText(value, MAX_TEXT);
-
-/** Trimmed text, or null when empty. */
-export const optional = (value: unknown) => str(value) || null;
-
-export const bool = (value: unknown) => value === true || value === "true" || value === "on" || value === "1";
-
-/** A whole number ≥ 0, or null when empty. */
-export function count(value: unknown): number | null {
-  if (value === null || value === undefined || value === "") return null;
-  const n = typeof value === "number" ? value : Number(value);
-  if (!Number.isInteger(n) || n < 0 || n > 1_000_000) fail("invalid_number");
-  return n;
-}
-
-/** YYYY-MM-DD, or null when empty. */
-export function calendarDate(value: unknown): string | null {
-  const raw = optional(value);
-  if (raw !== null && !isCalendarDate(raw)) fail("invalid_date");
-  return raw;
-}
-
-export function oneOf<T extends string>(value: unknown, allowed: readonly T[]): T | null {
-  const raw = optional(value);
-  if (raw === null) return null;
-  if (!allowed.includes(raw as T)) fail("invalid_option");
-  return raw as T;
-}
-
-/** A list of allowed values: a JSON array or a comma-separated string. */
-export function listOf<T extends string>(value: unknown, allowed: readonly T[]): T[] {
-  const items = Array.isArray(value) ? value : typeof value === "string" && value ? value.split(",") : [];
-  const list = [...new Set(items.map((item) => str(item)).filter(Boolean))];
-  if (list.some((item) => !allowed.includes(item as T))) fail("invalid_option");
-  return list as T[];
-}
-
-export function phone(value: unknown): string | null {
-  const raw = optional(value);
-  if (raw !== null && !PHONE_PATTERN.test(raw)) fail("invalid_phone");
-  return raw;
-}
-
-/** Applies the input's keys over `base`: an update may send only what changed. */
-export function merged<T extends object>(input: Record<string, unknown>, base: T | undefined) {
-  return (key: keyof T & string): unknown => (base && !(key in input) ? base[key] : input[key]);
 }
 
 // ─── Lookups ─────────────────────────────────────────────────────────────────
@@ -258,9 +204,9 @@ export const liveDocument = (tenantId: string) =>
  * version isn't: the only ones the rules look behind (a renewal uploaded
  * early, or rejected), and a handful among thousands.
  */
-async function latestVersions(tenantId: string, documents: SQL | undefined, validatedOnly: boolean) {
+async function latestVersions(tenantId: string, documents: SQL | undefined, validatedOnly: boolean, exec: Reader = db) {
   const v = subcontractorDocumentVersions;
-  const rows = await db
+  const rows = await exec
     .selectDistinctOn([v.documentId])
     .from(v)
     .where(
@@ -290,13 +236,21 @@ async function latestVersions(tenantId: string, documents: SQL | undefined, vali
 const documentIds = (where: SQL | undefined) =>
   sql`${db.select({ id: subcontractorDocuments.id }).from(subcontractorDocuments).where(where)}`;
 
+/** Where a read goes: the database, or the transaction of a write that must see its own rows. */
+export type Reader = typeof db | Tx;
+
 /**
  * Everything of the tenant's network, optionally only one company's, a few's
  * (`subcontractorId`: ids, or a subquery of them). Without `workers`, no
  * workers: a company's warnings (but for their names and how many workers an
- * expired document stops) and status don't need them.
+ * expired document stops) and status don't need them. `exec` reads inside a
+ * transaction.
  */
-export async function loadNetwork(tenantId: string, subcontractorId?: string | string[] | SQL, { workers: withWorkers = true } = {}) {
+export async function loadNetwork(
+  tenantId: string,
+  subcontractorId?: string | string[] | SQL,
+  { workers: withWorkers = true, exec = db }: { workers?: boolean; exec?: Reader } = {},
+) {
   const only = typeof subcontractorId === "string" ? [subcontractorId] : subcontractorId;
   const scoped = (tenantColumn: AnyColumn, subcontractorColumn: AnyColumn) =>
     and(eq(tenantColumn, tenantId), only ? inArray(subcontractorColumn, only) : undefined);
@@ -305,32 +259,32 @@ export async function loadNetwork(tenantId: string, subcontractorId?: string | s
   const docIds = only ? documentIds(docsWhere) : undefined;
 
   const [companies, workers, docs, assignments, projectRows, versions, validated] = await Promise.all([
-    db
+    exec
       .select()
       .from(subcontractors)
       .where(scoped(subcontractors.tenantId, subcontractors.id))
       .orderBy(asc(subcontractors.legalName)),
     withWorkers
-      ? db
+      ? exec
           .select()
           .from(subcontractorWorkers)
           .where(scoped(subcontractorWorkers.tenantId, subcontractorWorkers.subcontractorId))
           .orderBy(asc(subcontractorWorkers.surnames), asc(subcontractorWorkers.firstName))
       : [],
-    db.select().from(subcontractorDocuments).where(docsWhere),
-    db
+    exec.select().from(subcontractorDocuments).where(docsWhere),
+    exec
       .select()
       .from(subcontractorAssignments)
       .where(
         and(scoped(subcontractorAssignments.tenantId, subcontractorAssignments.subcontractorId), liveAssignment(tenantId)),
       ),
-    db
+    exec
       .select({ id: projects.id, ref: projects.ref, address: projects.address, obraStage: projects.obraStage })
       .from(projects)
       .where(projectsInTenant(tenantId))
       .orderBy(asc(projects.ref)),
-    latestVersions(tenantId, docIds, false),
-    latestVersions(tenantId, docIds, true),
+    latestVersions(tenantId, docIds, false, exec),
+    latestVersions(tenantId, docIds, true, exec),
   ]);
   return new Network(companies, workers, docs, versions, validated, assignments, projectRows, todayInSpain());
 }

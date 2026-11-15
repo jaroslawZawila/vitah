@@ -7,8 +7,15 @@ import {
   CoreError,
   subcontractorsService as svc,
   subcontractorWorkersService as workers,
+  type AccessCheckInput,
+  type AssignmentInput,
   type Ctx,
+  type DocumentRequestInput,
+  type SubcontractorChangesInput,
   type SubcontractorError,
+  type SubcontractorInput,
+  type WorkerChangesInput,
+  type WorkerInput,
   type WorkerListQuery,
 } from "@repo/core";
 import { revalidatePath } from "next/cache";
@@ -72,7 +79,7 @@ export async function getWorker(workerId: string) {
   return read((ctx) => workers.getWorker(ctx, workerId));
 }
 
-export async function checkWorkerAccessAction(input: { query: string; projectId?: string | null }) {
+export async function checkWorkerAccessAction(input: AccessCheckInput) {
   const ctx = await requireSession();
   return attempt(() => workers.checkAccess(ctx, input));
 }
@@ -87,11 +94,11 @@ async function attempt<T>(fn: () => Promise<T>): Promise<{ result: T; error?: ne
   }
 }
 
-export async function createSubcontractorAction(input: Record<string, unknown>) {
+export async function createSubcontractorAction(input: SubcontractorInput) {
   return mutate((ctx) => svc.createSubcontractor(ctx, input));
 }
 
-export async function updateSubcontractorAction(subcontractorId: string, input: Record<string, unknown>) {
+export async function updateSubcontractorAction(subcontractorId: string, input: SubcontractorChangesInput) {
   return mutate((ctx) => svc.updateSubcontractor(ctx, subcontractorId, input));
 }
 
@@ -113,14 +120,14 @@ export async function markNotApplicableAction(subcontractorId: string, requireme
 }
 
 /** "Solicitar" / "Recordar": { requirementIds, workerId?, projectId? }. */
-export async function requestSubcontractorDocumentsAction(subcontractorId: string, input: Record<string, unknown>) {
+export async function requestSubcontractorDocumentsAction(subcontractorId: string, input: DocumentRequestInput) {
   return mutate((ctx) => svc.requestDocuments(ctx, subcontractorId, input));
 }
 
 export async function assignSubcontractorAction(
   subcontractorId: string,
   projectId: string,
-  input: Record<string, unknown>,
+  input: AssignmentInput,
 ) {
   return mutate((ctx) => svc.assignToProject(ctx, subcontractorId, projectId, input));
 }
@@ -129,10 +136,10 @@ export async function removeSubcontractorAssignmentAction(subcontractorId: strin
   return mutate((ctx) => svc.removeAssignment(ctx, subcontractorId, projectId));
 }
 
-export async function createWorkerAction(input: Record<string, unknown>) {
+export async function createWorkerAction(input: WorkerInput) {
   return mutate((ctx) => workers.createWorker(ctx, input));
 }
 
-export async function updateWorkerAction(workerId: string, input: Record<string, unknown>) {
+export async function updateWorkerAction(workerId: string, input: WorkerChangesInput) {
   return mutate((ctx) => workers.updateWorker(ctx, workerId, input));
 }

@@ -1,17 +1,12 @@
 import { and, asc, clientProfiles, db, eq, isClientUser, users } from "@repo/db";
-import {
-  EMAIL_PATTERN,
-  hashPassword,
-  isUniqueViolation,
-  newPassword,
-  normalizeEmail,
-  replacePassword,
-} from "./accounts";
-import { isCalendarDate } from "./calendar";
+import { EMAIL_PATTERN, hashPassword, isUniqueViolation, replacePassword } from "./accounts";
 import { requireAdmin, type Ctx } from "./context";
 import type { ClientError, ClientListItem } from "./contract";
 import { CoreError } from "./errors";
-import { clippedText, MAX_TEXT, PHONE_PATTERN } from "./input";
+import { MAX_TEXT } from "./input";
+import { passwordSchema } from "./inputs/accounts";
+import { clientAccountSchema, clientSchema } from "./inputs/clients";
+import { parse } from "./inputs/fields";
 
 // ─── Clients ──────────────────────────────────────────────────────────────────
 // Homeowners who use the mobile app. Each is a `users` row with role "client"
@@ -32,31 +27,6 @@ const STATUS: Record<ClientError, number> = {
 
 function fail(code: ClientError): never {
   throw new CoreError(code, STATUS[code]);
-}
-
-// Input parsing: API bodies and form values arrive as unknown / strings.
-
-/** Trimmed, and cut at MAX_TEXT characters. */
-const text = (value: unknown) => clippedText(value, MAX_TEXT);
-
-/** Trimmed text, or null when empty. */
-function optional(value: unknown): string | null {
-  return text(value) || null;
-}
-
-/** YYYY-MM-DD that is a real calendar date, not in the future. */
-function dateOfBirth(value: unknown): string | null {
-  const raw = optional(value);
-  if (raw === null) return null;
-  const valid = isCalendarDate(raw) && Date.parse(`${raw}T00:00:00Z`) <= Date.now();
-  if (!valid) fail("invalid_date_of_birth");
-  return raw;
-}
-
-function phone(value: unknown): string | null {
-  const raw = optional(value);
-  if (raw !== null && !PHONE_PATTERN.test(raw)) fail("invalid_phone");
-  return raw;
 }
 
 export async function listClients(ctx: Ctx): Promise<ClientListItem[]> {
@@ -89,21 +59,14 @@ export async function listClients(ctx: Ctx): Promise<ClientListItem[]> {
 export async function createClient(ctx: Ctx, input: Record<string, unknown>) {
   requireAdmin(ctx);
 
-  const firstName = text(input.firstName);
-  const surnames = text(input.surnames);
-  // Not cut: a shortened email would be someone else's.
-  const email = typeof input.email === "string" ? normalizeEmail(input.email) : "";
-  if (!firstName || !surnames || !email || !input.password) fail("missing_fields");
-  if (email.length > MAX_TEXT || !EMAIL_PATTERN.test(email)) fail("invalid_email");
+  // The account first: what is missing, then the email; then the profile and the password.
+  const account = parse(clientAccountSchema, input);
+  if (!account.firstName || !account.surnames || !account.email || !account.password) fail("missing_fields");
+  if (account.email.length > MAX_TEXT || !EMAIL_PATTERN.test(account.email)) fail("invalid_email");
 
-  const profile = {
-    firstName,
-    surnames,
-    dateOfBirth: dateOfBirth(input.dateOfBirth),
-    address: optional(input.address),
-    phone: phone(input.phone),
-  };
-  const passwordHash = await hashPassword(newPassword(input.password));
+  const { password, email, ...profile } = parse(clientSchema, input);
+  const { firstName, surnames } = profile;
+  const passwordHash = await hashPassword(password);
 
   try {
     const id = await db.transaction(async (tx) => {
@@ -140,10 +103,8 @@ export async function setClientPassword(
   requireAdmin(ctx);
 
   // A reset also signs the client out of the app on every phone.
-  const updated = await replacePassword(
-    and(eq(users.id, clientId), eq(users.tenantId, ctx.tenantId), isClientUser),
-    newPassword(input.password),
-  );
+  const { password } = parse(passwordSchema, input);
+  const updated = await replacePassword(and(eq(users.id, clientId), eq(users.tenantId, ctx.tenantId), isClientUser), password);
   if (updated.length === 0) fail("not_found");
 
   return { id: clientId };

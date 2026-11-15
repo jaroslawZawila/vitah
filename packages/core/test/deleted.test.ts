@@ -912,3 +912,20 @@ describe("restoreDeleted: a supplier's payment", () => {
     expect(await invoices.getInvoice(admin, invoiceId)).toMatchObject({ paidCents: 30_000 });
   });
 });
+
+describe("input boundaries (schema in src/inputs/deleted.ts)", () => {
+  it("leaves out filters missing, null or empty, reads numbers as a URL sends them, ignores other keys", async () => {
+    const { admin, project } = await base();
+    for (const id of ["a", "b"]) {
+      const doc = await createTestDocument(admin.tenantId, project.id, { title: `Doc ${id}` });
+      await documentsService.deleteDocument(admin, project.id, doc.id);
+    }
+    expect(await list(admin, { kind: "", projectId: null, cursor: "", limit: undefined, tenantId: "other" })).toHaveLength(2);
+    // As before: Number(true) is 1.
+    expect(await list(admin, { limit: true })).toHaveLength(1);
+    expect(await list(admin, { limit: " 1 " })).toHaveLength(1);
+    for (const bad of [{ limit: "2.5" }, { limit: -1 }, { kind: ["document"] }, { cursor: 5 }]) {
+      await expect(svc.listDeleted(admin, bad)).rejects.toMatchObject({ code: "invalid_input", status: 400 });
+    }
+  });
+});

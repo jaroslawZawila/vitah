@@ -1,7 +1,7 @@
 import { and, clientProfiles, db, eq, projects, users } from "@repo/db";
 import { IDENTITY_FIELDS, type BudgetIdentity, type BudgetTexts, type IdentityField } from "./contract";
 import { foldAccents } from "./format";
-import type { Tx } from "./project-client";
+import { projectInTenant, type Tx } from "./project-client";
 
 // ─── Budget: the client and the address it names ──────────────────────────────
 // The project is the one source of truth for who the client is and where the
@@ -75,7 +75,7 @@ export async function projectIdentity(tenantId: string, projectId: string, tx: T
     .from(projects)
     .leftJoin(users, and(eq(users.id, projects.clientUserId), eq(users.tenantId, tenantId)))
     .leftJoin(clientProfiles, eq(clientProfiles.userId, users.id))
-    .where(and(eq(projects.id, projectId), eq(projects.tenantId, tenantId)));
+    .where(projectInTenant(tenantId, projectId));
   if (!row) return { client: null, address: null };
   const profile = [row.firstName, row.surnames].filter(Boolean).join(" ").trim();
   return { client: profile || row.name?.trim() || null, address: row.address.trim() || null };

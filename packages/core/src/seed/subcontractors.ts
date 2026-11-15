@@ -19,6 +19,7 @@ import { addDays, todayInSpain } from "../obra-calc";
 import { putFile } from "../storage";
 import { assignToProject, createSubcontractor } from "../subcontractors";
 import { createWorker } from "../subcontractor-workers";
+import { forgetCae } from "../subcontractor-attention";
 
 // `pnpm db:seed`: fictional subcontractors for the dev project VTH-26-001, in
 // every state the Subcontratas pages show (apta, pendiente, bloqueada;
@@ -278,5 +279,7 @@ export async function seedSubcontractors(ctx: Ctx, projectId: string, { files = 
       if (a.pss) await seedDoc(ctx, id, { requirementId: "adhesion_pss", projectId }, files);
     }
   }
+  // The documents went in past the services: the stored CAE values are worked out again on the first read.
+  await forgetCae(ctx.tenantId);
   return COMPANIES.length;
 }

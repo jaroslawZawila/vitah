@@ -9,12 +9,20 @@ import {
   budgetOptionsService as options,
   budgetService as svc,
   searchPriceBase,
+  type BudgetChapterChangesInput,
+  type BudgetGenerationInput,
+  type BudgetLineChangesInput,
+  type BudgetOptionChangesInput,
+  type BudgetRevisionChangesInput,
+  type IssueRevisionInput,
+  type NewBudgetLineInput,
+  type NewBudgetOptionInput,
+  type OptionFromLineInput,
+  type RejectRevisionInput,
 } from "@repo/core";
 import { requireSession } from "../../lib/access";
 import { cancelBudgetGeneration, startBudgetGeneration } from "../../lib/budget-generation";
 import { mutate, read, type ObraState } from "./run";
-
-type Input = Record<string, unknown>;
 
 /**
  * All revisions, one in full (default: the newest) and the newest AI run.
@@ -41,7 +49,7 @@ export async function searchPriceBaseAction(query: string, chapter?: string) {
 }
 
 /** Starts the AI over the project's budget documents (a durable workflow). */
-export async function startGenerationAction(projectId: string, input: Input): Promise<ObraState> {
+export async function startGenerationAction(projectId: string, input: BudgetGenerationInput): Promise<ObraState> {
   return mutate(projectId, (ctx) => startBudgetGeneration(ctx, projectId, input));
 }
 
@@ -53,7 +61,7 @@ export async function createRevisionAction(projectId: string): Promise<ObraState
   return mutate(projectId, (ctx) => svc.createRevision(ctx, projectId));
 }
 
-export async function updateRevisionAction(projectId: string, revisionId: string, input: Input): Promise<ObraState> {
+export async function updateRevisionAction(projectId: string, revisionId: string, input: BudgetRevisionChangesInput): Promise<ObraState> {
   return mutate(projectId, (ctx) => svc.updateRevision(ctx, projectId, revisionId, input));
 }
 
@@ -66,7 +74,7 @@ export async function deleteRevisionAction(projectId: string, revisionId: string
   return mutate(projectId, (ctx) => svc.deleteRevision(ctx, projectId, revisionId));
 }
 
-export async function issueRevisionAction(projectId: string, revisionId: string, input: Input): Promise<ObraState> {
+export async function issueRevisionAction(projectId: string, revisionId: string, input: IssueRevisionInput): Promise<ObraState> {
   return mutate(projectId, (ctx) => issue.issueRevision(ctx, projectId, revisionId, input));
 }
 
@@ -86,19 +94,19 @@ export async function acceptRevisionAction(projectId: string, revisionId: string
   return mutate(projectId, (ctx) => svc.acceptRevision(ctx, projectId, revisionId, input));
 }
 
-export async function rejectRevisionAction(projectId: string, revisionId: string, input: Input = {}): Promise<ObraState> {
+export async function rejectRevisionAction(projectId: string, revisionId: string, input: RejectRevisionInput = {}): Promise<ObraState> {
   return mutate(projectId, (ctx) => svc.rejectRevision(ctx, projectId, revisionId, input));
 }
 
-export async function updateChapterAction(projectId: string, chapterId: string, input: Input): Promise<ObraState> {
+export async function updateChapterAction(projectId: string, chapterId: string, input: BudgetChapterChangesInput): Promise<ObraState> {
   return mutate(projectId, (ctx) => svc.updateChapter(ctx, projectId, chapterId, input));
 }
 
-export async function addLineAction(projectId: string, chapterId: string, input: Input): Promise<ObraState> {
+export async function addLineAction(projectId: string, chapterId: string, input: NewBudgetLineInput): Promise<ObraState> {
   return mutate(projectId, (ctx) => svc.addLine(ctx, projectId, chapterId, input));
 }
 
-export async function updateLineAction(projectId: string, lineId: string, input: Input): Promise<ObraState> {
+export async function updateLineAction(projectId: string, lineId: string, input: BudgetLineChangesInput): Promise<ObraState> {
   return mutate(projectId, (ctx) => svc.updateLine(ctx, projectId, lineId, input));
 }
 
@@ -106,11 +114,11 @@ export async function deleteLineAction(projectId: string, lineId: string): Promi
   return mutate(projectId, (ctx) => svc.deleteLine(ctx, projectId, lineId));
 }
 
-export async function addOptionAction(projectId: string, revisionId: string, input: Input): Promise<ObraState> {
+export async function addOptionAction(projectId: string, revisionId: string, input: NewBudgetOptionInput): Promise<ObraState> {
   return mutate(projectId, (ctx) => options.addOption(ctx, projectId, revisionId, input));
 }
 
-export async function updateOptionAction(projectId: string, optionId: string, input: Input): Promise<ObraState> {
+export async function updateOptionAction(projectId: string, optionId: string, input: BudgetOptionChangesInput): Promise<ObraState> {
   return mutate(projectId, (ctx) => options.updateOption(ctx, projectId, optionId, input));
 }
 
@@ -118,6 +126,6 @@ export async function deleteOptionAction(projectId: string, optionId: string): P
   return mutate(projectId, (ctx) => options.deleteOption(ctx, projectId, optionId));
 }
 
-export async function optionFromLineAction(projectId: string, lineId: string, input: Input): Promise<ObraState> {
+export async function optionFromLineAction(projectId: string, lineId: string, input: OptionFromLineInput): Promise<ObraState> {
   return mutate(projectId, (ctx) => options.optionFromLine(ctx, projectId, lineId, input));
 }

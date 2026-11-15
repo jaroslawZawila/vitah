@@ -9,6 +9,7 @@ import {
   subcontractorsService,
   type Ctx,
 } from "../src";
+import { MAX_AMOUNT_CENTS } from "../src/contract";
 import { addDays, todayInSpain } from "../src/obra-calc";
 import { framerDraft } from "./budget-fixture";
 
@@ -317,5 +318,75 @@ describe("purchase requests", () => {
       purchasingService.createPurchase(s.ctx, second.id, orderOf(s, requestId, { lines: [{ lineageId: form.chapters[0]!.lines[0]!.lineageId, amountCents: 1_000 }] })),
     ).rejects.toMatchObject({ code: "not_found" });
     expect((await svc.getRequest(s.ctx, requestId)).status).toBe("approved");
+  });
+});
+
+describe("input boundaries (schemas in src/inputs/purchase-requests.ts)", () => {
+  const OVER = MAX_AMOUNT_CENTS + 1;
+  /** The code a write is refused with, or "ok". */
+  const outcome = (write: Promise<unknown>) => write.then(() => "ok", (error: { code?: string }) => error.code ?? String(error));
+
+  it("answers over-maximum estimates and wrong types with each field's code, as before, writing nothing", async () => {
+    const s = await setup();
+    const line = (overrides: Record<string, unknown>) => [{ lineageId: s.lineage("01"), amountCents: 1_000, ...overrides }];
+    const create: [Record<string, unknown>, string][] = [
+      [{ lines: line({ amountCents: OVER }) }, "invalid_input"],
+      [{ lines: line({ amountCents: -1 }) }, "invalid_input"],
+      [{ lines: line({ closesLine: 1 }) }, "invalid_input"],
+      [{ lines: [] }, "missing_fields"],
+      [{ kind: null }, "invalid_input"],
+      [{ subcontractorId: 5 }, "missing_fields"],
+      [{ description: "  " }, "missing_fields"],
+      [{ description: "x".repeat(501) }, "invalid_input"],
+      [{ neededBy: 5 }, "invalid_date"],
+      [{ notes: false }, "invalid_input"],
+      [{ notes: "x".repeat(2001) }, "invalid_input"],
+    ];
+    for (const [overrides, code] of create) {
+      expect([overrides, await outcome(svc.createRequest(s.ctx, s.project.id, request(s, overrides)))]).toEqual([overrides, code]);
+    }
+    expect(await db.select().from(purchaseRequests)).toHaveLength(0);
+
+    // No supplier: missing, null or "".
+    const { requestId } = await svc.createRequest(s.ctx, s.project.id, request(s, { subcontractorId: "" }));
+    const edit: [Record<string, unknown>, string][] = [
+      [{ lines: line({ amountCents: OVER }) }, "invalid_input"],
+      [{ lines: null }, "missing_fields"],
+      [{ kind: "goods" }, "invalid_input"],
+      [{ description: null }, "missing_fields"],
+      [{ neededBy: "2026-02-30" }, "invalid_date"],
+      [{ subcontractorId: 7 }, "missing_fields"],
+    ];
+    for (const [input, code] of edit) {
+      expect([input, await outcome(svc.updateRequest(s.ctx, requestId, input))]).toEqual([input, code]);
+    }
+    expect(await outcome(svc.decideRequest(s.admin, requestId, { decision: null }))).toBe("invalid_input");
+    expect(await outcome(svc.decideRequest(s.admin, requestId, { decision: "approve", note: 5 }))).toBe("invalid_input");
+    expect(await outcome(svc.cancelRequest(s.ctx, requestId, { note: "x".repeat(501) }))).toBe("invalid_input");
+    expect(await svc.getRequest(s.ctx, requestId)).toMatchObject({ status: "pending", subcontractorId: null, amountCents: 90_000 });
+    expect((await svc.getRequest(s.ctx, requestId)).events.map((e) => e.action)).toEqual(["created"]);
+  });
+
+  it("ignores keys it doesn't take, as before; null clears what may be cleared", async () => {
+    const s = await setup();
+    const extra = { tenantId: "other", number: 42, status: "approved", createdById: "someone", orderId: "x" };
+    const { requestId, number } = await svc.createRequest(s.ctx, s.project.id, request(s, extra));
+    expect(number).toBe(1);
+    const [row] = await db.select().from(purchaseRequests).where(eq(purchaseRequests.id, requestId));
+    expect(row).toMatchObject({ tenantId: s.tenant.id, number: 1, status: "pending", createdById: s.ctx.userId, orderId: null });
+
+    await svc.updateRequest(s.ctx, requestId, { ...extra, subcontractorId: null, neededBy: null, notes: null });
+    expect(await svc.getRequest(s.ctx, requestId)).toMatchObject({ status: "pending", subcontractorId: null, neededBy: null, notes: null });
+    await svc.cancelRequest(s.ctx, requestId, { ...extra, note: " Ya no hace falta " });
+    expect((await svc.getRequest(s.ctx, requestId)).events.find((e) => e.action === "cancelled")).toMatchObject({ note: "Ya no hace falta" });
+  });
+
+  it("looks the supplier up with the project, before the lines and the fields, as before", async () => {
+    const s = await setup();
+    expect(await outcome(svc.createRequest(s.ctx, s.project.id, request(s, { kind: "subcontract", description: "", lines: [] })))).toBe(
+      "supplies_only",
+    );
+    expect(await outcome(svc.createRequest(s.ctx, s.project.id, request(s, { subcontractorId: "nope", neededBy: 5 })))).toBe("unknown_supplier");
+    expect(await db.select().from(purchaseRequests)).toHaveLength(0);
   });
 });

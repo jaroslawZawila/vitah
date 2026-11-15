@@ -4,7 +4,7 @@
 // live in packages/core/src/projects.ts (shared with /api/v1);
 // this file only resolves the session and revalidates portal pages.
 
-import { budgetOverviewService, CoreError, projectsService as svc } from "@repo/core";
+import { budgetOverviewService, CoreError, projectsService as svc, type ProjectChangesInput, type ProjectInput } from "@repo/core";
 import { revalidatePath } from "next/cache";
 import { notFound } from "next/navigation";
 import { requireSession } from "../../lib/access";
@@ -53,7 +53,7 @@ export async function getProject(id: string) {
 }
 
 /** Creates a project from the new-project wizard's draft (plain values). */
-export async function createProject(draft: Record<string, unknown>) {
+export async function createProject(draft: ProjectInput) {
   const ctx = await requireSession();
   return formResult(async () => {
     const { id } = await svc.createProject(ctx, draft);
@@ -62,7 +62,7 @@ export async function createProject(draft: Record<string, unknown>) {
   });
 }
 
-export async function updateProject(id: string, data: Record<string, unknown>) {
+export async function updateProject(id: string, data: ProjectChangesInput) {
   const ctx = await requireSession();
   return formResult(async () => {
     await svc.updateProject(ctx, id, data);

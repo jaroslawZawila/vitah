@@ -25,6 +25,7 @@ const prefix = (name: string) =>
 
 /** Seeds the project's invoices once; returns how many it created. */
 export async function seedPurchaseInvoices(ctx: Ctx, projectId: string) {
+  // soft-delete-ok(purchaseInvoices): the seed runs once per project: any invoice there, deleted or not, means it ran.
   const [existing] = await db
     .select({ id: purchaseInvoices.id })
     .from(purchaseInvoices)

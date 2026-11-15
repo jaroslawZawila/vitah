@@ -28,14 +28,8 @@ import { toCalendarDate } from "./calendar";
 import { requireEditor, type Ctx } from "./context";
 import {
   CONTINGENCY_CHAPTER,
-  MAX_ORDER_LINES,
-  MAX_PAYMENT_DAYS,
-  MAX_RETENTION_BP,
   PURCHASE_FLOWS,
-  PURCHASE_KINDS,
-  PURCHASE_ORDER_GROUPS,
   PURCHASE_PROGRESS,
-  PURCHASE_VAT_KINDS,
   UPCOMING_DAYS,
   canCancel,
   canTakeOrder,
@@ -45,7 +39,6 @@ import {
   maskIdNumber,
   placedStatus,
   purchaseOrderGroup,
-  statusesOf,
   type LineContracting,
   type ProjectPurchaseLines,
   type ProjectPurchases,
@@ -64,6 +57,16 @@ import {
 } from "./contract";
 import { contractSchedule, contractTotals, daysPast, deviation, lateDays, type LineContract } from "./control-calc";
 import { idempotent, type Once } from "./idempotency";
+import { changesOf, parse } from "./inputs/fields";
+import {
+  newOrderSchemas,
+  orderChangesSchema,
+  orderKindSchema,
+  purchaseListSchema,
+  statusChangeSchemas,
+  type OrderLines,
+} from "./inputs/purchasing";
+import { MAX_AMOUNT_CENTS } from "./money";
 import { allPages, filterText, pageWindow, pagingOf, searchPattern } from "./paging";
 import { orderLabelSql } from "./sql-labels";
 import { orderByDate, templateLeadDays } from "./planning-calc";
@@ -84,23 +87,7 @@ import {
   orderMilestones,
 } from "./purchase-invoice-data";
 import { addDays, todayInSpain } from "./obra-calc";
-import {
-  calendarDate,
-  fail,
-  groupBy,
-  integer,
-  isObject,
-  loadBudget,
-  loadObra,
-  optionalText,
-  orNull,
-  pick,
-  pickChanges,
-  requiredText,
-  requireProject,
-  userName,
-  workDate,
-} from "./obra-data";
+import { fail, groupBy, loadBudget, loadObra, requireProject, userName } from "./obra-data";
 import { projectInTenant, projectNotDeleted, projectsInTenant, type Tx } from "./project-client";
 import { loadCompanyStatuses, requireCompany, type Network } from "./subcontractor-network";
 
@@ -121,10 +108,6 @@ import { loadCompanyStatuses, requireCompany, type Network } from "./subcontract
 // of every read.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const MAX_DESCRIPTION = 500;
-export const MAX_NOTES = 2000;
-export const MAX_NOTE = 500;
-export const MAX_AMOUNT_CENTS = 2_000_000_000;
 export const MAX_EVENTS = 500;
 const MAX_MILESTONE_CONCEPT = 200;
 /** The milestone a rise by an edit adds to the payment schedule; staff rename it on the order's page. */
@@ -326,12 +309,11 @@ const orderAmount = sql`(select coalesce(sum(l.amount_cents), 0) from ${purchase
 export async function listPurchases(ctx: Ctx, query: PurchaseListQuery = {}): Promise<TenantPurchases> {
   const today = todayInSpain();
   const window = pageWindow(query);
-  const group = orNull(pick(["all", ...PURCHASE_ORDER_GROUPS] as const))(query.group) ?? "all";
-  const kind = orNull(pick(["all", ...PURCHASE_KINDS] as const))(query.kind) ?? "all";
-  const from = orNull(calendarDate)(query.from);
-  const to = orNull(calendarDate)(query.to);
+  const filters = parse(purchaseListSchema, query);
+  const group = filters.group ?? "all";
+  const kind = filters.kind ?? "all";
+  const { from, to, late } = filters;
   const pattern = searchPattern(query.q);
-  const late = query.late === true || query.late === "1" || query.late === "true";
   const projectId = filterText(query.projectId);
   const supplierId = filterText(query.supplierId);
 
@@ -363,7 +345,7 @@ export async function listPurchases(ctx: Ctx, query: PurchaseListQuery = {}): Pr
   const shown = and(kept, group === "all" ? undefined : inGroup(group));
   const year = today.slice(0, 4);
   const thisYear = and(inArray(purchaseOrders.status, CONTRACTED), sql`to_char(${orderDay}, 'YYYY') = ${year}`)!;
-  const cents = (where: SQL) => sql<string>`coalesce(sum(${orderAmount}) filter (where ${where}), 0)`;
+  const cents = (where: SQL) => sql<number>`coalesce(sum(${orderAmount}) filter (where ${where}), 0)`.mapWith(Number);
   const many = (where: SQL) => sql<number>`(count(*) filter (where ${where}))::int`;
 
   const [ids, [counts], [totals], supplierRows, projectRows, bySupplier] = await Promise.all([
@@ -439,21 +421,21 @@ export async function listPurchases(ctx: Ctx, query: PurchaseListQuery = {}): Pr
     orders: loaded.map((o) => toListItem(o, net, today)),
     paging: pagingOf(window, groupCounts[group]),
     groupCounts,
-    shownContractedCents: Number(contractedCents),
+    shownContractedCents: contractedCents,
     suppliers: supplierRows.sort(byName),
     ...(bySupplier && {
       bySupplier: bySupplier
-        .map((g) => ({ ...g, projectRefs: [...g.projectRefs].sort(), contractedCents: Number(g.contractedCents), openCents: Number(g.openCents) }))
+        .map((g) => ({ ...g, projectRefs: [...g.projectRefs].sort(), contractedCents: g.contractedCents, openCents: g.openCents }))
         .sort((a, b) => b.contractedCents - a.contractedCents || byName(a, b)),
     }),
     projects: projectRows,
     summary: {
-      yearContractedCents: Number(totals?.yearContractedCents ?? 0),
+      yearContractedCents: totals?.yearContractedCents ?? 0,
       yearOrders: totals?.yearOrders ?? 0,
       yearProjects: totals?.yearProjects ?? 0,
-      openCents: Number(totals?.openCents ?? 0),
+      openCents: totals?.openCents ?? 0,
       openOrders: totals?.openOrders ?? 0,
-      pendingCents: Number(totals?.pendingCents ?? 0),
+      pendingCents: totals?.pendingCents ?? 0,
       pendingOrders: totals?.pendingOrders ?? 0,
       lateDeliveries: totals?.lateDeliveries ?? 0,
       lateProjectRefs: [...(totals?.lateProjectRefs ?? [])].sort(),
@@ -876,8 +858,7 @@ export async function getPurchase(ctx: Ctx, orderId: string): Promise<PurchaseOr
 // ─── Writes ──────────────────────────────────────────────────────────────────
 
 /** The tenant's company or material supplier, able to take an order of `kind`. */
-export async function requireSupplier(ctx: Ctx, subcontractorId: unknown, kind: PurchaseKind) {
-  if (typeof subcontractorId !== "string" || !subcontractorId) fail("missing_fields");
+export async function requireSupplier(ctx: Ctx, subcontractorId: string, kind: PurchaseKind) {
   const [row] = await db
     .select({ id: subcontractors.id, suppliesOnly: subcontractors.suppliesOnly })
     .from(subcontractors)
@@ -887,24 +868,15 @@ export async function requireSupplier(ctx: Ctx, subcontractorId: unknown, kind: 
   return row.id;
 }
 
-/** The order's lines: each a contract line once, with an amount; `closesLine` defaults to true. */
-export function parseLines(value: unknown, contract: Awaited<ReturnType<typeof contractLines>>): NewLine[] {
-  if (!Array.isArray(value) || value.length === 0) fail("missing_fields");
-  if (value.length > MAX_ORDER_LINES) fail("invalid_input");
+/** The order's lines as parsed (./inputs/purchasing's `orderLinesSchema`): each a line of the contract, once. */
+export function contractedLines(given: OrderLines, contract: Awaited<ReturnType<typeof contractLines>>): NewLine[] {
   const seen = new Set<string>();
-  return value.map((entry) => {
-    if (!isObject(entry) || typeof entry.lineageId !== "string") fail("invalid_input");
-    const line = contract.get(entry.lineageId);
+  return given.map(({ lineageId, amountCents, closesLine }) => {
+    const line = contract.get(lineageId);
     if (!line) fail("unknown_line");
-    if (seen.has(entry.lineageId)) fail("invalid_input");
-    seen.add(entry.lineageId);
-    if (entry.closesLine !== undefined && typeof entry.closesLine !== "boolean") fail("invalid_input");
-    return {
-      lineageId: entry.lineageId,
-      chapterCode: line.chapterCode,
-      amountCents: integer(entry.amountCents, 1, MAX_AMOUNT_CENTS),
-      closesLine: entry.closesLine ?? true,
-    };
+    if (seen.has(lineageId)) fail("invalid_input");
+    seen.add(lineageId);
+    return { lineageId, chapterCode: line.chapterCode, amountCents, closesLine };
   });
 }
 
@@ -923,19 +895,6 @@ type OrderFields = Pick<
   | "vatKind"
 >;
 
-const FIELD_PARSERS = {
-  description: (value: unknown) => requiredText(value, MAX_DESCRIPTION),
-  orderedOn: orNull(workDate),
-  expectedOn: orNull(calendarDate),
-  workStart: orNull(calendarDate),
-  workEnd: orNull(calendarDate),
-  notes: (value: unknown) => optionalText(value, MAX_NOTES),
-  // Its invoices' terms: null = the defaults.
-  paymentDays: orNull((value) => integer(value, 0, MAX_PAYMENT_DAYS)),
-  retentionBp: (value: unknown) => integer(value ?? 0, 0, MAX_RETENTION_BP),
-  vatKind: orNull(pick(PURCHASE_VAT_KINDS)),
-};
-
 /** Whether the order has invoices (credit notes too; deleted ones aside); in `run`, after locking the order. */
 async function hasInvoices(run: Tx | typeof db, tenantId: string, orderId: string) {
   const [row] = await run
@@ -949,7 +908,7 @@ async function hasInvoices(run: Tx | typeof db, tenantId: string, orderId: strin
 /** What the order's invoices (credit notes net; deleted ones aside) put on each budget line, by lineage. */
 async function invoicedByLineage(run: Tx, tenantId: string, orderId: string) {
   const rows = await run
-    .select({ lineageId: purchaseInvoiceLines.lineageId, cents: sql<number>`sum(${purchaseInvoiceLines.amountCents})::int` })
+    .select({ lineageId: purchaseInvoiceLines.lineageId, cents: sql<number>`sum(${purchaseInvoiceLines.amountCents})`.mapWith(Number) })
     .from(purchaseInvoiceLines)
     .innerJoin(purchaseInvoices, eq(purchaseInvoices.id, purchaseInvoiceLines.invoiceId))
     .where(and(eq(purchaseInvoiceLines.tenantId, tenantId), eq(purchaseInvoices.orderId, orderId), isNull(purchaseInvoices.deletedAt)))
@@ -1019,6 +978,8 @@ export async function followSchedule(tx: Tx, ctx: Ctx, orderId: string, deltaCen
     .where(eq(purchaseOrderMilestones.orderId, orderId))
     .orderBy(asc(purchaseOrderMilestones.position));
   if (milestones.length === 0) return false;
+  // A rise is a milestone of its own, stored as an integer: each line fits, a change of the order's total may not.
+  if (deltaCents > MAX_AMOUNT_CENTS) fail("invalid_input");
   if (deltaCents > 0) {
     const position = Math.max(...milestones.map((m) => m.position)) + 1;
     await tx.insert(purchaseOrderMilestones).values({ tenantId: ctx.tenantId, orderId, position, concept: concept.slice(0, MAX_MILESTONE_CONCEPT), amountCents: deltaCents });
@@ -1086,30 +1047,22 @@ export async function createPurchase(ctx: Ctx, projectId: string, input: Record<
 
 async function placeOrder(ctx: Ctx, projectId: string, input: Record<string, unknown>, once: Once<{ orderId: string; number: number }>) {
   await requireProject(ctx.tenantId, projectId);
-  const kind = pick(PURCHASE_KINDS)(input.kind);
+  const { kind } = parse(orderKindSchema, input);
+  const schema = newOrderSchemas[kind];
+  // The supplier before the rest, as always: one that can't take the kind answers first.
   const [subcontractorId, contract] = await Promise.all([
-    requireSupplier(ctx, input.subcontractorId, kind),
+    requireSupplier(ctx, parse(schema.pick({ subcontractorId: true }), input).subcontractorId, kind),
     contractLines(ctx.tenantId, projectId),
   ]);
-  const lines = parseLines(input.lines, contract);
+  const { lines: given, requestId: request, status, ...parsed } = parse(schema.omit({ subcontractorId: true }), input);
+  const lines = contractedLines(given, contract);
   // null or absent: an order of its own; else an approved request's id.
-  const requestId = input.requestId ?? null;
-  if (requestId !== null && (typeof requestId !== "string" || requestId === "")) fail("invalid_input");
-  const status = input.status === undefined ? "pending" : pick(["pending", placedStatus(kind)])(input.status);
-  const parsed = pickChanges(input, FIELD_PARSERS);
-  if (parsed.description === undefined) fail("missing_fields");
+  const requestId = request ?? null;
   const fields = checkDates({
+    ...parsed,
     kind,
     subcontractorId,
-    description: parsed.description,
     orderedOn: parsed.orderedOn ?? (status === "pending" ? null : todayInSpain()),
-    expectedOn: parsed.expectedOn ?? null,
-    workStart: parsed.workStart ?? null,
-    workEnd: parsed.workEnd ?? null,
-    notes: parsed.notes ?? null,
-    paymentDays: parsed.paymentDays ?? null,
-    retentionBp: parsed.retentionBp ?? 0,
-    vatKind: parsed.vatKind ?? null,
   });
   const sameProject = and(ofProject(projectId), inTenant(ctx));
   const amountCents = lines.reduce((sum, l) => sum + l.amountCents, 0);
@@ -1156,14 +1109,17 @@ export async function updatePurchase(ctx: Ctx, orderId: string, input: Record<st
   const order = await requireOrder(ctx, orderId);
   // A cancelled order is history; reopen it (setPurchaseStatus) to change it.
   if (order.status === "cancelled") fail("invalid_state");
-  const kind = input.kind === undefined ? order.kind : pick(PURCHASE_KINDS)(input.kind);
+  // The kind first: changing it is for a pending order only.
+  const kind = parse(orderChangesSchema.pick({ kind: true }), input).kind ?? order.kind;
   if (kind !== order.kind && order.status !== "pending") fail("invalid_state");
-  const [subcontractorId, contract] = await Promise.all([
-    input.subcontractorId === undefined && kind === order.kind
+  // The supplier next (sent, or the order's own under a new kind), then the rest.
+  const { subcontractorId: supplierId } = parse(orderChangesSchema.pick({ subcontractorId: true }), input);
+  const subcontractorId =
+    supplierId === undefined && kind === order.kind
       ? order.subcontractorId
-      : requireSupplier(ctx, input.subcontractorId ?? order.subcontractorId, kind),
-    "lines" in input ? contractLines(ctx.tenantId, order.projectId) : null,
-  ]);
+      : await requireSupplier(ctx, supplierId ?? order.subcontractorId, kind);
+  const { lines: given, ...changes } = changesOf(parse(orderChangesSchema.omit({ kind: true, subcontractorId: true }), input));
+  const contract = given ? await contractLines(ctx.tenantId, order.projectId) : null;
   const fields = checkDates({
     kind,
     subcontractorId,
@@ -1176,14 +1132,14 @@ export async function updatePurchase(ctx: Ctx, orderId: string, input: Record<st
     paymentDays: order.paymentDays,
     retentionBp: order.retentionBp,
     vatKind: order.vatKind,
-    ...pickChanges(input, FIELD_PARSERS),
+    ...changes,
   });
   const changed = Object.fromEntries(
     (Object.keys(fields) as (keyof OrderFields)[])
       .filter((key) => fields[key] !== order[key])
       .map((key) => [key, { from: order[key], to: fields[key] }]),
   );
-  const lines = contract ? parseLines(input.lines, contract) : null;
+  const lines = given && contract ? contractedLines(given, contract) : null;
 
   await db.transaction(async (tx) => {
     // Locked and compared: a status change at the same time can't slip a kind change past its check.
@@ -1239,11 +1195,12 @@ export function diffLines(before: NewLine[], after: NewLine[], contract: Awaited
 export async function setPurchaseStatus(ctx: Ctx, orderId: string, input: Record<string, unknown>) {
   requireEditor(ctx);
   const order = await requireOrder(ctx, orderId);
-  const status = pick(statusesOf(order.kind))(input.status);
+  const schema = statusChangeSchemas[order.kind];
+  // The status first: the state checks come before the day and the note.
+  const { status } = parse(schema.pick({ status: true }), input);
   if (status === order.status) fail("invalid_state");
   if (status === "cancelled" && !canCancel(order.status)) fail("invalid_state");
-  const date = orNull(workDate)(input.date);
-  const note = optionalText(input.note, MAX_NOTE);
+  const { date, note } = parse(schema, input);
   const placed = status !== "cancelled" && status !== "pending";
   let orderedOn = placed
     ? ((status === placedStatus(order.kind) ? date : null) ?? order.orderedOn ?? todayInSpain())

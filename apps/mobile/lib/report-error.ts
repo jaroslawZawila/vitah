@@ -1,6 +1,7 @@
 import { isRunningInExpoGo } from "expo";
 import Constants from "expo-constants";
 import { Platform } from "react-native";
+import type { ClientErrorReportInput } from "@repo/core/contract";
 import { API_BASE } from "./api-config";
 
 // Tells the portal when the app breaks (POST /api/mobile/client-error), so a
@@ -104,7 +105,7 @@ async function send(report: ErrorReport) {
         "Content-Type": "application/json",
         ...(sessionToken ? { Authorization: `Bearer ${sessionToken}` } : {}),
       },
-      body: JSON.stringify(report),
+      body: JSON.stringify(report satisfies ClientErrorReportInput),
       signal: controller.signal,
     });
   } finally {

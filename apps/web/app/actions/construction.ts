@@ -3,7 +3,13 @@
 // Thin portal adapters over @repo/core's construction control
 // (packages/core/src/construction.ts), behind the project's Obra tab.
 
-import { constructionService as svc, photosService } from "@repo/core";
+import {
+  constructionService as svc,
+  photosService,
+  type ChapterCorrectionInput,
+  type ObraIssueChangesInput,
+  type ObraIssueInput,
+} from "@repo/core";
 import { mutate, read, type ObraState } from "./run";
 
 // ─── Reads ───────────────────────────────────────────────────────────────────
@@ -60,11 +66,7 @@ export async function finishChapterAction(
 }
 
 /** Each date as YYYY-MM-DD, or null to clear it; absent ones stay. */
-export async function correctChapterAction(
-  projectId: string,
-  code: string,
-  input: { actualStart?: string | null; actualEnd?: string | null; note?: string },
-): Promise<ObraState> {
+export async function correctChapterAction(projectId: string, code: string, input: ChapterCorrectionInput): Promise<ObraState> {
   return mutate(projectId, (ctx) => svc.correctChapter(ctx, projectId, code, input));
 }
 
@@ -77,7 +79,7 @@ export async function reviewChangesAction(projectId: string): Promise<ObraState>
 /** → the new record's id too, to attach its files to. With the form's `idempotencyKey` in `input`, sent twice it is one record. */
 export async function createIssueAction(
   projectId: string,
-  input: Record<string, unknown>,
+  input: ObraIssueInput,
 ): Promise<(NonNullable<ObraState> & { issueId?: string }) | null> {
   let issueId: string | undefined;
   const state: ObraState = await mutate(projectId, async (ctx) => {
@@ -86,11 +88,7 @@ export async function createIssueAction(
   return state?.success ? { ...state, issueId } : state;
 }
 
-export async function updateIssueAction(
-  projectId: string,
-  issueId: string,
-  input: Record<string, unknown>,
-): Promise<ObraState> {
+export async function updateIssueAction(projectId: string, issueId: string, input: ObraIssueChangesInput): Promise<ObraState> {
   return mutate(projectId, (ctx) => svc.updateIssue(ctx, projectId, issueId, input));
 }
 

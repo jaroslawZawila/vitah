@@ -138,6 +138,7 @@ describe("/api/v1/subcontractors", () => {
     const zip = await dossier(apiRequest(token, { query: `?projectId=${project.id}` }));
     expect(zip.headers.get("content-type")).toBe("application/zip");
     expect(zip.headers.get("content-disposition")).toMatch(/^attachment; filename\*=UTF-8''dossier-cae-VTH-26-001-/);
+    expect(zip.headers.get("content-security-policy")).toBe("default-src 'none'; frame-ancestors 'self'");
     expect(Object.keys(unzipSync(new Uint8Array(await zip.arrayBuffer())))).toEqual(["indice.csv"]);
 
     const remove = () => unassign(apiRequest(token, { method: "DELETE" }), routeParams({ id, projectId: project.id }));

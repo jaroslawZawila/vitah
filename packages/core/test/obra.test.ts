@@ -240,3 +240,14 @@ describe("seedObra", () => {
     ]);
   });
 });
+
+describe("input boundaries (schema in src/inputs/obra.ts)", () => {
+  it("setStage: anything but a stage 1–8 is invalid_stage; other keys are ignored", async () => {
+    const { project, ctx } = await setup();
+    for (const body of [{}, { stage: null }, { stage: "3" }, { stage: 0 }, { stage: 2.5 }]) {
+      await expect(svc.setStage(ctx, project.id, body)).rejects.toMatchObject({ code: "invalid_stage", status: 400 });
+    }
+    expect(await svc.setStage(ctx, project.id, { stage: 3, obraStage: 8, tenantId: "other" })).toEqual({ stage: 3 });
+    expect((await svc.getObra(ctx, project.id)).stage).toBe(3);
+  });
+});

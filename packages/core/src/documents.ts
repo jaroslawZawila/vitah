@@ -18,20 +18,16 @@ import { clientProjectsWhere, resolveClientProject } from "./client-projects";
 import { requireEditor, type Ctx } from "./context";
 import {
   ACTIVE_GENERATION_STATUSES,
-  BUDGET_INPUTS,
   BUDGET_INPUT_EXTENSIONS,
   fileTypeOf,
-  DOCUMENT_CATEGORIES,
-  MAX_CAPTION_LENGTH,
   MAX_DIRECT_UPLOAD_BYTES,
   MAX_DOCUMENT_BYTES,
-  type BudgetInput,
   type BudgetPdfKind,
-  type DocumentCategory,
   type MobileDocument,
   type ProjectDocument,
 } from "./contract";
-import { clippedText } from "./input";
+import { parse } from "./inputs/fields";
+import { budgetInputMarkSchema, budgetInputSchema, documentSchema, visibilitySchema } from "./inputs/projects";
 import { notifyProjectClient } from "./notifications";
 import { raiseStage } from "./obra-stage";
 import { inLiveProject, softDeleted } from "./project-client";
@@ -60,10 +56,6 @@ function documentInProject(ctx: Ctx, projectId: string, documentId: string) {
     notDeleted,
     inLiveProject(projectDocuments.projectId),
   );
-}
-
-function isCategory(value: unknown): value is DocumentCategory {
-  return DOCUMENT_CATEGORIES.includes(value as DocumentCategory);
 }
 
 const mobileColumns = {
@@ -120,12 +112,8 @@ export function newPdfDocument(ctx: Ctx, projectId: string, body: Blob, doc: New
 export async function addDocument(ctx: Ctx, projectId: string, input: Record<string, unknown>) {
   requireEditor(ctx);
 
-  const { category } = input;
-  const title = clippedText(input.title, MAX_CAPTION_LENGTH);
-  if (!(input.file instanceof Blob) || input.file.size === 0) fail("missing_file");
-  if (!title) fail("missing_fields");
-  if (!isCategory(category)) fail("invalid_category");
-  const file = await requirePdf(input.file);
+  const { title, category, ...body } = parse(documentSchema, input);
+  const file = await requirePdf(body.file);
   await requireProject(ctx.tenantId, projectId);
 
   const { file: stored, row } = newPdfDocument(ctx, projectId, file, { title, category });
@@ -239,10 +227,10 @@ export async function setDocumentVisibility(
   input: Record<string, unknown>,
 ) {
   requireEditor(ctx);
-  if (typeof input.visibleToClient !== "boolean") fail("missing_fields");
+  const { visibleToClient } = parse(visibilitySchema, input);
   await requireProject(ctx.tenantId, projectId);
   const where = documentInProject(ctx, projectId, documentId);
-  if (input.visibleToClient) {
+  if (visibleToClient) {
     const found = await db.query.projectDocuments.findFirst({ where, columns: { contentType: true, sizeBytes: true } });
     if (!found) fail("not_found");
     if (found.contentType !== "application/pdf") fail("invalid_file_type");
@@ -250,12 +238,12 @@ export async function setDocumentVisibility(
   }
   const [doc] = await db
     .update(projectDocuments)
-    .set({ visibleToClient: input.visibleToClient, updatedAt: new Date() })
+    .set({ visibleToClient, updatedAt: new Date() })
     .where(where)
     .returning({ title: projectDocuments.title });
   if (!doc) fail("not_found");
   await markChanged(ctx.tenantId, projectId, ["documents"]);
-  if (input.visibleToClient && (await claimFirstShown(projectDocuments, where))) {
+  if (visibleToClient && (await claimFirstShown(projectDocuments, where))) {
     await notifyProjectClient(ctx.tenantId, projectId, { kind: "document", title: doc.title });
   }
   return { documentId };
@@ -312,10 +300,7 @@ async function startsWith(pathname: string, magic: string) {
 export async function registerBudgetInput(ctx: Ctx, projectId: string, input: Record<string, unknown>) {
   requireEditor(ctx);
   await requireProject(ctx.tenantId, projectId);
-  const { pathname, budgetInput } = input;
-  const filename = clippedText(input.filename, MAX_CAPTION_LENGTH);
-  if (typeof pathname !== "string" || !filename) fail("missing_fields");
-  if (!BUDGET_INPUTS.includes(budgetInput as BudgetInput)) fail("invalid_category");
+  const { pathname, filename, budgetInput, ...body } = parse(budgetInputSchema, input);
   // Only a file this project's upload could have written.
   if (!pathname.startsWith(inputsFolder(ctx.tenantId, projectId))) fail("not_found");
   const type = inputType(filename);
@@ -325,7 +310,7 @@ export async function registerBudgetInput(ctx: Ctx, projectId: string, input: Re
   if (info.size > MAX_DIRECT_UPLOAD_BYTES) fail("file_too_large");
   if (type.extension === "pdf" && !(await startsWith(pathname, "%PDF-"))) fail("invalid_file_type");
 
-  const title = clippedText(input.title, MAX_CAPTION_LENGTH) || filename.replace(/\.[^.]+$/, "");
+  const title = body.title || filename.replace(/\.[^.]+$/, "");
   const [doc] = await db
     .insert(projectDocuments)
     .values({
@@ -338,7 +323,7 @@ export async function registerBudgetInput(ctx: Ctx, projectId: string, input: Re
       visibleToClient: false,
       contentType: type.contentType,
       filename,
-      budgetInput: budgetInput as BudgetInput,
+      budgetInput,
       uploadedById: ctx.userId,
     })
     .onConflictDoNothing({ target: projectDocuments.pathname })
@@ -354,11 +339,11 @@ export async function registerBudgetInput(ctx: Ctx, projectId: string, input: Re
  */
 export async function markBudgetInput(ctx: Ctx, projectId: string, documentId: string, input: Record<string, unknown>) {
   requireEditor(ctx);
-  if (!BUDGET_INPUTS.includes(input.budgetInput as BudgetInput)) fail("invalid_category");
+  const { budgetInput } = parse(budgetInputMarkSchema, input);
   await requireProject(ctx.tenantId, projectId);
   const [doc] = await db
     .update(projectDocuments)
-    .set({ budgetInput: input.budgetInput as BudgetInput, updatedAt: new Date() })
+    .set({ budgetInput, updatedAt: new Date() })
     .where(and(documentInProject(ctx, projectId, documentId), isNull(projectDocuments.budgetRevisionId)))
     .returning({ id: projectDocuments.id });
   if (!doc) fail("not_found");

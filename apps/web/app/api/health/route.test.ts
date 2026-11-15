@@ -1,5 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { aiUsage, budgetGenerations, db, eq, purchaseDocumentChecks, purchaseOrders, subcontractors, tenants } from "@repo/db";
+import {
+  aiUsage,
+  budgetGenerations,
+  db,
+  eq,
+  purchaseDocumentChecks,
+  purchaseOrderDocuments,
+  purchaseOrderDocumentVersions,
+  purchaseOrders,
+  subcontractors,
+  tenants,
+} from "@repo/db";
 import { createTestProject, createTestTenant, resetDatabase } from "@repo/db/testing";
 import * as health from "@repo/core/health";
 import { HEALTH_DOWN_FRESH_MS, HEALTH_FRESH_MS, forgetHealth } from "../../../lib/health";
@@ -47,6 +58,7 @@ describe("GET /api/health", () => {
 
     expect(res.status).toBe(200);
     expect(res.headers.get("cache-control")).toBe("no-store");
+    expect(res.headers.get("content-security-policy")).toBe("default-src 'none'; frame-ancestors 'none'");
     expect(await res.json()).toEqual({
       status: "ok",
       commit: "dev",
@@ -81,7 +93,23 @@ describe("GET /api/health", () => {
       .insert(purchaseOrders)
       .values({ tenantId: tenant.id, projectId: project.id, number: 1, kind: "material", subcontractorId: supplier!.id, description: "Piedra" })
       .returning({ id: purchaseOrders.id });
-    await db.insert(purchaseDocumentChecks).values({ tenantId: tenant.id, orderId: order!.id, pathname: "x.pdf", label: "Pedido · v1", createdAt: new Date(Date.now() - 2 * HOUR) });
+    // The order's PDF, the file a check reviews.
+    const [document] = await db
+      .insert(purchaseOrderDocuments)
+      .values({ tenantId: tenant.id, orderId: order!.id, title: "Pedido" })
+      .returning({ id: purchaseOrderDocuments.id });
+    const [version] = await db
+      .insert(purchaseOrderDocumentVersions)
+      .values({ tenantId: tenant.id, documentId: document!.id, version: 1, pathname: "x.pdf", filename: "x.pdf", sizeBytes: 100 })
+      .returning({ id: purchaseOrderDocumentVersions.id });
+    await db.insert(purchaseDocumentChecks).values({
+      tenantId: tenant.id,
+      orderId: order!.id,
+      documentVersionId: version!.id,
+      pathname: "x.pdf",
+      label: "Pedido · v1",
+      createdAt: new Date(Date.now() - 2 * HOUR),
+    });
 
     const res = await GET();
 

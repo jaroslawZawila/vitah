@@ -44,7 +44,7 @@ async function setup(role: "manager" | "viewer" = "manager") {
   const form = await purchasingService.getPurchaseForm(admin, project.id);
   const lineageId = form.chapters.find((c) => c.code === "06")!.lines[0]!.lineageId;
   signInAs(ctx);
-  const request = { kind: "material", description: "Piedra", neededBy: "2026-11-02", lines: [{ lineageId, amountCents: 300_000 }] };
+  const request = { kind: "material" as const, description: "Piedra", neededBy: "2026-11-02", lines: [{ lineageId, amountCents: 300_000 }] };
   return { project, admin, ctx, request, lineageId, supplierId };
 }
 

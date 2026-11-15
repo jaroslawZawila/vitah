@@ -223,13 +223,15 @@ describe("project signals", () => {
   it("take the same number of queries for one obra as for many", async () => {
     const { admin } = await setup();
     await seeded(admin, "VTH-1");
+    // The first read works out the companies' stored CAE values; counted once they are.
+    await listWithSignals(admin);
     const one = await queriesOf(() => listWithSignals(admin));
     for (const ref of ["VTH-2", "VTH-3", "VTH-4"]) await contracted(admin, ref);
     await createTestProject(admin.tenantId, { ref: "VTH-5" });
     const many = await queriesOf(() => listWithSignals(admin));
 
     expect(many).toBe(one);
-    expect(many).toBeLessThanOrEqual(18);
+    expect(many).toBeLessThanOrEqual(13);
     // Without them, the list's own three.
     expect(await queriesOf(() => svc.listProjectsWithBudget(admin))).toBe(3);
   });

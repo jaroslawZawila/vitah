@@ -9,6 +9,7 @@ import {
   subcontractorsService,
   type Ctx,
 } from "../src";
+import { MAX_AMOUNT_CENTS, MAX_DOCUMENT_BYTES } from "../src/contract";
 import { files } from "../src/testing";
 import { framerDraft } from "./budget-fixture";
 
@@ -209,5 +210,75 @@ describe("an order's modificados", () => {
     await expect(svc.amendPurchase(s.ctx, s.orderId, amendment(s))).rejects.toMatchObject({ code: "forbidden" });
     const other = await setup();
     await expect(svc.amendPurchase(other.ctx, s.orderId, amendment(s))).rejects.toMatchObject({ code: "not_found" });
+  });
+});
+
+describe("input boundaries (schemas in src/inputs/purchase-amendments.ts)", () => {
+  const OVER = MAX_AMOUNT_CENTS + 1;
+  /** The code a write is refused with, or "ok". */
+  const outcome = (write: Promise<unknown>) => write.then(() => "ok", (error: { code?: string }) => error.code ?? String(error));
+
+  it("answers over-maximum amounts and wrong types with each field's code, as before, writing nothing", async () => {
+    const s = await setup();
+    const lines = (amountCents: unknown) => [
+      { lineageId: s.lineage("01"), amountCents },
+      { lineageId: s.lineage("02"), amountCents: 40_000, closesLine: false },
+    ];
+    const cases: [Record<string, unknown>, string][] = [
+      [{ lines: lines(OVER) }, "invalid_input"],
+      [{ lines: lines(2 ** 31) }, "invalid_input"],
+      [{ lines: lines("870.00") }, "invalid_input"],
+      [{ lines: "all" }, "missing_fields"],
+      [{ concept: 5 }, "missing_fields"],
+      [{ concept: "x".repeat(501) }, "invalid_input"],
+      [{ signedOn: 12 }, "invalid_date"],
+      [{ signedOn: "2026-10-20" }, "invalid_date"],
+      [{ documentTitle: 5 }, "invalid_input"],
+      [{ documentTitle: "x".repeat(201) }, "invalid_input"],
+      [{ file: new File(["not a pdf"], "x.pdf") }, "invalid_file_type"],
+    ];
+    for (const [overrides, code] of cases) {
+      expect([overrides, await outcome(svc.amendPurchase(s.ctx, s.orderId, amendment(s, overrides)))]).toEqual([overrides, code]);
+    }
+    expect(await purchasingService.getPurchase(s.ctx, s.orderId)).toMatchObject({ amountCents: 120_000, amendments: [], documents: [] });
+  });
+
+  it("ignores keys it doesn't take, as before; signed today when the day is missing, null or empty", async () => {
+    const s = await setup();
+    const extra = { tenantId: "other", number: 9, amountBeforeCents: 1, documentId: "x", signedOn: "" };
+    const { number } = await svc.amendPurchase(s.ctx, s.orderId, amendment(s, extra));
+    expect(number).toBe(1);
+    expect((await purchasingService.getPurchase(s.ctx, s.orderId)).amendments).toMatchObject([
+      { number: 1, signedOn: "2026-10-19", amountBeforeCents: 120_000, document: null },
+    ]);
+  });
+
+  it("checks the PDF before the lines, as before", async () => {
+    const s = await setup();
+    const big = new File(["%PDF-1.7", "x".repeat(MAX_DOCUMENT_BYTES)], "Modificado.pdf", { type: "application/pdf" });
+    expect(await outcome(svc.amendPurchase(s.ctx, s.orderId, amendment(s, { file: big, lines: "all" })))).toBe("file_too_large");
+    expect(await outcome(svc.amendPurchase(s.ctx, s.orderId, amendment(s, { file: big, concept: "" })))).toBe("missing_fields");
+  });
+
+  it("refuses a modificado whose order adds up to more than MAX_AMOUNT_CENTS, before or after (400, not a database error)", async () => {
+    const s = await setup();
+    const huge = [
+      { lineageId: s.lineage("01"), amountCents: MAX_AMOUNT_CENTS },
+      { lineageId: s.lineage("02"), amountCents: MAX_AMOUNT_CENTS },
+    ];
+    expect(await outcome(svc.amendPurchase(s.ctx, s.orderId, amendment(s, { lines: huge })))).toBe("invalid_input");
+    expect(await purchasingService.getPurchase(s.ctx, s.orderId)).toMatchObject({ amountCents: 120_000, amendments: [] });
+
+    // An order already that large (edited while pending, then contracted) can't be amended either.
+    const { orderId } = await purchasingService.createPurchase(s.admin, s.project.id, {
+      kind: "subcontract",
+      subcontractorId: s.subcontractorId,
+      description: "Ampliación",
+      status: "contracted",
+      orderedOn: "2026-09-01",
+      lines: huge,
+    });
+    expect(await outcome(svc.amendPurchase(s.ctx, orderId, amendment(s)))).toBe("invalid_input");
+    expect(await purchasingService.getPurchase(s.ctx, orderId)).toMatchObject({ amountCents: 2 * MAX_AMOUNT_CENTS, amendments: [] });
   });
 });

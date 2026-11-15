@@ -83,7 +83,8 @@ describe("budget actions", () => {
     expect(await updateRevisionAction(project.id, draft.id, { overheadPct: 12, profitPct: 6 })).toEqual({ success: true });
     expect(await updateRevisionAction(project.id, draft.id, { profitPct: 101 })).toEqual({ error: "invalid_input" });
     expect(await updateRevisionAction(project.id, draft.id, { reviewed: { key: "annex:i1", done: true } })).toEqual({ success: true });
-    expect(await updateRevisionAction(project.id, draft.id, { reviewed: { key: "annex:i1", done: "yes" } })).toEqual({ error: "invalid_input" });
+    // A wrong type, as a caller past the types could send it.
+    expect(await updateRevisionAction(project.id, draft.id, { reviewed: { key: "annex:i1", done: "yes" } } as never)).toEqual({ error: "invalid_input" });
     const c01 = await chapter(project.id, "01");
     expect(await updateChapterAction(project.id, c01.id, { pdfNote: "Sobre parcela llana." })).toEqual({ success: true });
     expect(await addLineAction(project.id, c01.id, { baseCode: "01.01", quantity: 1 })).toEqual({ success: true });
@@ -199,7 +200,7 @@ describe("budget actions", () => {
     const { project, ctx } = await setup();
     const { pathname } = await budgetInputUploadAction(project.id, "Planos.pdf");
     files.set(pathname!, new Blob(["%PDF-1.7 planos"]));
-    expect(await registerBudgetInputAction(project.id, { pathname, budgetInput: "plans", filename: "Planos.pdf" })).toEqual({ success: true });
+    expect(await registerBudgetInputAction(project.id, { pathname: pathname!, budgetInput: "plans", filename: "Planos.pdf" })).toEqual({ success: true });
     const [plans] = (await documentsService.listDocuments(ctx, project.id)).filter((d) => d.budgetInput);
 
     expect(await startGenerationAction(project.id, { documentIds: [plans!.id], quality: "framer" })).toEqual({ success: true });
@@ -219,7 +220,7 @@ describe("budget actions", () => {
     const { project, ctx } = await setup();
     const { pathname } = await budgetInputUploadAction(project.id, "Planos.pdf");
     files.set(pathname!, new Blob(["%PDF-1.7 planos"]));
-    await registerBudgetInputAction(project.id, { pathname, budgetInput: "plans", filename: "Planos.pdf" });
+    await registerBudgetInputAction(project.id, { pathname: pathname!, budgetInput: "plans", filename: "Planos.pdf" });
     const [plans] = (await documentsService.listDocuments(ctx, project.id)).filter((d) => d.budgetInput);
     vi.mocked(workflow.start).mockRejectedValueOnce(new Error("queue down"));
 

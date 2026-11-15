@@ -21,7 +21,6 @@ import {
   type PgTable,
   type SQL,
 } from "@repo/db";
-import { isCalendarDate } from "./calendar";
 import {
   amountCents,
   type BudgetLine,
@@ -41,7 +40,6 @@ import {
   priceLines,
   progressOf,
   progressOfTotals,
-  todayInSpain,
   type LineTotals,
   type Margins,
   type Progress,
@@ -50,8 +48,8 @@ import { requireProject as requireProjectRow } from "./project-files";
 import { approvedPlansOf, planDatesOf } from "./planning-data";
 
 // ─── Obra: shared loading and checks ─────────────────────────────────────────
-// What the budget, hitos and obra services share: errors, input parsing, and
-// loading a project's current budget and hitos into their computed shapes.
+// What the budget, hitos and obra services share: errors, and loading a
+// project's current budget and hitos into their computed shapes.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const STATUS: Record<ObraError, number> = {
@@ -106,70 +104,6 @@ export type ObraProject = Awaited<ReturnType<typeof requireProjectRow>>;
 
 export const asStage = (stage: number) => stage as ObraStage;
 
-// ─── Input parsing ───────────────────────────────────────────────────────────
-
-/** A trimmed, non-empty string of at most `max` characters. */
-export function requiredText(value: unknown, max: number): string {
-  if (typeof value !== "string" || !value.trim()) fail("missing_fields");
-  const text = value.trim();
-  if (text.length > max) fail("invalid_input");
-  return text;
-}
-
-/** A trimmed string, or null when empty. */
-export function optionalText(value: unknown, max: number): string | null {
-  if (value === null || value === undefined) return null;
-  if (typeof value !== "string") fail("invalid_input");
-  const text = value.trim();
-  if (text.length > max) fail("invalid_input");
-  return text || null;
-}
-
-/** An integer within [min, max]. */
-export function integer(value: unknown, min: number, max: number): number {
-  if (typeof value !== "number" || !Number.isInteger(value) || value < min || value > max) {
-    fail("invalid_input");
-  }
-  return value;
-}
-
-/** A number within [0, max] with up to log10(factor) decimals, stored × factor. */
-export function scaled(value: unknown, max: number, factor: number): number {
-  if (value === undefined) fail("missing_fields");
-  if (typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > max) {
-    fail("invalid_input");
-  }
-  return Math.round(value * factor);
-}
-
-/** A calendar date, YYYY-MM-DD. */
-export function calendarDate(value: unknown): string {
-  if (typeof value !== "string" || !isCalendarDate(value)) fail("invalid_date");
-  return value;
-}
-
-/** A day something happened on site: a calendar date, not after today (in Spain). */
-export function workDate(value: unknown, today = todayInSpain()): string {
-  const date = calendarDate(value);
-  if (date > today) fail("invalid_date");
-  return date;
-}
-
-/** Null when missing or empty; else as `parse` reads it. */
-export const orNull =
-  <T>(parse: (value: unknown) => T) =>
-  (value: unknown): T | null =>
-    value === undefined || value === null || value === "" ? null : parse(value);
-
-/** One of `allowed`; `invalid_input` otherwise. */
-export const pick =
-  <T extends string>(allowed: readonly T[]) =>
-  (value: unknown): T =>
-    allowed.find((a) => a === value) ?? fail("invalid_input");
-
-export const isObject = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value);
-
 /** Who did something: their name, else their email. */
 export const userName = sql<string | null>`coalesce(${users.name}, ${users.email})`;
 
@@ -202,7 +136,7 @@ export function pickChanges<T>(
 /** The next free `position` among the rows `where` selects, computed in the insert. */
 /** The sum of the selected lines' amounts, each rounded as `amountCents` does. */
 export const linesTotalSql = () =>
-  sql<string>`coalesce(sum(round(${budgetLines.quantityMilli}::numeric * ${budgetLines.unitPriceCents} / 1000)), 0)`;
+  sql<number>`coalesce(sum(round(${budgetLines.quantityMilli}::numeric * ${budgetLines.unitPriceCents} / 1000)), 0)`.mapWith(Number);
 
 /**
  * One line's amount at the client's price, as `priceLines` (obra-calc.ts): its
@@ -215,7 +149,7 @@ export const linePriceSql = () =>
   sql<string>`floor(${budgetLines.quantityMilli}::numeric * round(${budgetLines.unitPriceCents}::numeric * (10000 + ${budgetRevisions.overheadBp}) / (10000 - ${budgetRevisions.profitBp})) / 1000 + 0.5)`;
 
 /** The sum of the selected lines' `linePriceSql`. */
-export const linesPriceSql = () => sql<string>`coalesce(sum(${linePriceSql()}), 0)`;
+export const linesPriceSql = () => sql<number>`coalesce(sum(${linePriceSql()}), 0)`.mapWith(Number);
 
 export function nextPosition(table: PgTable, position: AnyColumn, where: SQL | undefined) {
   return sql<number>`(select coalesce(max(${position}), -1) + 1 from ${table} where ${where})`;

@@ -76,6 +76,7 @@ import { schedulePlan, templateItems } from "../planning-calc";
 import { invoiceAmounts, splitProportional, termsOf } from "../purchase-calc";
 import { contractLines } from "../purchasing";
 import { createSubcontractor } from "../subcontractors";
+import { forgetCae } from "../subcontractor-attention";
 import { seedBudget } from "./seed-obra";
 
 // ─── Where it may run ────────────────────────────────────────────────────────
@@ -1094,6 +1095,8 @@ async function seedTenant(shape: TenantShape, rng: Random, passwordHash: string,
   await insertAll(subcontractorDocuments, documents, 1000);
   await insertAll(subcontractorDocumentVersions, versions, 1000);
   await insertAll(subcontractorAudit, audits, 1000);
+  // Written past the services: the companies' stored CAE values are worked out again on the first read.
+  await forgetCae(tenantId);
   await insertAll(obraIssues, rows.issues);
   await insertAll(projectPhotos, rows.photos);
 

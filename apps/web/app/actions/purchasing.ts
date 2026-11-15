@@ -8,6 +8,9 @@ import {
   purchaseDocumentsService as documents,
   purchasingService as svc,
   type PurchaseListQuery,
+  type PurchaseOrderChangesInput,
+  type PurchaseOrderInput,
+  type PurchaseStatusInput,
 } from "@repo/core";
 import { fieldsWithFile } from "../../lib/api";
 import { mutateDashboard, read, type ObraState } from "./run";
@@ -60,7 +63,7 @@ const write = (projectId: string, fn: Parameters<typeof mutateDashboard>[1], rev
 /** → the new order's id and number too. With the form's `idempotencyKey` in `input`, sent twice it is one order. */
 export async function createPurchaseAction(
   projectId: string,
-  input: Record<string, unknown>,
+  input: PurchaseOrderInput,
 ): Promise<(NonNullable<ObraState> & { orderId?: string; number?: number }) | null> {
   let made: { orderId: string; number: number } | undefined;
   const state = await write(projectId, async (ctx) => {
@@ -69,16 +72,12 @@ export async function createPurchaseAction(
   return state?.success ? { ...state, ...made } : state;
 }
 
-export async function updatePurchaseAction(projectId: string, orderId: string, input: Record<string, unknown>): Promise<ObraState> {
+export async function updatePurchaseAction(projectId: string, orderId: string, input: PurchaseOrderChangesInput): Promise<ObraState> {
   return write(projectId, (ctx) => svc.updatePurchase(ctx, orderId, input));
 }
 
 /** { status, date?, note? } */
-export async function setPurchaseStatusAction(
-  projectId: string,
-  orderId: string,
-  input: { status: string; date?: string | null; note?: string },
-): Promise<ObraState> {
+export async function setPurchaseStatusAction(projectId: string, orderId: string, input: PurchaseStatusInput): Promise<ObraState> {
   return write(projectId, (ctx) => svc.setPurchaseStatus(ctx, orderId, input));
 }
 

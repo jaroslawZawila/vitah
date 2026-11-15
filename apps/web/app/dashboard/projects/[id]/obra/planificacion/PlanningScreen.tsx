@@ -8,7 +8,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import type { ProjectPlanning } from "@repo/core/contract";
+import type { PlanningDraftNewInput, ProjectPlanning } from "@repo/core/contract";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cardVariants } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -51,7 +51,7 @@ export default function PlanningScreen({
   const [onlyCritical, setOnlyCritical] = useState(false);
   const { baseline, draft, today } = planning;
   const editHref = planningHref(projectId, "editar");
-  const openDraft = (input: Record<string, unknown>) =>
+  const openDraft = (input: PlanningDraftNewInput) =>
     action.run(() => createPlanningDraftAction(projectId, input), () => router.push(editHref));
 
   const aside = baseline && (

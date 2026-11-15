@@ -388,3 +388,70 @@ describe("deactivating a user", () => {
     expect((await reload(viewer.id))!.passwordChangedAt).toBeNull();
   });
 });
+
+describe("input boundaries (schemas in src/inputs/accounts.ts)", () => {
+  const VALID = { email: "new@example.com", name: "New", password: "Long-enough1", role: "manager" };
+
+  it.each([
+    // The order of the checks is the old one: a long email or name, then what is missing, the email, the password.
+    ["too_long", { ...VALID, email: `${"a".repeat(200)}@x.es`, password: 5 }],
+    ["too_long", { ...VALID, name: "n".repeat(201), role: "client" }],
+    ["missing_fields", { ...VALID, email: 5 }],
+    ["missing_fields", { ...VALID, name: "  " }],
+    ["missing_fields", { ...VALID, password: "" }],
+    ["missing_fields", { ...VALID, password: 12345678901 }],
+    ["missing_fields", { ...VALID, role: "owner", email: "not-an-email" }],
+    ["invalid_email", { ...VALID, email: "not-an-email", password: "weak" }],
+    ["weak_password", { ...VALID, password: "weak" }],
+  ])("createUser answers %s, as before, and writes nothing", async (code, input) => {
+    const { ctx } = await setup();
+    await expect(svc.createUser(ctx, input)).rejects.toMatchObject({ code, status: 400 });
+    expect(await db.select().from(users)).toHaveLength(2);
+  });
+
+  it("ignores keys it doesn't take; a password is never trimmed", async () => {
+    const { tenant, ctx } = await setup();
+    const { id } = await svc.createUser(ctx, { ...VALID, password: " Long-enough1 ", tenantId: "other", active: false, extra: 1 });
+    const row = await reload(id);
+    expect(row).toMatchObject({ tenantId: tenant.id, active: true, role: "manager" });
+    expect(await bcrypt.compare(" Long-enough1 ", row!.passwordHash!)).toBe(true);
+  });
+
+  it.each([
+    ["invalid_role", { role: "client" }],
+    ["invalid_role", { role: null }],
+    ["invalid_active", { active: "false" }],
+    ["invalid_active", { active: null }],
+  ])("updateUser answers %s and changes nothing", async (code, input) => {
+    const { tenant, ctx } = await setup();
+    const viewer = await createTestUser(tenant.id, { role: "viewer" });
+    await expect(svc.updateUser(ctx, viewer.id, input)).rejects.toMatchObject({ code, status: 400 });
+    expect(await reload(viewer.id)).toMatchObject({ role: "viewer", active: true });
+  });
+
+  it("updateUser: a key sent as undefined is not sent; extra keys are ignored", async () => {
+    const { tenant, ctx } = await setup();
+    const viewer = await createTestUser(tenant.id, { role: "viewer" });
+    await svc.updateUser(ctx, viewer.id, { role: undefined, active: undefined, tenantId: "other", email: "x@y.es" });
+    expect(await reload(viewer.id)).toMatchObject({ role: "viewer", active: true, tenantId: tenant.id, email: viewer.email });
+  });
+
+  it("updateMe: a language or null; anything else is invalid_language", async () => {
+    const { ctx } = await setup();
+    for (const language of [5, "", "ES", ["es"]]) {
+      await expect(svc.updateMe(ctx, { language })).rejects.toMatchObject({ code: "invalid_language", status: 400 });
+    }
+    expect(await svc.updateMe(ctx, { language: "en", role: "viewer" })).toMatchObject({ language: "en", role: "admin" });
+    expect(await svc.updateMe(ctx, { language: null })).toMatchObject({ language: null });
+  });
+
+  it("resetUserPassword: refuses its own before the password, then any weak one", async () => {
+    const { tenant, admin, ctx } = await setup();
+    const viewer = await createTestUser(tenant.id, { role: "viewer" });
+    await expect(svc.resetUserPassword(ctx, admin.id, { password: 5 })).rejects.toMatchObject({ code: "cannot_reset_own_password" });
+    for (const password of [undefined, null, 12345678901, "weak"]) {
+      await expect(svc.resetUserPassword(ctx, viewer.id, { password })).rejects.toMatchObject({ code: "weak_password", status: 400 });
+    }
+    expect((await reload(viewer.id))?.passwordChangedAt).toBeNull();
+  });
+});

@@ -1,7 +1,8 @@
-import { NextResponse } from "next/server";
 import { attemptSignIn, clientIp } from "@repo/auth/credentials";
 import { createMobileToken } from "@repo/auth/mobile";
+import { mobileCredentials } from "@repo/core";
 import type { MobileSession } from "@repo/core/contract";
+import { apiJson } from "../../../../lib/responses";
 
 // ─── POST /api/mobile/auth ────────────────────────────────────────────────────
 // Credentials auth for the mobile app (client users only). Returns a signed
@@ -13,19 +14,18 @@ import type { MobileSession } from "@repo/core/contract";
 // ─────────────────────────────────────────────────────────────────────────────
 
 export async function POST(request: Request) {
-  let email: string | undefined;
-  let password: string | undefined;
-
+  let body: unknown;
   try {
-    const body = (await request.json()) as { email?: unknown; password?: unknown };
-    email = typeof body.email === "string" ? body.email.trim() : undefined;
-    password = typeof body.password === "string" ? body.password : undefined;
+    body = await request.json();
   } catch {
-    return NextResponse.json({ error: "invalid_body" }, { status: 400 });
+    return apiJson({ error: "invalid_body" }, { status: 400 });
   }
+  const credentials = mobileCredentials(body);
+  if (!credentials) return apiJson({ error: "invalid_body" }, { status: 400 });
+  const { email, password } = credentials;
 
   if (!email || !password) {
-    return NextResponse.json(
+    return apiJson(
       { error: "email_and_password_required" },
       { status: 400 }
     );
@@ -33,10 +33,10 @@ export async function POST(request: Request) {
 
   const user = await attemptSignIn(email, password, "mobile", clientIp(request));
   if (user === "too_many_attempts") {
-    return NextResponse.json({ error: user }, { status: 429 });
+    return apiJson({ error: user }, { status: 429 });
   }
   if (!user) {
-    return NextResponse.json({ error: "invalid_credentials" }, { status: 401 });
+    return apiJson({ error: "invalid_credentials" }, { status: 401 });
   }
 
   const token = await createMobileToken({
@@ -47,5 +47,5 @@ export async function POST(request: Request) {
     tenantId: user.tenantId,
   });
 
-  return NextResponse.json({ token, user } satisfies MobileSession);
+  return apiJson({ token, user } satisfies MobileSession);
 }

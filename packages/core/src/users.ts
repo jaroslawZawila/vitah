@@ -1,25 +1,14 @@
-import { db, users, userMfa, and, asc, eq, isStaffUser, sql, STAFF_ROLES } from "@repo/db";
-import {
-  changeOwnPassword,
-  EMAIL_PATTERN,
-  hashPassword,
-  isUniqueViolation,
-  newPassword,
-  replacePassword,
-} from "./accounts";
+import { db, users, userMfa, and, asc, eq, isStaffUser, sql } from "@repo/db";
+import { changeOwnPassword, EMAIL_PATTERN, hashPassword, isUniqueViolation, replacePassword } from "./accounts";
 import { requireAdmin, type Ctx, type UserRole } from "./context";
-import { isAppLanguage } from "./contract";
 import { invalid, notFound } from "./errors";
-import { MAX_TEXT, text } from "./input";
+import { meChangesSchema, passwordSchema, staffUserChangesSchema, staffUserSchema } from "./inputs/accounts";
+import { parse } from "./inputs/fields";
 import { mfaTableMissing } from "./mfa";
 
 // Staff management within the caller's tenant. Admin only. Clients (mobile
 // app users) are managed from their project (./project-client.ts). Except
 // `getMe` / `updateMe` / `changeMyPassword`: every staff user's own settings.
-
-function role(value: unknown): UserRole | undefined {
-  return STAFF_ROLES.includes(value as UserRole) ? (value as UserRole) : undefined;
-}
 
 export async function listUsers(ctx: Ctx) {
   requireAdmin(ctx);
@@ -52,17 +41,13 @@ export type UserListItem = Awaited<ReturnType<typeof listUsers>>[number];
 export async function createUser(ctx: Ctx, input: Record<string, unknown>) {
   requireAdmin(ctx);
 
-  const email = text(input.email, MAX_TEXT)?.toLowerCase();
-  const name = text(input.name, MAX_TEXT);
   // Passwords are not trimmed
-  const password =
-    typeof input.password === "string" ? input.password : undefined;
-  const userRole = role(input.role);
+  const { email, name, password, role: userRole } = parse(staffUserSchema, input);
 
   if (!email || !name || !password || !userRole)
     throw invalid("missing_fields");
   if (!EMAIL_PATTERN.test(email)) throw invalid("invalid_email");
-  newPassword(password);
+  parse(passwordSchema, input);
 
   try {
     const [created] = await db
@@ -93,19 +78,15 @@ export async function updateUser(
 ) {
   requireAdmin(ctx);
 
+  const body = parse(staffUserChangesSchema, input);
   const set: Partial<typeof users.$inferInsert> = { updatedAt: new Date() };
-  if (input.role !== undefined) {
-    const userRole = role(input.role);
-    if (!userRole) throw invalid("invalid_role");
-    set.role = userRole;
-  }
-  if (input.active !== undefined) {
-    if (typeof input.active !== "boolean") throw invalid("invalid_active");
-    set.active = input.active;
+  if (body.role !== undefined) set.role = body.role;
+  if (body.active !== undefined) {
+    set.active = body.active;
     // Deactivating signs the user out for good: the sessions they had don't
     // come back if the account is activated again (`passwordChangedAt` is
     // when sessions were last revoked; see @repo/auth's ./session.ts).
-    if (!input.active) set.passwordChangedAt = set.updatedAt;
+    if (!body.active) set.passwordChangedAt = set.updatedAt;
   }
 
   // An admin can't demote or deactivate themselves — that could leave the
@@ -163,10 +144,8 @@ export async function resetUserPassword(ctx: Ctx, userId: string, input: Record<
   requireAdmin(ctx);
   if (userId === ctx.userId) throw invalid("cannot_reset_own_password");
 
-  const updated = await replacePassword(
-    and(eq(users.id, userId), eq(users.tenantId, ctx.tenantId), isStaffUser),
-    newPassword(input.password),
-  );
+  const { password } = parse(passwordSchema, input);
+  const updated = await replacePassword(and(eq(users.id, userId), eq(users.tenantId, ctx.tenantId), isStaffUser), password);
   if (updated.length === 0) throw notFound();
   return { id: userId };
 }
@@ -189,11 +168,9 @@ export async function getMe(ctx: Ctx) {
  * portal's language ("es" | "en", null to follow the browser again).
  */
 export async function updateMe(ctx: Ctx, input: Record<string, unknown>) {
+  const { language } = parse(meChangesSchema, input);
   const set: Partial<typeof users.$inferInsert> = { updatedAt: new Date() };
-  if (input.language !== undefined) {
-    if (input.language !== null && !isAppLanguage(input.language)) throw invalid("invalid_language");
-    set.language = input.language;
-  }
+  if (language !== undefined) set.language = language;
   const [me] = await db
     .update(users)
     .set(set)

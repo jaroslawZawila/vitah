@@ -24,6 +24,10 @@ Then fix forward: revert or correct the commit on `main` and push. A rollback le
 
 - Migrations are additive (or expand then contract), so the previous code runs on the newer schema. If a migration in the bad deploy broke that rule, rolling the code back is not enough: see [database.md](database.md).
 - Data written by the new code stays. If the new code wrote something the old code cannot read, say so in the incident notes and repair it by hand.
+- Stored derived values go stale under older code that does not maintain them. The CAE warnings and statuses
+  (`cae_*` columns, `packages/db/sql/2026-11-15-0900-cae-stored-status.sql`): after running code from before that
+  file, forget them once the current code is back (`UPDATE subcontractors SET cae_status = NULL, cae_valid_until =
+  NULL; UPDATE subcontractor_assignments SET cae_warnings = NULL, cae_valid_until = NULL;`); the next reads work them out again.
 - The client app is not rolled back by this: installed builds keep calling the API they know. `/api/mobile/*` and `/api/v1` stay backwards compatible for that reason.
 
 ## Not rehearsed yet

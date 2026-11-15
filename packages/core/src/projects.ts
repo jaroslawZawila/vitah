@@ -1,40 +1,13 @@
 import { and, db, desc, eq, projects } from "@repo/db";
-import { fromCalendarDate, isCalendarDate } from "./calendar";
 import { markChanged } from "./changes";
 import { requireAdmin, requireEditor, type Ctx } from "./context";
 import { invalid, notFound } from "./errors";
-import { MAX_TEXT, text } from "./input";
+import { parse } from "./inputs/fields";
+import { projectChangesSchema, projectDatesSchema, projectNamesSchema, projectSchema } from "./inputs/projects";
 import { projectInTenant, projectsInTenant, requireAssignableClient, softDeleted } from "./project-client";
 
 // Every function here takes `ctx` and filters by `ctx.tenantId`.
 // A project holds exactly what the client's mobile app shows.
-
-// Input parsing: API bodies and form values arrive as unknown / strings.
-
-const ISO_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})$/;
-
-const MAX_REF = 40;
-const MAX_ADDRESS = 300;
-
-/**
- * A YYYY-MM-DD calendar date, stored at UTC midnight. A full ISO timestamp
- * (which /api/v1 accepted before) counts as its UTC date.
- * `undefined` = not provided, `null` = cleared (empty string or null).
- */
-function date(value: unknown): Date | null | undefined {
-  if (value === undefined) return undefined;
-  if (value === null) return null;
-  if (typeof value !== "string") throw invalid("invalid_date");
-  const trimmed = value.trim();
-  if (trimmed === "") return null;
-  const parsed = ISO_TIMESTAMP.test(trimmed) ? new Date(trimmed) : null;
-  const raw =
-    parsed && !Number.isNaN(parsed.getTime()) && isCalendarDate(trimmed.slice(0, 10))
-      ? parsed.toISOString().slice(0, 10)
-      : trimmed;
-  if (!isCalendarDate(raw)) throw invalid("invalid_date");
-  return fromCalendarDate(raw);
-}
 
 function checkOrder(start: Date | null | undefined, completion: Date | null | undefined) {
   if (start && completion && completion < start) throw invalid("dates_out_of_order");
@@ -82,13 +55,14 @@ export type ProjectDetail = NonNullable<Awaited<ReturnType<typeof getProject>>>;
  */
 export async function createProject(ctx: Ctx, input: Record<string, unknown>) {
   requireEditor(ctx);
-  const ref = text(input.ref, MAX_REF);
-  const address = text(input.address, MAX_ADDRESS);
+  // In the old order: ref and address (what is missing), the dates (their order), then the client.
+  const { ref, address } = parse(projectNamesSchema, input);
   if (!ref || !address) throw invalid("missing_fields");
-  const startDate = date(input.startDate) ?? null;
-  const completionDate = date(input.completionDate) ?? null;
+  const dates = parse(projectDatesSchema, input);
+  const startDate = dates.startDate ?? null;
+  const completionDate = dates.completionDate ?? null;
   checkOrder(startDate, completionDate);
-  const clientId = text(input.clientId, MAX_TEXT) ?? null;
+  const clientId = parse(projectSchema, input).clientId ?? null;
   if (clientId) requireAdmin(ctx);
 
   // Among the projects not deleted: a deleted one's ref is free again.
@@ -124,16 +98,10 @@ export async function createProject(ctx: Ctx, input: Record<string, unknown>) {
  */
 export async function updateProject(ctx: Ctx, id: string, input: Record<string, unknown>) {
   requireEditor(ctx);
+  const { address, startDate, completionDate } = parse(projectChangesSchema, input);
   const set: Partial<typeof projects.$inferInsert> = { updatedAt: new Date() };
-
-  if (input.address !== undefined) {
-    const address = text(input.address, MAX_ADDRESS);
-    if (!address) throw invalid("missing_fields");
-    set.address = address;
-  }
-  const startDate = date(input.startDate);
+  if (address !== undefined) set.address = address;
   if (startDate !== undefined) set.startDate = startDate;
-  const completionDate = date(input.completionDate);
   if (completionDate !== undefined) set.completionDate = completionDate;
 
   // Locked, so a concurrent edit of the other date can't slip past the order check.

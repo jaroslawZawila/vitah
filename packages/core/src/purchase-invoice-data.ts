@@ -86,7 +86,7 @@ export async function loadInvoices(tenantId: string, where?: SQL, { lines: withL
                 .where(and(eq(purchaseInvoiceLines.tenantId, tenantId), inArray(purchaseInvoiceLines.invoiceId, ids)))
             : [],
           db
-            .select({ invoiceId: purchasePayments.invoiceId, paid: sql<string>`sum(${purchasePayments.amountCents})` })
+            .select({ invoiceId: purchasePayments.invoiceId, paid: sql<number>`sum(${purchasePayments.amountCents})`.mapWith(Number) })
             .from(purchasePayments)
             .where(and(eq(purchasePayments.tenantId, tenantId), isNull(purchasePayments.deletedAt), inArray(purchasePayments.invoiceId, ids)))
             .groupBy(purchasePayments.invoiceId),
@@ -96,7 +96,7 @@ export async function loadInvoices(tenantId: string, where?: SQL, { lines: withL
             .where(and(eq(purchaseInvoiceFiles.tenantId, tenantId), inArray(purchaseInvoiceFiles.invoiceId, ids))),
         ]);
   const lines = groupBy(lineRows, (l) => l.invoiceId);
-  const paid = new Map(paidRows.map((p) => [p.invoiceId, Number(p.paid)]));
+  const paid = new Map(paidRows.map((p) => [p.invoiceId, p.paid]));
   const withFile = new Set(fileRows.map((f) => f.invoiceId));
   return rows.map((row) => ({
     ...row,
@@ -280,11 +280,11 @@ export function orderMilestones(milestones: MilestoneRow[], built: BuiltInvoices
 export async function invoicedByOrder(tenantId: string, orderIds: string[]) {
   if (orderIds.length === 0) return new Map<string, number>();
   const rows = await db
-    .select({ orderId: purchaseInvoices.orderId, base: sql<string>`sum(${purchaseInvoices.baseCents})` })
+    .select({ orderId: purchaseInvoices.orderId, base: sql<number>`sum(${purchaseInvoices.baseCents})`.mapWith(Number) })
     .from(purchaseInvoices)
     .where(and(eq(purchaseInvoices.tenantId, tenantId), isNull(purchaseInvoices.deletedAt), inArray(purchaseInvoices.orderId, orderIds)))
     .groupBy(purchaseInvoices.orderId);
-  return new Map(rows.map((r) => [r.orderId, Number(r.base)]));
+  return new Map(rows.map((r) => [r.orderId, r.base]));
 }
 
 /** The payments that count: not deleted, of an invoice not deleted, of an obra not deleted. */
@@ -296,7 +296,7 @@ export const paymentTotals = (tenantId: string, where: SQL | undefined, monthSta
   db
     .select({
       total: sql<number>`count(*)::int`,
-      monthCents: sql<number>`coalesce(sum(${purchasePayments.amountCents}) filter (where ${purchasePayments.paidOn} >= ${monthStart}::date), 0)::float8`,
+      monthCents: sql<number>`coalesce(sum(${purchasePayments.amountCents}) filter (where ${purchasePayments.paidOn} >= ${monthStart}::date), 0)`.mapWith(Number),
       monthPayments: sql<number>`(count(*) filter (where ${purchasePayments.paidOn} >= ${monthStart}::date))::int`,
     })
     .from(purchasePayments)

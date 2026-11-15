@@ -1,24 +1,31 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { unzipSync, strFromU8 } from "fflate";
 import {
   db,
   eq,
+  isNull,
   projects,
   sql,
   subcontractorAssignments,
   subcontractorAudit,
   subcontractorDocumentVersions,
+  subcontractors,
+  tenants,
 } from "@repo/db";
 import { createTestProject, createTestTenant, createTestUser, resetDatabase } from "@repo/db/testing";
 import {
   MANDATORY_COMPANY_REQUIREMENTS,
   addMonths,
+  deletedService,
+  projectsService,
   subcontractorsService as svc,
   subcontractorWorkersService as workers,
   type Ctx,
 } from "../src";
 import { files } from "../src/testing";
 import { addDays, todayInSpain } from "../src/obra-calc";
+import { caeValues, forgetCae } from "../src/subcontractor-attention";
+import { liveAssignment, loadNetwork } from "../src/subcontractor-network";
 
 vi.mock("../src/storage", () => import("../src/testing"));
 
@@ -99,6 +106,56 @@ async function readyWorker(ctx: Ctx, subcontractorId: string, overrides: Record<
 beforeEach(async () => {
   await resetDatabase();
   files.clear();
+});
+
+/**
+ * What every write leaves stored (`cae_status`, `cae_warnings` and their day)
+ * is what the rules give now, in every tenant: checked after each test, so
+ * every kind of write below is checked. A value never worked out (null) is
+ * skipped; then the project list's count, worked out from them, is each obra's
+ * `listProjectAttention`.
+ */
+async function expectStoredMatchesRules() {
+  for (const { id: tenantId } of await db.select({ id: tenants.id }).from(tenants)) {
+    const want = caeValues(await loadNetwork(tenantId));
+    const companies = await db
+      .select({ id: subcontractors.id, status: subcontractors.caeStatus, validUntil: subcontractors.caeValidUntil })
+      .from(subcontractors)
+      .where(eq(subcontractors.tenantId, tenantId));
+    for (const c of companies.filter((c) => c.validUntil !== null)) {
+      const { id, status, validUntil } = want.companies.find((w) => w.id === c.id)!;
+      expect(c, "a company's stored CAE status").toEqual({ id, status, validUntil });
+    }
+    const assignments = await db
+      .select({
+        id: subcontractorAssignments.id,
+        projectId: subcontractorAssignments.projectId,
+        subcontractorId: subcontractorAssignments.subcontractorId,
+        warnings: subcontractorAssignments.caeWarnings,
+        validUntil: subcontractorAssignments.caeValidUntil,
+      })
+      .from(subcontractorAssignments)
+      .where(liveAssignment(tenantId));
+    for (const a of assignments.filter((a) => a.validUntil !== null)) {
+      const { id, subcontractorId, warnings, validUntil } = want.assignments.find((w) => w.id === a.id)!;
+      expect(a, "an assignment's stored CAE warnings").toEqual({ id, projectId: a.projectId, subcontractorId, warnings, validUntil });
+    }
+    const ctx: Ctx = { tenantId, userId: "nobody", role: "viewer" };
+    const projectIds = [...new Set(assignments.map((a) => a.projectId))];
+    const counted = await svc.countProjectsAttention(ctx, projectIds);
+    for (const projectId of projectIds) {
+      expect(counted.get(projectId), "an obra's CAE warnings").toBe((await svc.listProjectAttention(ctx, projectId)).length);
+    }
+  }
+}
+
+afterEach(async () => {
+  // On the test's own clock: a test may have moved it.
+  try {
+    await expectStoredMatchesRules();
+  } finally {
+    vi.useRealTimers();
+  }
 });
 
 describe("companies", () => {
@@ -499,6 +556,7 @@ describe("listWorkersPage", () => {
       .update(subcontractorDocumentVersions)
       .set({ expiresAt: inDays(-3) })
       .where(sql`document_id in (select id from subcontractor_documents where subcontractor_id = ${blockedCompany})`);
+    await forgetCae(s.tenant.id, [blockedCompany]);
     const zubieta = (await workers.createWorker(s.ctx, workerInput(blockedCompany, { firstName: "Unai", surnames: "Zubieta Ortiz", idDocument: "00000004G" }))).id;
     return { ...s, blockedCompany, ids: [abascal, cobo, diaz, gomez, zubieta] };
   }
@@ -610,6 +668,7 @@ describe("the status Compras shows of its suppliers", () => {
       .update(subcontractorDocumentVersions)
       .set({ expiresAt: inDays(-3) })
       .where(sql`document_id in (select id from subcontractor_documents where subcontractor_id = ${expired} and requirement_id = 'cert_tgss')`);
+    await forgetCae(tenant.id, [expired]);
     const { id: missing } = await svc.createSubcontractor(ctx, company({ legalName: "Sin Papeles S.L.", taxId: "B39000013" }));
     const { id: supplier } = await svc.createSubcontractor(ctx, company({ legalName: "Áridos S.A.", taxId: "A39000013", suppliesOnly: true }));
 
@@ -1143,5 +1202,337 @@ describe("code review fixes", () => {
     await expect(
       svc.createSubcontractor(ctx, company({ taxId: "B39654322", notApplicable: [entry, { ...entry, reason: "y" }] })),
     ).resolves.toEqual({ id: expect.any(String) });
+  });
+});
+
+describe("stored CAE values", () => {
+  const stored = async (subcontractorId: string) => {
+    const [company] = await db
+      .select({ status: subcontractors.caeStatus, validUntil: subcontractors.caeValidUntil })
+      .from(subcontractors)
+      .where(eq(subcontractors.id, subcontractorId));
+    const assignments = await db
+      .select({ projectId: subcontractorAssignments.projectId, warnings: subcontractorAssignments.caeWarnings, validUntil: subcontractorAssignments.caeValidUntil })
+      .from(subcontractorAssignments)
+      .where(eq(subcontractorAssignments.subcontractorId, subcontractorId));
+    return { company: company!, assignments };
+  };
+  const listed = async (ctx: Ctx, projectId: string) => (await svc.listProjectAttention(ctx, projectId)).length;
+
+  /** The statements and transactions the database client is sent while `run` runs. */
+  async function sentBy(run: () => Promise<unknown>) {
+    const client = (db as unknown as { session: { client: Record<"unsafe" | "begin", (...args: unknown[]) => unknown> } }).session.client;
+    const statements = vi.spyOn(client, "unsafe");
+    const transactions = vi.spyOn(client, "begin");
+    try {
+      await run();
+      return { statements: statements.mock.calls.map((call) => String(call[0])), transactions: transactions.mock.calls.length };
+    } finally {
+      statements.mockRestore();
+      transactions.mockRestore();
+    }
+  }
+
+  it("follow the calendar: a document entering its alert window or expiring changes them that day, with no write", async () => {
+    vi.useFakeTimers({ toFake: ["Date"], now: new Date(`${today}T10:00:00Z`) });
+    const { ctx, id, tenant } = await setup();
+    await makeApta(ctx, id);
+    const project = await createTestProject(tenant.id);
+    await svc.assignToProject(ctx, id, project.id, { chapterCodes: ["05"] });
+    await validDoc(ctx, id, "adhesion_pss", { projectId: project.id });
+    // The insurance runs out in 31 days: its 30-day window opens tomorrow.
+    await validDoc(ctx, id, "poliza_rc_subcontrata", { expiresAt: inDays(31) });
+
+    expect(await svc.countProjectsAttention(ctx, [project.id])).toEqual(new Map([[project.id, 0]]));
+    expect(await stored(id)).toEqual({
+      company: { status: "apta", validUntil: today },
+      assignments: [{ projectId: project.id, warnings: 0, validUntil: today }],
+    });
+
+    vi.setSystemTime(new Date(`${inDays(1)}T10:00:00Z`));
+    expect(await svc.countProjectsAttention(ctx, [project.id])).toEqual(new Map([[project.id, 1]]));
+    expect(await listed(ctx, project.id)).toBe(1);
+    const tomorrow = await stored(id);
+    expect(tomorrow.company.status).toBe("apta");
+    expect(tomorrow.assignments[0]!.validUntil! >= inDays(1)).toBe(true);
+
+    // Past its expiry (and the monthly certificates' too): blocked, more to attend to.
+    vi.setSystemTime(new Date(`${inDays(32)}T10:00:00Z`));
+    const later = (await svc.countProjectsAttention(ctx, [project.id])).get(project.id)!;
+    expect(later).toBeGreaterThan(1);
+    expect(later).toBe(await listed(ctx, project.id));
+    expect((await stored(id)).company.status).toBe("bloqueada");
+  });
+
+  it("are read without a document once fresh, a viewer's read filling them in", async () => {
+    const { ctx, id, tenant, project } = await onObra();
+    const viewer: Ctx = { tenantId: tenant.id, userId: (await createTestUser(tenant.id, { role: "viewer" })).id, role: "viewer" };
+    await forgetCae(tenant.id);
+    expect((await stored(id)).company).toEqual({ status: null, validUntil: null });
+
+    const first = await svc.countProjectsAttention(viewer, [project.id]);
+    expect(first).toEqual(new Map([[project.id, await listed(ctx, project.id)]]));
+    expect((await stored(id)).company.status).toBe("apta");
+    // Derived data: nothing in the company's history.
+    expect(await auditActions(id)).not.toContain(expect.stringMatching(/cae/));
+
+    const again = await sentBy(() => svc.countProjectsAttention(viewer, [project.id]));
+    expect(again.transactions).toBe(0);
+    expect(again.statements).toHaveLength(1);
+    expect(again.statements[0]).not.toMatch(/subcontractor_document/);
+  });
+
+  it("keep tenants apart", async () => {
+    const mine = await onObra();
+    const theirs = await onObra();
+    await forgetCae(theirs.tenant.id);
+
+    // Asked for another tenant's obra, nothing of it is read nor worked out; nor by a write of mine.
+    const counted = await svc.countProjectsAttention(mine.ctx, [mine.project.id, theirs.project.id]);
+    expect([...counted.keys()]).toEqual([mine.project.id]);
+    await svc.requestDocuments(mine.ctx, mine.id, { requirementIds: ["doc_maquinaria"] });
+    await expect(svc.requestDocuments(mine.ctx, theirs.id, { requirementIds: ["doc_maquinaria"] })).rejects.toMatchObject({
+      code: "not_found",
+    });
+    expect(await stored(theirs.id)).toEqual({
+      company: { status: null, validUntil: null },
+      assignments: [{ projectId: theirs.project.id, warnings: null, validUntil: null }],
+    });
+    expect((await stored(mine.id)).company.status).toBe("apta");
+  });
+
+  it("leave out removed assignments and deleted obras, and are right again when they come back", async () => {
+    const { ctx, id, tenant, project } = await onObra();
+    const other = await createTestProject(tenant.id, { ref: "VTH-26-002" });
+    await svc.assignToProject(ctx, id, other.id, { chapterCodes: ["05"] });
+    expect(await svc.countProjectsAttention(ctx, [project.id, other.id])).toEqual(
+      new Map([
+        [project.id, await listed(ctx, project.id)],
+        [other.id, await listed(ctx, other.id)],
+      ]),
+    );
+
+    // Removed: no count there, and nothing stored for it to come back with.
+    await svc.removeAssignment(ctx, id, other.id);
+    expect(await svc.countProjectsAttention(ctx, [other.id])).toEqual(new Map());
+    expect((await stored(id)).assignments.find((a) => a.projectId === other.id)).toMatchObject({ warnings: null, validUntil: null });
+    // The company changes meanwhile (a renewal to validate), then the assignment is restored.
+    await svc.uploadDocument(ctx, id, { requirementId: "cert_tgss", issuedAt: inDays(-1), file: pdf("%PDF-1.7 renovado") });
+    const [removed] = await db
+      .select({ id: subcontractorAssignments.id })
+      .from(subcontractorAssignments)
+      .where(eq(subcontractorAssignments.projectId, other.id));
+    await deletedService.restoreDeleted(ctx, "assignment", removed!.id);
+    expect((await svc.countProjectsAttention(ctx, [other.id])).get(other.id)).toBe(await listed(ctx, other.id));
+
+    // A deleted obra: no count; the company changes while it is gone; restored, it counts what is true now.
+    await projectsService.deleteProject(ctx, project.id);
+    expect(await svc.countProjectsAttention(ctx, [project.id])).toEqual(new Map());
+    await svc.requestDocuments(ctx, id, { requirementIds: ["doc_maquinaria"] });
+    await deletedService.restoreDeleted(ctx, "project", project.id);
+    const back = (await svc.countProjectsAttention(ctx, [project.id])).get(project.id)!;
+    expect(back).toBe(await listed(ctx, project.id));
+    expect(back).toBeGreaterThan(0);
+  });
+
+  it("give a material supplier on an obra nothing to attend to", async () => {
+    const { ctx, tenant } = await setup();
+    const project = await createTestProject(tenant.id);
+    const { id } = await svc.createSubcontractor(ctx, company({ legalName: "Áridos S.A.", taxId: "A39000013", suppliesOnly: true }));
+    // Only data from before material suppliers existed puts one on an obra.
+    await db.insert(subcontractorAssignments).values({ tenantId: tenant.id, subcontractorId: id, projectId: project.id });
+    expect(await svc.countProjectsAttention(ctx, [project.id])).toEqual(new Map([[project.id, 0]]));
+    expect(await stored(id)).toEqual({
+      company: { status: "apta", validUntil: "9999-12-31" },
+      assignments: [{ projectId: project.id, warnings: 0, validUntil: "9999-12-31" }],
+    });
+  });
+
+  it("stay right with reads and writes at once", async () => {
+    const { ctx, id, tenant, project } = await onObra();
+    await forgetCae(tenant.id);
+    const count = () => svc.countProjectsAttention(ctx, [project.id]);
+    await Promise.all([
+      count(),
+      count(),
+      svc.uploadDocument(ctx, id, { requirementId: "cert_tgss", issuedAt: inDays(-1), file: pdf("%PDF-1.7 renovado") }),
+      count(),
+      svc.requestDocuments(ctx, id, { requirementIds: ["doc_maquinaria"] }),
+      count(),
+    ]);
+    expect((await count()).get(project.id)).toBe(await listed(ctx, project.id));
+    expect(await db.$count(subcontractorAssignments, isNull(subcontractorAssignments.caeWarnings))).toBe(0);
+  });
+});
+
+describe("input boundaries (schemas in src/inputs/subcontractors.ts)", () => {
+  const countCompanies = async () => (await db.execute<{ n: number }>(sql`select count(*)::int as n from subcontractors`))[0]!.n;
+
+  it.each([
+    // In the old order: the identity (missing, CIF/NIF, postal code), the staff, the chain, then the rest.
+    ["invalid_option", { kind: "sa", legalName: "" }],
+    ["missing_fields", { legalName: 5, phone: "llámame" }],
+    ["missing_fields", { taxId: "  ", email: "no-at" }],
+    ["invalid_tax_id", { taxId: "B-39123451", email: "no-at" }],
+    ["invalid_postal_code", { postalCode: "ab", headcount: "nine" }],
+    ["invalid_email", { email: "no-at" }],
+    ["invalid_number", { headcount: "nine" }],
+    ["invalid_number", { permanentCount: -1 }],
+    ["invalid_number", { chainLevel: 1.5 }],
+    ["permanent_exceeds_headcount", { headcount: 2, permanentCount: "3", chainLevel: "x", phone: "llámame" }],
+    ["self_employed_cannot_subcontract", { kind: "self_employed", taxId: "72145836B", subcontractsFurther: "on", chainLevel: "x" }],
+    ["invalid_number", { chainLevel: "x", trades: "magic" }],
+    ["chain_too_deep", { chainLevel: 0, machinery: "boat" }],
+    ["invalid_phone", { siteContactPhone: "llámame" }],
+    ["invalid_option", { trades: ["electrical", "magic"] }],
+    ["invalid_option", { trades: "electrical,magic" }],
+    ["invalid_option", { preventionMode: "self" }],
+    ["invalid_date", { preventionValidUntil: "2026-02-30" }],
+    ["invalid_option", { machinery: "boat" }],
+  ])("createSubcontractor answers %s and writes nothing", async (code, overrides) => {
+    const { ctx } = await setup();
+    await expect(svc.createSubcontractor(ctx, company({ taxId: "B39123468", ...overrides }))).rejects.toMatchObject({ code, status: 400 });
+    expect(await countCompanies()).toBe(1);
+  });
+
+  it("createSubcontractor reads form values as before and ignores keys it doesn't take", async () => {
+    const { tenant, ctx } = await setup();
+    const { id } = await svc.createSubcontractor(
+      ctx,
+      company({
+        taxId: "B39123468",
+        headcount: "9",
+        permanentCount: "",
+        isInstaller: "false",
+        installerReg: "RI-1",
+        subcontractsFurther: "1",
+        trades: " electrical,telecom,electrical ",
+        email: 5,
+        tenantId: "other",
+        reaRegion: "madrid",
+      }),
+    );
+    const detail = await svc.getSubcontractor(ctx, id);
+    expect(detail).toMatchObject({
+      headcount: 9,
+      permanentCount: null,
+      isInstaller: false,
+      installerReg: null,
+      subcontractsFurther: true,
+      trades: ["electrical", "telecom"],
+      email: null,
+      reaRegion: "cantabria",
+    });
+    const [row] = await db.execute<{ tenant_id: string }>(sql`select tenant_id from subcontractors where id = ${id}`);
+    expect(row!.tenant_id).toBe(tenant.id);
+  });
+
+  it("createSubcontractor: a material supplier refuses an obra or a list of documents, an empty one too", async () => {
+    const { ctx } = await setup();
+    const supplier = company({ taxId: "B39123468", suppliesOnly: true });
+    await expect(svc.createSubcontractor(ctx, { ...supplier, notApplicable: [] })).rejects.toMatchObject({ code: "supplies_only", status: 409 });
+    await expect(svc.createSubcontractor(ctx, { ...supplier, assignment: { projectId: "x" } })).rejects.toMatchObject({ code: "supplies_only" });
+    // Neither an object nor a list: as if not sent.
+    await expect(svc.createSubcontractor(ctx, { ...supplier, assignment: "x", notApplicable: "x" })).resolves.toMatchObject({ id: expect.any(String) });
+  });
+
+  it("the wizard's extras: the obra first, then its values, then the documents that don't apply", async () => {
+    const { tenant, ctx } = await setup();
+    const project = await createTestProject(tenant.id);
+    const create = (extras: Record<string, unknown>) => svc.createSubcontractor(ctx, { ...company({ taxId: "B39123468" }), ...extras });
+    await expect(create({ assignment: { projectId: "nope", chapterCodes: ["99"] } })).rejects.toMatchObject({ code: "project_not_found" });
+    await expect(create({ assignment: { projectId: project.id, chapterCodes: ["99"] } })).rejects.toMatchObject({ code: "invalid_chapter" });
+    await expect(create({ notApplicable: [5, { requirementId: "cert_tgss", reason: "x" }] })).rejects.toMatchObject({ code: "not_optional" });
+    await expect(create({ notApplicable: [{ requirementId: "doc_maquinaria", reason: " " }] })).rejects.toMatchObject({ code: "missing_reason" });
+    expect(await countCompanies()).toBe(1);
+  });
+
+  it("updateSubcontractor checks the company as merged, as before: a field sent as undefined is a blank one", async () => {
+    const { ctx, id } = await setup();
+    await expect(svc.updateSubcontractor(ctx, id, { phone: "llámame" })).rejects.toMatchObject({ code: "invalid_phone" });
+    await expect(svc.updateSubcontractor(ctx, id, { legalName: undefined })).rejects.toMatchObject({ code: "missing_fields" });
+    await expect(svc.updateSubcontractor(ctx, id, { kind: "self_employed" })).rejects.toMatchObject({ code: "invalid_tax_id" });
+    await svc.updateSubcontractor(ctx, id, { headcount: "12", tenantId: "other", id: "x" });
+    expect(await svc.getSubcontractor(ctx, id)).toMatchObject({ id, headcount: 12, legalName: "Electricidad Saja S.L." });
+  });
+
+  it("documents: the requirement and its owner first, then the file, then the dates", async () => {
+    const { ctx, id } = await setup();
+    const upload = (input: Record<string, unknown>) => svc.uploadDocument(ctx, id, { requirementId: "rea_subcontrata", file: pdf(), ...input });
+    await expect(svc.uploadDocument(ctx, "no-such-company", { requirementId: "nope" })).rejects.toMatchObject({ code: "invalid_requirement" });
+    await expect(upload({ requirementId: 5 })).rejects.toMatchObject({ code: "invalid_requirement", status: 400 });
+    await expect(upload({ requirementId: "tpc", workerId: 7 })).rejects.toMatchObject({ code: "missing_fields" });
+    await expect(upload({ requirementId: "adhesion_pss", projectId: "  " })).rejects.toMatchObject({ code: "missing_fields" });
+    await expect(upload({ file: undefined, issuedAt: "nope" })).rejects.toMatchObject({ code: "missing_file" });
+    await expect(upload({ issuedAt: "2026-02-30" })).rejects.toMatchObject({ code: "invalid_date" });
+    await expect(upload({ issuedAt: inDays(-1), expiresAt: 20270101 })).resolves.toMatchObject({ version: 1 });
+
+    await expect(svc.requestDocuments(ctx, id, { requirementIds: [] })).rejects.toMatchObject({ code: "missing_fields" });
+    await expect(svc.requestDocuments(ctx, id, { requirementIds: ["cert_tgss", "nope"] })).rejects.toMatchObject({ code: "invalid_requirement" });
+    await expect(svc.requestDocuments(ctx, id, { requirementIds: "cert_tgss" })).rejects.toMatchObject({ code: "invalid_requirement" });
+    await expect(svc.requestDocuments(ctx, id, { requirementIds: ["tpc"] })).rejects.toMatchObject({ code: "missing_fields" });
+
+    const doc = await findDoc(ctx, id, "rea_subcontrata");
+    for (const reason of [undefined, 5, "  "]) {
+      await expect(svc.rejectDocument(ctx, id, doc.id!, { reason })).rejects.toMatchObject({ code: "missing_reason", status: 400 });
+    }
+    await expect(svc.markNotApplicable(ctx, id, { requirementId: null, reason: "x" })).rejects.toMatchObject({ code: "invalid_requirement" });
+  });
+
+  it.each([
+    ["invalid_chapter", { chapterCodes: ["01", "21"] }],
+    ["invalid_chapter", { chapterCodes: "01, 02" }],
+    ["invalid_chapter", { chapterCodes: ["01", ""] }],
+    ["invalid_date", { chapterCodes: ["01"], plannedStart: "nope" }],
+    ["invalid_number", { chapterCodes: ["01"], bookOrder: "1.5" }],
+    ["invalid_date", { chapterCodes: ["01"], plannedStart: "2026-05-02", plannedEnd: "2026-05-01" }],
+  ])("assignToProject answers %s and assigns nothing", async (code, input) => {
+    const { tenant, ctx, id } = await setup();
+    const project = await createTestProject(tenant.id);
+    await expect(svc.assignToProject(ctx, id, project.id, input)).rejects.toMatchObject({ code, status: 400 });
+    expect(await db.select().from(subcontractorAssignments)).toHaveLength(0);
+  });
+
+  it("assignToProject: codes as a list or comma-separated, each once and sorted; a flag as a form sends it", async () => {
+    const { tenant, ctx, id } = await setup();
+    const project = await createTestProject(tenant.id);
+    await svc.assignToProject(ctx, id, project.id, { chapterCodes: "06,01,06", bookOrder: "3", cssInformed: "on", tenantId: "x" });
+    const [row] = await db.select().from(subcontractorAssignments);
+    expect(row).toMatchObject({ chapterCodes: ["01", "06"], bookOrder: 3, cssInformed: true, tenantId: tenant.id });
+  });
+
+  it.each([
+    // Who and which company first (as before, even before a bad field), then each field's own check.
+    ["missing_fields", { firstName: "", phone: "llámame" }],
+    ["invalid_id_document", { idDocument: "12345678A", ssNumber: "x" }],
+    ["not_found", { subcontractorId: "no-such-company", ssNumber: "x" }],
+    ["invalid_number", { ssNumber: "12" }],
+    ["invalid_phone", { phone: "llámame" }],
+    ["invalid_option", { category: "boss" }],
+    ["invalid_option", { roles: ["preventive_resource", "x"] }],
+    ["invalid_option", { ppeItems: "helmet,cape" }],
+    ["invalid_date", { startDate: "2026-13-01" }],
+  ])("createWorker answers %s and writes nothing", async (code, overrides) => {
+    const { ctx, id } = await setup();
+    await expect(workers.createWorker(ctx, workerInput(id, overrides))).rejects.toMatchObject({ code });
+    expect(await workers.listWorkers(ctx)).toHaveLength(0);
+  });
+
+  it("workers: lenient form values, merged updates, the access check and the list's filters", async () => {
+    const { ctx, id } = await setup();
+    const { id: workerId } = await workers.createWorker(ctx, workerInput(id, { roles: "machine_operator", tpcNumber: " ", tenantId: "x" }));
+    expect(await workers.getWorker(ctx, workerId)).toMatchObject({ roles: ["machine_operator"], tpcNumber: null });
+    await expect(workers.updateWorker(ctx, workerId, { surnames: null })).rejects.toMatchObject({ code: "missing_fields" });
+    await workers.updateWorker(ctx, workerId, { phone: "942 00 00 00" });
+    expect(await workers.getWorker(ctx, workerId)).toMatchObject({ phone: "942 00 00 00", firstName: "Iván" });
+
+    for (const query of [undefined, 5, "  - "]) {
+      await expect(workers.checkAccess(ctx, { query })).rejects.toMatchObject({ code: "missing_fields", status: 400 });
+    }
+    expect(await workers.checkAccess(ctx, { query: "72145836-b", projectId: "" })).toMatchObject({ worker: { id: workerId } });
+
+    await expect(workers.listWorkersPage(ctx, { page: 1, access: "nope" })).rejects.toMatchObject({ code: "invalid_option" });
+    await expect(workers.listWorkersPage(ctx, { page: "x", access: "nope" })).rejects.toMatchObject({ code: "invalid_page" });
+    expect((await workers.listWorkersPage(ctx, { page: 1, access: "", q: " IVÁN ", companyId: 5 })).workers).toHaveLength(1);
   });
 });

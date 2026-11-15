@@ -9,7 +9,9 @@ import { CONTINGENCY_CHAPTER, promoterName, type BudgetPdfKind, type BudgetRevis
 import { newPdfDocument, openDocument } from "./documents";
 import { notifyProjectClient } from "./notifications";
 import { addDays, forClient, perM2Cents, todayInSpain } from "./obra-calc";
-import { calendarDate, fail, optionalText, requireProject, workDate } from "./obra-data";
+import { issueSchema } from "./inputs/budget";
+import { parse } from "./inputs/fields";
+import { fail, requireProject } from "./obra-data";
 import { projectInTenant } from "./project-client";
 import { storeFiles, type StoredFile } from "./project-files";
 
@@ -18,8 +20,6 @@ import { storeFiles, type StoredFile } from "./project-files";
 // project documents; the general one can go straight to the client's app.
 // Until then the PDFs are rendered on the fly, marked "BORRADOR".
 // ─────────────────────────────────────────────────────────────────────────────
-
-const MAX_NOTE = 2_000;
 
 async function letterheadOf(tenantId: string): Promise<Letterhead & { jurisdiction: string; mediator: string }> {
   const tenant = await db.query.tenants.findFirst({ where: eq(tenants.id, tenantId), columns: { name: true, letterhead: true } });
@@ -171,11 +171,12 @@ export async function revisionPdf(
  */
 export async function issueRevision(ctx: Ctx, projectId: string, revisionId: string, input: Record<string, unknown> = {}) {
   const row = await revisionInProject(ctx, projectId, revisionId);
-  const changeReason = input.changeReason === undefined ? row.changeReason : optionalText(input.changeReason, MAX_NOTE);
+  const body = parse(issueSchema, input);
+  const changeReason = body.changeReason === undefined ? row.changeReason : body.changeReason;
   if (row.number > 0 && !changeReason) fail("change_reason_required");
   // Up to today: accepting needs a day from the issue on, and never after today.
-  const issuedOn = input.issuedOn === undefined ? todayInSpain() : workDate(input.issuedOn);
-  const shareWithClient = input.shareWithClient !== false;
+  const issuedOn = body.issuedOn ?? todayInSpain();
+  const { shareWithClient } = body;
 
   // All under the revision's row lock, which every draft edit takes (inDraft):
   // the PDFs are of exactly what gets frozen, and if storing them fails the
@@ -191,8 +192,7 @@ export async function issueRevision(ctx: Ctx, projectId: string, revisionId: str
     // The PDFs show the revision as issued: its date and reason, no watermark.
     const budget = await getBudget(ctx, projectId, revisionId);
     const view = budget.revision!;
-    const validUntil =
-      input.validUntil === undefined ? addDays(issuedOn, view.conditions.validityDays) : calendarDate(input.validUntil);
+    const validUntil = body.validUntil ?? addDays(issuedOn, view.conditions.validityDays);
     const revision: BudgetRevision = { ...view, status: "issued", issuedOn, validUntil, changeReason };
     const data = await pdfData(ctx, projectId, budget, revision);
     const docs = await Promise.all(

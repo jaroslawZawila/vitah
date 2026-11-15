@@ -12,6 +12,7 @@ import type {
   BudgetConditions,
   BudgetLine,
   BudgetRevision,
+  BudgetRevisionChangesInput,
   BudgetTexts,
   Hito,
   ProjectBudget,
@@ -119,8 +120,8 @@ export default function BudgetScreen({ projectId, projectRef, site, clientName, 
     reset();
     setDialog(next);
   };
-  const updateRevision = (input: Record<string, unknown>) => updateRevisionAction(projectId, revision.id, input);
-  const saveRevision = (input: Record<string, unknown>) => run(() => updateRevision(input));
+  const updateRevision = (input: BudgetRevisionChangesInput) => updateRevisionAction(projectId, revision.id, input);
+  const saveRevision = (input: BudgetRevisionChangesInput) => run(() => updateRevision(input));
   const nextNumber = revisions[0]!.number + 1;
 
   // ─── Header actions and the banner for where the revision stands ──────────

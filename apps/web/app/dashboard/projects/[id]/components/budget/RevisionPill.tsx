@@ -22,10 +22,10 @@ export default function RevisionPill({
   children,
   ...props
 }: { number: number; status: BudgetRevisionStatus } & Omit<ComponentProps<typeof Badge>, "variant">) {
-  const t = useTranslations("budget");
+  const t = useTranslations("budget.revisionPill");
   return (
     <Badge variant={VARIANT[status]} {...props}>
-      {t("statusPill", { number, status: t(`status.${status}`) })}
+      {t("label", { number, status: t(`status.${status}`) })}
       {children}
     </Badge>
   );

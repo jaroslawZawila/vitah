@@ -229,3 +229,48 @@ describe("setClientPassword", () => {
     ).rejects.toMatchObject({ code: "forbidden" });
   });
 });
+
+describe("input boundaries (schemas in src/inputs/clients.ts)", () => {
+  it.each([
+    // The order is the old one: what is missing, then the email, then the profile, then the password.
+    ["missing_fields", { firstName: 5 }],
+    ["missing_fields", { surnames: "  ", dateOfBirth: "tomorrow" }],
+    ["missing_fields", { email: 7, phone: "x" }],
+    ["missing_fields", { password: "", email: "bad" }],
+    ["invalid_email", { email: "bad", dateOfBirth: "nope", password: 5 }],
+    ["invalid_email", { email: `${"a".repeat(200)}@example.com` }],
+    ["invalid_date_of_birth", { dateOfBirth: "2026-02-31", phone: "x" }],
+    ["invalid_date_of_birth", { dateOfBirth: "2999-01-01" }],
+    ["invalid_phone", { phone: "llámame", password: "weak" }],
+    ["weak_password", { password: 12345678901 }],
+    ["weak_password", { password: "weak" }],
+  ])("createClient answers %s, as before, and writes nothing", async (code, overrides) => {
+    const { ctx } = await setup();
+    await expect(svc.createClient(ctx, { ...validInput, ...overrides })).rejects.toMatchObject({ code, status: 400 });
+    expect(await db.select().from(clientProfiles)).toHaveLength(0);
+  });
+
+  it("reads form values leniently and ignores keys it doesn't take", async () => {
+    const { tenant, ctx } = await setup();
+    const { id } = await svc.createClient(ctx, {
+      ...validInput,
+      email: "  ANA@Example.com ",
+      dateOfBirth: 19850412,
+      address: 42,
+      phone: "",
+      tenantId: "other",
+      role: "admin",
+    });
+    expect(await findUser("ana@example.com")).toMatchObject({ id, tenantId: tenant.id, role: "client" });
+    expect(await findProfile(id)).toMatchObject({ dateOfBirth: null, address: null, phone: null });
+  });
+
+  it("setClientPassword: anything but a strong password is weak_password", async () => {
+    const { tenant, ctx } = await setup();
+    const client = await createTestUser(tenant.id, { role: "client" });
+    for (const password of [undefined, null, 12345678901, "weak"]) {
+      await expect(svc.setClientPassword(ctx, client.id, { password })).rejects.toMatchObject({ code: "weak_password", status: 400 });
+    }
+    expect((await findUser(client.email))?.passwordChangedAt).toBeNull();
+  });
+});

@@ -6,6 +6,7 @@
 import {
   CoreError,
   documentsService as svc,
+  type BudgetInputRegistrationInput,
   type DocumentError,
   type ProjectDocument,
 } from "@repo/core";
@@ -70,7 +71,7 @@ export async function markBudgetInputAction(
 /** Records a budget input the browser uploaded straight to the store. */
 export async function registerBudgetInputAction(
   projectId: string,
-  input: Record<string, unknown>,
+  input: BudgetInputRegistrationInput,
 ): Promise<DocumentsState> {
   return mutate<DocumentError>(projectId, (ctx) => svc.registerBudgetInput(ctx, projectId, input));
 }

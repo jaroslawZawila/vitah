@@ -131,6 +131,7 @@ describe("GET /api/mobile/documents/:id", () => {
 
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toBe("application/pdf");
+    expect(res.headers.get("content-security-policy")).toBe("frame-ancestors 'self'");
     expect(await res.text()).toBe("%PDF-1.7\ncontrato");
   });
 

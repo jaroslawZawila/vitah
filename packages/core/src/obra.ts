@@ -3,7 +3,6 @@ import { toCalendarDate } from "./calendar";
 import { markChanged } from "./changes";
 import { requireEditor, type Ctx } from "./context";
 import {
-  OBRA_STAGES,
   type BudgetChapter,
   type Hito,
   type MobileObra,
@@ -12,6 +11,8 @@ import {
 } from "./contract";
 import { toBudgetChapters } from "./budget";
 import { resolveClientProject } from "./client-projects";
+import { parse } from "./inputs/fields";
+import { stageSchema } from "./inputs/obra";
 import {
   asStage,
   fail,
@@ -95,8 +96,7 @@ export async function getObra(ctx: Ctx, projectId: string): Promise<ProjectObra>
 export async function setStage(ctx: Ctx, projectId: string, input: Record<string, unknown>) {
   requireEditor(ctx);
   await requireProject(ctx.tenantId, projectId);
-  const stage = OBRA_STAGES.find((s) => s === input.stage);
-  if (!stage) fail("invalid_stage");
+  const { stage } = parse(stageSchema, input);
   await db
     .update(projects)
     .set({ obraStage: stage, updatedAt: new Date() })

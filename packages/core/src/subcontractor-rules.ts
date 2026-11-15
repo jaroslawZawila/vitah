@@ -228,6 +228,33 @@ export function standing(requirementId: string, doc: DocFacts | undefined, today
   return isValid(previous) ? previous : state;
 }
 
+/** The day `days` after `date` (before, when negative). */
+const shiftDays = (date: string, days: number) =>
+  new Date(Date.parse(`${date}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
+
+/**
+ * The first day after `today` on which the calendar alone can change what
+ * `docState` and `standing` say of this document (it enters its alert window,
+ * or expires), or null if no day will. Each of its expiries changes it at most
+ * twice: the day its alert window opens and the day after it.
+ */
+export function nextStateChange(requirementId: string, doc: DocFacts | undefined, today: string): string | null {
+  let next: string | null = null;
+  for (const expiry of [doc?.expiresAt, doc?.previousValidUntil]) {
+    if (!expiry) continue;
+    for (const day of [shiftDays(expiry, -alertDays(requirementId)), shiftDays(expiry, 1)]) {
+      if (day > today && (next === null || day < next)) next = day;
+    }
+  }
+  return next;
+}
+
+/** The last day a result worked out today holds, given the next day anything it read can change (null: none). */
+export const holdsUntil = (nextChange: string | null) => (nextChange === null ? HOLDS_FOREVER : shiftDays(nextChange, -1));
+
+/** "Holds until" of a result no date will ever change. */
+export const HOLDS_FOREVER = "9999-12-31";
+
 // Worst first: a column standing for several documents shows the worst of them.
 const SEVERITY: readonly DocState[] = [
   "expired",

@@ -3,7 +3,12 @@
 // Thin portal adapters over @repo/core's planning (packages/core/src/planning.ts):
 // the Obra tab's Planificación, its draft editor and its versions.
 
-import { planningService as svc, type ObraError } from "@repo/core";
+import {
+  planningService as svc,
+  type ObraError,
+  type PlanningDraftInput,
+  type PlanningDraftNewInput,
+} from "@repo/core";
 import { mutate, read, type ObraState } from "./run";
 
 // ─── Reads ───────────────────────────────────────────────────────────────────
@@ -28,18 +33,18 @@ export async function getPlanningVersions(projectId: string) {
 // summary read the approved plan.
 
 /** Opens a draft: a first plan (`from: "template" | "project"`) or a copy of the baseline. */
-export async function createPlanningDraftAction(projectId: string, input: Record<string, unknown>): Promise<ObraState> {
+export async function createPlanningDraftAction(projectId: string, input: PlanningDraftNewInput): Promise<ObraState> {
   return mutate<ObraError>(projectId, (ctx) => svc.createPlanningDraft(ctx, projectId, input));
 }
 
-export async function updatePlanningDraftAction(projectId: string, input: Record<string, unknown>): Promise<ObraState> {
+export async function updatePlanningDraftAction(projectId: string, input: PlanningDraftInput): Promise<ObraState> {
   return mutate<ObraError>(projectId, (ctx) => svc.updatePlanningDraft(ctx, projectId, input));
 }
 
 /** Approves the draft with the rules and calendar as sent: what staff see is what becomes the baseline. */
 export async function approvePlanningDraftAction(
   projectId: string,
-  input: Record<string, unknown>,
+  input: PlanningDraftInput,
   reason: string,
 ): Promise<ObraState> {
   return mutate<ObraError>(projectId, (ctx) => svc.approvePlanningDraft(ctx, projectId, { ...input, reason }));

@@ -29,7 +29,7 @@ import { Dash } from "../construction/SummaryTable";
 import Kpi from "../obra/Kpi";
 import { day, usePurchaseFormat } from "./format";
 import { requestHref } from "./links";
-import { EventText } from "./OrderViews";
+import { EventText } from "./OrderHistory";
 import { LatePill, PurchaseKindPill, RequestStatusPill } from "./pills";
 
 // Presentational: purchase requests (Compras › Solicitudes): the lists, a

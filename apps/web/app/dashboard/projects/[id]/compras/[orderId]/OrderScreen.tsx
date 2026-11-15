@@ -43,7 +43,8 @@ import { useRefreshWhile } from "../../components/purchasing/useRefreshWhile";
 import { dismissCheckAction, recheckDocumentAction } from "../../../../../actions/purchase-checks";
 import { OrderDocuments } from "../../components/purchasing/OrderDocumentViews";
 import { MilestonesCard, OrderInvoices } from "../../components/purchasing/OrderInvoiceViews";
-import { LateBanner, OrderData, OrderHeading, OrderHistory, OrderLines, StatusForm, StatusSteps } from "../../components/purchasing/OrderViews";
+import { LateBanner, OrderData, OrderHeading, OrderLines, StatusForm, StatusSteps } from "../../components/purchasing/OrderViews";
+import { OrderHistory } from "../../components/purchasing/OrderHistory";
 import BackLink from "../../../../components/BackLink";
 
 /** One order: where it stands, its lines against the budget, its data and history. */

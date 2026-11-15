@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createTestPhoto, createTestProject, createTestTenant, createTestUser, resetDatabase } from "@repo/db/testing";
+import type { ObraIssueInput } from "@repo/core";
 import { files } from "@repo/core/testing";
 import { seedObra } from "@repo/core/seed";
 import { signInAs } from "../../test/session";
@@ -135,7 +136,7 @@ describe("issues", () => {
 
   it("returns the service's errors", async () => {
     const { project } = await setup();
-    expect(await createIssueAction(project.id, { kind: "issue" })).toEqual({ error: "missing_fields" });
+    expect(await createIssueAction(project.id, { kind: "issue" } as ObraIssueInput)).toEqual({ error: "missing_fields" });
     expect(await updateIssueAction(project.id, "nope", { status: "resolved" })).toEqual({ error: "not_found" });
   });
 });

@@ -1,4 +1,4 @@
-import type { PurchaseForm, PurchaseKind, PurchaseRequestDetail } from "@repo/core/contract";
+import type { PurchaseForm, PurchaseKind, PurchaseRequestDetail, PurchaseRequestInput } from "@repo/core/contract";
 import { conceptAndLinesComplete, linesFromRequest, orderTotals, startChapter, type LineDraft, type ParseAmount } from "./draft";
 
 // What the purchase request form holds (estimates as typed, the day as ""
@@ -48,7 +48,7 @@ export const requestTotal = (form: PurchaseForm, draft: RequestDraft, parse: Par
 export const requestComplete = conceptAndLinesComplete;
 
 /** The body for createRequestAction / updateRequestAction. */
-export function requestInput(draft: RequestDraft, parse: ParseAmount): Record<string, unknown> {
+export function requestInput(draft: RequestDraft, parse: ParseAmount): PurchaseRequestInput {
   return {
     kind: draft.kind,
     subcontractorId: draft.subcontractorId || null,

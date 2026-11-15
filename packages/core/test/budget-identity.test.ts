@@ -175,4 +175,10 @@ describe("projectIdentity", () => {
     await db.update(projects).set({ clientUserId: stranger.id }).where(eq(projects.id, project.id));
     expect(await projectIdentity(tenant.id, project.id)).toEqual({ client: null, address: ADDRESS });
   });
+
+  it("names nothing of a deleted project", async () => {
+    const { tenant, project } = await setup();
+    await db.update(projects).set({ deletedAt: new Date() }).where(eq(projects.id, project.id));
+    expect(await projectIdentity(tenant.id, project.id)).toEqual({ client: null, address: null });
+  });
 });

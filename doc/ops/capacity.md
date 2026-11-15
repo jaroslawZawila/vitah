@@ -272,11 +272,33 @@ median of 7 after a warm-up):
   one statement, alongside the obra; the schedule (`obraSchedule`, now synchronous) and Planificación use it, so
   Resumen loses two serial round trips and Planificación one statement. `contractSchedule` runs once per obra.
 - Late deliveries are counted per obra in SQL, open material orders only.
-- What is left: the list still reads the assigned companies' documents and their latest versions (about
-  15,400 of its 20,340 rows): the CAE rules are TypeScript, so counting warnings needs every document's state.
-  The fix is the stored status of "Left alone". `loadCompanyStatuses` now always sends its two version reads
-  (in parallel with the rest), so `getPurchase` is at 30 statements (28) and `getSupplierPurchasing` at 14 (12),
-  with no more time.
+- What was left: the list still read the assigned companies' documents and their latest versions (about
+  15,400 of its 20,340 rows): the CAE rules are TypeScript, so counting warnings needed every document's state.
+  Fixed on 2026-11-15 by storing the rules' result (next section). `loadCompanyStatuses` now always sends its two
+  version reads (in parallel with the rest), so `getPurchase` is at 30 statements (28) and
+  `getSupplierPurchasing` at 14 (12), with no more time.
+
+### The CAE warnings, stored (2026-11-15)
+
+Each company keeps its CAE status (`subcontractors.cae_status`) and each obra assignment the warnings it gives
+its obra (`subcontractor_assignments.cae_warnings`), each with the last day it holds (`cae_valid_until`, the day
+before an expiry or an alert window could change it). Every Subcontratas write refreshes them in its own
+transaction; a read refreshes the ones missing or past their day. The TypeScript rules stay the one definition:
+the project list's count (`countProjectsAttention`) is now one grouped sum over the assignments (0.7 ms to
+execute, a sequential scan of 479 rows: no index needed), and reads no document once the values are fresh.
+Measured on the same dataset (`subcontractor-attention.ts`, `packages/db/sql/2026-11-15-0900-cae-stored-status.sql`):
+
+| Read | Time (ms) | was | SQL | was | DB rows | was |
+|---|--:|--:|--:|--:|--:|--:|
+| `listProjectsWithBudget(ctx, { signals: true })` (/dashboard/projects) ¹ | 138 | 220 | 13 | 18 | 4,318 | 20,333 |
+| `countProjectsAttention` alone, the 60 obras, values fresh ² | 5.1 | 213 | 1 | 6 | 42 | about 15,400 |
+| the same, every value missing (the first read after the deploy) ² | 371 | 213 | | 6 | | about 15,400 |
+
+¹ `pnpm db:bench`, median of 7 after a warm-up; load average 2.1 before, 7.4 after (other work on the machine:
+the reads this change does not touch were 30 to 100 % slower in the same run, so the 138 is pessimistic).
+² Side by side in one script, the old and the new count alternately, median of 9 (cold: of 5); load average 9.8.
+On the 60 obras the stored count gave each the same number as its `listProjectAttention` (685 warnings in all).
+A missing or outdated value costs what the old count did, once, and only for the companies concerned.
 
 ### Over HTTP
 
@@ -372,8 +394,8 @@ are sent whole with each page (see "Left alone"). `next start` does not compress
 
 | What | Number | Why not now | The fix when it is needed |
 |---|---|---|---|
-| The workers list still builds every worker before cutting the page | 183 ms in core (was 256), 268 ms over HTTP (was 544), 19,072 rows | A worker's access is computed from the documents by six rules in TypeScript, never stored: filtering by it in SQL means rewriting the rules in SQL or storing their result. Paging fixed what was broken (1.7 MB sent); the time is under the budget. | Store each worker's access (and each company's status) when a document changes, then filter and page in SQL. |
-| Subcontratas › Empresas (`getOverview`) | 200 ms in core (was 291), 323 ms over HTTP (was 370): at the "attention" line; 240 KB, 1.6 MB of HTML (102 KB gzipped) | Needs the whole network for its KPIs and attention list; 150 companies is not a long list. Fix 3 took a quarter off; the rest is the network itself. | The same stored status; then page the attention list. |
+| The workers list still builds every worker before cutting the page | 183 ms in core (was 256), 268 ms over HTTP (was 544), 19,072 rows | A worker's access is computed from the documents by six rules in TypeScript, never stored: filtering by it in SQL means rewriting the rules in SQL or storing their result. Paging fixed what was broken (1.7 MB sent); the time is under the budget. | Store each worker's access when a document changes, as the company's status now is (`subcontractor-attention.ts`), then filter and page in SQL. |
+| Subcontratas › Empresas (`getOverview`) | 200 ms in core (was 291), 323 ms over HTTP (was 370): at the "attention" line; 240 KB, 1.6 MB of HTML (102 KB gzipped) | Needs the whole network for its KPIs and attention list; 150 companies is not a long list. Fix 3 took a quarter off; the rest is the network itself. | The company's status is stored now (`cae_status`, refreshed by `refreshStale`): filter, count and page the companies in SQL; then page the attention list. |
 | "Each document's latest version" sorts every version of the tenant | 17 to 34 ms, on every Subcontratas page and in the rail's counter | Grows with every renewal (monthly certificates above all); fine at 9,000 versions. | A `current_version_id` on `subcontractor_documents`, set on upload. |
 | The rail's counters | 10 ms + 15 ms on every page | Both good, 1 and 3 statements. They read all history: every invoice ever, every version ever. No cache was added, as asked. | The invoices' counter needs a stored "settled" mark on the invoice; the documents' one the `current_version_id` above. Worth it around 100,000 invoices or versions. |
 | Solicitudes (purchase requests), not paged | 14 ms, 301 rows, 180 KB of JSON, 315 KB of RSC, 1.5 MB of HTML (143 KB gzipped) | Under every budget; about 7 requests per obra. | The same paging as the orders; the list already orders by state in memory (`RANK`), which moves to SQL. |

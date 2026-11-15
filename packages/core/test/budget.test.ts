@@ -14,6 +14,7 @@ import {
   hitosService,
   obraService,
   BUDGET_CHAPTER_CODES,
+  MAX_AMOUNT_CENTS,
   type Ctx,
 } from "../src";
 import { lockProject } from "../src/budget-draft";
@@ -962,5 +963,169 @@ describe("access", () => {
   it("returns an empty budget before one exists", async () => {
     const { project, ctx } = await setup();
     expect(await svc.getBudget(ctx, project.id)).toEqual({ revisions: [], revision: null, generation: null });
+  });
+});
+
+describe("input boundaries (schemas in src/inputs/budget.ts)", () => {
+  const MAX_UNIT_PRICE = 100_000_000;
+  const line = { description: "Partida", unit: "ud", quantity: 20, unitPriceCents: 100 };
+
+  it("refuses a unit price past its bound as invalid_input, never a database error, and takes the bound", async () => {
+    const { project, ctx } = await setup();
+    const { revisionId, chapterId } = await framerDraft(ctx, project.id, []);
+    const { optionId } = await options.addOption(ctx, project.id, revisionId, { name: "Piscina" });
+    const add = (unitPriceCents: unknown, parent = chapterId("01")) => svc.addLine(ctx, project.id, parent, { ...line, unitPriceCents });
+    for (const [price, parent] of [
+      [MAX_UNIT_PRICE + 1, chapterId("01")],
+      [MAX_AMOUNT_CENTS + 1, chapterId("01")],
+      [2 ** 31, chapterId("01")],
+      [-1, chapterId("01")],
+      [-MAX_UNIT_PRICE - 1, optionId],
+    ] as const) {
+      await expect(add(price, parent)).rejects.toMatchObject({ code: "invalid_input", status: 400 });
+    }
+    // 20 × 1.000.000,00 € and its deduction: the largest lines there are.
+    const { lineId } = await add(MAX_UNIT_PRICE);
+    await add(-MAX_UNIT_PRICE, optionId);
+    await expect(svc.updateLine(ctx, project.id, lineId, { unitPriceCents: MAX_UNIT_PRICE + 1 })).rejects.toMatchObject({ code: "invalid_input" });
+    const revision = await revisionOf(ctx, project.id, revisionId);
+    expect(revision.chapters.find((c) => c.code === "01")!.lines.map((l) => l.unitPriceCents)).toEqual([MAX_UNIT_PRICE]);
+    expect(revision.options[0]!.lines.map((l) => l.unitPriceCents)).toEqual([-MAX_UNIT_PRICE]);
+  });
+
+  it("answers wrong types with each field's old code, and writes nothing", async () => {
+    const { tenant, project, ctx } = await setup();
+    const fresh = await createTestProject(tenant.id);
+    const { revisionId, chapterId } = await framerDraft(ctx, project.id, ["01"]);
+    const { optionId } = await options.addOption(ctx, project.id, revisionId, { name: "Piscina" });
+    const before = await revisionOf(ctx, project.id, revisionId);
+    const lineId = before.chapters[0]!.lines[0]!.id;
+    const c01 = chapterId("01");
+    const revision = (body: Record<string, unknown>) => () => svc.updateRevision(ctx, project.id, revisionId, body);
+    const newLine = (body: Record<string, unknown>) => () => svc.addLine(ctx, project.id, c01, { ...line, ...body });
+    const lineChange = (body: Record<string, unknown>) => () => svc.updateLine(ctx, project.id, lineId, body);
+    const cases: [() => Promise<unknown>, string][] = [
+      [() => svc.createBudget(ctx, fresh.id, { reference: 5 }), "invalid_input"],
+      [() => svc.createBudget(ctx, fresh.id, { number: 1000 }), "invalid_input"],
+      [() => svc.createBudget(ctx, fresh.id, { number: null }), "invalid_input"],
+      [revision({ vatRateBp: 10_001 }), "invalid_input"],
+      [revision({ quality: "luxury" }), "invalid_input"],
+      [revision({ changeReason: 5 }), "invalid_input"],
+      [revision({ builtAreaM2: "200" }), "invalid_input"],
+      [revision({ contingencyPct: 51 }), "invalid_input"],
+      [revision({ overheadPct: null }), "invalid_input"],
+      [revision({ texts: [] }), "invalid_input"],
+      [revision({ texts: { cover: { promoter: 5 } } }), "invalid_input"],
+      [revision({ texts: { cover: null } }), "invalid_input"],
+      [revision({ texts: { justification: { blocks: [{ title: "Estructura" }] } } }), "invalid_input"],
+      [revision({ texts: { annex: [{ kind: "todo", title: "T", text: "x" }] } }), "invalid_input"],
+      [revision({ texts: { exclusions: Array.from({ length: 51 }, () => "x") } }), "invalid_input"],
+      [revision({ texts: { includes: "x".repeat(10_001) } }), "invalid_input"],
+      [revision({ exclusions: ["a"] }), "invalid_input"],
+      [revision({ conditions: [] }), "invalid_input"],
+      [revision({ conditions: { validityDays: 0 } }), "invalid_input"],
+      [revision({ review: { done: ["x".repeat(81)] } }), "invalid_input"],
+      [revision({ reviewed: null }), "invalid_input"],
+      [revision({ reviewed: { key: "", done: true } }), "invalid_input"],
+      [() => svc.updateChapter(ctx, project.id, c01, { name: " " }), "missing_fields"],
+      [() => svc.updateChapter(ctx, project.id, c01, { pdfNote: 5 }), "invalid_input"],
+      [newLine({ description: 5 }), "missing_fields"],
+      [newLine({ unit: "x".repeat(11) }), "invalid_input"],
+      [newLine({ quantity: "1" }), "invalid_input"],
+      [newLine({ quantity: undefined }), "missing_fields"],
+      [newLine({ unitPriceCents: undefined }), "missing_fields"],
+      [newLine({ unitPriceCents: null }), "missing_fields"],
+      [newLine({ unitPriceCents: 1.5 }), "invalid_input"],
+      [newLine({ source: "computed" }), "invalid_input"],
+      [newLine({ baseCode: "nope" }), "invalid_input"],
+      [newLine({ baseCode: 5 }), "invalid_input"],
+      [lineChange({ unitPriceCents: null }), "invalid_input"],
+      [lineChange({ quantity: -1 }), "invalid_input"],
+      [lineChange({ note: 5 }), "invalid_input"],
+      [lineChange({ source: null }), "invalid_input"],
+      [lineChange({ chapterId: 5 }), "invalid_input"],
+      [() => svc.setProgress(ctx, project.id, {}), "missing_fields"],
+      [() => svc.setProgress(ctx, project.id, { lines: [null] }), "invalid_input"],
+      [() => svc.setProgress(ctx, project.id, { lines: [{ id: lineId, executedPct: 101 }] }), "invalid_input"],
+      [() => options.addOption(ctx, project.id, revisionId, { name: " " }), "missing_fields"],
+      [() => options.addOption(ctx, project.id, revisionId, { name: "Pérgola", optionKind: "gift" }), "invalid_input"],
+      [() => options.addOption(ctx, project.id, revisionId, { baseCode: null }), "invalid_input"],
+      [() => options.updateOption(ctx, project.id, optionId, { optionKind: null }), "invalid_input"],
+      [() => options.updateOption(ctx, project.id, optionId, { intro: 5 }), "invalid_input"],
+      [() => options.updateOption(ctx, project.id, optionId, { replacesLine: "x".repeat(21) }), "invalid_input"],
+      [() => options.optionFromLine(ctx, project.id, lineId, {}), "invalid_input"],
+      [() => issue.issueRevision(ctx, project.id, revisionId, { issuedOn: "2999-01-01" }), "invalid_date"],
+      [() => issue.issueRevision(ctx, project.id, revisionId, { validUntil: 5 }), "invalid_date"],
+      [() => issue.issueRevision(ctx, project.id, revisionId, { changeReason: 5 }), "invalid_input"],
+    ];
+    for (const [call, code] of cases) await expect(call()).rejects.toMatchObject({ code, status: 400 });
+    // Checked as sent, before the rest: a FRAMER chapter keeps its code.
+    await expect(svc.updateChapter(ctx, project.id, c01, { code: 1 })).rejects.toMatchObject({ code: "fixed_chapters" });
+    expect(await revisionOf(ctx, project.id, revisionId)).toEqual(before);
+    expect((await svc.getBudget(ctx, fresh.id)).revisions).toEqual([]);
+    expect(await documentsService.listDocuments(ctx, project.id)).toEqual([]);
+  });
+
+  it("accept and reject: wrong types answer the old codes and leave the revision issued", async () => {
+    const { project, ctx } = await setup();
+    const { revisionId } = await draftBudget(ctx, project.id);
+    await issue.issueRevision(ctx, project.id, revisionId);
+    const accept = (body: Record<string, unknown>) => svc.acceptRevision(ctx, project.id, revisionId, body);
+    for (const [body, code] of [
+      [{ acceptedOn: "2999-01-01" }, "invalid_date"],
+      [{ acceptedOn: null }, "invalid_date"],
+      [{ acceptedBy: 5 }, "invalid_input"],
+      [{ chosenOptionIds: "all" }, "invalid_input"],
+      [{ chosenOptionIds: [5] }, "invalid_input"],
+    ] as const) {
+      await expect(accept(body)).rejects.toMatchObject({ code, status: 400 });
+    }
+    await expect(svc.rejectRevision(ctx, project.id, revisionId, { rejectedOn: "nope" })).rejects.toMatchObject({ code: "invalid_date" });
+    expect(await revisionOf(ctx, project.id, revisionId)).toMatchObject({ status: "issued", acceptedOn: null, rejectedOn: null });
+  });
+
+  it("ignores keys it doesn't take, as before, and reads what it always read", async () => {
+    const { tenant, project, ctx } = await setup();
+    const { revisionId, chapterId } = await framerDraft(ctx, project.id, []);
+    const { lineId } = await svc.addLine(ctx, project.id, chapterId("01"), {
+      ...line,
+      quantity: 2,
+      quantityMilli: 5,
+      tenantId: "other",
+      chapterId: "elsewhere",
+      extra: true,
+    });
+    const [row] = await db.select().from(budgetLines).where(eq(budgetLines.id, lineId));
+    expect(row).toMatchObject({ tenantId: tenant.id, chapterId: chapterId("01"), quantityMilli: 2000, source: "manual" });
+
+    await svc.updateRevision(ctx, project.id, revisionId, { status: "accepted", number: 7, tenantId: "other" });
+    expect(await revisionOf(ctx, project.id, revisionId)).toMatchObject({ status: "draft", number: 0 });
+
+    // An annex item keeps its id (up to 40 characters) or gets one; a cover sent as an array changes nothing, as before.
+    await svc.updateRevision(ctx, project.id, revisionId, {
+      texts: {
+        cover: { promoter: "Ana Ruiz", unknown: "x" },
+        annex: [
+          { id: "a".repeat(50), kind: "note", title: "Nota", text: "x" },
+          { kind: "assumption", title: "Parcela", text: "y" },
+        ],
+        exclusions: ["  Licencias ", " "],
+      },
+    });
+    await svc.updateRevision(ctx, project.id, revisionId, { texts: { cover: [] } });
+    const { texts } = await revisionOf(ctx, project.id, revisionId);
+    expect(texts.cover).toMatchObject({ promoter: "Ana Ruiz" });
+    expect(texts.cover).not.toHaveProperty("unknown");
+    expect(texts.annex.map((a) => a.id)).toEqual(["a".repeat(40), expect.stringMatching(/^[0-9a-f-]{36}$/)]);
+    expect(texts.exclusions).toEqual(["Licencias"]);
+
+    // An option's text is `intro`; its column's own name, `pdfNote`, is read when `intro` isn't sent.
+    const { optionId } = await options.addOption(ctx, project.id, revisionId, { name: "Piscina", pdfNote: "Not read on create" });
+    const pdfNote = async () => (await revisionOf(ctx, project.id, revisionId)).options.find((o) => o.id === optionId)!.pdfNote;
+    expect(await pdfNote()).toBeNull();
+    await options.updateOption(ctx, project.id, optionId, { pdfNote: "Por la parcela" });
+    expect(await pdfNote()).toBe("Por la parcela");
+    await options.updateOption(ctx, project.id, optionId, { intro: "Gana", pdfNote: "Pierde" });
+    expect(await pdfNote()).toBe("Gana");
   });
 });

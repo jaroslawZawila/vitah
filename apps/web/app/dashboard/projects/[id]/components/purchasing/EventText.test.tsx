@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import type { PurchaseOrderEvent } from "@repo/core/contract";
 import en from "../../../../../../messages/en.json";
 import es from "../../../../../../messages/es.json";
-import { EventText } from "./OrderViews";
+import { EventText } from "./OrderHistory";
 
 const event = (action: string, detail: Record<string, unknown> = {}): PurchaseOrderEvent => ({
   id: "ev-1",

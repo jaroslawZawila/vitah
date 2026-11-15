@@ -29,12 +29,12 @@ import {
   HitoConditions,
   HitoFileCard,
   HitoFileForm,
-  HitoHistory,
   HitoNotes,
   HitoSteps,
   PaymentCard,
   PhotoPicker,
 } from "../../components/obra/HitoParts";
+import { HitoHistory } from "../../components/obra/HitoHistory";
 import PhotoStrip from "../../components/obra/PhotoStrip";
 import { useObraAction } from "../../components/obra/useObraAction";
 import { projectPhotoUrl } from "../../components/photoUrl";

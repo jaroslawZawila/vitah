@@ -3,6 +3,8 @@ import { markChanged } from "./changes";
 import { requireAdmin, type Ctx } from "./context";
 import { CHANGE_AREAS, type ClientOption, type ProjectClientError } from "./contract";
 import { CoreError } from "./errors";
+import { projectClientSchema } from "./inputs/clients";
+import { parse } from "./inputs/fields";
 
 // ─── Project client access ────────────────────────────────────────────────────
 // A "client" is the homeowner of a project. They sign in to the mobile app
@@ -22,10 +24,6 @@ const STATUS: Record<ProjectClientError, number> = {
 
 function fail(code: ProjectClientError): never {
   throw new CoreError(code, STATUS[code]);
-}
-
-function text(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 /**
@@ -101,8 +99,7 @@ export async function assignProjectClient(
 ) {
   requireAdmin(ctx);
 
-  const clientId = text(input.clientId);
-  if (!clientId) fail("missing_fields");
+  const { clientId } = parse(projectClientSchema, input);
 
   await db.transaction(async (tx) => {
     const [project] = await tx

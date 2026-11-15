@@ -1,8 +1,8 @@
-import { NextResponse } from "next/server";
-import { CoreError, type Ctx, type StoredFile } from "@repo/core";
+import { CoreError, type Ctx } from "@repo/core";
 import { getRequestContext } from "@repo/auth/context";
 import { authenticateMobileRequest, type MobileTokenPayload } from "@repo/auth/mobile";
 import { logError, newErrorId } from "./log";
+import { apiJson, noContent } from "./responses";
 
 // Shared plumbing for /api route handlers: resolve the caller, run the core
 // function, and map errors to JSON `{ error: code }` responses. A handler may
@@ -10,21 +10,24 @@ import { logError, newErrorId } from "./log";
 // error answers `{ error: "internal_error", id }`: the id is in the log line
 // (lib/log.ts), for the caller to quote.
 
-const unauthorized = () => NextResponse.json({ error: "unauthorized" }, { status: 401 });
+/** A file answer, with its security headers (lib/responses.ts). */
+export { fileResponse } from "./responses";
+
+const unauthorized = () => apiJson({ error: "unauthorized" }, { status: 401 });
 
 async function respond(request: Request, handler: () => Promise<unknown>, successStatus: number) {
   try {
     const data = await handler();
     if (data instanceof Response) return data;
-    if (successStatus === 204) return new NextResponse(null, { status: 204 });
-    return NextResponse.json(data, { status: successStatus });
+    if (successStatus === 204) return noContent();
+    return apiJson(data, { status: successStatus });
   } catch (err) {
     if (err instanceof CoreError) {
-      return NextResponse.json({ error: err.code }, { status: err.status });
+      return apiJson({ error: err.code }, { status: err.status });
     }
     const id = newErrorId();
     logError("api.internal_error", err, { id, method: request.method, path: new URL(request.url).pathname });
-    return NextResponse.json({ error: "internal_error", id }, { status: 500 });
+    return apiJson({ error: "internal_error", id }, { status: 500 });
   }
 }
 
@@ -59,7 +62,7 @@ export async function withContext(
   successStatus = 200,
 ) {
   if (isCrossSiteWrite(request)) {
-    return NextResponse.json({ error: "forbidden" }, { status: 403 });
+    return apiJson({ error: "forbidden" }, { status: 403 });
   }
   const ctx = await getRequestContext(request);
   if (!ctx) return unauthorized();
@@ -156,26 +159,4 @@ export async function readCreate(request: Request, read: (request: Request) => P
   const body = await read(request);
   const key = request.headers.get("idempotency-key");
   return key === null ? body : { ...body, idempotencyKey: key };
-}
-
-/**
- * Streams a stored file to the caller. Never cached by shared caches;
- * `immutable` files (photos: new id per upload) may stay in the caller's own,
- * for a day only (the device may be shared). A file built on the fly (no
- * `sizeBytes`, e.g. a ZIP) streams without a length; `download` saves it
- * instead of opening it.
- */
-export function fileResponse(
-  { filename, contentType, sizeBytes, body }: Omit<StoredFile, "sizeBytes"> & { sizeBytes?: number },
-  { immutable = false, download = false } = {},
-) {
-  return new Response(body, {
-    headers: {
-      "Content-Type": contentType,
-      ...(sizeBytes === undefined ? {} : { "Content-Length": String(sizeBytes) }),
-      "Content-Disposition": `${download ? "attachment" : "inline"}; filename*=UTF-8''${encodeURIComponent(filename)}`,
-      "Cache-Control": immutable ? "private, max-age=86400, immutable" : "private, no-store",
-      "X-Content-Type-Options": "nosniff",
-    },
-  });
 }

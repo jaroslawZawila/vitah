@@ -12,6 +12,8 @@
 - The local commit gate has passed (it runs on every commit made through Claude Code; otherwise run `pnpm exec turbo run test check-types lint` and `pnpm exec turbo run build --filter=web`).
 - If the change adds a file under `packages/db/sql/`: it follows the rules in that folder's `README.md`, and you know whether production applies it automatically (`MIGRATE_ON_DEPLOY=1`) or you apply it first by hand.
 - If old code would break on the new schema, split the change (see [database.md](database.md)).
+- If the new code reads a column or a table the file adds, production must have it **before** the code goes live: every read of a table names all its columns, so a missing one is a 500 on every page that reads that table. While `MIGRATE_ON_DEPLOY` is off, apply the file first (`db:sql:migrate`, or by hand and then `db:sql:baseline -- <file>`); an additive file is safe to apply ahead, the code running meanwhile ignores it.
+- A file that adds constraints or changes keys locks its tables while it runs. Run it at a quiet hour. Such files start with `SET LOCAL lock_timeout = '5s'`: if a lock is not free they fail whole and change nothing; run them again. Afterwards `pnpm db:drift` must list no constraint left `NOT VALID` (one that existing rows break is left unvalidated with a notice in the output, and only the drift check shows it later).
 
 ## After you push
 
@@ -27,3 +29,5 @@ npx vercel logs --project vitah-web --scope vitah-s-projects \
 ## Preview deployments
 
 Every other branch pushed to GitHub gets a preview URL (behind Vercel login). It uses the **production database**, the production file store and the production session secret. It never runs migrations. Treat a preview as production with a different URL.
+
+A preview runs its branch's code, which may be older than production's. Two things follow. Its code may not maintain what newer code stores: the stored CAE values (`cae_*` columns) go stale without a trace if an older branch's preview is used to edit Subcontratas data; clear them afterwards (the two statements are in [rollback.md](rollback.md)). And its code may read columns production does not have yet, or miss ones it has: do not use a preview to change data.

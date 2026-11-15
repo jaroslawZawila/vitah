@@ -35,7 +35,7 @@ import { assertVolumeTarget, VOLUME_ADMIN_EMAIL, VOLUME_SLUGS } from "./volume";
 const sent = { statements: 0, rows: 0 };
 
 type Query = { then: (onFulfilled?: unknown, onRejected?: unknown) => unknown };
-type Client = { unsafe: (...args: unknown[]) => Query; begin: (...args: unknown[]) => unknown };
+type Client = { unsafe: (...args: unknown[]) => Query; begin?: (...args: unknown[]) => unknown };
 
 /** Counts every statement Drizzle sends through this postgres.js client, and the rows that come back. */
 function count(client: Client) {
@@ -52,6 +52,8 @@ function count(client: Client) {
       }, onRejected);
     return query;
   };
+  // A transaction's client has no `begin` of its own (a nested one is a savepoint).
+  if (!client.begin) return;
   const begin = client.begin.bind(client);
   // A transaction runs on a client of its own.
   client.begin = (...args: unknown[]) => {
@@ -139,6 +141,7 @@ async function run() {
   const inTenant = sql`tenant_id = ${ctx.tenantId}`;
 
   // The busiest obra, supplier, company, order and invoice: the worst case of each page.
+  // soft-delete-ok(projects): the benchmark measures the synthetic volume dataset, which deletes nothing.
   const [project] = await db
     .select({ id: projects.id, ref: projects.ref })
     .from(projects)
@@ -163,6 +166,7 @@ async function run() {
     .where(eq(subcontractorWorkers.subcontractorId, company!.id))
     .orderBy(subcontractorWorkers.idDocument)
     .limit(1);
+  // soft-delete-ok(purchaseInvoices): the benchmark measures the synthetic volume dataset, which deletes nothing.
   const [invoice] = await db
     .select({ id: purchaseInvoices.id, orderId: purchaseInvoices.orderId })
     .from(purchaseInvoices)
@@ -173,6 +177,7 @@ async function run() {
   if (!project || !supplier || !company || !worker || !invoice) throw new Error("The volume dataset is incomplete");
   const p = project.id;
 
+  // soft-delete-ok(projects, purchaseInvoices, purchasePayments, subcontractorAssignments, projectPhotos): the benchmark counts every row of the synthetic volume dataset, deleted or not.
   const sizes = await db.execute<{ name: string; rows: number }>(sql`
     select 'projects' as name, count(*)::int as rows from projects where ${inTenant}
     union all select 'budget_lines', count(*)::int from budget_lines where ${inTenant}

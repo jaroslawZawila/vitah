@@ -17,7 +17,7 @@ Turborepo monorepo with pnpm@9.0.0 workspaces.
 
 | Package | Name | Purpose |
 |---------|------|---------|
-| `packages/core` | `@repo/core` | Business logic / service layer (tenant-scoped, takes `ctx`) — the single API. `./contract` holds DB-free types/constants safe for mobile and browser code |
+| `packages/core` | `@repo/core` | Business logic / service layer (tenant-scoped, takes `ctx`) — the single API. `./contract` holds DB-free types/constants safe for mobile and browser code (`src/contract.ts` re-exports `src/contract/<domain>.ts`; a part never imports `@repo/db`, zod or server code, and imports its siblings, never `../contract`) |
 | `packages/auth` | `@repo/auth` | NextAuth.js v5 config, credential checks (`./credentials`), mobile JWT (`./mobile`), request context (`./context`) |
 | `packages/db` | `@repo/db` | Drizzle ORM schema, database client, seed script (postgres.js driver), test helpers (`./testing`, `./vitest`) |
 | `packages/tailwind-config` | `@repo/tailwind-config` | Shared Tailwind v4 theme with ViTAH brand tokens |
@@ -80,7 +80,7 @@ Every change goes through this, in order. Nothing gets committed until every ste
   `@react-native-vector-icons/feather` (not the deprecated `@expo/vector-icons`). `apps/mobile` keeps
   TypeScript 5.9.2 via `expo.install.exclude`; upgrade with `npx expo install expo@^<sdk> && npx expo install --fix`
 - **NextAuth.js 5.0.0-beta.32** — Credentials provider, JWT sessions, Drizzle adapter
-- **Drizzle ORM 0.35** + **postgres.js** — database layer with multi-tenant schema (works with any PostgreSQL)
+- **Drizzle ORM 0.45** + **postgres.js** — database layer with multi-tenant schema (works with any PostgreSQL)
 - **next-intl 4.12.0** — i18n (Spanish default, English)
 - **Tailwind CSS 4.3.0** + **shadcn/ui** (Base UI primitives, `base-nova` style) — the portal's only styling; no CSS Modules
 - **Fonts** (`next/font/google`): Figtree (body), Barlow Condensed (headings, KPI figures), JetBrains Mono (numbers)
@@ -107,6 +107,21 @@ route. In the portal, keep UI separate from logic: a page's container component 
 step to new-project creation, extend `ProjectDraft` and core `createProject`, write a step component
 + summary in `projects/new/steps/`, and register it in `PROJECT_STEPS`. Server data a step needs goes in
 `ProjectFlowOptions` (loaded in `projects/new/page.tsx`); `when` hides a step (e.g. the client step for non-admins). Keep `/api/v1` backwards compatible — installed mobile builds lag behind.
+
+**Input validation.** Every body a core write takes goes through a zod schema at the top of the core function:
+`parse(schema, input)` from `packages/core/src/inputs/fields.ts`, placed after the checks that came first before
+(`requireEditor`, the `require*` lookups, a state check), so 403/404/409 keep their precedence over a field's 400.
+Schemas live in `packages/core/src/inputs/<module>.ts` (DB-free: zod, `./fields`, `../contract` only), built from the
+blocks in `fields.ts`, which carry the error codes: a field's code is its zod `error`, and `parse` throws the first
+one as a 400 `CoreError`. Unknown keys are dropped, never refused (no `.strict()`); a key sent as `undefined` counts
+as not sent; checks that need the database or another field stay in code after `parse`. The `z.input` types
+(`<Thing>Input`) are re-exported from `@repo/core/contract` as types only, so the app and the browser never load zod;
+server actions and form builders take those types. Responses are never validated at runtime. Every money input is
+`cents()`, bounded by `MAX_AMOUNT_CENTS` (20 M €, `packages/core/src/money.ts`, also in `@repo/core/contract`):
+amounts are stored as 32-bit integers, so one too large is a 400, never a database error (a modificado's totals and
+the milestone an order edit adds are refused the same way). SQL totals of money are computed in `bigint`/`numeric`
+(never `::int`, never 32-bit arithmetic per row) and read back as numbers (`sql<number>…mapWith(Number)`, or
+`Number()` on a `db.execute` row: postgres.js returns them as text).
 
 ### Mobile app design (apps/mobile) — MUST follow
 
@@ -158,6 +173,18 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
   Signed out (the login page), it follows the browser. Prod SQL: `packages/db/sql/2026-10-user-language.sql`
 - All user-facing text must use `useTranslations()` — never hardcode strings
 - Add keys to both `es` and `en` files when adding new text
+- Client components get only the messages their layout gives them: `<ClientMessages scope="<folder under app/>">` in
+  a `layout.tsx`, with the paths listed in `apps/web/i18n/client-messages.ts` (`CLIENT_MESSAGES`: a namespace or a
+  part of one such as `construction.tabs`). The login page gets only `login` and `errorPages`. Each layout sends only
+  the paths it adds, less what a layout above sends (`scopeMessages`); the browser merges them into the messages above
+  (`i18n/NestedMessages.tsx`), so a page that renders a deep layout anew re-sends only that layout's part. A new
+  `useTranslations("x")` in a client component, or a new section, needs its path added at the deepest layout that
+  renders it: `i18n/client-messages.test.ts` reads the code and fails, naming the file and path, when one is missing,
+  misplaced, unused or sent twice. Namespaces must be string literals (`useTranslations("…")`, `namespace="…"` for
+  `FormError` / `FileSlot`, `useConfirm("…")`); never `useTranslations()` with no namespace in a client component.
+  A component reading one or two keys of a big namespace gets its own small sub-namespace (`purchasing.latePill`,
+  `budget.revisionPill`), so the pages showing it don't take the whole namespace. Server components still read the
+  whole catalogue (`getTranslations`)
 
 ### Multi-Tenancy
 
@@ -175,7 +202,10 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
 - JWT sessions include `role` and `tenantId` fields
 - `NEXTAUTH_SECRET` + `POSTGRES_URL` required in each app's `.env.local`
 - Login page is `/`, authenticated users redirect to `/dashboard` (which redirects to `/dashboard/projects`)
-- `proxy.ts` protects all routes except `/`, `/api/auth/*`, `/api/mobile/*`, `/api/v1/*` (these authenticate per request), and static assets
+- `proxy.ts` runs for every route except `/api/auth/*`, `/api/mobile/*`, `/api/v1/*`, `/api/health`, `/api/csp-report` and static assets: it reads the
+  session (the 60 s re-check), sends a signed-in user from `/` to the dashboard and sets the page's script policy (see Operations). It does **not** turn a
+  signed-out visitor away: next-auth calls our handler even when `authorized` says no. The pages do that themselves (the dashboard layout, `read()` /
+  `requireSession`, every server action via `getSessionContext()`), and the API routes authenticate per request: a new page or action must too
 - User roles: `admin`, `manager`, `viewer` (staff, portal only) and `client` (homeowner, mobile app only) — Postgres enum. Use `isStaffUser` / `isClientUser` / `STAFF_ROLES` from `@repo/db`. `Ctx` is staff-only: client tokens are rejected by `/api/v1`
 - Clients are created on the **Clients** tab (`/dashboard/clients`, admin only): first name, surnames, date of birth, address, phone, email and app password. Personal details live in `client_profiles`; login data stays on `users`. Client emails are unique across tenants. A project has at most one client, picked from the existing clients on the project page ("Client app access" card); removing them only detaches, the account stays. A client may have **several projects** (homes): see "Several homes" below
 - Mobile client API: `POST /api/mobile/auth` (clients only, returns a 30d JWT), `GET /api/mobile/projects` (all their homes, the default first), `GET /api/mobile/project`, `GET /api/mobile/documents` and `GET /api/mobile/documents/:id` (the PDF), `GET /api/mobile/photos` and `GET /api/mobile/photos/:id` (`?size=thumb`), `POST /api/mobile/password`, `GET`/`PUT /api/mobile/settings` (notification toggles), `POST`/`DELETE /api/mobile/push-token` (the phone's Expo push token + app language), `GET /api/mobile/obra` (the Obra tab: stage, progress, phases, payment hitos), `GET /api/mobile/obra/hitos/:id/:kind` (a hito's signed `acta` or `invoice` PDF) and `GET /api/mobile/changes` (change counters, see "Live updates") — all `Authorization: Bearer`, via `withMobileClient` in `apps/web/lib/api.ts`. Each request re-checks the client is still active. `project`, `obra`, `photos`, `documents` and `changes` take `?projectId=` (`projectParam`), else the default home
@@ -208,7 +238,7 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
 ### Database
 
 - **Driver:** `postgres` (postgres.js) — works with any PostgreSQL (local Docker, Vercel Postgres, AWS RDS, etc.)
-- Schema in `packages/db/src/schema.ts` — tables: `tenants`, `users`, `client_profiles`, `client_settings`, `push_tokens`, `accounts`, `sessions`, `verification_tokens`, `projects`, `project_documents`, `project_photos`, the construction control's `obra_chapter_progress`, `obra_progress_events`,
+- Schema in `packages/db/src/schema/` by module (`tenants`, `users`, `projects`, `project-files`, `budget`, `hitos`, `construction`, `ai`, `subcontractors`, `purchasing`, `purchase-requests`, `purchase-invoices`, `purchase-checks`, `planning`, `idempotency`, `relations`; `checks.ts` holds `COLUMN_VALUES`, `COLUMN_RANGES` and the CHECK helpers), re-exported by `packages/db/src/schema.ts`, the entry that drizzle-kit, the client, the test databases and `db:drift` read: a new module must be re-exported there — tables: `tenants`, `users`, `client_profiles`, `client_settings`, `push_tokens`, `accounts`, `sessions`, `verification_tokens`, `projects`, `project_documents`, `project_photos`, the construction control's `obra_chapter_progress`, `obra_progress_events`,
   `obra_invoice_requests`, `obra_issues`, `obra_issue_files`, and the obra's `budget_revisions`, `budget_chapters`, `budget_lines`, `obra_hitos`, `obra_hito_chapters`, `obra_hito_checks`, `obra_hito_photos`, `obra_hito_events`, plus `budget_generations` (AI runs) and `ai_usage` (one row per Claude call, with its cost), and the
   Subcontratas tables `subcontractors`, `subcontractor_workers`, `subcontractor_documents`, `subcontractor_document_versions`,
   `subcontractor_assignments`, `subcontractor_audit`, Compras' `purchase_orders`, `purchase_order_lines`,
@@ -223,7 +253,15 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
   filter `deleted_at is null`, and a tenant-wide query must also leave out the rows of a deleted project
   (`projectInTenant`, `projectsInTenant`, `projectIdsInTenant`, `projectNotDeleted` and, in raw SQL, `inLiveProject` /
   `inLiveOrder` in `project-client.ts`; a child row read by its own id checks its project too, e.g. `requireOrder`,
-  `requireInvoice`, `documentInProject`). A delete writes `softDeleted(ctx)`. A project's
+  `requireInvoice`, `documentInProject`). A delete writes `softDeleted(ctx)`. A static guard keeps it so
+  (`packages/core/test/soft-delete-guard.test.ts`): every production read of a table with `deletedAt` (Drizzle
+  `.from`/joins/`$count`, `db.query` and its `with`, raw `sql` naming it; `sql.raw` naming it and a hard `delete`
+  always fail) must leave out its deleted rows (`isNull(t.deletedAt)` on that very source, or `alias.deleted_at is
+  null` in a where/on of its own select, under no `or`/`not`) and, under a project, a deleted project's (a
+  `projects.deleted_at` helper, or narrowed by a value, never a subquery, to one project's rows). A left join's `on`
+  counts only for its own table. A read that must see deleted rows names the tables it excuses next to it:
+  `// soft-delete-ok(projectDocuments, …): <reason>` (that query only; it fails without a reason, or naming a table
+  its query doesn't read or reads correctly). A project's
   ref and a supplier's invoice number are unique among the rows not deleted. Admins see and restore them on
   **Elementos eliminados** (`/dashboard/eliminados`, in the rail's settings menu; `deletedService` in
   `packages/core/src/deleted.ts`: `listDeleted`, `restoreDeleted`; API `GET /api/v1/deleted`, `POST
@@ -239,6 +277,20 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
   `VERCEL_ENV=production` **and** `MIGRATE_ON_DEPLOY=1` (off until set on Vercel; Preview shares production's database
   and never migrates); otherwise it only says how many files are pending. No plain `db:push` on prod. `pnpm db:drift`
   (`DRIFT_URL`, read-only) compares a database with `schema.ts`; accepted leftovers are in `packages/db/drift-allow.json`
+- **The database enforces what the app guarantees** (comment "What the database enforces" in `schema.ts`): CHECK
+  constraints on every text status/kind column, built from `COLUMN_VALUES` (a new value goes there, in core's constant
+  (`packages/core/test/schema-values.test.ts` compares them, and the three ranges of `COLUMN_RANGES`) and in a prod SQL
+  file that replaces the constraint), ranges, date order, and `deleted_by_id` only with `deleted_at`;
+  **tenant-composite keys**: a row with `tenant_id` references its parent by `(tenant_id, <parent>_id)` against the
+  parent's `UNIQUE (id, tenant_id)` (a new child table does the same; `ON DELETE SET NULL` pointers stay single-column);
+  and keys to `projects` are NO ACTION, never cascade: a hand-run `DELETE FROM projects` on a project with rows is
+  refused, while deleting a whole tenant still works. A constraint added to a table with rows goes in `NOT VALID` and
+  is validated on its own, so old rows never fail the file (`pnpm db:drift` lists any left unvalidated), and a file
+  that takes table locks starts with `SET LOCAL lock_timeout = '5s'`. `packages/db/test/integrity-migrations.test.ts`
+  applies every SQL file newer than `test/fixtures/schema-before-2026-11-15.sql` and expects exactly `schema.ts`.
+  `db:push` on an existing local database re-adds the composite keys every time (a drizzle-kit quirk; harmless).
+  Prod SQL: `packages/db/sql/2026-11-15-1000-check-constraints.sql`, `-1010-tenant-composite-keys.sql`,
+  `-1020-project-fk-no-cascade.sql`
 
 ### Operations (errors, health, logs)
 
@@ -258,6 +310,19 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
 - Logs: one JSON line per event on stderr (`logError` / `logWarn` in `@repo/core/log` and `apps/web/lib/log.ts`;
   `instrumentation.ts` › `onRequestError` for unhandled server errors). Never a body, cookie, header, email or query
   string. An API 500 answers `{ "error": "internal_error", "id" }` and logs the same id. No `console.*` in app code
+- Security headers: `apps/web/lib/security-headers.js` is the one place. `next.config.js` sends `BASE_HEADERS`
+  (nosniff, HSTS, referrer and permissions policy) on everything and `PAGE_HEADERS` (X-Frame-Options DENY + the
+  enforced `PAGE_CSP`) on pages; on `/api` only `BASE_HEADERS`, because a header set there wins over a route's own.
+  API JSON goes through `apiJson` / `noContent` (`lib/responses.ts`: `default-src 'none'; frame-ancestors 'none'`) and
+  files through `fileResponse`, whose headers come from `fileHeaders(contentType)`: a PDF gets only `frame-ancestors
+  'self'` (a `default-src` would reach the browser's PDF viewer), anything else `default-src 'none'; frame-ancestors
+  'self'`; both `X-Frame-Options: SAMEORIGIN` and nosniff. Never `NextResponse.json` in a route
+- Pages' script policy: `proxy.ts` sends `pagePolicy(nonce)` with a fresh nonce per request, **report-only** while
+  `ENFORCE_SCRIPT_POLICY` is false. Next reads the nonce from the request header and puts it on its scripts, so pages
+  must stay dynamic (a static page would carry none). Violations go to `POST /api/csp-report` (no session,
+  rate-limited, nothing stored; one `csp.violation` warn line with a known directive name, the blocked origin or a
+  fixed keyword, and the path). Enforce by setting that constant once the log is quiet; a new origin the portal loads
+  must be added to `pagePolicy`
 
 - Retries: the six creates that make a numbered or money record (a supplier payment, invoice or credit note, an
   order, a purchase request, a modificado, an incident) take an idempotency key (`Idempotency-Key` header or
@@ -531,10 +596,24 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
   Ley 32/2006). Web-only and staff-only: the client never sees it, so no `/api/mobile` route and no `markChanged`
 - Pure rules in `packages/core/src/subcontractor-rules.ts` (re-exported by `@repo/core/contract`, also run in the
   browser): the document template `SUBCONTRACTOR_REQUIREMENTS` (stable ids, validity), expiry (`docState`; alert 30
-  days before, 7 for monthly documents), company status (`companyStatus`: apta / pendiente / bloqueada — computed, never
-  stored), worker access (`workerAccess`: the six rules, with reasons), CIF/NIF/NIE check digits, masking, REA region
+  days before, 7 for monthly documents), company status (`companyStatus`: apta / pendiente / bloqueada — computed; its
+  stored copy is below), worker access (`workerAccess`: the six rules, with reasons), CIF/NIF/NIE check digits, masking, REA region
   from the postal code. Services: `subcontractors.ts` (companies, documents, obra assignments, overview, CAE dossier
   ZIP) and `subcontractor-workers.ts`; both load the tenant's whole network at once (`subcontractor-network.ts`)
+- The rules' result is also **stored** (`packages/core/src/subcontractor-attention.ts`): `subcontractors.cae_status`
+  and `subcontractor_assignments.cae_warnings` (the warnings that company gives that obra, as `listProjectAttention`
+  counts them), each with `cae_valid_until`, the last day it holds before an expiry or alert window could change it
+  (`nextStateChange`; `9999-12-31` = never; null = not worked out yet). The TS rules stay the one definition: SQL never
+  re-implements them. Every write to a company's CAE data (company, documents and versions, workers, assignments) runs
+  in `caeTransaction(tenantId, ids, …)`: company rows locked first (`no key update`, id order), values refreshed before
+  commit. A new write path must use it; anything writing past the services (seeds, a test's direct `db.update`) calls
+  `forgetCae`. Reads refresh stale values themselves (`refreshStale`, any role, no audit or `markChanged`). Only live
+  assignments carry values. The project list's count (`countProjectsAttention`) is one grouped sum and reads no
+  document once values are fresh; nothing reads the stored status yet (the lists still compute it): read it only after
+  `refreshStale`. Code from before this change does not maintain the values: after a rollback past it, or after an
+  older branch's Preview edited Subcontratas data (Preview shares production's database), clear the `cae_*` columns
+  (`doc/ops/rollback.md`). Prod SQL: `packages/db/sql/2026-11-15-0900-cae-stored-status.sql`, applied **before** the
+  code goes live (every read of those tables names the columns)
 - Documents are versioned: an upload adds an immutable version (private Blob store); validate / reject (with reason)
   act on the current one. Every write goes to `subcontractor_audit` (the ficha's Historial)
 - Admins and managers (contractor, jefe de obra) write; viewers read with masked CIF/DNI. No subcontractor portal login yet
@@ -644,6 +723,7 @@ apps/web/
   proxy.ts                         # Route protection (Next 16 "proxy", formerly middleware)
   postcss.config.mjs               # @tailwindcss/postcss plugin
   i18n/request.ts                  # next-intl config
+  i18n/client-messages.ts          # Which translations each layout sends to its client components
   messages/{locale}.json           # Translation strings
   lib/utils.ts                     # cn() utility for Tailwind class merging
   components/ui/                   # shadcn/ui components, themed to the portal look

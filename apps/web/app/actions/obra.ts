@@ -9,7 +9,12 @@ import {
   hitosService,
   obraService,
   photosService,
+  type BudgetProgressInput,
+  type HitoChangesInput,
+  type HitoCheckChangesInput,
   type HitoFileKind,
+  type HitoPaymentInput,
+  type HitoPlanInput,
 } from "@repo/core";
 import { mutate, read, type ObraState } from "./run";
 
@@ -43,29 +48,19 @@ export async function setObraStageAction(projectId: string, stage: number): Prom
   return mutate(projectId, (ctx) => obraService.setStage(ctx, projectId, { stage }));
 }
 
-export async function saveProgressAction(
-  projectId: string,
-  lines: { id: string; executedPct: number }[],
-): Promise<ObraState> {
+export async function saveProgressAction(projectId: string, lines: BudgetProgressInput["lines"]): Promise<ObraState> {
   // Progress is recorded on the budget's lines.
   return mutate(projectId, (ctx) => budgetService.setProgress(ctx, projectId, { lines }));
 }
 
 // ─── Hitos ───────────────────────────────────────────────────────────────────
 
-export async function updateHitoAction(
-  projectId: string,
-  hitoId: string,
-  input: Record<string, unknown>,
-): Promise<ObraState> {
+export async function updateHitoAction(projectId: string, hitoId: string, input: HitoChangesInput): Promise<ObraState> {
   return mutate(projectId, (ctx) => hitosService.updateHito(ctx, projectId, hitoId, input));
 }
 
 /** The Payments tab's plan editor: several hitos' % and chapters, all or nothing. */
-export async function savePlanAction(
-  projectId: string,
-  hitos: { id: string; pctBp: number; chapterCodes: string[] }[],
-): Promise<ObraState> {
+export async function savePlanAction(projectId: string, hitos: HitoPlanInput["hitos"]): Promise<ObraState> {
   return mutate(projectId, (ctx) => hitosService.updatePlan(ctx, projectId, { hitos }));
 }
 
@@ -77,11 +72,7 @@ export async function addCheckAction(
   return mutate(projectId, (ctx) => hitosService.addCheck(ctx, projectId, hitoId, { label }));
 }
 
-export async function updateCheckAction(
-  projectId: string,
-  checkId: string,
-  input: { label?: string; done?: boolean },
-): Promise<ObraState> {
+export async function updateCheckAction(projectId: string, checkId: string, input: HitoCheckChangesInput): Promise<ObraState> {
   return mutate(projectId, (ctx) => hitosService.updateCheck(ctx, projectId, checkId, input));
 }
 
@@ -120,11 +111,7 @@ export async function removeHitoFileAction(
   return mutate(projectId, (ctx) => hitosService.removeHitoFile(ctx, projectId, hitoId, kind));
 }
 
-export async function registerPaymentAction(
-  projectId: string,
-  hitoId: string,
-  input: { paidOn: string; amountCents?: number },
-): Promise<ObraState> {
+export async function registerPaymentAction(projectId: string, hitoId: string, input: HitoPaymentInput): Promise<ObraState> {
   return mutate(projectId, (ctx) => hitosService.registerPayment(ctx, projectId, hitoId, input));
 }
 

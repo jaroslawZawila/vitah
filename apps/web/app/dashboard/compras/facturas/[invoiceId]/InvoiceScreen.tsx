@@ -24,7 +24,7 @@ import { INVOICES_HREF, editInvoiceHref, invoiceHref, newInvoiceHref, orderHref 
 import { DocumentChecks, reviewing } from "../../../projects/[id]/components/purchasing/DocumentCheckViews";
 import { useRefreshWhile } from "../../../projects/[id]/components/purchasing/useRefreshWhile";
 import { dismissCheckAction, recheckDocumentAction } from "../../../../actions/purchase-checks";
-import { OrderHistory } from "../../../projects/[id]/components/purchasing/OrderViews";
+import { OrderHistory } from "../../../projects/[id]/components/purchasing/OrderHistory";
 import {
   AmountsCard,
   CreditNotes,

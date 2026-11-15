@@ -2,16 +2,9 @@ import { and, db, eq, or, subcontractorDocuments, subcontractors, subcontractorW
 import { isUniqueViolation } from "./accounts";
 import { canEdit, requireEditor, type Ctx } from "./context";
 import {
-  CONTRACT_TYPES,
-  PPE_ITEMS,
-  SUBCONTRACTOR_TRADES,
-  WORKER_ACCESS_FILTERS,
-  WORKER_CATEGORIES,
-  WORKER_ROLES,
   docState,
   isValidPersonalId,
   maskIdNumber,
-  normalizeIdNumber,
   requirementsFor,
   workerName,
   type AccessCheckResult,
@@ -23,24 +16,19 @@ import {
   type WorkerListQuery,
   type WorkersPage,
 } from "./contract";
+import { parse } from "./inputs/fields";
+import { accessCheckSchema, workerIdentitySchema, workerListSchema, workerSchema } from "./inputs/subcontractors";
 import { pageWindow, pagingOf } from "./paging";
 import {
   allVersions,
   audit,
-  calendarDate,
   changes,
   fail,
   hasBookEntry,
-  listOf,
   loadNetwork,
-  merged,
-  oneOf,
-  optional,
-  phone,
   requireCaeCompany,
   requireProjectRef,
   requireWorker,
-  str,
   toDoc,
   userNames,
   type AssignmentRow,
@@ -48,6 +36,7 @@ import {
   type Network,
   type WorkerRow,
 } from "./subcontractor-network";
+import { caeTransaction, refreshCae } from "./subcontractor-attention";
 
 // ─── Subcontractor workers ────────────────────────────────────────────────────
 // The people each company sends to site. Their access to an obra is computed
@@ -57,36 +46,16 @@ import {
 // company's. Every staff member reads; admins and managers write.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const SS_PATTERN = /^[0-9][0-9 /-]{9,15}$/;
-
+/** The worker's fields from `input`; an update passes the current ones as `base`, under what it sends. */
 async function parseFields(ctx: Ctx, input: Record<string, unknown>, base?: WorkerFields): Promise<WorkerFields> {
-  const get = merged(input, base);
-  const subcontractorId = str(get("subcontractorId"));
-  const firstName = str(get("firstName"));
-  const surnames = str(get("surnames"));
-  const idDocument = normalizeIdNumber(str(get("idDocument")));
+  const merged = base ? { ...base, ...input } : input;
+  const { subcontractorId, firstName, surnames, idDocument } = parse(workerIdentitySchema, merged);
   if (!subcontractorId || !firstName || !surnames || !idDocument) fail("missing_fields");
   if (!isValidPersonalId(idDocument)) fail("invalid_id_document");
 
   await requireCaeCompany(ctx, subcontractorId);
-  const ssNumber = optional(get("ssNumber"));
-  if (ssNumber !== null && !SS_PATTERN.test(ssNumber)) fail("invalid_number");
-
-  return {
-    subcontractorId,
-    firstName,
-    surnames,
-    idDocument,
-    phone: phone(get("phone")),
-    category: oneOf(get("category"), WORKER_CATEGORIES),
-    trade: oneOf(get("trade"), SUBCONTRACTOR_TRADES),
-    ssNumber,
-    contractType: oneOf(get("contractType"), CONTRACT_TYPES),
-    startDate: calendarDate(get("startDate")),
-    tpcNumber: normalizeIdNumber(str(get("tpcNumber"))) || null,
-    roles: listOf(get("roles"), WORKER_ROLES),
-    ppeItems: listOf(get("ppeItems"), PPE_ITEMS),
-  };
+  const { ssNumber, phone, category, trade, contractType, startDate, tpcNumber, roles, ppeItems } = parse(workerSchema, merged);
+  return { subcontractorId, firstName, surnames, idDocument, phone, category, trade, ssNumber, contractType, startDate, tpcNumber, roles, ppeItems };
 }
 
 function fieldsOf(row: WorkerRow): WorkerFields {
@@ -145,12 +114,9 @@ export async function listWorkers(ctx: Ctx, options: { projectId?: string | null
  */
 export async function listWorkersPage(ctx: Ctx, query: WorkerListQuery = {}): Promise<WorkersPage> {
   const window = pageWindow(query);
-  const access = query.access === undefined || query.access === "" ? "all" : WORKER_ACCESS_FILTERS.find((a) => a === query.access);
-  if (!access) fail("invalid_option");
-  const text = (value: unknown) => (typeof value === "string" ? value.trim() : "");
-  const companyId = text(query.companyId);
-  const q = text(query.q).toLowerCase();
-  const all = await listWorkers(ctx, { projectId: text(query.projectId) || null });
+  const { access, companyId, projectId, ...filters } = parse(workerListSchema, query);
+  const q = filters.q.toLowerCase();
+  const all = await listWorkers(ctx, { projectId: projectId || null });
   const matching = all.filter(
     (w) => (!companyId || w.subcontractorId === companyId) && (!q || `${workerName(w)} ${w.subcontractorName}`.toLowerCase().includes(q)),
   );
@@ -209,7 +175,7 @@ export async function createWorker(ctx: Ctx, input: Record<string, unknown>) {
   requireEditor(ctx);
   const fields = await parseFields(ctx, input);
   try {
-    const id = await db.transaction(async (tx) => {
+    const id = await caeTransaction(ctx.tenantId, [fields.subcontractorId], async (tx) => {
       const [row] = await tx
         .insert(subcontractorWorkers)
         .values({ ...fields, tenantId: ctx.tenantId })
@@ -233,15 +199,24 @@ export async function updateWorker(ctx: Ctx, workerId: string, input: Record<str
   const diff = changes(before, after);
   if (Object.keys(diff).length === 0) return { id: workerId };
   try {
-    await db.transaction(async (tx) => {
+    // Their documents go with them: both companies' warnings change.
+    await caeTransaction(ctx.tenantId, [before.subcontractorId, after.subcontractorId], async (tx) => {
+      // Where the worker is now: another move, committed while this one waited for the locks, may have taken
+      // them (and their documents) to a third company, whose values then change too.
+      const [now] = await tx
+        .select({ subcontractorId: subcontractorWorkers.subcontractorId })
+        .from(subcontractorWorkers)
+        .where(eq(subcontractorWorkers.id, workerId))
+        .for("update");
       await tx.update(subcontractorWorkers).set(after).where(eq(subcontractorWorkers.id, workerId));
-      if (after.subcontractorId !== before.subcontractorId) {
+      if (after.subcontractorId !== (now?.subcontractorId ?? before.subcontractorId)) {
         await tx
           .update(subcontractorDocuments)
           .set({ subcontractorId: after.subcontractorId })
           .where(eq(subcontractorDocuments.workerId, workerId));
       }
       await audit(tx, ctx, after.subcontractorId, "worker_updated", { fields: diff }, workerId);
+      if (now && now.subcontractorId !== before.subcontractorId) await refreshCae(tx, ctx.tenantId, [now.subcontractorId]);
     });
   } catch (error) {
     if (isUniqueViolation(error)) fail("id_document_exists");
@@ -256,9 +231,7 @@ export async function updateWorker(ctx: Ctx, workerId: string, input: Record<str
  * An obra that isn't the tenant's, or was deleted, is `project_not_found`.
  */
 export async function checkAccess(ctx: Ctx, input: Record<string, unknown>): Promise<AccessCheckResult> {
-  const query = normalizeIdNumber(str(input.query));
-  if (!query) fail("missing_fields");
-  const projectId = optional(input.projectId);
+  const { query, projectId } = parse(accessCheckSchema, input);
   if (projectId) await requireProjectRef(ctx, projectId);
   const [row] = await db
     .select()

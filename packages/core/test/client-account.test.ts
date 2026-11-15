@@ -209,3 +209,62 @@ describe("push tokens", () => {
     expect(await db.select().from(pushTokens)).toHaveLength(0);
   });
 });
+
+describe("input boundaries (schemas in src/inputs/clients.ts and accounts.ts)", () => {
+  // Installed app builds can't be updated: each of these answers exactly as before.
+  it.each([
+    ["missing_fields", { currentPassword: 5, newPassword: "weak" }],
+    ["missing_fields", { currentPassword: "vitah2026", newPassword: null }],
+    ["missing_fields", { currentPassword: null }],
+    ["weak_password", { currentPassword: "not-this-one", newPassword: "weak" }],
+  ])("changePassword answers %s before looking at the current password", async (code, input) => {
+    const { tenant, client } = await setup();
+    await expect(svc.changePassword(tenant.id, client.id, input)).rejects.toMatchObject({ code, status: 400 });
+  });
+
+  it.each([
+    [{ notifications: null }],
+    [{ notifications: true }],
+    [{ notifications: { documents: 0 } }],
+    [{ notifications: { progress: true, messages: "false" } }],
+  ])("updateSettings refuses %j as invalid_settings and changes nothing", async (input) => {
+    const { tenant, client } = await setup();
+    await expect(svc.updateSettings(tenant.id, client.id, input)).rejects.toMatchObject({ code: "invalid_settings", status: 400 });
+    expect(await svc.getSettings(tenant.id, client.id)).toEqual(svc.DEFAULT_SETTINGS);
+  });
+
+  it("updateSettings takes an array as no change and ignores keys it doesn't know", async () => {
+    const { tenant, client } = await setup();
+    expect(await svc.updateSettings(tenant.id, client.id, { notifications: [] })).toEqual(svc.DEFAULT_SETTINGS);
+    expect(
+      await svc.updateSettings(tenant.id, client.id, { notifications: { progress: false, sound: true }, language: "en" }),
+    ).toEqual({ notifications: { progress: false, documents: true, messages: true } });
+  });
+
+  it.each([
+    ["invalid_token", { token: 5 }],
+    ["invalid_token", { language: "fr" }],
+    ["invalid_settings", { token: TOKEN, language: null }],
+    ["invalid_settings", { token: TOKEN, language: "EN" }],
+  ])("registerPushToken answers %s and stores nothing", async (code, input) => {
+    const { tenant, client } = await setup();
+    await expect(svc.registerPushToken(tenant.id, client.id, input)).rejects.toMatchObject({ code, status: 400 });
+    expect(await db.select().from(pushTokens)).toHaveLength(0);
+  });
+
+  it("removePushToken: a token that isn't text is invalid_token", async () => {
+    const { tenant, client } = await setup();
+    await svc.registerPushToken(tenant.id, client.id, { token: TOKEN });
+    for (const token of [undefined, null, 5]) {
+      await expect(svc.removePushToken(tenant.id, client.id, { token })).rejects.toMatchObject({ code: "invalid_token" });
+    }
+    expect(await db.select().from(pushTokens)).toHaveLength(1);
+  });
+
+  it("readErrorReport: the known texts as sent, blank ones and others left out, fatal only when true", () => {
+    expect(
+      svc.readErrorReport({ message: " Boom ", stack: "  ", screen: 5, fatal: "yes", locale: "es-ES", token: "x" }),
+    ).toEqual({ message: " Boom ", fatal: false, locale: "es-ES" });
+    expect(svc.readErrorReport({ fatal: true })).toEqual({ fatal: true });
+  });
+});

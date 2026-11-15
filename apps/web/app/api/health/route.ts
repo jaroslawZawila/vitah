@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { apiJson } from "../../../lib/responses";
 import { readHealth } from "../../../lib/health";
 
 // GET /api/health: for an uptime check, without signing in (proxy.ts lets it
@@ -26,7 +26,7 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const { status, time, checks } = await readHealth();
 
-  return NextResponse.json(
+  return apiJson(
     {
       status,
       // Read as the request is served (Vercel sets it on the running function), so no build depends on it.

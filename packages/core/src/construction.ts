@@ -32,11 +32,7 @@ import { requireEditor, type Ctx } from "./context";
 import {
   CONTINGENCY_CHAPTER,
   ISSUE_FILE_TYPES,
-  ISSUE_KINDS,
-  ISSUE_PARTIES,
-  ISSUE_STATUSES,
   MAX_ISSUE_FILE_BYTES,
-  MAX_ISSUE_TEXT,
   fileTypeOf,
   type ConstructionControl,
   type ConstructionCosts,
@@ -55,19 +51,9 @@ import {
 import { chapterState, chapterTiming, contractTotals, deviation, milestoneState } from "./control-calc";
 import { idempotent } from "./idempotency";
 import { MAX_TEXT } from "./input";
-import {
-  fail,
-  integer,
-  loadObra,
-  optionalText,
-  orNull,
-  pick,
-  pickChanges,
-  requiredText,
-  requireProject,
-  userName,
-  workDate,
-} from "./obra-data";
+import { changesOf, parse } from "./inputs/fields";
+import { chapterCorrectionSchema, chapterDateSchema, issueChangesSchema, issueListSchema, newIssueSchema } from "./inputs/construction";
+import { fail, loadObra, requireProject, userName } from "./obra-data";
 import { todayInSpain } from "./obra-calc";
 import { listPhotos } from "./photos";
 import { obraContract, obraSchedule } from "./planning";
@@ -88,7 +74,6 @@ import { listProjectAttention } from "./subcontractors";
 // Staff only; the client's app sees the result as the obra's progress.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const MAX_NOTE = 500;
 const RECENT_PHOTOS = 6;
 const RECENT_EVENTS = 5;
 const MAX_EVENTS = 1000;
@@ -533,9 +518,9 @@ export async function getCosts(ctx: Ctx, projectId: string): Promise<Constructio
 }
 
 /** The project's issues and changes, newest first; `kind` filters them. */
-export async function listIssues(ctx: Ctx, projectId: string, { kind }: { kind?: string } = {}) {
+export async function listIssues(ctx: Ctx, projectId: string, query: { kind?: string } = {}) {
   await requireProject(ctx.tenantId, projectId);
-  const filter = kind === undefined ? undefined : pick(ISSUE_KINDS)(kind);
+  const filter = parse(issueListSchema, query).kind;
   return issueRows(ctx, projectId, filter && eq(obraIssues.kind, filter));
 }
 
@@ -670,7 +655,7 @@ async function requestInvoice(tx: Tx, ctx: Ctx, projectId: string, code: string,
 /** Body: { date } — the day work started (may be before today). Pending → in progress. */
 export async function startChapter(ctx: Ctx, projectId: string, code: string, input: Record<string, unknown>) {
   await requireItem(ctx, projectId, code);
-  const date = workDate(input.date);
+  const { date } = parse(chapterDateSchema, input);
   await db.transaction(async (tx) => {
     const row = await lockedRow(tx, ctx, projectId, code);
     if (row?.actualStart) fail("invalid_state");
@@ -688,7 +673,7 @@ export async function startChapter(ctx: Ctx, projectId: string, code: string, in
  */
 export async function finishChapter(ctx: Ctx, projectId: string, code: string, input: Record<string, unknown>) {
   await requireItem(ctx, projectId, code);
-  const date = workDate(input.date);
+  const { date } = parse(chapterDateSchema, input);
   const plan = await invoicePlan(ctx, projectId, code);
   const invoiceRequested = await db.transaction(async (tx) => {
     const row = await lockedRow(tx, ctx, projectId, code);
@@ -703,9 +688,6 @@ export async function finishChapter(ctx: Ctx, projectId: string, code: string, i
   return { state: "finished" as const, invoiceRequested };
 }
 
-/** A date in a correction: a work date, or null to clear it. */
-const correctedDate = orNull(workDate);
-
 /**
  * Corrects recorded dates. Body: { actualStart?, actualEnd?, note? } — each
  * a date or null to clear it (clearing the end reopens the chapter, clearing
@@ -715,16 +697,18 @@ const correctedDate = orNull(workDate);
  */
 export async function correctChapter(ctx: Ctx, projectId: string, code: string, input: Record<string, unknown>) {
   await requireItem(ctx, projectId, code);
-  const note = optionalText(input.note, MAX_NOTE);
-  // Only needed when the correction records an end, but loaded before the locks.
-  const plan = "actualEnd" in input && input.actualEnd ? await invoicePlan(ctx, projectId, code) : null;
+  const { note } = parse(chapterCorrectionSchema.pick({ note: true }), input);
+  // Only needed when the correction records an end (parsed below), but loaded before the locks.
+  const plan = input.actualEnd ? await invoicePlan(ctx, projectId, code) : null;
   const result = await db.transaction(async (tx) => {
     const row = await lockedRow(tx, ctx, projectId, code);
     if (!row?.actualStart && !row?.actualEnd) fail("invalid_state");
+    // The dates once the chapter has any: a pending one is refused first, whatever was sent.
+    const sent = parse(chapterCorrectionSchema, input);
     const before = { actualStart: row.actualStart, actualEnd: row.actualEnd };
     const after = {
-      actualStart: "actualStart" in input ? correctedDate(input.actualStart) : before.actualStart,
-      actualEnd: "actualEnd" in input ? correctedDate(input.actualEnd) : before.actualEnd,
+      actualStart: sent.actualStart === undefined ? before.actualStart : sent.actualStart,
+      actualEnd: sent.actualEnd === undefined ? before.actualEnd : sent.actualEnd,
     };
     if (after.actualEnd && (!after.actualStart || after.actualEnd < after.actualStart)) fail("invalid_date");
     const changed = after.actualStart !== before.actualStart || after.actualEnd !== before.actualEnd;
@@ -776,43 +760,9 @@ export async function reviewChanges(ctx: Ctx, projectId: string) {
 // affects. It records history: it never changes the budget, dates, amounts or
 // statuses, and never asks for an invoice. Resolved records stay.
 
-/** Within the column (a Postgres integer): 20 M€. */
-const MAX_IMPACT_CENTS = 2_000_000_000;
-const MAX_IMPACT_DAYS = 3650;
-const REQUIRED_ISSUE_FIELDS = ["kind", "occurredOn", "chapterCode", "description", "party"] as const;
-
-const nullableInteger = (min: number, max: number) => (value: unknown) =>
-  value === null || value === undefined || value === "" ? null : integer(value, min, max);
-
-/** One of `allowed`, else `invalid_input`. */
-type IssueValues = {
-  kind: (typeof ISSUE_KINDS)[number];
-  occurredOn: string;
-  chapterCode: string;
-  description: string;
-  party: (typeof ISSUE_PARTIES)[number];
-  partyName: string | null;
-  costImpactCents: number | null;
-  scheduleImpactDays: number | null;
-  status: (typeof ISSUE_STATUSES)[number];
-};
-
-function issueParsers(codes: Set<string>) {
-  return {
-    kind: pick(ISSUE_KINDS),
-    occurredOn: (value: unknown) => workDate(value),
-    chapterCode: (value: unknown) => {
-      const code = requiredText(value, 20);
-      if (!codes.has(code)) fail("unknown_chapter");
-      return code;
-    },
-    description: (value: unknown) => requiredText(value, MAX_ISSUE_TEXT),
-    party: pick(ISSUE_PARTIES),
-    partyName: (value: unknown) => optionalText(value, MAX_TEXT),
-    costImpactCents: nullableInteger(-MAX_IMPACT_CENTS, MAX_IMPACT_CENTS),
-    scheduleImpactDays: nullableInteger(-MAX_IMPACT_DAYS, MAX_IMPACT_DAYS),
-    status: pick(ISSUE_STATUSES),
-  } satisfies { [K in keyof IssueValues]: (value: unknown) => IssueValues[K] };
+/** A chapter an issue is tied to: the contract's (`codes`), else `unknown_chapter`. */
+function checkChapter(codes: Set<string>, chapterCode: string) {
+  if (!codes.has(chapterCode)) fail("unknown_chapter");
 }
 
 /**
@@ -825,10 +775,8 @@ export async function createIssue(ctx: Ctx, projectId: string, input: Record<str
   requireEditor(ctx);
   return idempotent<{ issueId: string; number: number }>(ctx, "obra.issue.create", { projectId }, input, async (once) => {
     const codes = await contractCodes(ctx, projectId);
-    for (const key of REQUIRED_ISSUE_FIELDS) {
-      if (input[key] === undefined || input[key] === "") fail("missing_fields");
-    }
-    const values = { status: "pending", ...pickChanges<IssueValues>(input, issueParsers(codes)) } as IssueValues;
+    const values = parse(newIssueSchema, input);
+    checkChapter(codes, values.chapterCode);
     const sameKind = and(eq(obraIssues.projectId, projectId), eq(obraIssues.tenantId, ctx.tenantId), eq(obraIssues.kind, values.kind));
     return db.transaction((tx) =>
       once(tx, async () => {
@@ -869,9 +817,9 @@ async function requireIssue(ctx: Ctx, projectId: string, issueId: string) {
 export async function updateIssue(ctx: Ctx, projectId: string, issueId: string, input: Record<string, unknown>) {
   requireEditor(ctx);
   await requireIssue(ctx, projectId, issueId);
+  const changes = changesOf(parse(issueChangesSchema, input));
   // Only a new chapter needs checking against the contract.
-  const codes = "chapterCode" in input ? await contractCodes(ctx, projectId) : new Set<string>();
-  const changes = pickChanges<IssueValues>(input, issueParsers(codes));
+  if (changes.chapterCode !== undefined) checkChapter(await contractCodes(ctx, projectId), changes.chapterCode);
   if (Object.keys(changes).length > 0) {
     await db.update(obraIssues).set(changes).where(eq(obraIssues.id, issueId));
   }

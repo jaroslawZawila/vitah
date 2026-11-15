@@ -12,7 +12,7 @@ import {
   subcontractorsService,
   type Ctx,
 } from "../src";
-import { DUE_SOON_DAYS, orderLabel, PAYMENT_FORECAST_DAYS, PURCHASE_INVOICE_GROUPS } from "../src/contract";
+import { DUE_SOON_DAYS, MAX_AMOUNT_CENTS, orderLabel, PAYMENT_FORECAST_DAYS, PURCHASE_INVOICE_GROUPS } from "../src/contract";
 import { lateDays } from "../src/control-calc";
 import { addDays } from "../src/obra-calc";
 import { isDueSoon, isOwed } from "../src/purchase-calc";
@@ -1446,5 +1446,106 @@ describe("the SQL of the lists and the TypeScript rules", () => {
     expect(all.summary.lateDeliveries).toBe(lateShown.length);
     expect(described(lateShown)).toEqual(["confirmed, expected yesterday", "in transit, expected long ago", "ordered, expected yesterday"]);
     expect(all.orders).toHaveLength(11);
+  });
+});
+
+describe("input boundaries (schemas in src/inputs/purchase-invoices.ts)", () => {
+  const OVER = MAX_AMOUNT_CENTS + 1;
+
+  it("refuses an amount over MAX_AMOUNT_CENTS as invalid_input, never a database error", async () => {
+    const s = await setup();
+    const reject = (overrides: Record<string, unknown>) => svc.createInvoice(s.ctx, s.subId, invoice({ number: "BIG", ...overrides }));
+    await expect(reject({ baseCents: OVER })).rejects.toMatchObject({ code: "invalid_input", status: 400 });
+    await expect(reject({ baseCents: 2 ** 31 })).rejects.toMatchObject({ code: "invalid_input", status: 400 });
+    await expect(reject({ lines: [{ lineageId: s.lineage("03"), amountCents: OVER }] })).rejects.toMatchObject({ code: "invalid_input" });
+    await expect(svc.setOrderMilestones(s.ctx, s.subId, { milestones: [{ concept: "Todo", amountCents: OVER }] })).rejects.toMatchObject({
+      code: "invalid_input",
+    });
+
+    const { invoiceId } = await svc.createInvoice(s.ctx, s.subId, invoice());
+    await expect(
+      svc.createInvoice(s.ctx, s.subId, { kind: "credit_note", number: "R", issuedOn: "2026-10-01", rectifiesId: invoiceId, baseCents: -OVER }),
+    ).rejects.toMatchObject({ code: "invalid_input" });
+    await expect(svc.updateInvoice(s.ctx, invoiceId, { baseCents: OVER })).rejects.toMatchObject({ code: "invalid_input" });
+    await expect(svc.createPayment(s.ctx, invoiceId, { amountCents: OVER })).rejects.toMatchObject({ code: "invalid_input" });
+    expect(await db.select().from(purchaseInvoices)).toHaveLength(1);
+    expect(await db.select().from(purchasePayments)).toHaveLength(0);
+  });
+
+  it("answers wrong types with the code of the field, as before", async () => {
+    const s = await setup();
+    const reject = (overrides: Record<string, unknown>) => svc.createInvoice(s.ctx, s.subId, invoice({ number: "T", ...overrides }));
+    await expect(reject({ baseCents: "490.00" })).rejects.toMatchObject({ code: "invalid_input" });
+    await expect(reject({ baseCents: 490.5 })).rejects.toMatchObject({ code: "invalid_input" });
+    await expect(reject({ number: 112 })).rejects.toMatchObject({ code: "missing_fields" });
+    await expect(reject({ number: "x".repeat(61) })).rejects.toMatchObject({ code: "invalid_input" });
+    await expect(reject({ issuedOn: 20261001 })).rejects.toMatchObject({ code: "invalid_date" });
+    await expect(reject({ issuedOn: undefined })).rejects.toMatchObject({ code: "invalid_date" });
+    await expect(reject({ dueOn: 5 })).rejects.toMatchObject({ code: "invalid_date" });
+    await expect(reject({ kind: null })).rejects.toMatchObject({ code: "invalid_input" });
+    await expect(reject({ vatKind: null })).rejects.toMatchObject({ code: "invalid_input" });
+    await expect(reject({ notes: 5 })).rejects.toMatchObject({ code: "invalid_input" });
+    await expect(reject({ lines: [] })).rejects.toMatchObject({ code: "invalid_input" });
+    await expect(reject({ lines: "all" })).rejects.toMatchObject({ code: "invalid_input" });
+    await expect(reject({ lines: [{ lineageId: 3, amountCents: 49_000 }] })).rejects.toMatchObject({ code: "invalid_input" });
+
+    const { invoiceId } = await svc.createInvoice(s.ctx, s.subId, invoice());
+    const pay = (body: Record<string, unknown>) => svc.createPayment(s.ctx, invoiceId, body);
+    await expect(pay({})).rejects.toMatchObject({ code: "invalid_input" });
+    await expect(pay({ amountCents: 100, paidOn: null })).rejects.toMatchObject({ code: "invalid_date" });
+    await expect(pay({ amountCents: 100, reference: 7 })).rejects.toMatchObject({ code: "invalid_input" });
+
+    await expect(svc.updateInvoice(s.ctx, invoiceId, { number: null })).rejects.toMatchObject({ code: "missing_fields" });
+    await expect(svc.updateInvoice(s.ctx, invoiceId, { dueOn: null })).rejects.toMatchObject({ code: "invalid_date" });
+    await expect(svc.updateInvoice(s.ctx, invoiceId, { milestoneId: null })).rejects.toMatchObject({ code: "invalid_input" });
+
+    const milestones = (body: Record<string, unknown>) => svc.setOrderMilestones(s.ctx, s.subId, body);
+    await expect(milestones({})).rejects.toMatchObject({ code: "missing_fields" });
+    await expect(milestones({ milestones: "two" })).rejects.toMatchObject({ code: "missing_fields" });
+    await expect(milestones({ milestones: ["x"] })).rejects.toMatchObject({ code: "invalid_input" });
+    await expect(milestones({ milestones: [{ concept: " ", amountCents: 98_000 }] })).rejects.toMatchObject({ code: "missing_fields" });
+    await expect(milestones({ milestones: [{ id: 1, concept: "Todo", amountCents: 98_000 }] })).rejects.toMatchObject({ code: "invalid_input" });
+    const many = Array.from({ length: 21 }, () => ({ concept: "Parte", amountCents: 1 }));
+    await expect(milestones({ milestones: many })).rejects.toMatchObject({ code: "invalid_input" });
+  });
+
+  it("ignores keys it doesn't take, as before; refuses a credit note's due date or milestone on an edit", async () => {
+    const s = await setup();
+    const { invoiceId } = await svc.createInvoice(s.ctx, s.subId, invoice({ tenantId: "other", createdById: "someone", vatCents: 1, extra: true }));
+    expect(await svc.getInvoice(s.ctx, invoiceId)).toMatchObject({ vatCents: 0, createdBy: "Laura Pérez" });
+    const [row] = await db.select().from(purchaseInvoices).where(eq(purchaseInvoices.id, invoiceId));
+    expect(row).toMatchObject({ tenantId: s.tenant.id, createdById: s.ctx.userId });
+
+    // A credit note's own due date and milestone were never read on create; on an edit they are refused.
+    const credit = await svc.createInvoice(s.ctx, s.subId, {
+      kind: "credit_note",
+      number: "R",
+      issuedOn: "2026-10-01",
+      rectifiesId: invoiceId,
+      baseCents: -1_000,
+      dueOn: "not a date",
+      milestoneId: 42,
+    });
+    expect(await svc.getInvoice(s.ctx, credit.invoiceId)).toMatchObject({ dueOn: null, milestoneId: null });
+    await expect(svc.updateInvoice(s.ctx, credit.invoiceId, { dueOn: "2026-11-01" })).rejects.toMatchObject({ code: "invalid_input" });
+    await expect(svc.updateInvoice(s.ctx, credit.invoiceId, { milestoneId: "m" })).rejects.toMatchObject({ code: "invalid_input" });
+
+    // The portal sends the kind and the invoice's own fields along: ignored; nothing sent changes nothing.
+    await svc.updateInvoice(s.ctx, invoiceId, { kind: "credit_note", rectifiesId: "x", notes: " Revisada " });
+    await svc.updateInvoice(s.ctx, invoiceId, {});
+    expect(await svc.getInvoice(s.ctx, invoiceId)).toMatchObject({ kind: "invoice", notes: "Revisada", baseCents: 49_000 });
+    expect((await svc.getInvoice(s.ctx, invoiceId)).events.filter((e) => e.action === "invoice_updated")).toHaveLength(1);
+  });
+
+  it("looks a credit note's invoice up before its fields, as before", async () => {
+    const s = await setup();
+    const credit = (overrides: Record<string, unknown>) =>
+      svc.createInvoice(s.ctx, s.subId, { kind: "credit_note", number: "R", issuedOn: "2026-10-01", baseCents: -1_000, ...overrides });
+    await expect(credit({ rectifiesId: "nope", issuedOn: "nope", baseCents: 5 })).rejects.toMatchObject({ code: "not_found", status: 404 });
+    await expect(credit({ rectifiesId: 5, issuedOn: "nope" })).rejects.toMatchObject({ code: "missing_fields" });
+    const { invoiceId } = await svc.createInvoice(s.ctx, s.subId, invoice());
+    await svc.deleteInvoice(s.ctx, invoiceId);
+    await expect(credit({ rectifiesId: invoiceId, number: "" })).rejects.toMatchObject({ code: "not_found" });
+    expect(await db.select().from(purchaseInvoices)).toHaveLength(1);
   });
 });

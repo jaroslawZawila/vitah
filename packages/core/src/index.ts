@@ -1,6 +1,6 @@
 export { canDecideRequest, canEdit, requireAdmin, requireEditor, type Ctx, type UserRole } from "./context";
 export { CoreError, notFound, forbidden, invalid } from "./errors";
-export { hashPassword, normalizeEmail } from "./accounts";
+export { hashPassword, mobileCredentials, normalizeEmail, portalCredentials } from "./accounts";
 export { countSignIn, SIGN_IN_LIMITS } from "./throttle";
 export * from "./contract";
 export * as projectsService from "./projects";

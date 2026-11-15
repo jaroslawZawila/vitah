@@ -3,8 +3,6 @@ import { markChanged } from "./changes";
 import { clientProjectsWhere, resolveClientProject } from "./client-projects";
 import { requireEditor, type Ctx } from "./context";
 import {
-  MAX_CAPTION_LENGTH,
-  MAX_CHAPTER_CODE,
   MAX_PHOTO_BYTES,
   PHOTO_TYPES,
   type MobilePhoto,
@@ -12,8 +10,8 @@ import {
   type PhotoType,
   type ProjectPhoto,
 } from "./contract";
-import { clippedText } from "./input";
-import { workDate } from "./obra-data";
+import { parse } from "./inputs/fields";
+import { photoSchema, visibilitySchema } from "./inputs/projects";
 import { notifyProjectClient } from "./notifications";
 import type { PhotosByChapter } from "./obra-calc";
 import { inLiveProject, softDeleted } from "./project-client";
@@ -115,10 +113,7 @@ function toMobilePhoto({ createdAt, ...photo }: PhotoRow): MobilePhoto {
 export async function addPhoto(ctx: Ctx, projectId: string, input: Record<string, unknown>) {
   requireEditor(ctx);
 
-  const { file } = input;
-  const caption = clippedText(input.caption, MAX_CAPTION_LENGTH);
-  const chapterCode = clippedText(input.chapterCode, MAX_CHAPTER_CODE);
-  const takenOn = input.takenOn ? workDate(input.takenOn) : null;
+  const { file, caption, chapterCode, takenOn } = parse(photoSchema, input);
   if (!(file instanceof Blob) || file.size === 0) fail("missing_file");
   if (file.size > MAX_PHOTO_BYTES) fail("file_too_large");
   const [image] = await Promise.all([readImage(file), requireProject(ctx.tenantId, projectId)]);
@@ -185,17 +180,17 @@ export async function setPhotoVisibility(
   input: Record<string, unknown>,
 ) {
   requireEditor(ctx);
-  if (typeof input.visibleToClient !== "boolean") fail("missing_fields");
+  const { visibleToClient } = parse(visibilitySchema, input);
   await requireProject(ctx.tenantId, projectId);
   const where = photoInProject(ctx, projectId, photoId);
   const [photo] = await db
     .update(projectPhotos)
-    .set({ visibleToClient: input.visibleToClient, updatedAt: new Date() })
+    .set({ visibleToClient, updatedAt: new Date() })
     .where(where)
     .returning({ id: projectPhotos.id });
   if (!photo) fail("not_found");
   await markChanged(ctx.tenantId, projectId, ["photos"]);
-  if (input.visibleToClient && (await claimFirstShown(projectPhotos, where))) {
+  if (visibleToClient && (await claimFirstShown(projectPhotos, where))) {
     await pushPhoto(ctx, projectId, photoId);
   }
   return { photoId };

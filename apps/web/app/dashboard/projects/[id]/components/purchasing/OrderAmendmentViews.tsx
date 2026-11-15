@@ -17,8 +17,8 @@ import FileSlot from "../../../../subcontratas/empresas/nueva/steps/FileSlot";
 import { deviationTone } from "../construction/format";
 import { orderTotals, type LineDraft, type ParseAmount } from "./draft";
 import { day, usePurchaseFormat } from "./format";
-import { Lines } from "./OrderForm";
-import { EventText } from "./OrderViews";
+import { Lines } from "./OrderSteps";
+import { EventText } from "./OrderHistory";
 
 // Presentational: an order's modificados (the card on its page) and the form
 // that records one. The containers (OrderScreen, AmendmentFormScreen) run the

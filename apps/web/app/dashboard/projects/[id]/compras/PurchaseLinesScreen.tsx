@@ -18,7 +18,8 @@ import { openGroups, openParam, parseOpen, useUrlState } from "../../../componen
 import { FilterSelect, FoldAllButtons } from "../components/construction/Filters";
 import { StageEyebrow, type ObraHeader } from "../components/construction/ObraFrame";
 import Segmented from "../components/construction/Segmented";
-import { DueBanner, LineKpis, LineTable, ViewSwitch } from "../components/purchasing/LineViews";
+import { DueBanner, LineKpis, ViewSwitch } from "../components/purchasing/LineViews";
+import { LineTable } from "../components/purchasing/LineTable";
 import { orderSoon, rollUpLines } from "../components/purchasing/line-rollup";
 import { newOrderHref } from "../components/purchasing/links";
 

@@ -22,7 +22,6 @@ import { clientProjectsWhere } from "./client-projects";
 import { raiseStage } from "./obra-stage";
 import { requireEditor, type Ctx } from "./context";
 import {
-  MAX_CHAPTER_CODE,
   MAX_DOCUMENT_BYTES,
   type Hito,
   type HitoDetail,
@@ -30,20 +29,19 @@ import {
   type HitoEventAction,
   type HitoFileKind,
 } from "./contract";
+import { changesOf, parse } from "./inputs/fields";
 import {
-  calendarDate,
-  fail,
-  integer,
-  loadObra,
-  nextPosition,
-  optionalText,
-  pickChanges,
-  requireProject,
-  requiredText,
-  userName,
-  workDate,
-  type HitoRow,
-} from "./obra-data";
+  actaPhotosSchema,
+  checkChangesSchema,
+  hitoChangesSchema,
+  hitoFileSchemas,
+  hitoPaymentSchema,
+  newCheckSchema,
+  planSchema,
+  type HitoChanges,
+} from "./inputs/hitos";
+import { MAX_AMOUNT_CENTS } from "./money";
+import { fail, loadObra, nextPosition, requireProject, userName, type HitoRow } from "./obra-data";
 import { todayInSpain } from "./obra-calc";
 import { HITO_TEMPLATE } from "./obra-template";
 import { isPdf, openStoredFile, projectFolder, storeFiles } from "./project-files";
@@ -58,10 +56,6 @@ import type { Tx } from "./project-client";
 // logged in `obra_hito_events` with what was there before, and no PDF is
 // deleted. Nothing here updates or deletes that table's rows.
 // ─────────────────────────────────────────────────────────────────────────────
-
-const MAX_NAME = 120;
-const MAX_TEXT = 2_000;
-const MAX_CHECK = 300;
 
 /** The standard plan (./obra-template), for a project that has none yet. */
 export async function createDefaultHitos(tx: Tx, tenantId: string, projectId: string) {
@@ -222,21 +216,10 @@ type PlanChange = {
   chapterCodes: string[] | null;
 };
 
-/** Validates one hito's changes: any of { name, pctBp, scope, billingMoment, chapterCodes }. */
-function parseChange(hitoId: string, input: Record<string, unknown>): PlanChange {
-  const changes = pickChanges<typeof obraHitos.$inferInsert>(input, {
-    name: (v) => requiredText(v, MAX_NAME),
-    pctBp: (v) => integer(v, 0, 10_000),
-    scope: (v) => optionalText(v, MAX_TEXT) ?? "",
-    billingMoment: (v) => optionalText(v, MAX_TEXT) ?? "",
-  });
-  let chapterCodes: string[] | null = null;
-  if ("chapterCodes" in input) {
-    if (!Array.isArray(input.chapterCodes)) fail("invalid_input");
-    const codes = (input.chapterCodes as unknown[]).map((code) => requiredText(code, MAX_CHAPTER_CODE));
-    chapterCodes = [...new Set(codes)];
-  }
-  return { hitoId, changes, chapterCodes };
+/** One hito's parsed changes (any of { name, pctBp, scope, billingMoment, chapterCodes }) as applyPlan takes them. */
+function planChange(hitoId: string, body: HitoChanges): PlanChange {
+  const { chapterCodes, ...changes } = changesOf(body);
+  return { hitoId, changes, chapterCodes: chapterCodes === undefined ? null : [...new Set(chapterCodes)] };
 }
 
 /**
@@ -298,7 +281,7 @@ export async function updateHito(
   input: Record<string, unknown>,
 ) {
   await hitoInProject(ctx, projectId, hitoId);
-  await applyPlan(ctx, projectId, [parseChange(hitoId, input)]);
+  await applyPlan(ctx, projectId, [planChange(hitoId, parse(hitoChangesSchema, input))]);
   return { hitoId };
 }
 
@@ -308,12 +291,7 @@ export async function updateHito(
  */
 export async function updatePlan(ctx: Ctx, projectId: string, input: Record<string, unknown>) {
   requireEditor(ctx);
-  if (!Array.isArray(input.hitos)) fail("missing_fields");
-  const plan = (input.hitos as unknown[]).map((entry) => {
-    const { id, ...fields } = (entry ?? {}) as Record<string, unknown>;
-    if (typeof id !== "string") fail("invalid_input");
-    return parseChange(id, fields);
-  });
+  const plan = parse(planSchema, input).hitos.map(({ id, ...fields }) => planChange(id, fields));
   const ids = [...new Set(plan.map((p) => p.hitoId))];
   const [, found] = await Promise.all([
     requireProject(ctx.tenantId, projectId),
@@ -345,7 +323,7 @@ export async function addCheck(
   input: Record<string, unknown>,
 ) {
   await hitoInProject(ctx, projectId, hitoId);
-  const label = requiredText(input.label, MAX_CHECK);
+  const { label } = parse(newCheckSchema, input);
   const [check] = await db
     .insert(obraHitoChecks)
     .values({
@@ -389,10 +367,7 @@ export async function updateCheck(
   hitoId?: string,
 ) {
   await checkInProject(ctx, projectId, checkId, hitoId);
-  const changes = pickChanges<typeof obraHitoChecks.$inferInsert>(input, {
-    label: (v) => requiredText(v, MAX_CHECK),
-    done: (v) => (typeof v === "boolean" ? v : fail("invalid_input")),
-  });
+  const changes = changesOf(parse(checkChangesSchema, input));
   if (Object.keys(changes).length > 0) {
     await db.update(obraHitoChecks).set(changes).where(eq(obraHitoChecks.id, checkId));
     await obraChanged(ctx, projectId);
@@ -417,10 +392,7 @@ export async function setActaPhotos(
   input: Record<string, unknown>,
 ) {
   await hitoInProject(ctx, projectId, hitoId);
-  if (!Array.isArray(input.photoIds)) fail("invalid_input");
-  const photoIds = [...new Set(input.photoIds as unknown[])];
-  if (photoIds.some((id) => typeof id !== "string")) fail("invalid_input");
-  const ids = photoIds as string[];
+  const ids = [...new Set(parse(actaPhotosSchema, input).photoIds)];
   if (ids.length > 0) {
     const found = await db
       .select({ id: projectPhotos.id })
@@ -483,10 +455,8 @@ export async function uploadHitoFile(
   if (!(file instanceof Blob) || file.size === 0) fail("missing_file");
   if (file.size > MAX_DOCUMENT_BYTES) fail("file_too_large");
   if (!(await isPdf(file))) fail("invalid_file_type");
-  const date =
-    kind === "invoice" && (input.date === undefined || input.date === "")
-      ? todayInSpain()
-      : calendarDate(input.date);
+  // An acta's date is required; an invoice's is today when missing or "".
+  const date = parse(hitoFileSchemas[kind], input).date || todayInSpain();
 
   const columns = FILE_COLUMNS[kind];
   const pathname = `${projectFolder(ctx.tenantId, projectId)}hitos/${hitoId}/${kind}-${crypto.randomUUID()}.pdf`;
@@ -583,14 +553,10 @@ export async function registerPayment(
   input: Record<string, unknown>,
 ) {
   await hitoInProject(ctx, projectId, hitoId);
-  const paidOn = workDate(input.paidOn);
+  const { paidOn, amountCents: given } = parse(hitoPaymentSchema, input);
+  const amountCents = given ?? (await loadObra(ctx.tenantId, projectId)).hitos.find((h) => h.id === hitoId)!.totalCents;
   // Never a payment of nothing: a hito without a price yet needs its amount given.
-  const amountCents = integer(
-    input.amountCents ??
-      (await loadObra(ctx.tenantId, projectId)).hitos.find((h) => h.id === hitoId)!.totalCents,
-    1,
-    2_000_000_000,
-  );
+  if (amountCents < 1 || amountCents > MAX_AMOUNT_CENTS) fail("invalid_input");
   await record(ctx, hitoId, (hito) => ({
     changes: { paidOn, paidAmountCents: amountCents },
     action: "payment_registered",

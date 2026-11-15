@@ -332,3 +332,26 @@ describe("measurements", () => {
     expect(await parseXlsx(bytes)).toBe("## Mediciones\nCódigo | Concepto | Ud | Cantidad\n01.01 | Excavación | m3 | 3.06");
   });
 });
+
+describe("input boundaries (schema in src/inputs/budget.ts)", () => {
+  it("startGeneration: wrong types answer the old codes and queue nothing; missing options take their defaults", async () => {
+    const { project, ctx, documentIds } = await setup();
+    for (const [body, code] of [
+      [{}, "no_documents"],
+      [{ documentIds: "all" }, "no_documents"],
+      [{ documentIds: [5] }, "invalid_input"],
+      [{ documentIds, reference: 5 }, "invalid_input"],
+      [{ documentIds, quality: null }, "invalid_input"],
+      [{ documentIds, vatRateBp: 10_001 }, "invalid_input"],
+      [{ documentIds, vatRateBp: "2100" }, "invalid_input"],
+    ] as const) {
+      await expect(svc.startGeneration(ctx, project.id, body)).rejects.toMatchObject({ code, status: 400 });
+    }
+    expect(await db.select().from(budgetGenerations)).toHaveLength(0);
+
+    // A repeated document counts once; keys it doesn't take are ignored.
+    const { generationId } = await svc.startGeneration(ctx, project.id, { documentIds: [...documentIds, documentIds[0]], status: "done", tenantId: "other" });
+    const [row] = await db.select().from(budgetGenerations).where(eq(budgetGenerations.id, generationId));
+    expect(row).toMatchObject({ status: "queued", tenantId: ctx.tenantId, documentIds, options: { reference: null, quality: "framer", vatRateBp: 1000 } });
+  });
+});

@@ -524,3 +524,52 @@ describe("deleteProject", () => {
     expect(await svc.listDocuments(other.ctx, other.project.id)).toHaveLength(1);
   });
 });
+
+describe("input boundaries (schemas in src/inputs/projects.ts)", () => {
+  it.each([
+    // The order is the old one: the file, the title, the category, then the PDF itself.
+    ["missing_file", { file: undefined, title: "", category: "nope" }],
+    ["missing_file", { file: new File([], "vacío.pdf") }],
+    ["missing_file", { file: "contrato.pdf" }],
+    ["missing_fields", { title: 5, category: "nope" }],
+    ["missing_fields", { title: "   ", file: new File(["not a pdf"], "x.pdf") }],
+    ["invalid_category", { category: null, file: new File(["not a pdf"], "x.pdf") }],
+    ["invalid_file_type", { file: new File(["not a pdf"], "x.pdf") }],
+  ])("addDocument answers %s and stores nothing", async (code, overrides) => {
+    const { project, ctx } = await setup();
+    await expect(upload(ctx, project.id, overrides)).rejects.toMatchObject({ code, status: 400 });
+    expect(await db.select().from(projectDocuments)).toHaveLength(0);
+    expect(files.size).toBe(0);
+  });
+
+  it("addDocument ignores keys it doesn't take", async () => {
+    const { tenant, project, ctx } = await setup();
+    const { documentId } = await upload(ctx, project.id, { tenantId: "other", visibleToClient: false, budgetInput: "plans" });
+    const row = await db.query.projectDocuments.findFirst({ where: eq(projectDocuments.id, documentId) });
+    expect(row).toMatchObject({ tenantId: tenant.id, visibleToClient: true, budgetInput: null });
+  });
+
+  it("visibility: anything but a boolean is missing_fields, before the project is looked for", async () => {
+    const { project, ctx } = await setup();
+    const { documentId } = await upload(ctx, project.id);
+    for (const visibleToClient of [undefined, null, "false", 0]) {
+      await expect(svc.setDocumentVisibility(ctx, "no-such-project", documentId, { visibleToClient })).rejects.toMatchObject({
+        code: "missing_fields",
+        status: 400,
+      });
+    }
+  });
+
+  it("budget inputs: the pathname and filename first, then the kind of input", async () => {
+    const { project, ctx } = await setup();
+    const register = (input: Record<string, unknown>) => svc.registerBudgetInput(ctx, project.id, input);
+    await expect(register({ pathname: 5, filename: "planos.pdf", budgetInput: "fotos" })).rejects.toMatchObject({ code: "missing_fields" });
+    await expect(register({ pathname: "x", filename: "  ", budgetInput: "fotos" })).rejects.toMatchObject({ code: "missing_fields" });
+    await expect(register({ pathname: "x", filename: "planos.pdf", budgetInput: null })).rejects.toMatchObject({ code: "invalid_category" });
+    const { documentId } = await upload(ctx, project.id);
+    await expect(svc.markBudgetInput(ctx, "no-such-project", documentId, { budgetInput: "fotos" })).rejects.toMatchObject({
+      code: "invalid_category",
+      status: 400,
+    });
+  });
+});

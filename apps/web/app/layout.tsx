@@ -1,9 +1,9 @@
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import type { Metadata } from "next";
-import { NextIntlClientProvider } from "next-intl";
-import { getLocale, getMessages } from "next-intl/server";
+import { getLocale } from "next-intl/server";
 import { Barlow_Condensed, Figtree, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
+import ClientMessages from "@/i18n/ClientMessages";
 import { cn } from "@/lib/utils";
 
 const figtree = Figtree({ subsets: ["latin"], variable: "--font-figtree" });
@@ -30,7 +30,6 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const locale = await getLocale();
-  const messages = await getMessages();
 
   return (
     <html
@@ -38,9 +37,8 @@ export default async function RootLayout({
       className={cn(figtree.variable, barlowCondensed.variable, jetbrainsMono.variable)}
     >
       <body>
-        <NextIntlClientProvider messages={messages}>
-          {children}
-        </NextIntlClientProvider>
+        {/* Only the signed-out pages' text: each layout below adds what its pages use. */}
+        <ClientMessages scope="">{children}</ClientMessages>
         <SpeedInsights />
       </body>
     </html>

@@ -2,8 +2,10 @@ import { and, budgetChapters, budgetLines, budgetRevisions, eq, obraHitoChapters
 import { chapterInProject, draftLine, inDraft, revisionInProject } from "./budget-draft";
 import { deleteChapter, withFreeCode } from "./budget";
 import type { Ctx } from "./context";
-import { BUDGET_MODEL, MAX_CHAPTER_CODE, OPTION_KINDS, type OptionKind } from "./contract";
-import { fail, nextPosition, optionalText, pickChanges, requiredText } from "./obra-data";
+import { BUDGET_MODEL, type OptionKind } from "./contract";
+import { MAX_NAME, newOptionSchema, optionBaseSchema, optionChangesSchema, optionFromLineSchema } from "./inputs/budget";
+import { changesOf, parse } from "./inputs/fields";
+import { fail, nextPosition } from "./obra-data";
 import { priceBaseItem } from "./price-base";
 import type { Tx } from "./project-client";
 
@@ -14,11 +16,6 @@ import type { Tx } from "./project-client";
 // all options (budget-draft.ts keeps the numbers in order). The client
 // chooses on acceptance; the chosen ones join the contract.
 // ─────────────────────────────────────────────────────────────────────────────
-
-const MAX_NAME = 200;
-const MAX_NOTE = 2_000;
-
-const optionKind = (value: unknown): OptionKind => OPTION_KINDS.find((k) => k === value) ?? fail("invalid_input");
 
 /**
  * The next option code: OP1, OP2… past every code an option of the project
@@ -88,13 +85,11 @@ async function framerDraft(ctx: Ctx, projectId: string, revisionId: string) {
  */
 export async function addOption(ctx: Ctx, projectId: string, revisionId: string, input: Record<string, unknown>) {
   await framerDraft(ctx, projectId, revisionId);
-  const base = input.baseCode === undefined ? null : (priceBaseItem(String(input.baseCode)) ?? fail("invalid_input"));
-  const values = {
-    name: requiredText(input.name ?? base?.description.slice(0, MAX_NAME), MAX_NAME),
-    optionKind: optionKind(input.optionKind ?? "extra"),
-    pdfNote: optionalText(input.intro, MAX_NOTE),
-    replacesLine: optionalText(input.replacesLine, MAX_CHAPTER_CODE),
-  };
+  const { baseCode } = parse(optionBaseSchema, input);
+  const base = baseCode === undefined ? null : (priceBaseItem(baseCode) ?? fail("invalid_input"));
+  // Named after the price base entry unless a name is sent (or it is null).
+  const { intro, ...fields } = parse(newOptionSchema, { ...input, name: input.name ?? base?.description.slice(0, MAX_NAME) });
+  const values = { ...fields, pdfNote: intro };
   const optionId = await withFreeCode(() =>
     inDraft(revisionId, async (tx) => {
       const id = await insertOption(tx, ctx.tenantId, revisionId, values);
@@ -114,15 +109,9 @@ export async function addOption(ctx: Ctx, projectId: string, revisionId: string,
 export async function updateOption(ctx: Ctx, projectId: string, optionId: string, input: Record<string, unknown>) {
   const option = await chapterInProject(ctx, projectId, optionId);
   if (option.kind !== "option") fail("not_found");
-  const changes = pickChanges<typeof budgetChapters.$inferInsert>(
-    { ...input, ...("intro" in input ? { pdfNote: input.intro } : {}) },
-    {
-      name: (v) => requiredText(v, MAX_NAME),
-      optionKind: (v) => optionKind(v),
-      pdfNote: (v) => optionalText(v, MAX_NOTE),
-      replacesLine: (v) => optionalText(v, MAX_CHAPTER_CODE),
-    },
-  );
+  // As before, the column's own name (`pdfNote`) is read when `intro` isn't sent.
+  const { intro, ...fields } = changesOf(parse(optionChangesSchema, "intro" in input ? input : { ...input, intro: input.pdfNote }));
+  const changes = intro === undefined ? fields : { ...fields, pdfNote: intro };
   if (Object.keys(changes).length > 0) {
     // Names and texts: neither the numbering nor chapter 20 moves.
     await inDraft(option.revisionId, (tx) => tx.update(budgetChapters).set(changes).where(eq(budgetChapters.id, optionId)), {
@@ -149,7 +138,7 @@ export async function deleteOption(ctx: Ctx, projectId: string, optionId: string
  * Body: { kind: "deduction" | "alternative" }
  */
 export async function optionFromLine(ctx: Ctx, projectId: string, lineId: string, input: Record<string, unknown>) {
-  const kind = input.kind === "deduction" || input.kind === "alternative" ? input.kind : fail("invalid_input");
+  const { kind } = parse(optionFromLineSchema, input);
   const row = await draftLine(ctx, projectId, lineId);
   if (row.chapterKind !== "chapter" || row.line.source === "computed") fail("invalid_input");
   const { line } = row;

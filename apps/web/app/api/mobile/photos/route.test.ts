@@ -124,6 +124,7 @@ describe("GET /api/mobile/photos/:id", () => {
 
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toBe("image/jpeg");
+    expect(res.headers.get("content-security-policy")).toBe("default-src 'none'; frame-ancestors 'self'");
     expect(new Uint8Array(await res.arrayBuffer())).toEqual(
       new Uint8Array(await photo.arrayBuffer()),
     );
@@ -138,6 +139,7 @@ describe("GET /api/mobile/photos/:id", () => {
 
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toBe("image/webp");
+    expect(res.headers.get("content-security-policy")).toBe("default-src 'none'; frame-ancestors 'self'");
   });
 
   it("returns 404 for another client's photo", async () => {

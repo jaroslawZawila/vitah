@@ -560,3 +560,35 @@ describe("photo sizes in URLs", () => {
     expect(parsePhotoSize("huge")).toBe("full");
   });
 });
+
+describe("input boundaries (schemas in src/inputs/projects.ts)", () => {
+  it.each([
+    // The day first, then the file, as before.
+    ["invalid_date", { takenOn: 20260302, file: undefined }],
+    ["invalid_date", { takenOn: true }],
+    ["missing_file", { file: "foto.jpg" }],
+    ["missing_file", { file: new File([], "vacía.jpg") }],
+  ])("addPhoto answers %s and stores nothing", async (code, overrides) => {
+    const { project, ctx } = await setup();
+    await expect(upload(ctx, project.id, overrides)).rejects.toMatchObject({ code, status: 400 });
+    expect(await db.select().from(projectPhotos)).toHaveLength(0);
+  });
+
+  it("addPhoto: an empty day is none, texts that aren't text are blank; extra keys are ignored", async () => {
+    const { tenant, project, ctx } = await setup();
+    const { photoId } = await upload(ctx, project.id, { takenOn: "", caption: 5, chapterCode: null, tenantId: "other", visibleToClient: false });
+    const row = await db.query.projectPhotos.findFirst({ where: eq(projectPhotos.id, photoId) });
+    expect(row).toMatchObject({ tenantId: tenant.id, takenOn: null, caption: null, chapterCode: null, visibleToClient: true });
+  });
+
+  it("setPhotoVisibility: anything but a boolean is missing_fields, before the project is looked for", async () => {
+    const { project, ctx } = await setup();
+    const { photoId } = await upload(ctx, project.id);
+    for (const visibleToClient of [undefined, "true", 1]) {
+      await expect(svc.setPhotoVisibility(ctx, "no-such-project", photoId, { visibleToClient })).rejects.toMatchObject({
+        code: "missing_fields",
+        status: 400,
+      });
+    }
+  });
+});

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createTestUser, resetDatabase, withoutTable } from "@repo/db/testing";
+import type { ObraIssueInput, PurchaseOrderInput, PurchaseRequestInput } from "@repo/core";
 import { files } from "@repo/core/testing";
 import { CREATES, countRecords, createBody, obraToCreateOn, type Create, type Obra } from "../../test/idempotency-fixture";
 import { signInAs } from "../../test/session";
@@ -32,11 +33,11 @@ function formOf(data: Record<string, unknown>, file?: File) {
 function submit(obra: Obra, create: Create, input: Record<string, unknown>) {
   switch (create) {
     case "order":
-      return createPurchaseAction(obra.project.id, input);
+      return createPurchaseAction(obra.project.id, input as PurchaseOrderInput);
     case "request":
-      return createRequestAction(obra.project.id, input);
+      return createRequestAction(obra.project.id, input as PurchaseRequestInput);
     case "issue":
-      return createIssueAction(obra.project.id, input);
+      return createIssueAction(obra.project.id, input as ObraIssueInput);
     case "invoice":
       return createInvoiceAction(obra.orderId, formOf(input, pdf()));
     case "payment":

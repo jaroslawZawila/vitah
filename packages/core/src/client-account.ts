@@ -10,8 +10,10 @@ import {
   users,
 } from "@repo/db";
 import { changeOwnPassword } from "./accounts";
-import { isAppLanguage, type AccountError, type MobileSettings } from "./contract";
+import type { AccountError, MobileSettings } from "./contract";
 import { CoreError } from "./errors";
+import { clientErrorReportSchema, clientSettingsSchema, pushTokenRemovalSchema, pushTokenSchema } from "./inputs/clients";
+import { parse } from "./inputs/fields";
 
 // ─── Client account ──────────────────────────────────────────────────────────
 // What a signed-in client manages themselves in the app's Perfil tab: their
@@ -94,14 +96,11 @@ export async function updateSettings(
   clientUserId: string,
   input: Record<string, unknown>,
 ): Promise<MobileSettings> {
-  const { notifications } = input;
-  if (typeof notifications !== "object" || notifications === null) fail("invalid_settings");
+  const { notifications } = parse(clientSettingsSchema, input);
   const changes: Partial<Record<(typeof COLUMNS)[keyof typeof COLUMNS], boolean>> = {};
-  for (const [key, column] of Object.entries(COLUMNS)) {
-    const value = (notifications as Record<string, unknown>)[key];
-    if (value === undefined) continue;
-    if (typeof value !== "boolean") fail("invalid_settings");
-    changes[column] = value;
+  for (const [key, column] of Object.entries(COLUMNS) as [keyof typeof COLUMNS, (typeof COLUMNS)[keyof typeof COLUMNS]][]) {
+    const value = notifications[key];
+    if (value !== undefined) changes[column] = value;
   }
 
   const user = await db.query.users.findFirst({
@@ -122,8 +121,6 @@ export async function updateSettings(
   return settingsOf(row);
 }
 
-const EXPO_TOKEN = /^Expo(nent)?PushToken\[[^\]]{1,200}\]$/;
-
 /** Phones a client may get pushes on; registering another forgets the least recent. */
 export const MAX_PUSH_TOKENS = 10;
 
@@ -137,9 +134,7 @@ export async function registerPushToken(
   clientUserId: string,
   input: Record<string, unknown>,
 ) {
-  const { token, language = "es" } = input;
-  if (typeof token !== "string" || !EXPO_TOKEN.test(token)) fail("invalid_token");
-  if (!isAppLanguage(language)) fail("invalid_settings");
+  const { token, language } = parse(pushTokenSchema, input);
   await db
     .insert(pushTokens)
     .values({ token, language, userId: clientUserId, tenantId })
@@ -163,8 +158,7 @@ export async function removePushToken(
   clientUserId: string,
   input: Record<string, unknown>,
 ) {
-  const { token } = input;
-  if (typeof token !== "string") fail("invalid_token");
+  const { token } = parse(pushTokenRemovalSchema, input);
   await db
     .delete(pushTokens)
     .where(
@@ -175,4 +169,13 @@ export async function removePushToken(
       ),
     );
   return { success: true };
+}
+
+/**
+ * An error report the app sends (POST /api/mobile/client-error), an object:
+ * its known texts as sent, those blank or not text left out, `fatal` only when
+ * true. Never fails; the route cuts, scrubs and logs it.
+ */
+export function readErrorReport(body: object) {
+  return parse(clientErrorReportSchema, body);
 }

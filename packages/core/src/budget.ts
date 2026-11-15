@@ -39,15 +39,11 @@ import { markChanged } from "./changes";
 import { raiseStage } from "./obra-stage";
 import { requireEditor, type Ctx } from "./context";
 import {
-  ANNEX_KINDS,
   BUDGET_MODEL,
-  BUDGET_QUALITIES,
   CONTINGENCY_CHAPTER,
   DEFAULT_MARGINS,
-  MAX_CHAPTER_CODE,
   type BudgetChapter,
   type BudgetCheck,
-  type BudgetConditions,
   type BudgetLineChange,
   type BudgetOption,
   type BudgetPdfKind,
@@ -56,27 +52,35 @@ import {
   type BudgetRevisionSummary,
   type BudgetTexts,
   type ChapterChange,
-  type LineSource,
   type ProjectBudget,
 } from "./contract";
 import { getLatestGeneration } from "./budget-generations";
 import { createDefaultHitos } from "./hitos";
+import {
+  acceptSchema,
+  chapterChangesSchema,
+  lineBaseSchema,
+  lineChangesSchemas,
+  MAX_REVIEWED,
+  newBudgetSchema,
+  newChapterSchema,
+  newLineSchemas,
+  numberedLineSchemas,
+  progressSchema,
+  rejectSchema,
+  revisionChangesSchema,
+  type TextsChanges,
+} from "./inputs/budget";
+import { changesOf, parse } from "./inputs/fields";
 import type { Tx } from "./project-client";
 import { marginsOn, ofBp, perM2Cents, shareBp, todayInSpain, withPrices } from "./obra-calc";
 import {
-  calendarDate,
   fail,
-  integer,
   linesPriceSql,
   loadChapters,
   nextPosition,
-  optionalText,
-  pickChanges,
   requireProject,
-  requiredText,
-  scaled,
   userNamesById,
-  workDate,
   type LoadedChapter,
   type RevisionRow,
 } from "./obra-data";
@@ -97,18 +101,6 @@ import { storeFiles } from "./project-files";
 // Budgets entered before the FRAMER model (`model` null) keep free chapters.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const MAX_NAME = 200;
-const MAX_DESCRIPTION = 2_000;
-const MAX_UNIT = 10;
-const MAX_NOTE = 2_000;
-const MAX_TEXT = 10_000;
-const MAX_QUANTITY = 1_000_000;
-const MAX_AREA_M2 = 1_000_000;
-const MAX_UNIT_PRICE_CENTS = 100_000_000;
-const MAX_BLOCKS = 50;
-/** Ticked review checks kept on a revision (keys of checks hidden for now stay too). */
-const MAX_REVIEWED = 1_000;
-
 // ─── Reading ─────────────────────────────────────────────────────────────────
 
 /** Each revision's PEC (chapters only, never options, at the client's price). */
@@ -123,7 +115,7 @@ async function revisionTotals(projectId: string) {
     .innerJoin(budgetRevisions, eq(budgetRevisions.id, budgetChapters.revisionId))
     .where(and(eq(budgetRevisions.projectId, projectId), eq(budgetChapters.kind, "chapter")))
     .groupBy(budgetChapters.revisionId);
-  return new Map(rows.map((r) => [r.revisionId, Number(r.total)]));
+  return new Map(rows.map((r) => [r.revisionId, r.total]));
 }
 
 /** Which hito closes each chapter (or option) code. */
@@ -446,8 +438,7 @@ export async function insertFramerRevision(
 export async function createBudget(ctx: Ctx, projectId: string, input: Record<string, unknown>) {
   requireEditor(ctx);
   await requireProject(ctx.tenantId, projectId);
-  const reference = optionalText(input.reference, MAX_NAME);
-  const number = input.number === undefined ? 0 : integer(input.number, 0, 999);
+  const { reference, number = 0 } = parse(newBudgetSchema, input);
 
   const created = await db.transaction(async (tx) => {
     await lockForFirstBudget(tx, projectId);
@@ -553,64 +544,17 @@ export async function takeProjectData(ctx: Ctx, projectId: string, revisionId: s
   return { revisionId, changed };
 }
 
-/** Partial texts over the stored ones; each section is validated as a whole. */
-function parseTexts(value: unknown, current: BudgetTexts): BudgetTexts {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) fail("invalid_input");
-  const input = value as Record<string, unknown>;
-  const str = (v: unknown, max = MAX_TEXT) => (typeof v === "string" && v.length <= max ? v : fail("invalid_input"));
-  const list = <T>(v: unknown, parse: (item: Record<string, unknown>) => T): T[] => {
-    if (!Array.isArray(v) || v.length > MAX_BLOCKS) fail("invalid_input");
-    return v.map((item) => {
-      if (typeof item !== "object" || item === null) fail("invalid_input");
-      return parse(item as Record<string, unknown>);
-    });
+/** The sections of the texts sent over the stored ones (the cover's fields over the stored cover). */
+function mergeTexts(sent: TextsChanges, current: BudgetTexts): BudgetTexts {
+  const { cover, justification, ...sections } = changesOf(sent);
+  return {
+    ...current,
+    ...sections,
+    cover: cover ? { ...current.cover, ...changesOf(cover) } : current.cover,
+    justification: justification
+      ? { intro: justification.intro ?? current.justification.intro, blocks: justification.blocks ?? current.justification.blocks }
+      : current.justification,
   };
-  const texts = { ...current };
-  if ("cover" in input) {
-    const cover = input.cover as Record<string, unknown> | null;
-    if (typeof cover !== "object" || cover === null) fail("invalid_input");
-    texts.cover = { ...current.cover };
-    for (const key of Object.keys(current.cover) as (keyof BudgetTexts["cover"])[]) {
-      if (key in cover) texts.cover[key] = str(cover[key], 2_000);
-    }
-  }
-  if ("justification" in input) {
-    const j = input.justification as Record<string, unknown> | null;
-    if (typeof j !== "object" || j === null) fail("invalid_input");
-    texts.justification = {
-      intro: "intro" in j ? str(j.intro) : current.justification.intro,
-      blocks:
-        "blocks" in j
-          ? list(j.blocks, (b) => ({ title: str(b.title, MAX_NAME), text: str(b.text) }))
-          : current.justification.blocks,
-    };
-  }
-  if ("measurementCriterion" in input) texts.measurementCriterion = str(input.measurementCriterion);
-  if ("annex" in input) {
-    texts.annex = list(input.annex, (item) => {
-      const kind = ANNEX_KINDS.find((k) => k === item.kind) ?? fail("invalid_input");
-      const id = typeof item.id === "string" && item.id ? item.id.slice(0, 40) : crypto.randomUUID();
-      return { id, kind, title: str(item.title, MAX_NAME), text: str(item.text) };
-    });
-  }
-  if ("exclusions" in input) {
-    if (!Array.isArray(input.exclusions) || input.exclusions.length > MAX_BLOCKS) fail("invalid_input");
-    texts.exclusions = input.exclusions.map((v) => str(v, 2_000).trim()).filter(Boolean);
-  }
-  if ("includes" in input) texts.includes = str(input.includes);
-  return texts;
-}
-
-function parseConditions(value: unknown, current: BudgetConditions): BudgetConditions {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) fail("invalid_input");
-  const input = value as Record<string, unknown>;
-  const changes = pickChanges<BudgetConditions>(input, {
-    validityDays: (v) => integer(v, 1, 365),
-    term: (v) => optionalText(v, MAX_NAME) ?? "",
-    penalty: (v) => optionalText(v, MAX_NAME) ?? "",
-    signingPlace: (v) => optionalText(v, MAX_NAME) ?? "",
-  });
-  return { ...current, ...changes };
 }
 
 /**
@@ -626,40 +570,24 @@ export async function updateRevision(
   input: Record<string, unknown>,
 ) {
   const revision = await revisionInProject(ctx, projectId, revisionId);
-  const area = (value: unknown) => (value === null ? null : scaled(value, MAX_AREA_M2, 100));
+  const { builtAreaM2, usefulAreaM2, contingencyPct, overheadPct, profitPct, texts, exclusions, conditions, review, reviewed, ...columns } =
+    changesOf(parse(revisionChangesSchema, input));
   const framer = revision.model === BUDGET_MODEL;
-  const changes = pickChanges<typeof budgetRevisions.$inferInsert>(input, {
-    reference: (v) => optionalText(v, MAX_NAME),
-    vatRateBp: (v) => integer(v, 0, 10_000),
-    quality: (v) => (v === null ? null : (BUDGET_QUALITIES.find((q) => q === v) ?? fail("invalid_input"))),
-    changeReason: (v) => optionalText(v, MAX_NOTE),
-  });
-  // The API names the areas in m² and the contingency and margins in %; they're stored in hundredths.
-  if ("builtAreaM2" in input) changes.builtAreaCm2 = area(input.builtAreaM2);
-  if ("usefulAreaM2" in input) changes.usefulAreaCm2 = area(input.usefulAreaM2);
-  if ("contingencyPct" in input) changes.contingencyBp = scaled(input.contingencyPct, 50, 100);
-  if ("overheadPct" in input) changes.overheadBp = scaled(input.overheadPct, 100, 100);
-  // A margin on the price: at 100 % there would be no price.
-  if ("profitPct" in input) changes.profitBp = scaled(input.profitPct, 50, 100);
-  if ("texts" in input) changes.texts = parseTexts(input.texts, readTexts(revision.texts));
-  if ("exclusions" in input) {
+  const changes: Partial<typeof budgetRevisions.$inferInsert> = columns;
+  // The API names the areas in m² and the contingency and margins in %; parse gives them in hundredths.
+  if (builtAreaM2 !== undefined) changes.builtAreaCm2 = builtAreaM2;
+  if (usefulAreaM2 !== undefined) changes.usefulAreaCm2 = usefulAreaM2;
+  if (contingencyPct !== undefined) changes.contingencyBp = contingencyPct;
+  if (overheadPct !== undefined) changes.overheadBp = overheadPct;
+  if (profitPct !== undefined) changes.profitBp = profitPct;
+  if (texts) changes.texts = mergeTexts(texts, readTexts(revision.texts));
+  if (exclusions !== undefined) {
     // /api/v1's one-per-line string: a FRAMER revision keeps them in its texts.
-    const exclusions = optionalText(input.exclusions, MAX_TEXT);
     if (framer) changes.texts = { ...((changes.texts as BudgetTexts | undefined) ?? readTexts(revision.texts)), exclusions: lines(exclusions) };
     else changes.exclusions = exclusions;
   }
-  if ("conditions" in input) changes.conditions = parseConditions(input.conditions, readConditions(revision.conditions));
-  if ("review" in input) {
-    const done = (input.review as { done?: unknown } | null)?.done;
-    if (!Array.isArray(done) || done.length > MAX_REVIEWED || done.some((key) => typeof key !== "string" || key.length > 80)) fail("invalid_input");
-    changes.review = { done: [...new Set(done as string[])] };
-  }
-  let reviewed: { key: string; done: boolean } | undefined;
-  if ("reviewed" in input) {
-    const { key, done } = (input.reviewed ?? {}) as { key?: unknown; done?: unknown };
-    if (typeof key !== "string" || key.length === 0 || key.length > 80 || typeof done !== "boolean") fail("invalid_input");
-    reviewed = { key, done };
-  }
+  if (conditions) changes.conditions = { ...readConditions(revision.conditions), ...changesOf(conditions) };
+  if (review) changes.review = { done: [...new Set(review.done)] };
   if (Object.keys(changes).length > 0 || reviewed) {
     await inDraft(revisionId, async (tx) => {
       if (reviewed) {
@@ -681,11 +609,9 @@ export async function updateRevision(
   return { revisionId };
 }
 
-/** Reads `chosenOptionIds`: options of this revision. */
-async function chosenOptions(revisionId: string, value: unknown): Promise<Set<string>> {
-  if (value === undefined) return new Set();
-  if (!Array.isArray(value) || value.some((id) => typeof id !== "string")) fail("invalid_input");
-  const ids = new Set(value as string[]);
+/** The options chosen (`chosenOptionIds`): options of this revision. */
+async function chosenOptions(revisionId: string, chosenIds: string[]): Promise<Set<string>> {
+  const ids = new Set(chosenIds);
   if (ids.size === 0) return ids;
   const found = await db
     .select({ id: budgetChapters.id })
@@ -728,18 +654,19 @@ export async function acceptRevision(
   const revision = await revisionInProject(ctx, projectId, revisionId, { draft: false });
   const acceptable = (status: RevisionRow["status"]) => status === "issued" || (status === "draft" && options.unissued === true);
   if (!acceptable(revision.status)) fail("not_issued");
-  const acceptedOn = input.acceptedOn === undefined ? todayInSpain() : workDate(input.acceptedOn);
+  const body = parse(acceptSchema, input);
+  const acceptedOn = body.acceptedOn ?? todayInSpain();
   // Nobody accepts what they haven't been sent yet.
   const afterIssue = (issuedOn: string | null) => issuedOn === null || acceptedOn >= issuedOn;
   if (!afterIssue(revision.issuedOn)) fail("invalid_date");
-  const acceptedBy = optionalText(input.acceptedBy, MAX_NAME);
-  const chosen = await chosenOptions(revisionId, input.chosenOptionIds);
+  const { acceptedBy } = body;
+  const chosen = await chosenOptions(revisionId, body.chosenOptionIds ?? []);
   // The signed copy is filed with the contracts, in the same step: if storing
   // it fails the revision isn't accepted, and the dialog can be sent again.
   const signed =
-    input.signed == null
+    body.signed == null
       ? null
-      : newPdfDocument(ctx, projectId, await requirePdf(input.signed), {
+      : newPdfDocument(ctx, projectId, await requirePdf(body.signed), {
           title: `Presupuesto ${revision.reference ?? ""} · Rev.${revision.number} · firmado`.replace("  ", " "),
           category: "contract",
         });
@@ -823,7 +750,7 @@ export async function rejectRevision(
 ) {
   const revision = await revisionInProject(ctx, projectId, revisionId, { draft: false });
   if (revision.status !== "issued") fail("not_issued");
-  const rejectedOn = input.rejectedOn === undefined ? todayInSpain() : calendarDate(input.rejectedOn);
+  const rejectedOn = parse(rejectSchema, input).rejectedOn ?? todayInSpain();
   const [updated] = await db
     .update(budgetRevisions)
     .set({ status: "rejected", rejectedOn })
@@ -861,11 +788,7 @@ export async function addChapter(
   const revision = await revisionInProject(ctx, projectId, revisionId);
   // The FRAMER model has its twenty chapters; options go through budget-options.ts.
   if (revision.model === BUDGET_MODEL) fail("fixed_chapters");
-  const values = {
-    code: requiredText(input.code, MAX_CHAPTER_CODE),
-    name: requiredText(input.name, MAX_NAME),
-    changeNote: optionalText(input.changeNote, MAX_NOTE),
-  };
+  const values = parse(newChapterSchema, input);
   const [chapter] = await withFreeCode(() =>
     inDraft(revisionId, (tx) =>
       tx
@@ -890,13 +813,9 @@ export async function updateChapter(
   input: Record<string, unknown>,
 ) {
   const chapter = await chapterInProject(ctx, projectId, chapterId);
-  if (chapter.model === BUDGET_MODEL && "code" in input && input.code !== chapter.code) fail("fixed_chapters");
-  const changes = pickChanges<typeof budgetChapters.$inferInsert>(input, {
-    code: (v) => requiredText(v, MAX_CHAPTER_CODE),
-    name: (v) => requiredText(v, MAX_NAME),
-    changeNote: (v) => optionalText(v, MAX_NOTE),
-    pdfNote: (v) => optionalText(v, MAX_NOTE),
-  });
+  // As sent, before it is read: a FRAMER chapter's code never changes.
+  if (chapter.model === BUDGET_MODEL && input.code !== undefined && input.code !== chapter.code) fail("fixed_chapters");
+  const changes = changesOf(parse(chapterChangesSchema, input));
   if (Object.keys(changes).length > 0) {
     await withFreeCode(() =>
       inDraft(chapter.revisionId, (tx) => tx.update(budgetChapters).set(changes).where(eq(budgetChapters.id, chapterId)), {
@@ -916,29 +835,6 @@ export async function deleteChapter(ctx: Ctx, projectId: string, chapterId: stri
 }
 
 // ─── Lines ───────────────────────────────────────────────────────────────────
-
-/**
- * Line fields; an option's lines may have a negative price (a deduction), and
- * their code is assigned by the option numbering (OP.01…).
- */
-function lineParsers(kind: "chapter" | "option") {
-  return {
-    code: (v: unknown) => requiredText(v, MAX_CHAPTER_CODE),
-    description: (v: unknown) => requiredText(v, MAX_DESCRIPTION),
-    unit: (v: unknown) => requiredText(v, MAX_UNIT),
-    quantityMilli: (v: unknown) => scaled(v, MAX_QUANTITY, 1000),
-    unitPriceCents: (v: unknown) =>
-      v === undefined
-        ? fail("missing_fields")
-        : integer(v, kind === "option" ? -MAX_UNIT_PRICE_CENTS : 0, MAX_UNIT_PRICE_CENTS),
-    note: (v: unknown) => optionalText(v, MAX_NOTE),
-    source: (v: unknown) => (v === "base" || v === "estimated" || v === "manual" ? (v as LineSource) : fail("invalid_input")),
-  };
-}
-
-/** The API's `quantity` is stored in thousandths as `quantityMilli` (which the API never takes). */
-const lineInput = ({ quantity, quantityMilli: _, ...input }: Record<string, unknown>) =>
-  quantity === undefined ? input : { ...input, quantityMilli: quantity };
 
 /** Chapter 20's line follows the others; nothing else may be written to it. */
 const isComputedChapter = (chapter: { kind: string; code: string; model: string | null }) =>
@@ -960,21 +856,21 @@ export async function addLine(
   const chapter = await chapterInProject(ctx, projectId, chapterId);
   if (isComputedChapter(chapter)) fail("fixed_chapters");
   const kind = chapter.kind;
-  const parse = lineParsers(kind);
-  const base = typeof input.baseCode === "string" ? priceBaseItem(input.baseCode) : null;
-  if (input.baseCode !== undefined && !base) fail("invalid_input");
-  const fields = lineInput(input);
-  const autoCode = fields.code === undefined && (kind === "option" || chapter.model === BUDGET_MODEL);
-  const values = {
-    code: autoCode ? "" : parse.code(fields.code ?? base?.code),
-    description: parse.description(fields.description ?? base?.description),
-    unit: parse.unit(fields.unit ?? base?.unit),
-    quantityMilli: parse.quantityMilli(fields.quantityMilli),
-    unitPriceCents: parse.unitPriceCents(fields.unitPriceCents ?? base?.unitPriceCents),
-    note: parse.note(fields.note),
-    source: fields.source === undefined ? (base ? "base" : "manual") : parse.source(fields.source),
-    baseCode: base?.code ?? null,
+  const { baseCode } = parse(lineBaseSchema, input);
+  const base = baseCode === undefined ? null : (priceBaseItem(baseCode) ?? fail("invalid_input"));
+  const autoCode = input.code === undefined && (kind === "option" || chapter.model === BUDGET_MODEL);
+  // The price base entry gives what isn't sent (or is null).
+  const given = {
+    ...input,
+    code: input.code ?? base?.code,
+    description: input.description ?? base?.description,
+    unit: input.unit ?? base?.unit,
+    unitPriceCents: input.unitPriceCents ?? base?.unitPriceCents,
   };
+  const { quantity, source, ...fields } = autoCode
+    ? { ...parse(numberedLineSchemas[kind], given), code: "" }
+    : parse(newLineSchemas[kind], given);
+  const values = { ...fields, quantityMilli: quantity, source: source ?? (base ? "base" : "manual"), baseCode: base?.code ?? null };
   const [line] = await inDraft(chapter.revisionId, async (tx) =>
     tx
       .insert(budgetLines)
@@ -1003,17 +899,12 @@ export async function updateLine(
 ) {
   const row = await draftLine(ctx, projectId, lineId);
   if (row.line.source === "computed") fail("fixed_chapters");
-  const kind = row.chapterKind;
-  const { code: _, ...withoutCode } = lineInput(input);
-  const changes = pickChanges<typeof budgetLines.$inferInsert>(
-    // An option line's code follows its position.
-    kind === "option" ? withoutCode : lineInput(input),
-    lineParsers(kind),
-  );
+  // An option line's code follows its position: its schema leaves it out.
+  const { quantity, chapterId, ...columns } = changesOf(parse(lineChangesSchemas[row.chapterKind], input));
+  const changes = quantity === undefined ? columns : { ...columns, quantityMilli: quantity };
   let move = {};
-  if ("chapterId" in input && input.chapterId !== row.line.chapterId) {
-    if (typeof input.chapterId !== "string") fail("invalid_input");
-    const target = await chapterInProject(ctx, projectId, input.chapterId);
+  if (chapterId !== undefined && chapterId !== row.line.chapterId) {
+    const target = await chapterInProject(ctx, projectId, chapterId);
     if (target.revisionId !== row.revisionId || target.kind !== row.chapterKind || isComputedChapter(target)) fail("invalid_input");
     move = { chapterId: target.id, position: nextPosition(budgetLines, budgetLines.position, eq(budgetLines.chapterId, target.id)) };
   }
@@ -1038,13 +929,7 @@ export async function deleteLine(ctx: Ctx, projectId: string, lineId: string) {
  */
 export async function setProgress(ctx: Ctx, projectId: string, input: Record<string, unknown>) {
   requireEditor(ctx);
-  if (!Array.isArray(input.lines)) fail("missing_fields");
-  const updates = new Map<string, number>();
-  for (const entry of input.lines as unknown[]) {
-    const { id, executedPct } = (entry ?? {}) as Record<string, unknown>;
-    if (typeof id !== "string") fail("invalid_input");
-    updates.set(id, integer(executedPct, 0, 100));
-  }
+  const updates = new Map(parse(progressSchema, input).lines.map(({ id, executedPct }) => [id, executedPct]));
   if (updates.size === 0) {
     await requireProject(ctx.tenantId, projectId);
     return { updated: 0 };

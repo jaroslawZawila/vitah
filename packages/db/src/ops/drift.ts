@@ -10,7 +10,7 @@ const IGNORED_TABLES = new Set(["schema_migrations"]);
 
 type Column = { type: string; notNull: boolean; default: string | null; generated: string | null };
 type Named = { name: string; def: string };
-type ForeignKey = { name: string; signature: string; rules: string };
+type ForeignKey = { name: string; signature: string; rules: string; validated: boolean };
 type Table = {
   columns: Map<string, Column>;
   /** Indexes that don't back a constraint; `def` without the index's name. */
@@ -94,6 +94,7 @@ export async function introspect(url: string): Promise<Snapshot> {
           refColumns: string[] | null;
           onDelete: string;
           onUpdate: string;
+          validated: boolean;
         }[]
       >`
         select c.relname as "table", k.conname as name, k.contype as type, pg_get_constraintdef(k.oid) as def,
@@ -104,7 +105,7 @@ export async function introspect(url: string): Promise<Snapshot> {
                (select array_agg(a.attname order by u.ord)
                   from unnest(k.confkey) with ordinality u(attnum, ord)
                   join pg_attribute a on a.attrelid = k.confrelid and a.attnum = u.attnum) as "refColumns",
-               k.confdeltype as "onDelete", k.confupdtype as "onUpdate"
+               k.confdeltype as "onDelete", k.confupdtype as "onUpdate", k.convalidated as validated
         from pg_constraint k
         join pg_class c on c.oid = k.conrelid
         join pg_namespace n on n.oid = c.relnamespace
@@ -141,6 +142,7 @@ export async function introspect(url: string): Promise<Snapshot> {
             name: k.name,
             signature: `(${k.columns.join(", ")}) -> ${k.refTable}(${(k.refColumns ?? []).join(", ")})`,
             rules: `on delete ${FK_ACTIONS[k.onDelete] ?? k.onDelete}, on update ${FK_ACTIONS[k.onUpdate] ?? k.onUpdate}`,
+            validated: k.validated,
           });
         } else table.constraints.push({ name: k.name, def: k.def });
       }
@@ -211,7 +213,9 @@ function compareNamed(kind: "index" | "constraint", table: string, expected: Nam
   for (const want of expected) {
     const same = take((candidate) => candidate.name === want.name);
     if (!same) unnamed.push(want);
-    else if (same.def !== want.def) {
+    else if (same.def === `${want.def} NOT VALID`) {
+      items.push({ group: "different", item: `${kind} ${table}.${want.name}`, detail: notValidated(table, want.name), table });
+    } else if (same.def !== want.def) {
       items.push({
         group: "different",
         item: `${kind} ${table}.${want.name}`,
@@ -221,12 +225,12 @@ function compareNamed(kind: "index" | "constraint", table: string, expected: Nam
     }
   }
   for (const want of unnamed) {
-    const renamed = take((candidate) => candidate.def === want.def);
+    const renamed = take((candidate) => candidate.def === want.def || candidate.def === `${want.def} NOT VALID`);
     if (renamed) {
       items.push({
         group: "different",
         item: `${kind} ${table}.${want.name}`,
-        detail: `is named ${renamed.name} in the target (${want.def})`,
+        detail: `is named ${renamed.name} in the target (${want.def})${renamed.def === want.def ? "" : `; ${notValidated(table, renamed.name)}`}`,
         table,
       });
     } else items.push({ group: "missing", item: `${kind} ${table}.${want.name}`, detail: want.def, table });
@@ -236,6 +240,14 @@ function compareNamed(kind: "index" | "constraint", table: string, expected: Nam
   }
   return items;
 }
+
+/**
+ * A constraint added NOT VALID whose validation failed or never ran: new writes
+ * are checked, the rows already there never were.
+ */
+const notValidated = (table: string, name: string) =>
+  `NOT VALID: the rows from before it was added were never checked. Fix those that break it, then ` +
+  `ALTER TABLE ${table} VALIDATE CONSTRAINT ${name}`;
 
 /** Foreign keys by what they say (columns, referenced table, rules), never by name: production's names differ. */
 function compareForeignKeys(table: string, expected: ForeignKey[], target: ForeignKey[]): DriftItem[] {
@@ -259,6 +271,9 @@ function compareForeignKeys(table: string, expected: ForeignKey[], target: Forei
     } else if (found.length !== wanted.length) {
       const detail = `defined ${found.length} times, schema.ts has it ${wanted.length === 1 ? "once" : `${wanted.length} times`}`;
       items.push({ group: "different", item, detail, table });
+    } else {
+      const unvalidated = target.find((key) => key.signature === signature && !key.validated);
+      if (unvalidated) items.push({ group: "different", item, detail: notValidated(table, unvalidated.name), table });
     }
   }
   return items;

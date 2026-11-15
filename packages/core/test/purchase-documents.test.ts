@@ -9,6 +9,7 @@ import {
   subcontractorsService,
   type Ctx,
 } from "../src";
+import { MAX_DOCUMENT_BYTES } from "../src/contract";
 import { files, putFile } from "../src/testing";
 import { framerDraft } from "./budget-fixture";
 
@@ -249,5 +250,48 @@ describe("access", () => {
       await expect(attempt()).rejects.toMatchObject({ code: "not_found" });
     }
     expect(await db.select().from(purchaseOrderDocuments)).toMatchObject([{ deletedAt: null }]);
+  });
+});
+
+describe("input boundaries (schemas in src/inputs/purchase-documents.ts)", () => {
+  /** The code a write is refused with, or "ok". */
+  const outcome = (write: Promise<unknown>) => write.then(() => "ok", (error: { code?: string }) => error.code ?? String(error));
+
+  it("answers wrong types with each field's code, as before, writing nothing; ignores keys it doesn't take", async () => {
+    const s = await setup();
+    const cases: [Record<string, unknown>, string][] = [
+      [{ title: 5, file: pdf() }, "missing_fields"],
+      [{ title: " ", file: pdf() }, "missing_fields"],
+      [{ title: "x".repeat(201), file: pdf() }, "invalid_input"],
+      [{ title: "Contrato", file: pdf(), note: 5 }, "invalid_input"],
+      [{ title: "Contrato", file: pdf(), note: "x".repeat(301) }, "invalid_input"],
+      [{ title: "Contrato" }, "missing_file"],
+    ];
+    for (const [input, code] of cases) {
+      expect([input, await outcome(svc.addOrderDocument(s.ctx, s.orderId, input))]).toEqual([input, code]);
+    }
+    expect(await db.select().from(purchaseOrderDocuments)).toHaveLength(0);
+
+    const { documentId } = await svc.addOrderDocument(s.ctx, s.orderId, {
+      title: " Contrato ",
+      file: pdf(),
+      tenantId: "other",
+      orderId: "other",
+      version: 7,
+    });
+    expect(await outcome(svc.addOrderDocumentVersion(s.ctx, s.orderId, documentId, { file: pdf("%PDF-1.7 v2"), note: 5 }))).toBe("invalid_input");
+    expect(await outcome(svc.addOrderDocumentVersion(s.ctx, s.orderId, documentId, { note: "Firmado" }))).toBe("missing_file");
+    const [document] = (await purchasingService.getPurchase(s.ctx, s.orderId)).documents;
+    expect(document).toMatchObject({ title: "Contrato", versions: [{ version: 1 }] });
+    const [row] = await db.select().from(purchaseOrderDocuments).where(eq(purchaseOrderDocuments.id, documentId));
+    expect(row).toMatchObject({ tenantId: s.tenant.id, orderId: s.orderId });
+  });
+
+  it("checks the title, the PDF and the note in that order, as before", async () => {
+    const s = await setup();
+    const big = new File(["%PDF-1.7", "x".repeat(MAX_DOCUMENT_BYTES)], "Contrato.pdf", { type: "application/pdf" });
+    expect(await outcome(svc.addOrderDocument(s.ctx, s.orderId, { title: "Contrato", file: big, note: 5 }))).toBe("file_too_large");
+    expect(await outcome(svc.addOrderDocument(s.ctx, s.orderId, { title: "", file: big }))).toBe("missing_fields");
+    expect(await db.select().from(purchaseOrderDocuments)).toHaveLength(0);
   });
 });

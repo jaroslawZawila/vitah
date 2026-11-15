@@ -1571,13 +1571,15 @@
   },
   "budget": {
     "title": "Presupuesto",
-    "statusPill": "Rev.{number} · {status}",
-    "status": {
-      "draft": "Borrador",
-      "issued": "Emitida",
-      "accepted": "Aceptada",
-      "rejected": "Rechazada",
-      "superseded": "Sustituida"
+    "revisionPill": {
+      "label": "Rev.{number} · {status}",
+      "status": {
+        "draft": "Borrador",
+        "issued": "Emitida",
+        "accepted": "Aceptada",
+        "rejected": "Rechazada",
+        "superseded": "Sustituida"
+      }
     },
     "summaryReference": "N.º {reference}",
     "summaryBuilt": "{m2} m² construidos",
@@ -3030,8 +3032,9 @@
       "pendiente": "CAE pendiente",
       "bloqueada": "CAE bloqueada"
     },
-    "lateDays": "{days} d tarde",
-    "notCounted": "Pendientes y cancelados no suman",
+    "latePill": {
+      "days": "{days} d tarde"
+    },
     "groups": {
       "label": "Estado",
       "all": "Todos",
@@ -3060,7 +3063,8 @@
       "chapterFilter": "Capítulo",
       "lateOnly": "Solo con retraso",
       "noMatch": "Ningún pedido con estos filtros.",
-      "invoiced": "Facturado"
+      "invoiced": "Facturado",
+      "notCounted": "Pendientes y cancelados no suman"
     },
     "kpis": {
       "label": "Resumen de compras",

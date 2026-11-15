@@ -8,19 +8,23 @@ import {
   daysBetween,
   defaultExpiry,
   docState,
+  holdsUntil,
+  HOLDS_FOREVER,
   isValidCif,
   isValidDni,
   isValidNie,
   lowPermanentShare,
   maskIdNumber,
+  nextStateChange,
   normalizeIdNumber,
   provinceForPostalCode,
   requiredTrainings,
+  standing,
   workerAccess,
   type DocFacts,
   type WorkerAccessInput,
 } from "../src/contract";
-import { todayInSpain } from "../src/obra-calc";
+import { addDays, todayInSpain } from "../src/obra-calc";
 
 // The pure CAE rules (src/subcontractor-rules.ts): no database.
 
@@ -294,5 +298,42 @@ describe("dates", () => {
     // 23:30 UTC on 31 Dec is already New Year's Day in Madrid.
     expect(todayInSpain(new Date("2026-12-31T23:30:00Z"))).toBe("2027-01-01");
     expect(daysBetween("2026-10-17", "2026-11-04")).toBe(18);
+  });
+});
+
+describe("nextStateChange", () => {
+  const day = (offset: number) => addDays(TODAY, offset);
+
+  it("is the day the alert window opens, then the day after the expiry", () => {
+    expect(nextStateChange("cert_aeat_contratistas", validUntil(day(40)), TODAY)).toBe(day(10));
+    expect(nextStateChange("cert_aeat_contratistas", validUntil(day(20)), TODAY)).toBe(day(21));
+    // A monthly document's window is a week.
+    expect(nextStateChange("cert_tgss", validUntil(day(20)), TODAY)).toBe(day(13));
+    expect(nextStateChange("cert_tgss", validUntil(day(-1)), TODAY)).toBeNull();
+    expect(nextStateChange("evaluacion_riesgos", valid, TODAY)).toBeNull();
+    expect(nextStateChange("rea_subcontrata", undefined, TODAY)).toBeNull();
+    // The version validated before a pending renewal counts too.
+    expect(nextStateChange("cert_tgss", { status: "uploaded", expiresAt: day(60), previousValidUntil: day(3) }, TODAY)).toBe(day(4));
+    expect(holdsUntil(day(4))).toBe(day(3));
+    expect(holdsUntil(null)).toBe(HOLDS_FOREVER);
+  });
+
+  it("never misses a day the state or the standing changes", () => {
+    const statuses = ["requested", "uploaded", "validated", "rejected", "not_applicable"] as const;
+    const expiries = [null, -40, -8, -7, -1, 0, 1, 6, 7, 8, 29, 30, 31, 45];
+    for (const requirementId of ["cert_tgss", "poliza_rc_subcontrata"]) {
+      for (const status of statuses) {
+        for (const current of expiries) {
+          for (const previous of [undefined, ...expiries]) {
+            const doc: DocFacts = { status, expiresAt: current === null ? null : day(current) };
+            if (previous !== undefined) doc.previousValidUntil = previous === null ? null : day(previous);
+            const seen = (on: string) => [docState(requirementId, doc, on).state, standing(requirementId, doc, on)].join();
+            const next = nextStateChange(requirementId, doc, TODAY);
+            // Nothing changes before it (nor, when null, ever).
+            for (let d = 1; d < 80 && (next === null || day(d) < next); d++) expect(seen(day(d))).toBe(seen(TODAY));
+          }
+        }
+      }
+    }
   });
 });

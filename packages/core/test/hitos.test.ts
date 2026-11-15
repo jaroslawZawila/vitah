@@ -7,7 +7,8 @@ import {
   resetDatabase,
 } from "@repo/db/testing";
 import { asc, db, eq, obraHitoEvents, users } from "@repo/db";
-import { budgetService, hitosService as svc, MAX_DOCUMENT_BYTES, photosService, type Ctx, type Hito } from "../src";
+import { budgetService, hitosService as svc, MAX_AMOUNT_CENTS, MAX_DOCUMENT_BYTES, photosService, type Ctx, type Hito } from "../src";
+import { todayInSpain } from "../src/obra-calc";
 import { framerDraft } from "./budget-fixture";
 import { files } from "../src/testing";
 
@@ -491,5 +492,69 @@ describe("access", () => {
     expect(await new Response(mine.body).text()).toBe("%PDF-mine");
     await expect(svc.openClientHitoFile(tenant.id, client.id, other.byCode("H3").id, "invoice")).rejects.toMatchObject({ code: "not_found" });
     await expect(svc.openClientHitoFile(tenant.id, client.id, byCode("H3").id, "acta")).rejects.toMatchObject({ code: "not_found" });
+  });
+});
+
+describe("input boundaries (schemas in src/inputs/hitos.ts)", () => {
+  it("takes a payment up to MAX_AMOUNT_CENTS and refuses more (or nothing) as invalid_input, never a database error", async () => {
+    const { project, ctx, byCode } = await setup();
+    const h3 = byCode("H3");
+    const pay = (amountCents: unknown) => svc.registerPayment(ctx, project.id, h3.id, { paidOn: "2026-09-24", amountCents });
+    for (const amount of [MAX_AMOUNT_CENTS + 1, 2 ** 31, 0, -5, 1.5, "100", ""]) {
+      await expect(pay(amount)).rejects.toMatchObject({ code: "invalid_input", status: 400 });
+    }
+    expect(await stored(h3.id)).toHaveLength(0);
+    await pay(MAX_AMOUNT_CENTS);
+    expect(await find(ctx, project.id, "H3")).toMatchObject({ paidAmountCents: MAX_AMOUNT_CENTS });
+    // Null, as missing: the hito's price with VAT.
+    await pay(null);
+    expect(await find(ctx, project.id, "H3")).toMatchObject({ paidAmountCents: h3.totalCents });
+  });
+
+  it("answers wrong types with each field's old code, and writes nothing", async () => {
+    const { project, ctx, byCode } = await setup();
+    const h3 = byCode("H3");
+    const checkId = byCode("H4").checks[0]!.id;
+    const hito = (body: Record<string, unknown>) => () => svc.updateHito(ctx, project.id, h3.id, body);
+    const plan = (body: Record<string, unknown>) => () => svc.updatePlan(ctx, project.id, body);
+    const cases: [() => Promise<unknown>, string][] = [
+      [hito({ name: " " }), "missing_fields"],
+      [hito({ pctBp: 10_001 }), "invalid_input"],
+      [hito({ pctBp: "1200" }), "invalid_input"],
+      [hito({ scope: 5 }), "invalid_input"],
+      [hito({ chapterCodes: "01" }), "invalid_input"],
+      [hito({ chapterCodes: [""] }), "missing_fields"],
+      [hito({ chapterCodes: [1] }), "missing_fields"],
+      [plan({}), "missing_fields"],
+      [plan({ hitos: "all" }), "missing_fields"],
+      [plan({ hitos: [null] }), "invalid_input"],
+      [plan({ hitos: [{ pctBp: 1200 }] }), "invalid_input"],
+      [plan({ hitos: [{ id: h3.id, pctBp: -1 }] }), "invalid_input"],
+      [() => svc.addCheck(ctx, project.id, h3.id, {}), "missing_fields"],
+      [() => svc.addCheck(ctx, project.id, h3.id, { label: 5 }), "missing_fields"],
+      [() => svc.addCheck(ctx, project.id, h3.id, { label: "x".repeat(301) }), "invalid_input"],
+      [() => svc.updateCheck(ctx, project.id, checkId, { done: "yes" }), "invalid_input"],
+      [() => svc.updateCheck(ctx, project.id, checkId, { label: "" }), "missing_fields"],
+      [() => svc.setActaPhotos(ctx, project.id, h3.id, {}), "invalid_input"],
+      [() => svc.setActaPhotos(ctx, project.id, h3.id, { photoIds: [5] }), "invalid_input"],
+      [() => svc.uploadHitoFile(ctx, project.id, h3.id, "acta", { file: pdf(), date: "" }), "invalid_date"],
+      [() => svc.uploadHitoFile(ctx, project.id, h3.id, "invoice", { file: pdf(), date: null }), "invalid_date"],
+      [() => svc.uploadHitoFile(ctx, project.id, h3.id, "invoice", { file: pdf(), date: "24/09/2026" }), "invalid_date"],
+      [() => svc.registerPayment(ctx, project.id, h3.id, {}), "invalid_date"],
+      [() => svc.registerPayment(ctx, project.id, h3.id, { paidOn: "2999-01-01" }), "invalid_date"],
+    ];
+    const before = await svc.listHitos(ctx, project.id);
+    for (const [call, code] of cases) await expect(call()).rejects.toMatchObject({ code, status: 400 });
+    expect(await svc.listHitos(ctx, project.id)).toEqual(before);
+    expect(await db.select().from(obraHitoEvents)).toHaveLength(0);
+    expect(files.size).toBe(0);
+  });
+
+  it("ignores keys it doesn't take, as before; an invoice dated \"\" is today's", async () => {
+    const { project, ctx, byCode } = await setup();
+    const h3 = byCode("H3");
+    await svc.updateHito(ctx, project.id, h3.id, { name: "Estructura", code: "H99", projectId: "other", tenantId: "other" });
+    await svc.uploadHitoFile(ctx, project.id, h3.id, "invoice", { file: pdf(), date: "", invoicePathname: "elsewhere" });
+    expect(await find(ctx, project.id, "H3")).toMatchObject({ code: "H3", name: "Estructura", invoicedOn: todayInSpain() });
   });
 });

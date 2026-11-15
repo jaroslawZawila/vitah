@@ -1,13 +1,16 @@
-import { db, eq, max, purchaseOrderAmendments, purchaseOrders } from "@repo/db";
+import { db, eq, max, purchaseOrderAmendments, purchaseOrderLines, purchaseOrders, sql } from "@repo/db";
 import { requireEditor, type Ctx } from "./context";
 import { canAmend } from "./contract";
 import { requirePdf } from "./documents";
 import { idempotent, type Once } from "./idempotency";
 import { logError } from "./log";
-import { fail, optionalText, requiredText, workDate } from "./obra-data";
+import { parse } from "./inputs/fields";
+import { MAX_TITLE, amendmentSchema } from "./inputs/purchase-amendments";
+import { fail } from "./obra-data";
+import { MAX_AMOUNT_CENTS } from "./money";
 import { todayInSpain } from "./obra-calc";
 import { addOrderDocument } from "./purchase-documents";
-import { MAX_DESCRIPTION, contractLines, followSchedule, logEvent, parseLines, replaceOrderLines, requireOrder } from "./purchasing";
+import { contractLines, contractedLines, followSchedule, logEvent, replaceOrderLines, requireOrder } from "./purchasing";
 
 // ─── An order's modificados (formal amendments) ──────────────────────────────
 // A placed order changes formally by a modificado: numbered per order, signed
@@ -18,8 +21,6 @@ import { MAX_DESCRIPTION, contractLines, followSchedule, logEvent, parseLines, r
 // comes off the last milestones not invoiced. A pending order is just edited.
 // Staff only: admins and managers write; it shows on the order's page.
 // ─────────────────────────────────────────────────────────────────────────────
-
-const MAX_TITLE = 200;
 
 const sum = (lines: { amountCents: number }[]) => lines.reduce((total, l) => total + l.amountCents, 0);
 
@@ -43,9 +44,9 @@ export async function amendPurchase(ctx: Ctx, orderId: string, input: Record<str
   requireEditor(ctx);
   const made = await idempotent<Made>(ctx, "purchase.amendment.create", { orderId }, input, (once) => recordAmendment(ctx, orderId, input, once));
   // Read again here: a retry answered from its key has checked nothing.
-  const file = input.file === undefined || input.file === null ? null : await requirePdf(input.file);
+  const { file: sent, documentTitle: title } = parse(amendmentSchema.pick({ documentTitle: true, file: true }), input);
+  const file = sent === undefined || sent === null ? null : await requirePdf(sent);
   if (!file) return made;
-  const title = optionalText(input.documentTitle, MAX_TITLE);
   const fileName = file instanceof File ? file.name.replace(/\.pdf$/i, "").slice(0, MAX_TITLE) : "";
   let documentId: string;
   try {
@@ -68,22 +69,29 @@ export async function amendPurchase(ctx: Ctx, orderId: string, input: Record<str
 async function recordAmendment(ctx: Ctx, orderId: string, input: Record<string, unknown>, once: Once<Made>): Promise<Made> {
   const order = await requireOrder(ctx, orderId);
   if (!canAmend(order.status)) fail("invalid_state");
-  const concept = requiredText(input.concept, MAX_DESCRIPTION);
-  const signedOn = input.signedOn === undefined || input.signedOn === null || input.signedOn === "" ? todayInSpain() : workDate(input.signedOn);
+  const { concept, file, ...body } = parse(amendmentSchema.omit({ lines: true }), input);
+  const signedOn = body.signedOn ?? todayInSpain();
   // Not before the contract it changes.
   if (order.orderedOn && signedOn < order.orderedOn) fail("invalid_date");
-  optionalText(input.documentTitle, MAX_TITLE);
+  // The PDF before the lines, as always.
   const [contract] = await Promise.all([
     contractLines(ctx.tenantId, order.projectId),
-    input.file === undefined || input.file === null ? null : requirePdf(input.file),
+    file === undefined || file === null ? null : requirePdf(file),
   ]);
-  const lines = parseLines(input.lines, contract);
+  const lines = contractedLines(parse(amendmentSchema.pick({ lines: true }), input).lines, contract);
+  // The amounts before and after are stored as integers: each line fits, an order's total may not.
+  if (sum(lines) > MAX_AMOUNT_CENTS) fail("invalid_input");
 
   return db.transaction((tx) =>
     once(tx, async () => {
       // Locked: a status change, an edit or another modificado waits for this one.
       const [locked] = await tx.select({ status: purchaseOrders.status }).from(purchaseOrders).where(eq(purchaseOrders.id, orderId)).for("update");
       if (!locked || !canAmend(locked.status)) fail("invalid_state");
+      const [current] = await tx
+        .select({ cents: sql<number>`coalesce(sum(${purchaseOrderLines.amountCents}), 0)`.mapWith(Number) })
+        .from(purchaseOrderLines)
+        .where(eq(purchaseOrderLines.orderId, orderId));
+      if ((current?.cents ?? 0) > MAX_AMOUNT_CENTS) fail("invalid_input");
       const { before, changes } = await replaceOrderLines(tx, ctx, orderId, lines, contract);
       if (changes.length === 0) fail("no_changes");
       const [last] = await tx

@@ -19,15 +19,16 @@ export type OrderListVariant = "project" | "company" | "supplier";
 
 /** The supplier's kind line under its name: "Material · CAE pendiente". */
 function SupplierLine({ order }: { order: PurchaseOrderListItem }) {
-  const t = useTranslations("purchasing");
+  const kind = useTranslations("purchasing.kind");
+  const cae = useTranslations("purchasing.cae");
   const caePending = !order.suppliesOnly && order.caeStatus !== null && order.caeStatus !== "apta";
   return (
     <div className="text-meta text-muted-foreground">
-      {t(`kind.${order.kind}`)}
+      {kind(order.kind)}
       {caePending && (
         <>
           {" · "}
-          <span className="font-semibold text-warn">{t(`cae.${order.caeStatus}`)}</span>
+          <span className="font-semibold text-warn">{cae(`${order.caeStatus}`)}</span>
         </>
       )}
     </div>
@@ -70,7 +71,6 @@ export default function OrderList({
   totals?: { count: number; contractedCents: number };
 }) {
   const t = useTranslations("purchasing.list");
-  const tp = useTranslations("purchasing");
   const f = usePurchaseFormat();
   const vat = useVatLabel();
   // The project's own list leaves the obra out; a supplier's, the supplier.
@@ -193,7 +193,7 @@ export default function OrderList({
                 </TableCell>
                 <TableCell className="num text-right">{f.amount(totals?.contractedCents ?? contractedCents(orders))}</TableCell>
                 <TableCell colSpan={isCompany ? 4 : 3} className="pr-[18px] text-meta font-normal text-muted-foreground">
-                  {tp("notCounted")}
+                  {t("notCounted")}
                 </TableCell>
               </TableRow>
             </TableFooter>

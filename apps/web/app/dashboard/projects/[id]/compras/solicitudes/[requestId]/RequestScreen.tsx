@@ -13,7 +13,7 @@ import BackLink from "../../../../../components/BackLink";
 import { useConfirm } from "../../../../../components/useConfirm";
 import { useObraAction } from "../../../components/obra/useObraAction";
 import { editRequestHref, orderFromRequestHref, orderHref, requestsViewHref } from "../../../components/purchasing/links";
-import { OrderHistory } from "../../../components/purchasing/OrderViews";
+import { OrderHistory } from "../../../components/purchasing/OrderHistory";
 import {
   DecisionCard,
   RequestData,

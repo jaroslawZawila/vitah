@@ -181,3 +181,15 @@ describe("unassignProjectClient", () => {
     ).rejects.toMatchObject({ code: "forbidden" });
   });
 });
+
+describe("input boundaries (schemas in src/inputs/clients.ts)", () => {
+  it("assignProjectClient: a clientId that isn't text or is blank is missing_fields; it is trimmed", async () => {
+    const { project, client, ctx } = await setup();
+    for (const clientId of [undefined, null, 5, "   "]) {
+      await expect(svc.assignProjectClient(ctx, project.id, { clientId })).rejects.toMatchObject({ code: "missing_fields", status: 400 });
+    }
+    expect((await findProject(project.id))?.clientUserId).toBeNull();
+    await svc.assignProjectClient(ctx, project.id, { clientId: ` ${client.id} `, tenantId: "other" });
+    expect((await findProject(project.id))?.clientUserId).toBe(client.id);
+  });
+});

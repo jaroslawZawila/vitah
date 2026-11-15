@@ -397,3 +397,102 @@ describe("who and what", () => {
     await expect(svc.createPlanningDraft(ctx, bare.id, { from: "magic" })).rejects.toMatchObject({ code: "invalid_input" });
   });
 });
+
+describe("input boundaries (schemas in src/inputs/planning.ts)", () => {
+  /** The code a write is refused with, or "ok". */
+  const outcome = (write: Promise<unknown>) => write.then(() => "ok", (error: { code?: string }) => error.code ?? String(error));
+  const rulesOf = async (ctx: Ctx, projectId: string) =>
+    (await svc.getPlanningDraft(ctx, projectId)).rows.map(({ code, after, lagDays, durationDays, fixedStart, leadDays }) => ({
+      code,
+      after,
+      lagDays,
+      durationDays,
+      fixedStart,
+      leadDays,
+    }));
+
+  it("answers wrong types with each field's code, as before, writing nothing", async () => {
+    const { ctx, project } = await setup();
+    const create: [unknown, string][] = [
+      [null, "invalid_input"],
+      [[], "invalid_input"],
+      [{}, "invalid_input"],
+      [{ from: "scratch" }, "invalid_input"],
+      [{ ...PLAIN, region: "xx" }, "invalid_input"],
+      [{ ...PLAIN, region: "" }, "invalid_input"],
+      [{ ...PLAIN, augustClosure: "yes" }, "invalid_input"],
+      [{ ...PLAIN, christmasClosure: null }, "invalid_input"],
+      [{ ...PLAIN, startDate: "" }, "missing_fields"],
+      [{ ...PLAIN, startDate: 5 }, "invalid_date"],
+      [{ ...PLAIN, startDate: "2026-02-30" }, "invalid_date"],
+      [{ ...PLAIN, from: "project", projectId: 5 }, "invalid_input"],
+      [{ ...PLAIN, from: "project", projectId: project.id }, "invalid_input"],
+      // A copy of the baseline reads nothing else.
+      [{ from: "baseline", region: "xx" }, "not_found"],
+    ];
+    for (const [input, code] of create) {
+      expect([input, await outcome(svc.createPlanningDraft(ctx, project.id, input))]).toEqual([input, code]);
+    }
+    expect(await db.select().from(planningVersions)).toHaveLength(0);
+
+    // A null start is the project's; keys it doesn't take are ignored.
+    await svc.createPlanningDraft(ctx, project.id, { ...PLAIN, startDate: null, status: "approved", number: 7 });
+    expect((await svc.getPlanningDraft(ctx, project.id)).version).toMatchObject({ number: 1, status: "draft", startDate: "2026-06-01" });
+    // The body is checked before the draft that exists; its fields after.
+    expect(await outcome(svc.createPlanningDraft(ctx, project.id, null))).toBe("invalid_input");
+    expect(await outcome(svc.createPlanningDraft(ctx, project.id, { from: "scratch" }))).toBe("draft_exists");
+
+    const rules = await rulesOf(ctx, project.id);
+    const change = (code: string, changes: Record<string, unknown>) => rules.map((r) => (r.code === code ? { ...r, ...changes } : r));
+    const save: [unknown, string][] = [
+      [null, "invalid_input"],
+      [{}, "invalid_input"],
+      [{ items: "all" }, "invalid_input"],
+      [{ items: ["01"] }, "invalid_input"],
+      [{ items: change("01", { code: 1 }) }, "invalid_input"],
+      [{ items: change("01", { code: "99" }) }, "invalid_input"],
+      [{ items: change("02", { lagDays: 251 }) }, "invalid_input"],
+      [{ items: change("02", { lagDays: "1" }) }, "invalid_input"],
+      [{ items: change("02", { durationDays: 601 }) }, "invalid_input"],
+      [{ items: change("02", { durationDays: undefined }) }, "invalid_input"],
+      [{ items: change("02", { leadDays: null }) }, "invalid_input"],
+      [{ items: change("02", { after: 1 }) }, "invalid_input"],
+      [{ items: change("01", { fixedStart: "next week" }) }, "invalid_date"],
+      [{ items: rules, region: "xx" }, "invalid_input"],
+      [{ items: rules, startDate: null }, "invalid_date"],
+    ];
+    for (const [input, code] of save) {
+      expect([input, await outcome(svc.updatePlanningDraft(ctx, project.id, input))]).toEqual([input, code]);
+    }
+    expect(await rulesOf(ctx, project.id)).toEqual(rules);
+
+    // What a rule doesn't use isn't read: a chapter that starts on its own has no lag; a missing or null lag is 0.
+    await svc.updatePlanningDraft(ctx, project.id, { items: change("01", { lagDays: "n/a" }).map((r) => (r.code === "02" ? { ...r, lagDays: null } : r)) });
+    expect((await rulesOf(ctx, project.id)).map((r) => [r.code, r.lagDays])).toEqual([["01", 0], ["02", 0], ["03", rules[2]!.lagDays]]);
+
+    expect(await outcome(svc.approvePlanningDraft(ctx, project.id, { reason: 5 }))).toBe("invalid_input");
+    expect(await outcome(svc.approvePlanningDraft(ctx, project.id, { reason: "x".repeat(501) }))).toBe("invalid_input");
+    expect(await outcome(svc.approvePlanningDraft(ctx, project.id, { items: "all" }))).toBe("invalid_input");
+    // Approving takes no body: one that isn't an object is nothing sent.
+    await svc.approvePlanningDraft(ctx, project.id, null);
+    await svc.createPlanningDraft(ctx, project.id, { from: "baseline" });
+    expect(await outcome(svc.approvePlanningDraft(ctx, project.id, { reason: 5 }))).toBe("change_reason_required");
+    expect(await outcome(svc.approvePlanningDraft(ctx, project.id, { reason: "x".repeat(501) }))).toBe("invalid_input");
+    expect((await svc.getPlanningVersions(ctx, project.id)).versions.map((v) => v.status)).toEqual(["draft", "approved"]);
+  });
+
+  it("reads nothing of a chapter that spans the works but what it is and what it waits for", async () => {
+    const { tenant, ctx, admin } = await setup();
+    const project = await createTestProject(tenant.id, { startDate: new Date("2026-06-01T00:00:00Z") });
+    const { revisionId } = await framerDraft(admin, project.id, ["01", "17"]);
+    await budgetService.acceptRevision(admin, project.id, revisionId, {}, { unissued: true });
+    await svc.createPlanningDraft(ctx, project.id, PLAIN);
+    const rules = await rulesOf(ctx, project.id);
+    const spanning = (changes: Record<string, unknown>) => ({ items: rules.map((r) => (r.code === "17" ? { ...r, ...changes } : r)) });
+
+    await svc.updatePlanningDraft(ctx, project.id, spanning({ durationDays: "junk", lagDays: -1000, leadDays: null }));
+    expect((await rulesOf(ctx, project.id))[1]).toMatchObject({ code: "17", durationDays: 1, lagDays: 0, leadDays: 0 });
+    expect(await outcome(svc.updatePlanningDraft(ctx, project.id, spanning({ after: 1 })))).toBe("invalid_input");
+    expect(await outcome(svc.updatePlanningDraft(ctx, project.id, spanning({ fixedStart: "soon" })))).toBe("invalid_date");
+  });
+});

@@ -83,7 +83,7 @@ async function factsOf(check: CheckRow): Promise<{ projectId: string; text: stri
       address: projects.address,
       supplier: subcontractors.legalName,
       taxId: subcontractors.taxId,
-      amountCents: sql<number>`(select coalesce(sum(amount_cents), 0) from purchase_order_lines where order_id = ${purchaseOrders.id})::int`,
+      amountCents: sql<number>`(select coalesce(sum(amount_cents), 0) from purchase_order_lines where order_id = ${purchaseOrders.id})`.mapWith(Number),
     })
     .from(purchaseOrders)
     .innerJoin(projects, eq(projects.id, purchaseOrders.projectId))
@@ -158,6 +158,7 @@ async function duplicatesOf(check: CheckRow, sha256: string): Promise<DocumentFi
       label: purchaseDocumentChecks.label,
       orderId: purchaseDocumentChecks.orderId,
       projectId: purchaseOrders.projectId,
+      // soft-delete-ok(purchasePayments): names the invoice of a check that `liveCheck` already keeps to live records.
       invoiceId: sql<string | null>`coalesce(
         (select invoice_id from purchase_invoice_files where id = ${purchaseDocumentChecks.invoiceFileId}),
         (select invoice_id from purchase_payments where id = ${purchaseDocumentChecks.paymentId}))`,

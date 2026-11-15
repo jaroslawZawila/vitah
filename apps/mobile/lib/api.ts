@@ -2,6 +2,7 @@ import {
   DOCUMENT_CATEGORIES,
   photoSizeQuery,
   type AccountError,
+  type ClientSettingsInput,
   type MobileChangesReply,
   type HitoFileKind,
   type MobileObra,
@@ -11,8 +12,12 @@ import {
   type MobileProject,
   type MobileSession,
   type MobileSettings,
+  type MobileSignInInput,
   type NotificationPrefs,
+  type PasswordChangeInput,
   type PhotoSize,
+  type PushTokenInput,
+  type PushTokenRemovalInput,
 } from "@repo/core/contract";
 import { API_BASE, REQUEST_TIMEOUT_MS } from "./api-config";
 
@@ -114,7 +119,7 @@ export const api = {
     return request<MobileSession>("/api/mobile/auth", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ email, password } satisfies MobileSignInInput),
     });
   },
 
@@ -170,7 +175,7 @@ export const api = {
 
   /** Saves the given notification flags; returns all settings. */
   updateSettings(token: string, notifications: Partial<NotificationPrefs>) {
-    return authed<MobileSettings>("/api/mobile/settings", token, "PUT", { notifications });
+    return authed<MobileSettings>("/api/mobile/settings", token, "PUT", { notifications } satisfies ClientSettingsInput);
   },
 
   /**
@@ -181,7 +186,7 @@ export const api = {
     return authed<{ success: true; token?: string }>("/api/mobile/password", token, "POST", {
       currentPassword,
       newPassword,
-    });
+    } satisfies PasswordChangeInput);
   },
 
   /** Registers this phone for pushes, written in its app `language`. */
@@ -189,12 +194,12 @@ export const api = {
     return authed<{ success: true }>("/api/mobile/push-token", token, "POST", {
       token: pushToken,
       language,
-    });
+    } satisfies PushTokenInput);
   },
 
   removePushToken(token: string, pushToken: string) {
     return authed<{ success: true }>("/api/mobile/push-token", token, "DELETE", {
       token: pushToken,
-    });
+    } satisfies PushTokenRemovalInput);
   },
 };

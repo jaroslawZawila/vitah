@@ -19,17 +19,12 @@ import {
   subcontractorWorkers,
   users,
 } from "@repo/db";
-import { EMAIL_PATTERN, isUniqueViolation } from "./accounts";
+import { isUniqueViolation } from "./accounts";
 import { canEdit, requireEditor, type Ctx } from "./context";
 import {
-  BUDGET_CHAPTER_CODES,
   DOC_PILLARS,
-  MACHINERY,
   MANDATORY_COMPANY_REQUIREMENTS,
   MAX_CHAIN_LEVEL,
-  PREVENTION_MODES,
-  SUBCONTRACTOR_KINDS,
-  SUBCONTRACTOR_TRADES,
   defaultExpiry,
   docState,
   isValid,
@@ -37,7 +32,6 @@ import {
   isValidPersonalId,
   lowPermanentShare,
   maskIdNumber,
-  normalizeIdNumber,
   provinceForPostalCode,
   requirement,
   requirementsFor,
@@ -48,7 +42,6 @@ import {
   type DocBadge,
   type DocumentRequirement,
   type DocPillar,
-  type DocState,
   type Region,
   type RequirementId,
   type SubcontractorAssignment,
@@ -60,6 +53,21 @@ import {
   type SubcontractorsOverview,
 } from "./contract";
 import { requirePdf } from "./documents";
+import { parse } from "./inputs/fields";
+import {
+  assignmentSchema,
+  assignmentTargetSchema,
+  companyChainSchema,
+  companyExtrasSchema,
+  companyIdentitySchema,
+  companySchema,
+  companyStaffSchema,
+  documentOwnerSchema,
+  documentRequestSchema,
+  notApplicableSchema,
+  rejectionSchema,
+  versionDatesSchema,
+} from "./inputs/subcontractors";
 import { addDays, todayInSpain } from "./obra-calc";
 import { projectsInTenant, softDeleted } from "./project-client";
 import { openStoredFile, storeFiles, type StoredFile } from "./project-files";
@@ -67,72 +75,61 @@ import { readFile } from "./storage";
 import {
   allVersions,
   audit,
-  bool,
-  calendarDate,
   changes,
-  count,
   fail,
-  listOf,
   liveAssignment,
   liveDocument,
   loadNetwork,
-  merged,
-  oneOf,
-  optional,
-  phone,
   projectOptions,
   requireCaeCompany,
   requireCompany,
   requireProjectRef,
   requireWorker,
-  str,
   toDoc,
   userNames,
   type CompanyRow,
   type Network,
 } from "./subcontractor-network";
 import { workerListItem } from "./subcontractor-workers";
+import { attentionItems, caeTransaction, countProjectsAttention as countAttention, refreshCae } from "./subcontractor-attention";
 
 // ─── Subcontractors ───────────────────────────────────────────────────────────
 // The companies (and self-employed) working on the tenant's obras, their CAE
 // documents and their obra assignments. A company's status and its workers'
-// access are computed from the documents, never stored
-// (./subcontractor-rules.ts). Every staff member reads; admins and managers
-// (the contractor and the jefe de obra) create, edit, validate and reject.
+// access are computed from the documents (./subcontractor-rules.ts); the
+// status and each obra's warning count are also stored, refreshed by every
+// write here (`caeTransaction`, ./subcontractor-attention.ts). Every staff
+// member reads; admins and managers (the contractor and the jefe de obra)
+// create, edit, validate and reject.
 // Every write is in the company's audit log. Documents are versioned: an
 // upload adds a version and never replaces an older one.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** The company fields from `input`; an update passes the current ones as `base`. */
+/**
+ * The company fields from `input`; an update passes the current ones as
+ * `base`, under what it sends (it may send only what changed).
+ */
 function parseFields(input: Record<string, unknown>, base?: SubcontractorFields): SubcontractorFields & { reaRegion: Region } {
-  const get = merged(input, base);
-  const kind = oneOf(get("kind"), SUBCONTRACTOR_KINDS);
-  const legalName = str(get("legalName"));
-  const taxId = normalizeIdNumber(str(get("taxId")));
-  const address = str(get("address"));
-  const postalCode = str(get("postalCode"));
-  const city = str(get("city"));
+  const merged = base ? { ...base, ...input } : input;
+  const { kind, legalName, taxId, address, postalCode, city } = parse(companyIdentitySchema, merged);
   if (!kind || !legalName || !taxId || !address || !postalCode || !city) fail("missing_fields");
 
   if (!(kind === "company" ? isValidCif(taxId) : isValidPersonalId(taxId))) fail("invalid_tax_id");
   const place = provinceForPostalCode(postalCode);
   if (!place) fail("invalid_postal_code");
-  const email = optional(get("email"))?.toLowerCase() ?? null;
-  if (email !== null && !EMAIL_PATTERN.test(email)) fail("invalid_email");
 
-  const headcount = count(get("headcount"));
-  const permanentCount = count(get("permanentCount"));
+  const { headcount, permanentCount, subcontractsFurther } = parse(companyStaffSchema, merged);
   if (headcount !== null && permanentCount !== null && permanentCount > headcount) {
     fail("permanent_exceeds_headcount");
   }
-  const subcontractsFurther = bool(get("subcontractsFurther"));
   if (subcontractsFurther && kind === "self_employed") fail("self_employed_cannot_subcontract");
-  const suppliesOnly = bool(get("suppliesOnly"));
-  const chainLevel = count(get("chainLevel")) ?? 1;
+  const chainLevel = parse(companyChainSchema, merged).chainLevel ?? 1;
   if (chainLevel < 1 || chainLevel > MAX_CHAIN_LEVEL || (subcontractsFurther && chainLevel === MAX_CHAIN_LEVEL)) {
     fail("chain_too_deep");
   }
-  const isInstaller = bool(get("isInstaller"));
+
+  const fields = parse(companySchema, merged);
+  const { isInstaller } = fields;
 
   return {
     kind,
@@ -142,31 +139,31 @@ function parseFields(input: Record<string, unknown>, base?: SubcontractorFields)
     postalCode,
     city,
     // A new postal code brings its own province unless one is given with it.
-    province: ("province" in input || !base || base.postalCode === postalCode ? str(get("province")) : "") || place.province,
+    province: ("province" in input || !base || base.postalCode === postalCode ? fields.province : "") || place.province,
     reaRegion: place.region,
-    reaNumber: optional(get("reaNumber")),
-    phone: phone(get("phone")),
-    email,
-    legalRep: optional(get("legalRep")),
-    siteContact: optional(get("siteContact")),
-    siteContactPhone: phone(get("siteContactPhone")),
-    trades: listOf(get("trades"), SUBCONTRACTOR_TRADES),
+    reaNumber: fields.reaNumber,
+    phone: fields.phone,
+    email: fields.email,
+    legalRep: fields.legalRep,
+    siteContact: fields.siteContact,
+    siteContactPhone: fields.siteContactPhone,
+    trades: fields.trades,
     isInstaller,
-    installerReg: isInstaller ? optional(get("installerReg")) : null,
+    installerReg: isInstaller ? fields.installerReg : null,
     headcount,
     permanentCount,
     subcontractsFurther,
     chainLevel,
-    preventionMode: oneOf(get("preventionMode"), PREVENTION_MODES),
-    preventionEntity: optional(get("preventionEntity")),
-    preventionValidUntil: calendarDate(get("preventionValidUntil")),
-    machinery: listOf(get("machinery"), MACHINERY),
-    suppliesOnly,
+    preventionMode: fields.preventionMode,
+    preventionEntity: fields.preventionEntity,
+    preventionValidUntil: fields.preventionValidUntil,
+    machinery: fields.machinery,
+    suppliesOnly: fields.suppliesOnly,
   };
 }
 
 function fieldsOf(row: CompanyRow): SubcontractorFields {
-  const { id: _, tenantId: __, reaRegion: ___, createdAt: ____, updatedAt: _____, ...fields } = row;
+  const { id: _, tenantId: __, reaRegion: ___, createdAt: ____, updatedAt: _____, caeStatus: ______, caeValidUntil: _______, ...fields } = row;
   return fields;
 }
 
@@ -182,17 +179,15 @@ function fieldsOf(row: CompanyRow): SubcontractorFields {
 export async function createSubcontractor(ctx: Ctx, input: Record<string, unknown>) {
   requireEditor(ctx);
   const fields = parseFields(input);
-  const assignment = isObject(input.assignment) ? input.assignment : null;
-  if (fields.suppliesOnly && (assignment || Array.isArray(input.notApplicable))) fail("supplies_only");
-  const project = assignment ? await requireProjectRef(ctx, str(assignment.projectId)) : null;
+  const extras = parse(companyExtrasSchema, input);
+  const { assignment } = extras;
+  if (fields.suppliesOnly && (assignment || extras.notApplicable)) fail("supplies_only");
+  const project = assignment ? await requireProjectRef(ctx, parse(assignmentTargetSchema, assignment).projectId) : null;
   const assigned = assignment && assignmentValues(assignment);
   // One entry per document: the last reason given wins.
   const notApplicable = [
     ...new Map(
-      (Array.isArray(input.notApplicable) ? input.notApplicable : [])
-        .filter(isObject)
-        .map((entry) => notApplicableEntry(entry))
-        .map((entry) => [entry.id, entry]),
+      (extras.notApplicable ?? []).map((entry) => notApplicableEntry(entry)).map((entry) => [entry.id, entry]),
     ).values(),
   ];
   try {
@@ -205,6 +200,7 @@ export async function createSubcontractor(ctx: Ctx, input: Record<string, unknow
       await audit(tx, ctx, id, "created", { legalName: fields.legalName });
       if (project && assigned) await saveAssignment(tx, ctx, id, project, assigned);
       for (const entry of notApplicable) await saveNotApplicable(tx, ctx, id, entry, undefined);
+      await refreshCae(tx, ctx.tenantId, [id]);
       return id;
     });
     return { id };
@@ -238,7 +234,7 @@ export async function updateSubcontractor(ctx: Ctx, subcontractorId: string, inp
     if (net.workers.length > 0 || net.assignments.length > 0 || subcontracts > 0) fail("supplies_only");
   }
   try {
-    await db.transaction(async (tx) => {
+    await caeTransaction(ctx.tenantId, [subcontractorId], async (tx) => {
       await tx
         .update(subcontractors)
         .set({ ...after, reaRegion })
@@ -296,91 +292,6 @@ export function listCompanyOptions(ctx: Ctx) {
 export async function listSubcontractors(ctx: Ctx): Promise<SubcontractorListItem[]> {
   const net = await loadNetwork(ctx.tenantId);
   return net.companies.map((row) => listItem(net, row));
-}
-
-// What needs doing first: expired, rejected, missing, awaiting validation,
-// requested, then expiring soonest.
-const ATTENTION_ORDER: DocState[] = ["expired", "rejected", "missing", "uploaded", "requested", "expiring"];
-
-function attentionItems(net: Network): AttentionItem[] {
-  const companies = new Map(net.companies.map((c) => [c.id, c]));
-  const workers = new Map(net.workers.map((w) => [w.id, w]));
-  const items: AttentionItem[] = [];
-
-  for (const doc of net.docs) {
-    const req = requirement(doc.requirementId);
-    const company = companies.get(doc.subcontractorId);
-    if (!req || !company || company.suppliesOnly) continue;
-    const version = net.versions.get(doc.id);
-    const { state, daysLeft } = docState(req.id, net.facts(doc), net.today);
-    // Every row exists, so "missing" only comes from the loop below.
-    if (!ATTENTION_ORDER.includes(state)) continue;
-    const worker = doc.workerId ? workers.get(doc.workerId) : undefined;
-    const date =
-      state === "expired" || state === "expiring"
-        ? (version?.expiresAt ?? null)
-        : state === "uploaded"
-          ? (version?.createdAt.toISOString().slice(0, 10) ?? null)
-          : (doc.requestedAt?.toISOString().slice(0, 10) ?? null);
-    const companyDoc = !doc.workerId && !doc.projectId;
-    items.push({
-      subcontractorId: company.id,
-      subcontractorName: company.legalName,
-      workerId: worker?.id ?? null,
-      workerName: worker ? workerName(worker) : null,
-      projectId: doc.projectId,
-      projectRef: doc.projectId ? (net.projectsById.get(doc.projectId)?.ref ?? null) : null,
-      documentId: doc.id,
-      requirementIds: [req.id as RequirementId],
-      state,
-      daysLeft,
-      date,
-      affectedWorkers: state === "expired" && companyDoc && req.mandatory ? net.workersOf(company.id).length : 0,
-    });
-  }
-
-  // Missing mandatory documents: one line per company, one per obra without its PSS adhesion.
-  for (const company of net.companies.filter((c) => !c.suppliesOnly)) {
-    const missing = MANDATORY_COMPANY_REQUIREMENTS.filter((r) => !net.doc(company.id, null, null, r.id)).map(
-      (r) => r.id,
-    );
-    if (missing.length > 0) {
-      items.push(missingItem(company, missing, null));
-    }
-    for (const a of net.assignmentsOf(company.id)) {
-      if (!net.doc(company.id, null, a.projectId, "adhesion_pss")) {
-        items.push(missingItem(company, ["adhesion_pss"], net.projectsById.get(a.projectId) ?? null));
-      }
-    }
-  }
-
-  return items.sort(
-    (a, b) =>
-      ATTENTION_ORDER.indexOf(a.state) - ATTENTION_ORDER.indexOf(b.state) ||
-      (a.daysLeft ?? 0) - (b.daysLeft ?? 0) ||
-      a.subcontractorName.localeCompare(b.subcontractorName),
-  );
-}
-
-function missingItem(
-  company: CompanyRow,
-  requirementIds: RequirementId[],
-  project: { id: string; ref: string } | null,
-): AttentionItem {
-  return {
-    subcontractorId: company.id,
-    subcontractorName: company.legalName,
-    workerId: null,
-    workerName: null,
-    projectId: project?.id ?? null,
-    projectRef: project?.ref ?? null,
-    documentId: null,
-    requirementIds,
-    state: "missing",
-    daysLeft: null,
-    date: null,
-    affectedWorkers: 0,
-  };
 }
 
 export async function getOverview(ctx: Ctx): Promise<SubcontractorsOverview> {
@@ -447,29 +358,12 @@ export async function listProjectAttention(ctx: Ctx, projectId: string): Promise
 
 /**
  * How many items `listProjectAttention` gives each of several obras at once
- * (the project list), by project id; one without any is absent. The same
- * items, from the same companies, without their workers (only their lines
- * show them: names, workers affected).
+ * (the project list), by project id: an obra with companies on it has an
+ * entry, 0 when they give none. From the values stored on the assignments
+ * (./subcontractor-attention.ts), no document read once they are fresh.
  */
-export async function countProjectsAttention(ctx: Ctx, projectIds: string[]): Promise<Map<string, number>> {
-  if (projectIds.length === 0) return new Map();
-  const net = await loadNetwork(ctx.tenantId, assignedTo(ctx.tenantId, projectIds), { workers: false });
-  // A company's items: on its own (and its workers') documents, or on one obra's.
-  const counts = new Map<string, number>();
-  const add = (key: string) => counts.set(key, (counts.get(key) ?? 0) + 1);
-  for (const item of attentionItems(net)) add(`${item.subcontractorId}|${item.projectId ?? ""}`);
-  const wanted = new Set(projectIds);
-  const assigned = new Map<string, Set<string>>();
-  for (const a of net.assignments) {
-    if (wanted.has(a.projectId)) assigned.set(a.projectId, (assigned.get(a.projectId) ?? new Set()).add(a.subcontractorId));
-  }
-  return new Map(
-    [...assigned].map(([projectId, companies]) => {
-      let count = 0;
-      for (const id of companies) count += (counts.get(`${id}|`) ?? 0) + (counts.get(`${id}|${projectId}`) ?? 0);
-      return [projectId, count] as const;
-    }),
-  );
+export function countProjectsAttention(ctx: Ctx, projectIds: string[]): Promise<Map<string, number>> {
+  return countAttention(ctx.tenantId, projectIds);
 }
 
 function expiryCounts(net: Network) {
@@ -635,16 +529,20 @@ function history(
 
 // ─── Documents ───────────────────────────────────────────────────────────────
 
-/** Who a document belongs to: the company, one of its workers, or the company on one obra. */
-async function owner(ctx: Ctx, subcontractorId: string, input: Record<string, unknown>) {
-  const req = requirement(str(input.requirementId));
-  if (!req) fail("invalid_requirement");
-  const workerId = req.scope === "worker" ? str(input.workerId) : "";
-  const projectId = req.scope === "obra" ? str(input.projectId) : "";
+/** Who a document belongs to, as sent: the company, one of its workers, or the company on one obra. */
+function documentOwner(input: Record<string, unknown>) {
+  const { requirementId: req, ...sent } = parse(documentOwnerSchema, input);
+  const workerId = req.scope === "worker" ? sent.workerId : "";
+  const projectId = req.scope === "obra" ? sent.projectId : "";
   if ((req.scope === "worker" && !workerId) || (req.scope === "obra" && !projectId)) fail("missing_fields");
-  if (workerId) await requireWorker(ctx, workerId, subcontractorId);
-  if (projectId) {
-    await requireProjectRef(ctx, projectId);
+  return { req, workerId: workerId || null, projectId: projectId || null };
+}
+
+/** The document's worker is the company's; its obra is one the company is on. */
+async function requireOwner<T extends Owner>(ctx: Ctx, subcontractorId: string, own: T): Promise<T> {
+  if (own.workerId) await requireWorker(ctx, own.workerId, subcontractorId);
+  if (own.projectId) {
+    await requireProjectRef(ctx, own.projectId);
     // An obra's document goes with the company's assignment there: without one, no read would show it.
     const [assigned] = await db
       .select({ id: subcontractorAssignments.id })
@@ -652,14 +550,14 @@ async function owner(ctx: Ctx, subcontractorId: string, input: Record<string, un
       .where(
         and(
           eq(subcontractorAssignments.subcontractorId, subcontractorId),
-          eq(subcontractorAssignments.projectId, projectId),
+          eq(subcontractorAssignments.projectId, own.projectId),
           liveAssignment(ctx.tenantId),
         ),
       )
       .limit(1);
     if (!assigned) fail("project_not_found");
   }
-  return { req, workerId: workerId || null, projectId: projectId || null };
+  return own;
 }
 
 type Owner = { workerId: string | null; projectId: string | null; req: { id: string } };
@@ -686,11 +584,13 @@ function findDoc(ctx: Ctx, subcontractorId: string, own: Owner) {
  */
 export async function uploadDocument(ctx: Ctx, subcontractorId: string, input: Record<string, unknown>) {
   requireEditor(ctx);
-  const [, own] = await Promise.all([requireCaeCompany(ctx, subcontractorId), owner(ctx, subcontractorId, input)]);
+  const sent = documentOwner(input);
+  const [, own] = await Promise.all([requireCaeCompany(ctx, subcontractorId), requireOwner(ctx, subcontractorId, sent)]);
   const file = await requirePdf(input.file);
 
-  const issuedAt = calendarDate(input.issuedAt);
-  const expiresAt = calendarDate(input.expiresAt) ?? (issuedAt ? defaultExpiry(own.req.id, issuedAt) : null);
+  const dates = parse(versionDatesSchema, input);
+  const issuedAt = dates.issuedAt;
+  const expiresAt = dates.expiresAt ?? (issuedAt ? defaultExpiry(own.req.id, issuedAt) : null);
   if (own.req.validityMonths && !expiresAt) fail("missing_dates");
 
   const filename = (file instanceof File && file.name ? file.name : `${own.req.id}.pdf`).slice(0, 200);
@@ -699,7 +599,7 @@ export async function uploadDocument(ctx: Ctx, subcontractorId: string, input: R
 
   let version = 0;
   await storeFiles([{ pathname, body: file, contentType: "application/pdf" }], () =>
-    db.transaction(async (tx) => {
+    caeTransaction(ctx.tenantId, [subcontractorId], async (tx) => {
       // Create the document if needed, then lock it: concurrent uploads of the
       // same document take their version numbers one after the other.
       await tx
@@ -783,7 +683,7 @@ async function reviewable(ctx: Ctx, subcontractorId: string, documentId: string)
 async function review(ctx: Ctx, subcontractorId: string, documentId: string, reason: string | null) {
   requireEditor(ctx);
   const { doc, version } = await reviewable(ctx, subcontractorId, documentId);
-  await db.transaction(async (tx) => {
+  await caeTransaction(ctx.tenantId, [subcontractorId], async (tx) => {
     await tx
       .update(subcontractorDocumentVersions)
       .set({ reviewedById: ctx.userId, reviewedAt: new Date(), rejectReason: reason })
@@ -816,8 +716,7 @@ export async function rejectDocument(
   input: Record<string, unknown>,
 ) {
   requireEditor(ctx);
-  const reason = str(input.reason);
-  if (!reason) fail("missing_reason");
+  const { reason } = parse(rejectionSchema, input);
   return review(ctx, subcontractorId, documentId, reason);
 }
 
@@ -827,18 +726,14 @@ export async function markNotApplicable(ctx: Ctx, subcontractorId: string, input
   await requireCaeCompany(ctx, subcontractorId);
   const entry = notApplicableEntry(input);
   const existing = await findDoc(ctx, subcontractorId, { req: entry, workerId: null, projectId: null });
-  await db.transaction((tx) => saveNotApplicable(tx, ctx, subcontractorId, entry, existing?.id));
+  await caeTransaction(ctx.tenantId, [subcontractorId], (tx) => saveNotApplicable(tx, ctx, subcontractorId, entry, existing?.id));
   return { subcontractorId };
 }
 
 /** { requirementId, reason } of an optional company document. */
 function notApplicableEntry(input: Record<string, unknown>) {
-  const req = requirement(str(input.requirementId));
-  if (!req) fail("invalid_requirement");
-  if (req.mandatory || req.scope !== "company") fail("not_optional");
-  const reason = str(input.reason);
-  if (!reason) fail("missing_reason");
-  return { id: req.id, reason };
+  const { requirementId, reason } = parse(notApplicableSchema, input);
+  return { id: requirementId, reason };
 }
 
 async function saveNotApplicable(
@@ -873,13 +768,13 @@ async function saveNotApplicable(
 export async function requestDocuments(ctx: Ctx, subcontractorId: string, input: Record<string, unknown>) {
   requireEditor(ctx);
   await requireCaeCompany(ctx, subcontractorId);
-  const ids = Array.isArray(input.requirementIds) ? input.requirementIds : [input.requirementId];
+  const asked = parse(documentRequestSchema, input);
+  const ids = asked.requirementIds ?? [asked.requirementId];
   if (ids.length === 0) fail("missing_fields");
-  const owners = await Promise.all(
-    ids.map((id) => owner(ctx, subcontractorId, { ...input, requirementId: id })),
-  );
+  const sent = ids.map((id) => documentOwner({ ...input, requirementId: id }));
+  const owners = await Promise.all(sent.map((own) => requireOwner(ctx, subcontractorId, own)));
 
-  await db.transaction(async (tx) => {
+  await caeTransaction(ctx.tenantId, [subcontractorId], async (tx) => {
     for (const own of owners) {
       const existing = await findDoc(ctx, subcontractorId, own);
       // Asked for before and still not in: a reminder.
@@ -954,23 +849,12 @@ export async function assignToProject(
   requireEditor(ctx);
   const [, project] = await Promise.all([requireCaeCompany(ctx, subcontractorId), requireProjectRef(ctx, projectId)]);
   const values = assignmentValues(input);
-  await db.transaction((tx) => saveAssignment(tx, ctx, subcontractorId, project, values));
+  await caeTransaction(ctx.tenantId, [subcontractorId], (tx) => saveAssignment(tx, ctx, subcontractorId, project, values));
   return { subcontractorId, projectId };
 }
 
 function assignmentValues(input: Record<string, unknown>) {
-  const codes = Array.isArray(input.chapterCodes)
-    ? input.chapterCodes.map(str)
-    : str(input.chapterCodes).split(",").filter(Boolean);
-  if (codes.some((code) => !BUDGET_CHAPTER_CODES.includes(code))) fail("invalid_chapter");
-  const values = {
-    chapterCodes: [...new Set(codes)].sort(),
-    plannedStart: calendarDate(input.plannedStart),
-    plannedEnd: calendarDate(input.plannedEnd),
-    bookOrder: count(input.bookOrder),
-    bookDate: calendarDate(input.bookDate),
-    cssInformed: bool(input.cssInformed),
-  };
+  const values = parse(assignmentSchema, input);
   if (values.plannedStart && values.plannedEnd && values.plannedEnd < values.plannedStart) fail("invalid_date");
   return values;
 }
@@ -993,16 +877,13 @@ async function saveAssignment(
   await audit(tx, ctx, subcontractorId, "assigned", { projectId: project.id, projectRef: project.ref, ...values });
 }
 
-const isObject = (value: unknown): value is Record<string, unknown> =>
-  !!value && typeof value === "object" && !Array.isArray(value);
-
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 /** Takes a company off an obra. Its assignment is kept, marked as removed: no read shows it again. */
 export async function removeAssignment(ctx: Ctx, subcontractorId: string, projectId: string) {
   requireEditor(ctx);
   await requireCompany(ctx, subcontractorId);
-  await db.transaction(async (tx) => {
+  await caeTransaction(ctx.tenantId, [subcontractorId], async (tx) => {
     const removed = await tx
       .update(subcontractorAssignments)
       .set(softDeleted(ctx))

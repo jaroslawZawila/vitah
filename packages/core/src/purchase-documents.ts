@@ -2,7 +2,9 @@ import { and, asc, db, desc, eq, isNull, purchaseOrderDocumentVersions, purchase
 import { requireEditor, type Ctx } from "./context";
 import { requirePdf } from "./documents";
 import { idempotent, type Once } from "./idempotency";
-import { fail, optionalText, requiredText } from "./obra-data";
+import { parse } from "./inputs/fields";
+import { orderDocumentSchema, orderDocumentVersionSchema } from "./inputs/purchase-documents";
+import { fail } from "./obra-data";
 import { softDeleted } from "./project-client";
 import { openStoredFile, projectFolder, storeFiles, uploadedName, type StoredFile } from "./project-files";
 import { logEvent, requireOrder } from "./purchasing";
@@ -16,9 +18,6 @@ import { logEvent, requireOrder } from "./purchasing";
 // (./purchase-invoices). Admins and managers upload and remove; every staff
 // member downloads.
 // ─────────────────────────────────────────────────────────────────────────────
-
-const MAX_TITLE = 200;
-const MAX_NOTE = 300;
 
 type OrderRow = Awaited<ReturnType<typeof requireOrder>>;
 
@@ -125,9 +124,10 @@ export async function addOrderDocument(ctx: Ctx, orderId: string, input: Record<
   requireEditor(ctx);
   return idempotent<{ documentId: string; version: number }>(ctx, "purchase.document.create", { orderId }, { ...input, idempotencyKey }, async (once) => {
     const order = await requireOrder(ctx, orderId);
-    const title = requiredText(input.title, MAX_TITLE);
+    // Title, PDF, note: in that order, as always.
+    const { title } = parse(orderDocumentSchema.pick({ title: true }), input);
     const file = await requirePdf(input.file);
-    const note = optionalText(input.note, MAX_NOTE);
+    const { note } = parse(orderDocumentSchema, input);
     const documentId = crypto.randomUUID();
     // The key is kept with the document and its version (a new document's first version is never taken already: no 0).
     const version = await addVersion(ctx, order, { id: documentId, title }, file, note, true, async (tx, add) => {
@@ -144,7 +144,7 @@ export async function addOrderDocumentVersion(ctx: Ctx, orderId: string, documen
   const order = await requireOrder(ctx, orderId);
   const document = await requireDocument(ctx, order, documentId);
   const file = await requirePdf(input.file);
-  const note = optionalText(input.note, MAX_NOTE);
+  const { note } = parse(orderDocumentVersionSchema, input);
   const version = await addVersion(ctx, order, document, file, note, false);
   return { documentId, version };
 }

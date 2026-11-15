@@ -4,7 +4,6 @@ import { markChanged } from "./changes";
 import { requireEditor, type Ctx } from "./context";
 import {
   CONTINGENCY_CHAPTER,
-  PLANNING_REGIONS,
   type ObraStage,
   type PlanningCalendar,
   type PlanningDraft,
@@ -19,18 +18,18 @@ import {
 import { toCalendarDate } from "./calendar";
 import { chapterState, contractSchedule } from "./control-calc";
 import { notifyProjectClient } from "./notifications";
-import { todayInSpain } from "./obra-calc";
+import { parse } from "./inputs/fields";
 import {
-  calendarDate,
-  fail,
-  integer,
-  isObject,
-  loadObra,
-  optionalText,
-  requiredText,
-  requireProject,
-  userNamesById,
-} from "./obra-data";
+  newPlanningSchemas,
+  planningBodySchema,
+  planningEditSchema,
+  planningReasonSchemas,
+  planningRuleSchemas,
+  planningSaveSchema,
+  planningSourceSchema,
+} from "./inputs/planning";
+import { todayInSpain } from "./obra-calc";
+import { fail, loadObra, requireProject, userNamesById } from "./obra-data";
 import {
   clientDates,
   criticalPath,
@@ -57,8 +56,6 @@ import { scheduleStatus } from "./schedule-status";
 // shows the approved plan's handover and phase dates, and approving one that
 // moves the handover pushes it to the client.
 // ─────────────────────────────────────────────────────────────────────────────
-
-const MAX_REASON = 500;
 
 type VersionRow = typeof planningVersions.$inferSelect;
 type ItemRow = typeof planningItems.$inferSelect;
@@ -365,16 +362,13 @@ export async function getPlanningVersions(ctx: Ctx, projectId: string): Promise<
 
 // ─── Writes ──────────────────────────────────────────────────────────────────
 
-function parseCalendar(input: Record<string, unknown>, fallback?: PlanningCalendar): PlanningCalendar {
-  const region = input.region === undefined ? (fallback?.region ?? null) : input.region;
-  if (region !== null && !PLANNING_REGIONS.includes(region as PlanningRegion)) fail("invalid_input");
-  const flag = (key: "augustClosure" | "christmasClosure") => {
-    const value = input[key];
-    if (value === undefined) return fallback?.[key] ?? true;
-    if (typeof value !== "boolean") fail("invalid_input");
-    return value;
+/** The calendar sent (as parsed), each part `fallback`'s when not sent: national holidays and both closures without one. */
+function calendarFrom(sent: Partial<PlanningCalendar>, fallback?: PlanningCalendar): PlanningCalendar {
+  return {
+    region: sent.region === undefined ? (fallback?.region ?? null) : sent.region,
+    augustClosure: sent.augustClosure ?? fallback?.augustClosure ?? true,
+    christmasClosure: sent.christmasClosure ?? fallback?.christmasClosure ?? true,
   };
-  return { region: region as PlanningRegion | null, augustClosure: flag("augustClosure"), christmasClosure: flag("christmasClosure") };
 }
 
 /**
@@ -427,7 +421,7 @@ export async function createPlanningDraft(
   input: unknown,
 ): Promise<{ versionId: string; number: number }> {
   requireEditor(ctx);
-  if (!isObject(input)) fail("invalid_input");
+  parse(planningBodySchema, input);
   const [loaded, { versions, draft, approved }] = await Promise.all([
     loadProject(ctx.tenantId, projectId),
     loadVersions(ctx.tenantId, projectId),
@@ -439,30 +433,33 @@ export async function createPlanningDraft(
   let rules: PlanningItemInput[];
   let calendar: PlanningCalendar;
   let startDate: string;
-  if (input.from === "baseline") {
+  const { from } = parse(planningSourceSchema, input);
+  if (from === "baseline") {
     if (!approved) fail("not_found");
     rules = fitToContract(((await loadItems([approved])).get(approved.id) ?? []).map(toInput), codes);
     calendar = calendarOf(approved);
     startDate = approved.startDate;
-  } else if (input.from === "template" || input.from === "project") {
-    calendar = parseCalendar(input);
-    const start = input.startDate ?? loaded.startDate;
-    if (start === null || start === undefined || start === "") fail("missing_fields");
-    startDate = calendarDate(start);
-    if (input.from === "template") rules = templateItems(codes);
+  } else {
+    const { startDate: start, projectId: sourceId, ...sent } =
+      from === "project" ? parse(newPlanningSchemas.project, input) : { ...parse(newPlanningSchemas.template, input), projectId: null };
+    calendar = calendarFrom(sent);
+    const day = start ?? loaded.startDate;
+    if (!day) fail("missing_fields");
+    startDate = day;
+    if (sourceId === null) rules = templateItems(codes);
     else {
-      if (typeof input.projectId !== "string" || input.projectId === projectId) fail("invalid_input");
+      if (sourceId === projectId) fail("invalid_input");
       // Another project of the tenant (not a deleted one), with a baseline.
       const [other, { approved: source }] = await Promise.all([
-        db.query.projects.findFirst({ where: projectInTenant(ctx.tenantId, input.projectId), columns: { id: true } }),
-        loadVersions(ctx.tenantId, input.projectId),
+        db.query.projects.findFirst({ where: projectInTenant(ctx.tenantId, sourceId), columns: { id: true } }),
+        loadVersions(ctx.tenantId, sourceId),
       ]);
       if (!other || !source) fail("not_found");
       // Its fixed days belong to its own calendar: here those chapters start with the works.
       const copied = ((await loadItems([source])).get(source.id) ?? []).map((row) => ({ ...toInput(row), fixedStart: null }));
       rules = fitToContract(copied, codes);
     }
-  } else fail("invalid_input");
+  }
 
   const problem = planProblem(rules);
   if (problem) fail(problem);
@@ -485,21 +482,23 @@ export async function createPlanningDraft(
   }
 }
 
-/** A rule as staff sent it: `spansWorks` stays as the draft has it, and so does a lead time not sent. */
-function parseItem(value: unknown, current: PlanningItemInput): PlanningItemInput {
+/**
+ * A rule as staff sent it (`planningRuleSchemas`, by what it is): `spansWorks`
+ * stays as the draft has it, and so does a lead time not sent.
+ */
+function ruleOf(item: unknown, current: PlanningItemInput): PlanningItemInput {
   const { spansWorks } = current;
-  if (!isObject(value) || typeof value.code !== "string") fail("invalid_input");
-  const after = value.after === null || value.after === undefined || value.after === "" ? null : value.after;
-  if (after !== null && typeof after !== "string") fail("invalid_input");
-  const fixedStart = value.fixedStart === null || value.fixedStart === undefined || value.fixedStart === "" ? null : calendarDate(value.fixedStart);
+  const { code, after, fixedStart } = parse(planningRuleSchemas.head, item);
+  if (spansWorks) return { code, after: null, lagDays: 0, durationDays: 1, fixedStart: null, spansWorks, leadDays: 0 };
+  const rule = after === null ? { ...parse(planningRuleSchemas.own, item), lagDays: 0 } : parse(planningRuleSchemas.after, item);
   return {
-    code: value.code,
-    after: spansWorks ? null : after,
-    lagDays: spansWorks || after === null ? 0 : integer(value.lagDays ?? 0, -250, 250),
-    durationDays: spansWorks ? 1 : integer(value.durationDays, 1, 600),
-    fixedStart: spansWorks || after !== null ? null : fixedStart,
+    code,
+    after,
+    lagDays: rule.lagDays,
+    durationDays: rule.durationDays,
+    fixedStart: after === null ? fixedStart : null,
     spansWorks,
-    leadDays: spansWorks ? 0 : value.leadDays === undefined ? current.leadDays : integer(value.leadDays, 0, 365),
+    leadDays: rule.leadDays ?? current.leadDays,
   };
 }
 
@@ -508,27 +507,24 @@ function parseItem(value: unknown, current: PlanningItemInput): PlanningItemInpu
  * chapter of it, in its order), start and calendar, each kept as stored when
  * not sent.
  */
-async function editedDraft(ctx: Ctx, projectId: string, input: Record<string, unknown>) {
+async function editedDraft(ctx: Ctx, projectId: string, input: unknown) {
   const [loaded, { draft, approved }] = await Promise.all([
     loadProject(ctx.tenantId, projectId),
     loadVersions(ctx.tenantId, projectId),
   ]);
   if (!draft) fail("not_found");
+  const { items, startDate: start, ...sent } = parse(planningEditSchema, input);
   const current = ((await loadItems([draft])).get(draft.id) ?? []).map(toInput);
   let rules = current;
-  if (input.items !== undefined) {
-    if (!Array.isArray(input.items) || input.items.length !== current.length) fail("invalid_input");
+  if (items) {
+    if (items.length !== current.length) fail("invalid_input");
     const byCode = new Map(current.map((rule) => [rule.code, rule]));
-    rules = input.items.map((item: unknown) => {
-      const rule = isObject(item) && typeof item.code === "string" ? byCode.get(item.code) : undefined;
-      if (!rule) fail("invalid_input");
-      return parseItem(item, rule);
-    });
+    rules = items.map((item) => ruleOf(item, byCode.get(item.code) ?? fail("invalid_input")));
     const problem = planProblem(rules);
     if (problem) fail(problem);
   }
-  const calendar = parseCalendar(input, calendarOf(draft));
-  const startDate = input.startDate === undefined ? draft.startDate : calendarDate(input.startDate);
+  const calendar = calendarFrom(sent, calendarOf(draft));
+  const startDate = start ?? draft.startDate;
   return {
     draft,
     approved,
@@ -543,7 +539,7 @@ async function editedDraft(ctx: Ctx, projectId: string, input: Record<string, un
 /** Saves the draft's rules and calendar, and stores the dates they give as of today. */
 export async function updatePlanningDraft(ctx: Ctx, projectId: string, input: unknown) {
   requireEditor(ctx);
-  if (!isObject(input) || !Array.isArray(input.items)) fail("invalid_input");
+  parse(planningSaveSchema, input);
   const { draft, rules, calendar, startDate, dates } = await editedDraft(ctx, projectId, input);
   await db.transaction(async (tx) => {
     await tx.update(planningVersions).set({ startDate, ...calendar }).where(eq(planningVersions.id, draft.id));
@@ -559,18 +555,15 @@ export async function updatePlanningDraft(ctx: Ctx, projectId: string, input: un
  */
 export async function approvePlanningDraft(ctx: Ctx, projectId: string, input: unknown) {
   requireEditor(ctx);
-  const body = isObject(input) ? input : {};
+  // Not an object: nothing sent with it.
+  const body = planningBodySchema.safeParse(input).success ? input : {};
   // Before it changes: the handover the client was told.
   const [{ draft, approved, rules, calendar, startDate, dates, completionDate }, baseline] = await Promise.all([
     editedDraft(ctx, projectId, body),
     approvedPlanDates(ctx.tenantId, projectId),
   ]);
   const toldBefore = clientDates(baseline, { startDate: null, completionDate }).completionDate;
-  let reason: string | null;
-  if (approved) {
-    if (typeof body.reason !== "string" || !body.reason.trim()) fail("change_reason_required");
-    reason = requiredText(body.reason, MAX_REASON);
-  } else reason = optionalText(body.reason, MAX_REASON);
+  const { reason } = parse(approved ? planningReasonSchemas.change : planningReasonSchemas.first, body);
 
   await db.transaction(async (tx) => {
     if (approved) {

@@ -4,7 +4,13 @@
 // (packages/core/src/purchase-invoices.ts): Compras › Facturas and Pagos, an
 // invoice's page and form, and an order's payment schedule.
 
-import { purchaseInvoicesService as svc, type InvoiceListQuery, type PageQuery } from "@repo/core";
+import {
+  purchaseInvoicesService as svc,
+  type InvoiceListQuery,
+  type OrderMilestonesInput,
+  type PageQuery,
+  type PurchaseInvoiceChangesInput,
+} from "@repo/core";
 import { fieldsWithFile } from "../../lib/api";
 import { mutateDashboard, read, type ObraState } from "./run";
 
@@ -58,7 +64,7 @@ export async function createInvoiceAction(
   return state?.success ? { ...state, ...made } : state;
 }
 
-export async function updateInvoiceAction(invoiceId: string, input: Record<string, unknown>): Promise<ObraState> {
+export async function updateInvoiceAction(invoiceId: string, input: PurchaseInvoiceChangesInput): Promise<ObraState> {
   return write((ctx) => svc.updateInvoice(ctx, invoiceId, input));
 }
 
@@ -85,9 +91,6 @@ export async function deletePaymentAction(paymentId: string): Promise<ObraState>
 }
 
 /** The order's payment schedule: [{ id?, concept, amountCents }], [] to drop it. */
-export async function setOrderMilestonesAction(
-  orderId: string,
-  milestones: { id?: string; concept: string; amountCents: number }[],
-): Promise<ObraState> {
+export async function setOrderMilestonesAction(orderId: string, milestones: OrderMilestonesInput["milestones"]): Promise<ObraState> {
   return write((ctx) => svc.setOrderMilestones(ctx, orderId, { milestones }));
 }

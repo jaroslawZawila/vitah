@@ -6,10 +6,10 @@ import { aiUsage, and, db, eq, gt, sql, tenants } from "@repo/db";
 /** This month's AI spend of the tenant, in US cents. */
 export async function monthSpendCents(tenantId: string) {
   const [row] = await db
-    .select({ micro: sql<string>`coalesce(sum(${aiUsage.costMicroUsd}), 0)` })
+    .select({ micro: sql<number>`coalesce(sum(${aiUsage.costMicroUsd}), 0)`.mapWith(Number) })
     .from(aiUsage)
     .where(and(eq(aiUsage.tenantId, tenantId), gt(aiUsage.createdAt, sql`date_trunc('month', now())`)));
-  return Number(row?.micro ?? 0) / 10_000;
+  return (row?.micro ?? 0) / 10_000;
 }
 
 /** Whether the tenant has spent its monthly AI limit. */

@@ -6,6 +6,8 @@ import {
   eq,
   projects,
   purchaseDocumentChecks,
+  purchaseOrderDocuments,
+  purchaseOrderDocumentVersions,
   purchaseOrders,
   sql,
   subcontractors,
@@ -56,7 +58,18 @@ async function check(tenantId: string, projectId: string, status: "pending" | "r
     .insert(purchaseOrders)
     .values({ tenantId, projectId, number: ++orders, kind: "material", subcontractorId: supplier!.id, description: "Piedra" })
     .returning({ id: purchaseOrders.id });
-  await db.insert(purchaseDocumentChecks).values({ tenantId, orderId: order!.id, pathname: "x.pdf", label: "Pedido · v1", status, createdAt });
+  // The order's PDF, the file a check reviews.
+  const [document] = await db
+    .insert(purchaseOrderDocuments)
+    .values({ tenantId, orderId: order!.id, title: "Pedido" })
+    .returning({ id: purchaseOrderDocuments.id });
+  const [version] = await db
+    .insert(purchaseOrderDocumentVersions)
+    .values({ tenantId, documentId: document!.id, version: 1, pathname: `orders/${order!.id}/v1.pdf`, filename: "x.pdf", sizeBytes: 100 })
+    .returning({ id: purchaseOrderDocumentVersions.id });
+  await db
+    .insert(purchaseDocumentChecks)
+    .values({ tenantId, orderId: order!.id, documentVersionId: version!.id, pathname: "x.pdf", label: "Pedido · v1", status, createdAt });
 }
 
 const limit = (tenantId: string, cents: number | null) => db.update(tenants).set({ aiMonthlyLimitCents: cents }).where(eq(tenants.id, tenantId));

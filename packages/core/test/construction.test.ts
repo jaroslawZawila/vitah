@@ -11,6 +11,7 @@ import {
   subcontractorsService,
   type Ctx,
 } from "../src";
+import { MAX_AMOUNT_CENTS } from "../src/contract";
 import { files } from "../src/testing";
 import { framerDraft } from "./budget-fixture";
 
@@ -596,5 +597,104 @@ describe("document warnings", () => {
     const theirs = await svc.getControl(ctx, elsewhere.id);
     expect(theirs.documentAlerts.length).toBeGreaterThan(0);
     expect(theirs.documentAlerts.every((a) => a.projectId === null || a.projectId === elsewhere.id)).toBe(true);
+  });
+});
+
+describe("input boundaries (schemas in src/inputs/construction.ts)", () => {
+  const OVER = MAX_AMOUNT_CENTS + 1;
+  /** The code a write is refused with, or "ok". */
+  const outcome = (write: Promise<unknown>) => write.then(() => "ok", (error: { code?: string }) => error.code ?? String(error));
+  const issue = (overrides: Record<string, unknown> = {}) => ({
+    kind: "issue",
+    occurredOn: "2026-10-08",
+    chapterCode: "02",
+    description: "Retraso en el suministro del panel",
+    party: "subcontractor",
+    ...overrides,
+  });
+
+  it("answers over-maximum impacts and wrong types with each field's code, as before, writing nothing", async () => {
+    const { ctx, project } = await setup();
+    const create: [Record<string, unknown>, string][] = [
+      [{ costImpactCents: OVER }, "invalid_input"],
+      [{ costImpactCents: -OVER }, "invalid_input"],
+      [{ costImpactCents: "100" }, "invalid_input"],
+      [{ costImpactCents: 1.5 }, "invalid_input"],
+      [{ scheduleImpactDays: 3651 }, "invalid_input"],
+      [{ kind: "" }, "missing_fields"],
+      [{ kind: undefined }, "missing_fields"],
+      [{ kind: null }, "invalid_input"],
+      [{ kind: "bug" }, "invalid_input"],
+      [{ occurredOn: "" }, "missing_fields"],
+      [{ occurredOn: null }, "invalid_date"],
+      [{ occurredOn: "2026-10-18" }, "invalid_date"],
+      [{ chapterCode: null }, "missing_fields"],
+      [{ chapterCode: "x".repeat(21) }, "invalid_input"],
+      [{ chapterCode: "99" }, "unknown_chapter"],
+      [{ description: 5 }, "missing_fields"],
+      [{ party: "" }, "missing_fields"],
+      [{ party: null }, "invalid_input"],
+      [{ partyName: 5 }, "invalid_input"],
+      [{ status: null }, "invalid_input"],
+      [{ status: "done" }, "invalid_input"],
+    ];
+    for (const [overrides, code] of create) {
+      expect([overrides, await outcome(svc.createIssue(ctx, project.id, issue(overrides)))]).toEqual([overrides, code]);
+    }
+    expect(await db.select().from(obraIssues)).toHaveLength(0);
+
+    // At the bounds, and "" for no estimate; keys it doesn't take are ignored.
+    const { issueId } = await svc.createIssue(
+      ctx,
+      project.id,
+      issue({ costImpactCents: -MAX_AMOUNT_CENTS, scheduleImpactDays: "", tenantId: "other", number: 9, createdById: "someone" }),
+    );
+    const edit: [Record<string, unknown>, string][] = [
+      [{ costImpactCents: OVER }, "invalid_input"],
+      [{ chapterCode: "99" }, "unknown_chapter"],
+      [{ kind: "" }, "invalid_input"],
+      [{ occurredOn: "" }, "invalid_date"],
+      [{ description: "" }, "missing_fields"],
+      [{ status: null }, "invalid_input"],
+    ];
+    for (const [input, code] of edit) {
+      expect([input, await outcome(svc.updateIssue(ctx, project.id, issueId, input))]).toEqual([input, code]);
+    }
+    const [row] = await db.select().from(obraIssues).where(eq(obraIssues.id, issueId));
+    expect(row).toMatchObject({
+      tenantId: project.tenantId,
+      number: 1,
+      createdById: ctx.userId,
+      kind: "issue",
+      chapterCode: "02",
+      status: "pending",
+      costImpactCents: -MAX_AMOUNT_CENTS,
+      scheduleImpactDays: null,
+      partyName: null,
+    });
+    await expect(svc.listIssues(ctx, project.id, { kind: "bug" })).rejects.toMatchObject({ code: "invalid_input" });
+  });
+
+  it("checks a chapter's dates as before: a correction's dates only once the chapter has any", async () => {
+    const { ctx, project } = await setup();
+    expect(await outcome(svc.startChapter(ctx, project.id, "01", {}))).toBe("invalid_date");
+    expect(await outcome(svc.startChapter(ctx, project.id, "01", { date: null }))).toBe("invalid_date");
+    expect(await outcome(svc.finishChapter(ctx, project.id, "01", { date: 20261001 }))).toBe("invalid_date");
+    // Pending: the note is read first, then the state.
+    expect(await outcome(svc.correctChapter(ctx, project.id, "01", { note: 5 }))).toBe("invalid_input");
+    expect(await outcome(svc.correctChapter(ctx, project.id, "01", { actualStart: 5 }))).toBe("invalid_state");
+
+    await svc.startChapter(ctx, project.id, "01", { date: "2026-10-01" });
+    const corrections: [Record<string, unknown>, string][] = [
+      [{ actualStart: 5 }, "invalid_date"],
+      [{ actualEnd: "2026-10-18" }, "invalid_date"],
+      [{ note: "x".repeat(501) }, "invalid_input"],
+    ];
+    for (const [input, code] of corrections) {
+      expect([input, await outcome(svc.correctChapter(ctx, project.id, "01", input))]).toEqual([input, code]);
+    }
+    expect(await chapter(ctx, project.id, "01")).toMatchObject({ actualStart: "2026-10-01", actualEnd: null });
+    // "" clears a date, as null does.
+    expect(await svc.correctChapter(ctx, project.id, "01", { actualStart: "", tenantId: "other" })).toMatchObject({ state: "pending" });
   });
 });

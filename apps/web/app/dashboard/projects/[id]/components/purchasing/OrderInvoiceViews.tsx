@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
 import FormError from "../../../../components/FormError";
 import { useVatLabel } from "../../../../components/vat-basis";
 import { usePurchaseFormat } from "./format";
-import { InvoicingFoot } from "./LineViews";
+import { InvoicingFoot } from "./LineOrders";
 import { invoiceHref } from "./links";
 import { InvoiceStatePill, ProgressPill } from "./pills";
 

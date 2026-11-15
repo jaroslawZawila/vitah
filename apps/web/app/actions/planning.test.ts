@@ -32,7 +32,7 @@ async function setup(role: "admin" | "manager" | "viewer" = "manager") {
   return { tenant, project };
 }
 
-const FIRST_PLAN = { from: "template", region: "as", augustClosure: true, christmasClosure: true };
+const FIRST_PLAN = { from: "template", region: "as", augustClosure: true, christmasClosure: true } as const;
 
 beforeEach(async () => {
   await resetDatabase();
@@ -69,7 +69,7 @@ describe("planning actions", () => {
 
   it("return core's error codes", async () => {
     const { project } = await setup();
-    expect(await createPlanningDraftAction(project.id, { ...FIRST_PLAN, region: "xx" })).toEqual({ error: "invalid_input" });
+    expect(await createPlanningDraftAction(project.id, { ...FIRST_PLAN, region: "xx" as never })).toEqual({ error: "invalid_input" });
     expect(await discardPlanningDraftAction(project.id)).toEqual({ error: "not_found" });
     await createPlanningDraftAction(project.id, FIRST_PLAN);
     expect(await createPlanningDraftAction(project.id, FIRST_PLAN)).toEqual({ error: "draft_exists" });

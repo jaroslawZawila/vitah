@@ -641,3 +641,60 @@ describe("project input", () => {
     ).rejects.toMatchObject({ code: "too_long" });
   });
 });
+
+describe("input boundaries (schemas in src/inputs/projects.ts)", () => {
+  const base = { ref: "VTH-9", address: "Calle 9" };
+
+  it.each([
+    // Ref and address first, as before: what is missing is told before a bad date.
+    ["too_long", { ref: "V".repeat(41), address: 5 }],
+    ["missing_fields", { ref: 5, address: "Calle 9", startDate: "nope" }],
+    ["missing_fields", { ref: "VTH-9", address: "   " }],
+    ["invalid_date", { ...base, startDate: 20261001 }],
+    ["invalid_date", { ...base, completionDate: true }],
+    ["dates_out_of_order", { ...base, startDate: "2026-05-01", completionDate: " 2026-04-30 ", clientId: "c".repeat(201) }],
+    ["too_long", { ...base, clientId: "c".repeat(201) }],
+  ])("createProject answers %s and writes nothing", async (code, input) => {
+    const { ctx } = await setup();
+    await expect(svc.createProject(ctx, input)).rejects.toMatchObject({ code, status: 400 });
+    expect(await db.select().from(projects)).toHaveLength(0);
+  });
+
+  it("createProject: blank or null dates and clientId are none; extra keys are ignored", async () => {
+    const { tenant, ctx } = await setup();
+    const { id } = await svc.createProject(ctx, {
+      ...base,
+      startDate: "",
+      completionDate: null,
+      clientId: "  ",
+      tenantId: "other",
+      obraStage: 8,
+    });
+    const [row] = await db.select().from(projects).where(eq(projects.id, id));
+    expect(row).toMatchObject({ tenantId: tenant.id, startDate: null, completionDate: null, clientUserId: null, obraStage: 1 });
+  });
+
+  it.each([
+    ["missing_fields", { address: null }],
+    ["missing_fields", { address: 5 }],
+    ["missing_fields", { address: " " }],
+    ["invalid_date", { startDate: 5 }],
+    ["invalid_date", { completionDate: "2026-13-01" }],
+  ])("updateProject answers %s and changes nothing", async (code, input) => {
+    const { tenant, ctx } = await setup();
+    const project = await createTestProject(tenant.id, { address: "Calle 1" });
+    await expect(svc.updateProject(ctx, project.id, input)).rejects.toMatchObject({ code, status: 400 });
+    expect(await svc.getProject(ctx, project.id)).toMatchObject({ address: "Calle 1" });
+  });
+
+  it("updateProject: a key sent as undefined is not sent; ref and other keys are ignored", async () => {
+    const { tenant, ctx } = await setup();
+    const project = await createTestProject(tenant.id, { address: "Calle 1", startDate: new Date("2026-03-01") });
+    await svc.updateProject(ctx, project.id, { address: undefined, startDate: undefined, ref: "OTHER", tenantId: "x" });
+    expect(await svc.getProject(ctx, project.id)).toMatchObject({
+      ref: project.ref,
+      address: "Calle 1",
+      startDate: new Date("2026-03-01"),
+    });
+  });
+});

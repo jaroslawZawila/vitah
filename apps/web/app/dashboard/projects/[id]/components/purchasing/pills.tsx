@@ -65,11 +65,11 @@ export function PurchaseKindPill({ kind }: { kind: PurchaseKind }) {
 
 /** "3 d tarde": a material order past its expected delivery. */
 export function LatePill({ days }: { days: number }) {
-  const t = useTranslations("purchasing");
+  const t = useTranslations("purchasing.latePill");
   return (
     <Badge variant="warn">
       <Dot />
-      {t("lateDays", { days })}
+      {t("days", { days })}
     </Badge>
   );
 }

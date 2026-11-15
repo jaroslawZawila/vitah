@@ -6,6 +6,7 @@ vi.mock("@repo/auth/mobile", () => ({ authenticateMobileRequest: vi.fn() }));
 const { getRequestContext } = await import("@repo/auth/context");
 const { authenticateMobileRequest } = await import("@repo/auth/mobile");
 const { isCrossSiteWrite, readCreate, readWithFile, withContext, withMobileClient } = await import("./api");
+const { JSON_CSP } = await import("./security-headers.js");
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -63,6 +64,7 @@ describe("withContext", () => {
 
     expect(res.status).toBe(403);
     expect(await res.json()).toEqual({ error: "forbidden" });
+    expect(res.headers.get("content-security-policy")).toBe(JSON_CSP);
     expect(getRequestContext).not.toHaveBeenCalled();
     expect(handler).not.toHaveBeenCalled();
   });
@@ -78,6 +80,31 @@ describe("withContext", () => {
     expect(res.status).toBe(404);
     expect(await res.json()).toEqual({ error: "not_found" });
     expect(log).not.toHaveBeenCalled();
+  });
+
+  it("answers every JSON, empty or not, with the API's locked-down policy", async () => {
+    vi.mocked(getRequestContext).mockResolvedValueOnce(null);
+    const unauthorized = await withContext(request("GET", {}), vi.fn());
+    expect(unauthorized.status).toBe(401);
+    expect(unauthorized.headers.get("content-security-policy")).toBe(JSON_CSP);
+
+    vi.mocked(getRequestContext).mockResolvedValue({ tenantId: "t1", userId: "u1", role: "manager" });
+    const ok = await withContext(request("GET", {}), async () => ({ id: "p1" }));
+    expect(await ok.json()).toEqual({ id: "p1" });
+    expect(ok.headers.get("content-security-policy")).toBe(JSON_CSP);
+
+    const empty = await withContext(request("DELETE", {}), async () => undefined, 204);
+    expect(empty.status).toBe(204);
+    expect(empty.headers.get("content-security-policy")).toBe(JSON_CSP);
+  });
+
+  it("passes a file the handler made through as it is, with the file's own policy", async () => {
+    vi.mocked(getRequestContext).mockResolvedValue({ tenantId: "t1", userId: "u1", role: "manager" });
+    const file = new Response("%PDF", { headers: { "Content-Security-Policy": "frame-ancestors 'self'" } });
+
+    const res = await withContext(request("GET", {}), async () => file);
+
+    expect(res).toBe(file);
   });
 
   it("answers an unexpected error with internal_error and an id, logged once with the route", async () => {

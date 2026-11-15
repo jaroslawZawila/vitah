@@ -169,3 +169,27 @@ describe("what Auth.js logs", () => {
     ]);
   });
 });
+
+describe("what authorize reads of the credentials (portalCredentials in @repo/core)", () => {
+  it("takes them as typed: a blank email is an attempt that counts, an empty or missing field is none", async () => {
+    const tenant = await createTestTenant();
+    const user = await createTestUser(tenant.id, { email: EMAIL, role: "viewer", password: PASSWORD });
+
+    // Not counted: nothing to sign in with.
+    for (let i = 0; i < 12; i++) {
+      expect(await authorize({ email: EMAIL, password: "" })).toBeNull();
+      expect(await authorize({ email: "", password: PASSWORD })).toBeNull();
+    }
+    expect(await authorize({ email: EMAIL, password: PASSWORD, role: "admin" })).toMatchObject({ id: user.id, role: "viewer" });
+
+    // Never trimmed before the check: spaces are an email, wrong, and counted like any other.
+    for (let i = 0; i < 10; i++) expect(await authorize({ email: "   ", password: PASSWORD })).toBeNull();
+    await expect(authorize({ email: "   ", password: PASSWORD })).rejects.toBeInstanceOf(TooManyAttempts);
+  });
+
+  it("asks for the code when the one sent isn't text, as when there is none", async () => {
+    await enrolledUser();
+    await expect(authorize({ email: EMAIL, password: PASSWORD, code: 123456 })).rejects.toBeInstanceOf(MfaRequired);
+    expect(await authorize({ email: EMAIL, password: "NotThisOne26", code: 123456 })).toBeNull();
+  });
+});
