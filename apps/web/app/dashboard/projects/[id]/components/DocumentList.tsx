@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useObraFormat } from "./obra/format";
+import { touchLink } from "../../../components/touch";
 
 /** "PDF", "BC3", "XLSX"…: the file's kind, from its name. */
 const typeOf = (document: ProjectDocument) =>
@@ -61,7 +62,7 @@ export default function DocumentList({
                   href={fileUrl(document)}
                   target="_blank"
                   rel="noreferrer"
-                  className="font-semibold wrap-anywhere text-foreground transition-colors hover:text-primary hover:underline focus-visible:text-primary focus-visible:underline"
+                  className={cn("font-semibold wrap-anywhere text-foreground transition-colors hover:text-primary hover:underline focus-visible:text-primary focus-visible:underline", touchLink)}
                 >
                   {document.title}
                 </a>

@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import FormError from "../../../../components/FormError";
 import { Dot } from "../construction/pills";
 import { day, usePurchaseFormat } from "./format";
+import { touchLink } from "../../../../components/touch";
 
 // Presentational: the AI's review of an order's or an invoice's PDFs. It
 // only warns; staff mark warnings as seen or ask again. The containers
@@ -43,7 +44,7 @@ function Finding({ finding, duplicateHref }: { finding: DocumentFinding; duplica
       {finding.duplicate ? (
         <span className="text-meta text-muted-foreground">
           {t("duplicateOf")}{" "}
-          <Link href={duplicateHref(finding)} className="font-medium text-brand-ink hover:text-primary">
+          <Link href={duplicateHref(finding)} className={cn("font-medium text-brand-ink hover:text-primary", touchLink)}>
             {finding.duplicate.label}
           </Link>
         </span>

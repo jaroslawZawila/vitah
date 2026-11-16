@@ -29,6 +29,7 @@ import ProgressBar from "../../projects/[id]/components/obra/ProgressBar";
 import { usePurchaseFormat } from "../../projects/[id]/components/purchasing/format";
 import { invoiceFileUrl, invoiceHref, orderHref } from "../../projects/[id]/components/purchasing/links";
 import { InvoiceStatePill } from "../../projects/[id]/components/purchasing/pills";
+import { touchLink } from "../../components/touch";
 
 // Presentational: a supplier invoice's page (heading, where it stands, its
 // amounts, data, payments, PDF versions and credit notes). The container
@@ -50,11 +51,11 @@ export function InvoiceHeading({ invoice, actions }: { invoice: PurchaseInvoiceD
         </div>
         <h1 className="num mt-1.5 font-mono text-[30px] [overflow-wrap:anywhere] sm:text-[36px]">{invoice.number}</h1>
         <p className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[14px] text-muted-foreground">
-          <Link href={companyHref(invoice.subcontractorId)} className="font-semibold text-brand-ink hover:text-primary">
+          <Link href={companyHref(invoice.subcontractorId)} className={cn("font-semibold text-brand-ink hover:text-primary", touchLink)}>
             {invoice.supplierName}
           </Link>
           <span>·</span>
-          <Link href={orderHref(invoice.projectId, invoice.orderId)} className="num hover:text-primary">
+          <Link href={orderHref(invoice.projectId, invoice.orderId)} className={cn("num hover:text-primary", touchLink)}>
             {orderLabel(invoice.orderNumber)}
           </Link>
           <span>{invoice.orderDescription}</span>
@@ -287,7 +288,7 @@ export function InvoiceData({ invoice }: { invoice: PurchaseInvoiceDetail }) {
     [t("project"), <><span className="num">{invoice.projectRef}</span> · {invoice.projectAddress}</>],
     [
       t("order"),
-      <Link key="o" href={orderHref(invoice.projectId, invoice.orderId)} className="text-brand-ink hover:text-primary">
+      <Link key="o" href={orderHref(invoice.projectId, invoice.orderId)} className="text-brand-ink hover:text-primary pointer-coarse:inline-block pointer-coarse:min-h-11 pointer-coarse:py-2.5">
         <span className="num">{orderLabel(invoice.orderNumber)}</span> {invoice.orderDescription}
       </Link>,
     ],
@@ -295,7 +296,7 @@ export function InvoiceData({ invoice }: { invoice: PurchaseInvoiceDetail }) {
     ...(invoice.rectifiesId
       ? ([[
           t("rectifies"),
-          <Link key="r" href={invoiceHref(invoice.rectifiesId)} className="num font-semibold text-brand-ink hover:text-primary">
+          <Link key="r" href={invoiceHref(invoice.rectifiesId)} className={cn("num font-semibold text-brand-ink hover:text-primary", touchLink)}>
             {invoice.rectifiesNumber}
           </Link>,
         ]] as [string, React.ReactNode][])
@@ -304,7 +305,7 @@ export function InvoiceData({ invoice }: { invoice: PurchaseInvoiceDetail }) {
       t("lines"),
       <ul key="l" className="m-0 flex list-none flex-col gap-1 p-0">
         {invoice.lines.map((line) => (
-          <li key={line.lineageId} className="flex flex-wrap gap-x-2">
+          <li key={line.lineageId} className="flex flex-wrap gap-x-2 max-sm:grid max-sm:grid-cols-[auto_minmax(0,1fr)_auto]">
             <span className="num text-muted-foreground">{line.code ?? line.chapterCode}</span>
             <span className="min-w-0 flex-1">{line.description ?? "—"}</span>
             <span className="num">{f.amount(line.amountCents)}</span>
@@ -320,10 +321,10 @@ export function InvoiceData({ invoice }: { invoice: PurchaseInvoiceDetail }) {
       <h2 id="invoice-data-title" className="text-[22px]">
         {t("title")}
       </h2>
-      <dl className="m-0 grid grid-cols-[minmax(0,110px)_minmax(0,1fr)] gap-x-3.5 gap-y-2.5 text-sm">
+      <dl className="m-0 grid gap-x-3.5 gap-y-0.5 text-sm sm:grid-cols-[minmax(0,110px)_minmax(0,1fr)] sm:gap-y-2.5">
         {rows.map(([label, value]) => (
           <div key={label} className="contents">
-            <dt className="text-muted-foreground">{label}</dt>
+            <dt className="text-muted-foreground max-sm:mt-2">{label}</dt>
             <dd className="m-0 min-w-0 [overflow-wrap:anywhere]">{value}</dd>
           </div>
         ))}
@@ -375,7 +376,7 @@ export function InvoiceFiles({
         <ul className="m-0 list-none p-0">
           {invoice.files.map((file, index) => (
             <li key={file.id} className={cn("flex flex-wrap items-center gap-x-2.5 gap-y-1 border-b py-2.5 text-sm last:border-b-0", index > 0 && "text-muted-foreground")}>
-              <a href={invoiceFileUrl(invoice.id, index === 0 ? undefined : file.id)} download className={cn("inline-flex items-center gap-1.5 font-semibold", index === 0 ? "text-brand-ink hover:text-primary" : "hover:text-foreground")}>
+              <a href={invoiceFileUrl(invoice.id, index === 0 ? undefined : file.id)} download className={cn("inline-flex items-center gap-1.5 font-semibold pointer-coarse:min-h-11", index === 0 ? "text-brand-ink hover:text-primary" : "hover:text-foreground")}>
                 <FileText aria-hidden className="size-4 flex-none" />
                 {file.filename}
               </a>
@@ -437,7 +438,7 @@ export function CreditNotes({ invoice }: { invoice: PurchaseInvoiceDetail }) {
       <ul className="m-0 list-none p-0">
         {invoice.creditNotes.map((credit) => (
           <li key={credit.id} className="flex flex-wrap items-center gap-x-2.5 border-b py-2 text-sm last:border-b-0">
-            <Link href={invoiceHref(credit.id)} className="num font-semibold text-brand-ink hover:text-primary">
+            <Link href={invoiceHref(credit.id)} className={cn("num font-semibold text-brand-ink hover:text-primary", touchLink)}>
               {credit.number}
             </Link>
             <span className="text-muted-foreground">{f.date(credit.issuedOn)}</span>

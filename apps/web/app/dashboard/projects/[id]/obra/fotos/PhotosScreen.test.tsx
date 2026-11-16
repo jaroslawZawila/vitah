@@ -51,6 +51,19 @@ describe("PhotosScreen", () => {
     expect(groups()).toEqual(["06 · Envolvente térmica Thermochip", "04 · Albañilería y saneamiento", "Sin capítulo"]);
   });
 
+  it("lets a finger pick photos anywhere on the drop box, and wraps a tile's buttons under its date", () => {
+    renderScreen();
+    const form = within(screen.getByRole("form", { name: "Subir fotos" }));
+    // The file input is hidden inside its box (at least 120px tall), which is what is tapped.
+    const input = form.getByLabelText(/Arrastra las fotos/);
+    expect(input).toHaveClass("sr-only");
+    const box = input.closest("label")!;
+    expect(box).toHaveClass("relative", "min-h-[120px]");
+
+    const actionsRow = screen.getByRole("link", { name: "Descargar Fachada norte" }).parentElement!.parentElement!;
+    expect(actionsRow).toHaveClass("flex-wrap");
+  });
+
   it("uploads every photo picked with the same date, caption and chapter", async () => {
     renderScreen();
 

@@ -98,6 +98,10 @@ describe("OrderFormScreen", () => {
     expect(within(open).getByText("abierta")).toBeInTheDocument();
     const closed = screen.getByRole("textbox", { name: "Importe de 07.01" }).closest("tr")!;
     expect(within(closed).getByText("−190,00")).toHaveClass("text-good");
+    // On a phone the table's headings are hidden and each line is a card: each figure says what it is.
+    for (const label of ["Coste presup.", "Ya contratado", "Este pedido", "Desviación"]) {
+      expect(within(closed).getByText(label)).toBeInTheDocument();
+    }
 
     expect(total().getByText("8.910,00 €")).toBeInTheDocument();
     expect(total().getByText("Desviación en 1 partida cerrada")).toBeInTheDocument();

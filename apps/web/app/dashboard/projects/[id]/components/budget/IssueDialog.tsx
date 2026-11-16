@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 import FormError from "../../../../components/FormError";
 import { muted } from "../obra/classes";
 import { useObraFormat } from "../obra/format";
+import { touchLink } from "../../../../components/touch";
 
 export type IssueInput = { issuedOn: string; validUntil: string; changeReason?: string; shareWithClient: boolean };
 
@@ -118,7 +119,7 @@ export default function IssueDialog({
               <b>{t(`${kind}.title`)}</b> <span className="text-muted-foreground">· {t(`${kind}.hint`)}</span>
             </span>
             <Badge variant={kind === "general" && share ? "good" : "outline"}>{t(kind === "general" && share ? "inApp" : "staffOnly")}</Badge>
-            <Link href={pdfHref(kind)} target="_blank" className="text-sm font-semibold text-brand-ink hover:underline">
+            <Link href={pdfHref(kind)} target="_blank" className={cn("text-sm font-semibold text-brand-ink hover:underline", touchLink)}>
               {t("preview")}
             </Link>
           </div>

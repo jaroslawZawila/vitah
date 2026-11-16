@@ -10,6 +10,7 @@ import Kpi from "../../projects/[id]/components/obra/Kpi";
 import { usePurchaseFormat } from "../../projects/[id]/components/purchasing/format";
 import { supplierHref } from "../../projects/[id]/components/purchasing/links";
 import { SupplierCaePill } from "../../projects/[id]/components/purchasing/pills";
+import { stretchedLink, touchLink } from "../../components/touch";
 import { useVatLabel } from "../../components/vat-basis";
 
 // Presentational: Compras › Proveedores, every company as a supplier, and one
@@ -121,7 +122,7 @@ export function SupplierList({ suppliers, empty }: { suppliers: PurchaseSupplier
         {suppliers.map((supplier) => (
           <li key={supplier.id} className="relative rounded-xl border bg-card px-4 py-3.5 shadow-card">
             <div className="flex items-start justify-between gap-2.5">
-              {name(supplier, "min-w-0 after:absolute after:inset-0 [overflow-wrap:anywhere]")}
+              {name(supplier, cn("min-w-0 [overflow-wrap:anywhere]", stretchedLink))}
               <SupplierCaePill suppliesOnly={supplier.suppliesOnly} status={supplier.caeStatus} />
             </div>
             <div className="mt-0.5 text-sm text-muted-foreground">
@@ -155,7 +156,7 @@ export function SupplierList({ suppliers, empty }: { suppliers: PurchaseSupplier
             {suppliers.map((supplier) => (
               <TableRow key={supplier.id}>
                 <TableCell className="min-w-[220px] pl-[18px] whitespace-normal">
-                  {name(supplier)}
+                  {name(supplier, touchLink)}
                   <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-meta text-muted-foreground">
                     {typeOf(supplier)}
                     {!supplier.suppliesOnly && supplier.caeStatus !== "apta" && (
@@ -205,7 +206,7 @@ export function SupplierHeading({ supplier, fichaHref }: { supplier: PurchaseSup
         <h1 className="mt-1.5 [overflow-wrap:anywhere]">{supplier.legalName}</h1>
         <p className="mt-1 text-[14px] text-muted-foreground">
           {typeOf(supplier)} ·{" "}
-          <Link href={fichaHref} className="font-medium text-brand-ink hover:text-primary">
+          <Link href={fichaHref} className={cn("font-medium text-brand-ink hover:text-primary", touchLink)}>
             {t("ficha")}
           </Link>
         </p>

@@ -30,6 +30,7 @@ import { deviationTone } from "../construction/format";
 import { lineFigures, remainingCents, type LineDraft, type OrderDraft, type ParseAmount } from "./draft";
 import { usePurchaseFormat } from "./format";
 import { SupplierCaePill } from "./pills";
+import { phoneLabel, phoneLine } from "../../../../components/phone-table";
 
 const option =
   "group flex min-h-11 w-full cursor-pointer items-start gap-3 rounded-[10px] border bg-card px-3.5 py-3 text-left text-sm transition-colors hover:border-primary/50 disabled:cursor-not-allowed disabled:opacity-50 aria-checked:border-primary aria-checked:bg-brand-soft aria-pressed:border-primary aria-pressed:bg-brand-soft";
@@ -37,6 +38,18 @@ const dot =
   "mt-0.5 size-4 flex-none rounded-full border-2 border-border bg-card group-aria-checked:border-primary group-aria-checked:shadow-[inset_0_0_0_3px_var(--card)] group-aria-checked:bg-primary group-aria-pressed:border-primary group-aria-pressed:bg-primary group-aria-pressed:shadow-[inset_0_0_0_3px_var(--card)]";
 export const section = cn(cardVariants(), "gap-3.5");
 const check = "size-[18px] flex-none cursor-pointer accent-primary disabled:cursor-not-allowed";
+
+/**
+ * Below 768px the lines table reflows into one card per line (the same elements,
+ * so one set of inputs): the tick and the line on top, then each figure on a row
+ * of its own with its column's name, which the table says in its heading.
+ */
+const phone = {
+  table: "max-md:block",
+  row: "max-md:grid max-md:grid-cols-[44px_minmax(0,1fr)] max-md:items-center max-md:gap-x-2 max-md:gap-y-1 max-md:px-[18px] max-md:py-2.5",
+  cell: `max-md:col-start-2 ${phoneLine} max-md:text-right`,
+  label: phoneLabel,
+};
 
 /** What the kind and supplier step reads and writes: an order's or a purchase request's. */
 type KindDraft = Pick<OrderDraft, "kind" | "subcontractorId">;
@@ -133,7 +146,7 @@ export function KindAndSupplier({
                   ? onChange({ subcontractorId: "" })
                   : onChange({ subcontractorId: s.id, ...(s.suppliesOnly ? { kind: "material" } : {}) })
               }
-              className={cn(option, "items-center")}
+              className={cn(option, "flex-none items-center")}
             >
               <span aria-hidden className={dot} />
               <span className="min-w-0 flex-1">
@@ -190,26 +203,35 @@ function LineRow({
   const { deviationCents } = lineFigures(line, draft, parse);
 
   return (
-    <TableRow className={cn(!ticked && "text-muted-foreground")}>
-      <TableCell className="w-11 pl-[18px]">
-        <input type="checkbox" className={check} checked={ticked} onChange={onToggle} aria-label={t("include", { code: line.code })} />
+    <TableRow className={cn(phone.row, !ticked && "text-muted-foreground")}>
+      <TableCell className="w-11 pl-[18px] max-md:p-0">
+        <label className="cursor-pointer pointer-coarse:flex pointer-coarse:min-h-11 pointer-coarse:min-w-11 pointer-coarse:items-center">
+          <input type="checkbox" className={check} checked={ticked} onChange={onToggle} aria-label={t("include", { code: line.code })} />
+        </label>
       </TableCell>
-      <TableCell className="max-w-[360px] min-w-[240px] whitespace-normal">
+      <TableCell className="max-w-[360px] min-w-[240px] whitespace-normal max-md:max-w-none max-md:min-w-0 max-md:p-0">
         <span className="num font-semibold text-foreground">{line.code}</span> {line.description}{" "}
         <span className="num text-meta text-muted-foreground">
           {f.decimal(line.quantity)} {line.unit}
         </span>
       </TableCell>
-      <TableCell className="num text-right">{f.amount(line.costCents)}</TableCell>
-      <TableCell className="num text-right text-muted-foreground">
-        {line.contractedCents ? f.amount(line.contractedCents) : "—"}
-        {line.closed && (
-          <Badge variant="outline" className="ml-1.5">
-            {t("alreadyClosed")}
-          </Badge>
-        )}
+      <TableCell className={cn("num text-right", phone.cell)}>
+        <span className={phone.label}>{t("cost")}</span>
+        {f.amount(line.costCents)}
       </TableCell>
-      <TableCell className={cn("text-right", estimate && "pr-[18px]")}>
+      <TableCell className={cn("num text-right text-muted-foreground", phone.cell)}>
+        <span className={phone.label}>{t("contracted")}</span>
+        <span>
+          {line.contractedCents ? f.amount(line.contractedCents) : "—"}
+          {line.closed && (
+            <Badge variant="outline" className="ml-1.5">
+              {t("alreadyClosed")}
+            </Badge>
+          )}
+        </span>
+      </TableCell>
+      <TableCell className={cn("text-right", estimate && "pr-[18px]", phone.cell, !ticked && "max-md:hidden")}>
+        <span className={phone.label}>{estimate ? t("estimate") : t("thisOrder")}</span>
         <Input
           inputMode="decimal"
           className="num ml-auto w-[120px] text-right"
@@ -221,8 +243,8 @@ function LineRow({
       </TableCell>
       {!estimate && (
         <>
-          <TableCell>
-            <label className={cn("inline-flex min-h-10 items-center gap-2 text-meta", ticked ? "cursor-pointer" : "cursor-not-allowed")}>
+          <TableCell className={cn(phone.cell, "max-md:justify-start", !ticked && "max-md:hidden")}>
+            <label className={cn("inline-flex min-h-10 items-center gap-2 text-meta pointer-coarse:min-h-11 pointer-coarse:min-w-11", ticked ? "cursor-pointer" : "cursor-not-allowed")}>
               <input
                 type="checkbox"
                 className={check}
@@ -234,7 +256,8 @@ function LineRow({
               {ticked && (draft.closes ? t("closesYes") : t("closesNo"))}
             </label>
           </TableCell>
-          <TableCell className={cn("num pr-[18px] text-right", deviationTone(deviationCents))}>
+          <TableCell className={cn("num pr-[18px] text-right", deviationTone(deviationCents), phone.cell, !ticked && "max-md:hidden")}>
+            <span className={phone.label}>{t("deviation")}</span>
             {ticked && (draft.closes ? (deviationCents === null ? "—" : f.signedAmount(deviationCents)) : <span className="font-sans text-muted-foreground">{t("open")}</span>)}
           </TableCell>
         </>
@@ -319,8 +342,8 @@ export function Lines({
         {!chapter || chapter.lines.length === 0 ? (
           <p className="px-[18px] py-4 text-sm text-muted-foreground">{t("noLines")}</p>
         ) : (
-          <Table className={estimate ? "min-w-[640px]" : "min-w-[900px]"} aria-label={t("linesOf", { code: chapter.code })}>
-            <TableHeader>
+          <Table className={cn(phone.table, estimate ? "md:min-w-[640px]" : "md:min-w-[900px]")} aria-label={t("linesOf", { code: chapter.code })}>
+            <TableHeader className="max-md:hidden">
               <TableRow>
                 <TableHead className="pl-[18px]">
                   <span className="sr-only">{t("includeColumn")}</span>
@@ -339,7 +362,7 @@ export function Lines({
                 )}
               </TableRow>
             </TableHeader>
-            <TableBody>
+            <TableBody className="max-md:block">
               {chapter.lines.map((line) => (
                 <LineRow
                   key={line.lineageId}

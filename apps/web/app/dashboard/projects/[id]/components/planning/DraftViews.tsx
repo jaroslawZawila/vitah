@@ -27,6 +27,28 @@ const FIXED = "fixed";
 
 export type RuleChange = Partial<Pick<PlanningItemInput, "after" | "lagDays" | "durationDays" | "fixedStart" | "leadDays">>;
 
+/**
+ * Below 768px the table's rows become cards: the chapter on top, then each
+ * field on a line of its own with its label (the table's heading) on the left.
+ * One set of inputs serves both layouts.
+ */
+const phone = {
+  table: "max-md:block max-md:[&_tbody]:block",
+  row: "max-md:grid max-md:grid-cols-[auto_minmax(0,1fr)] max-md:gap-x-3 max-md:gap-y-2 max-md:px-[18px] max-md:py-3.5 max-md:hover:bg-transparent",
+  code: "max-md:p-0 max-md:pt-px",
+  chapter: "max-md:min-w-0 max-md:p-0",
+  field: "max-md:col-span-2 max-md:flex max-md:flex-wrap max-md:items-center max-md:justify-between max-md:gap-x-3 max-md:gap-y-1.5 max-md:p-0",
+};
+
+/** A field's heading, shown beside it on a phone (the input has its own label). */
+function PhoneLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <span aria-hidden className="font-sans text-sm font-normal text-muted-foreground md:hidden">
+      {children}
+    </span>
+  );
+}
+
 /** The draft's chapters: their rules (editable), and the dates and change against the baseline those give. */
 export function DraftTable({
   rows,
@@ -59,8 +81,8 @@ export function DraftTable({
 
   return (
     <section className={cn(cardVariants({ size: "flush" }), "min-w-0 py-1.5")} aria-label={t("tableLabel")}>
-      <Table className="min-w-[860px]">
-        <TableHeader>
+      <Table className={cn("md:min-w-[860px]", phone.table)}>
+        <TableHeader className="max-md:hidden">
           <TableRow>
             <TableHead className="pl-[18px]">{t("code")}</TableHead>
             <TableHead>{t("chapter")}</TableHead>
@@ -82,9 +104,9 @@ export function DraftTable({
             const delta = d && was ? daysBetween(was, d.end) : null;
             const from = rule.after ?? (rule.fixedStart ? FIXED : FROM_START);
             return (
-              <TableRow key={rule.code}>
-                <TableCell className="num pl-[18px]">{rule.code}</TableCell>
-                <TableCell className="min-w-[190px] whitespace-normal">
+              <TableRow key={rule.code} className={phone.row}>
+                <TableCell className={cn("num pl-[18px] font-semibold md:font-normal", phone.code)}>{rule.code}</TableCell>
+                <TableCell className={cn("min-w-[190px] whitespace-normal", phone.chapter)}>
                   <div className="font-semibold">{row?.name ?? rule.code}</div>
                   <div className={cn(muted, "flex flex-wrap items-center gap-1.5")}>
                     {finished
@@ -95,10 +117,11 @@ export function DraftTable({
                     {critical.has(rule.code) && <Badge variant="warn">{t("critical")}</Badge>}
                   </div>
                 </TableCell>
-                <TableCell>
+                <TableCell className={phone.field}>
+                  <PhoneLabel>{t("after")}</PhoneLabel>
                   <NativeSelect
                     aria-label={t("afterLabel", { code: rule.code })}
-                    className="w-[132px]"
+                    className="w-[132px] max-md:w-44"
                     value={from}
                     disabled={readOnly || finished || started}
                     onChange={(e) => {
@@ -119,7 +142,8 @@ export function DraftTable({
                       ))}
                   </NativeSelect>
                 </TableCell>
-                <TableCell>
+                <TableCell className={phone.field}>
+                  <PhoneLabel>{t("lagOrDate")}</PhoneLabel>
                   {rule.after ? (
                     <Input
                       type="number"
@@ -142,7 +166,8 @@ export function DraftTable({
                     <span className={muted}>—</span>
                   )}
                 </TableCell>
-                <TableCell>
+                <TableCell className={phone.field}>
+                  <PhoneLabel>{t("days")}</PhoneLabel>
                   <Input
                     type="number"
                     min={1}
@@ -153,8 +178,12 @@ export function DraftTable({
                     onChange={(e) => onChange(rule.code, { durationDays: Math.trunc(Number(e.target.value)) })}
                   />
                 </TableCell>
-                <TableCell className="num whitespace-nowrap">{d ? `${f.date(d.start)} – ${f.date(d.end)}` : "—"}</TableCell>
-                <TableCell>
+                <TableCell className={cn("num whitespace-nowrap", phone.field)}>
+                  <PhoneLabel>{t("dates")}</PhoneLabel>
+                  {d ? `${f.date(d.start)} – ${f.date(d.end)}` : "—"}
+                </TableCell>
+                <TableCell className={phone.field}>
+                  <PhoneLabel>{t("lead")}</PhoneLabel>
                   <div className="flex items-center gap-2">
                     <Input
                       type="number"
@@ -176,9 +205,11 @@ export function DraftTable({
                   <TableCell
                     className={cn(
                       "num pr-[18px] text-right font-semibold",
+                      phone.field,
                       delta === null ? "text-muted-foreground" : delta > 0 ? "text-warn" : delta < 0 ? "text-good" : "text-muted-foreground",
                     )}
                   >
+                    <PhoneLabel>{t("vs", { number: baseline.number })}</PhoneLabel>
                     {was === undefined ? t("new") : delta === null ? "—" : delta === 0 ? t("same") : f.signedDays(delta)}
                   </TableCell>
                 )}
@@ -186,8 +217,8 @@ export function DraftTable({
             );
           })}
           {spanning.length > 0 && (
-            <TableRow className="hover:bg-transparent">
-              <TableCell colSpan={baseline ? 8 : 7} className={cn(muted, "pl-[18px] whitespace-normal")}>
+            <TableRow className="hover:bg-transparent max-md:block">
+              <TableCell colSpan={baseline ? 8 : 7} className={cn(muted, "pl-[18px] whitespace-normal max-md:block max-md:px-[18px] max-md:py-3")}>
                 {t("spans", {
                   codes: spanning.map((r) => `${r.code} ${rowOf.get(r.code)?.name ?? ""}`.trim()).join(" · "),
                   date: f.date(end),

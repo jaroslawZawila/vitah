@@ -108,7 +108,7 @@ function DocumentRow({
       {needsDate && <p className="m-0 text-meta text-destructive">{t("needsDate")}</p>}
       {!req.mandatory && (
         <div className="flex flex-col gap-2">
-          <label className="flex min-h-11 w-fit cursor-pointer items-center gap-2.5 text-sm font-medium lg:min-h-9">
+          <label className="flex min-h-11 w-fit cursor-pointer items-center gap-2.5 text-sm font-medium lg:min-h-9 lg:pointer-coarse:min-h-11">
             <input
               type="checkbox"
               className="size-[18px] accent-primary"

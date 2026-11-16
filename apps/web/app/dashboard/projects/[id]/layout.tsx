@@ -10,8 +10,11 @@ export default async function ProjectLayout({ children }: { children: React.Reac
 
   return (
     <ClientMessages scope="dashboard/projects/[id]">
-      {/* Hidden on a page with its own BackLink (an order, a hito, a chapter…): one way back. */}
-      <ProjectsBackLink label={t("backToProjects")} className={cn(backLinkClass, "[:root:has([data-back-link])_&]:hidden")} />
+      {/* Below `lg` it is the arrow before the project's tabs in the top bar (Sidebar). */}
+      <ProjectsBackLink
+        label={t("backToProjects")}
+        className={cn(backLinkClass, "max-lg:hidden")}
+      />
       {children}
     </ClientMessages>
   );

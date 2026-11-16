@@ -33,7 +33,8 @@ describe("HitosScreen", () => {
     expect(screen.getByText("Por facturar · sin IVA")).toBeInTheDocument();
     expect(screen.getByText("H3 · vence el 1 oct 2026")).toBeInTheDocument();
 
-    const link = screen.getByRole("link", { name: "Envolvente estanca" });
+    const table = within(screen.getByRole("table", { name: "Pagos" }));
+    const link = table.getByRole("link", { name: "Envolvente estanca" });
     expect(link).toHaveAttribute("href", "/dashboard/projects/p-1/payments/hito-h4");
     const row = link.closest("[role=row]") as HTMLElement;
     expect(within(row).getByText("13 %")).toBeInTheDocument();
@@ -41,11 +42,36 @@ describe("HitosScreen", () => {
     expect(within(row).getByText("Comprobaciones 0/1")).toBeInTheDocument();
     expect(within(row).getByText("69 % listo")).toBeInTheDocument();
 
-    const h3 = screen.getByRole("link", { name: "Estructura Steel Frame" }).closest("[role=row]") as HTMLElement;
+    const h3 = table.getByRole("link", { name: "Estructura Steel Frame" }).closest("[role=row]") as HTMLElement;
     expect(within(h3).getByText("Facturado")).toBeInTheDocument();
     expect(within(h3).getByText("Vence 1 oct 2026")).toBeInTheDocument();
     // The fixture's plan adds up to 40 %.
     expect(screen.getByText("Los porcentajes suman 40 %, no el 100 %.")).toBeInTheDocument();
+  });
+
+  it("gives phones a card per hito, the whole card its link, then the plan's total", () => {
+    const requested = obra.hitos.map((h) => (h.code === "H4" ? { ...h, invoiceRequestedAt: "2026-10-17T10:00:00.000Z" } : h));
+    renderScreen({ obra: { ...obra, hitos: requested } });
+
+    const cards = within(screen.getByRole("list", { name: "Pagos" }));
+    expect(cards.getAllByRole("listitem")).toHaveLength(obra.hitos.length);
+    const link = cards.getByRole("link", { name: "Envolvente estanca" });
+    expect(link).toHaveAttribute("href", "/dashboard/projects/p-1/payments/hito-h4");
+    // The link covers its card, so a finger can tap anywhere on it.
+    expect(link).toHaveClass("after:absolute", "after:inset-0");
+    const h4 = link.closest("li")!;
+    expect(h4).toHaveClass("relative");
+    expect(within(h4).getByText("13 %")).toBeInTheDocument();
+    expect(within(h4).getByText("58.266,65 €")).toBeInTheDocument();
+    expect(within(h4).getByText("Vivienda cerrada al agua y al aire")).toBeInTheDocument();
+    expect(within(h4).getByText("En curso")).toBeInTheDocument();
+    expect(within(h4).getByText("Comprobaciones 0/1")).toBeInTheDocument();
+    expect(within(h4).getByText("Factura solicitada · 17 oct 2026")).toBeInTheDocument();
+    expect(within(h4).getByText("69 % listo")).toBeInTheDocument();
+
+    const h3 = cards.getByRole("link", { name: "Estructura Steel Frame" }).closest("li")!;
+    expect(within(h3).getByText("Vence 1 oct 2026")).toBeInTheDocument();
+    expect(screen.getAllByText("TOTAL PLAN H0–H9")).toHaveLength(2);
   });
 
   it("edits the plan's % and chapters", async () => {
@@ -73,10 +99,11 @@ describe("HitosScreen", () => {
     );
     renderScreen({ obra: { ...obra, hitos: requested } });
 
-    const h4 = screen.getByRole("link", { name: "Envolvente estanca" }).closest("[role=row]") as HTMLElement;
+    const table = within(screen.getByRole("table", { name: "Pagos" }));
+    const h4 = table.getByRole("link", { name: "Envolvente estanca" }).closest("[role=row]") as HTMLElement;
     expect(within(h4).getByText("Factura solicitada · 17 oct 2026")).toBeInTheDocument();
     // Once invoiced, the request is done.
-    const h3 = screen.getByRole("link", { name: "Estructura Steel Frame" }).closest("[role=row]") as HTMLElement;
+    const h3 = table.getByRole("link", { name: "Estructura Steel Frame" }).closest("[role=row]") as HTMLElement;
     expect(within(h3).queryByText(/Factura solicitada/)).not.toBeInTheDocument();
   });
 

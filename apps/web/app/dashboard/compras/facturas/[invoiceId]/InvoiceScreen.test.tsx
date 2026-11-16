@@ -123,7 +123,8 @@ describe("InvoiceScreen", () => {
 
   it("takes a payment back, adds a version of the PDF and deletes the invoice", async () => {
     renderScreen();
-    await userEvent.click(screen.getByRole("button", { name: "Quitar el pago del 15 oct 2026" }));
+    // The phone's card and the table's row each offer it.
+    await userEvent.click(screen.getAllByRole("button", { name: "Quitar el pago del 15 oct 2026" })[0]!);
     // Each confirmation names the record and says what happens: it leaves the lists and totals, an admin can restore it.
     let dialog = within(await screen.findByRole("alertdialog", { name: /^¿Quitar el pago de 15\.000,00\s€ del 15 oct 2026\?$/ }));
     expect(
@@ -133,7 +134,7 @@ describe("InvoiceScreen", () => {
     await userEvent.click(dialog.getByRole("button", { name: "Quitar pago" }));
     expect(actions.deletePaymentAction).toHaveBeenCalledWith("pay-1");
     // Its button is disabled while the action runs.
-    await waitFor(() => expect(screen.getByRole("button", { name: "Quitar el pago del 15 oct 2026" })).toBeEnabled());
+    await waitFor(() => expect(screen.getAllByRole("button", { name: "Quitar el pago del 15 oct 2026" })[0]).toBeEnabled());
 
     await userEvent.click(screen.getByRole("button", { name: "+ Nueva versión" }));
     const upload = within(screen.getByRole("form", { name: "+ Nueva versión" }));

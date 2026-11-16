@@ -190,6 +190,11 @@ describe("CompanyTabs", () => {
     await userEvent.click(screen.getByRole("tab", { name: "Historial" }));
     expect(onChange).toHaveBeenCalledWith("historial");
   });
+
+  it("scrolls sideways within itself on a phone, clipping anything absolute inside it", () => {
+    wrap(<CompanyTabs tab="documentos" counts={{}} onChange={() => {}} />);
+    expect(screen.getByRole("tablist")).toHaveClass("relative", "overflow-x-auto");
+  });
 });
 
 describe("SummaryTab", () => {
@@ -204,12 +209,15 @@ describe("SummaryTab", () => {
 describe("WorkersTab", () => {
   it("lists workers with why they can't enter", () => {
     wrap(<WorkersTab workers={[worker]} subcontractorId="c-1" kind="company" canManage />);
-    expect(screen.getByRole("link", { name: "Iván Gómez Ruiz" })).toHaveAttribute(
-      "href",
-      "/dashboard/subcontratas/trabajadores/w-1",
-    );
-    expect(screen.getByText("12 días")).toBeInTheDocument();
-    expect(screen.getByText("Empresa bloqueada")).toBeInTheDocument();
+    // The table, and the phone's card: the same worker, link, document and reason.
+    for (const view of [within(screen.getByRole("table")), within(screen.getAllByRole("listitem")[0]!)]) {
+      expect(view.getByRole("link", { name: "Iván Gómez Ruiz" })).toHaveAttribute(
+        "href",
+        "/dashboard/subcontratas/trabajadores/w-1",
+      );
+      expect(view.getByText("12 días")).toBeInTheDocument();
+      expect(view.getByText("Empresa bloqueada")).toBeInTheDocument();
+    }
     expect(screen.getByRole("link", { name: /Registrar trabajador/ })).toHaveAttribute(
       "href",
       "/dashboard/subcontratas/trabajadores/nuevo?empresa=c-1",

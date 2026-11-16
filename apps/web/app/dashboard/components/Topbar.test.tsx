@@ -50,6 +50,12 @@ describe("Topbar", () => {
     expect(document.title).toBe(`${title} · ViTAH`);
   });
 
+  it("shows the strip from lg up only, still naming the browser tab on a phone", () => {
+    renderAt("/dashboard/projects/p-1/obra");
+    expect(screen.getByText("Proyecto — Obra").closest("header")).toHaveClass("max-lg:hidden");
+    expect(document.title).toBe("Proyecto — Obra · ViTAH");
+  });
+
   it("speaks the user's language", () => {
     renderAt("/dashboard/compras/facturas/i-1", "en", en);
     expect(screen.getByText("Purchasing — Invoices")).toBeInTheDocument();

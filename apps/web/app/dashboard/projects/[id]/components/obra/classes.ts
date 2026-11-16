@@ -28,7 +28,7 @@ export const columns = (template: string) => ({ "--columns": template }) as CSSP
 
 /** `div role="table"` grid tables: stacked rows on phones, a grid from 768px. */
 export const table = {
-  root: "flex flex-col overflow-x-auto text-sm",
+  root: "relative flex flex-col overflow-x-auto text-sm",
   head: "hidden border-b px-2 py-[7px] text-xs font-semibold tracking-[0.06em] whitespace-nowrap text-muted-foreground uppercase md:grid md:min-w-fit md:grid-cols-(--columns) md:items-center md:gap-3",
   row: "flex flex-wrap items-center gap-x-3 gap-y-1 border-b py-2.5 transition-colors last:border-b-0 md:grid md:min-h-11 md:min-w-fit md:grid-cols-(--columns) md:gap-3 md:px-2 md:py-1.5 md:hover:bg-raise",
   total:

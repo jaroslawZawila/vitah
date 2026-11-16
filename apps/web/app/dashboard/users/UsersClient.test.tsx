@@ -29,8 +29,12 @@ function renderUsers(users: Row[] = [laura, marcos]) {
   );
 }
 
+/** The table (from 768px); the phone's cards repeat each row's controls. */
+const table = () => within(screen.getByRole("table"));
+const cardOf = (name: string) => within(within(screen.getByRole("list")).getByText(name).closest("li")!);
+
 const openReset = async () => {
-  await userEvent.click(screen.getByRole("button", { name: "Restablecer contraseña de Marcos" }));
+  await userEvent.click(table().getByRole("button", { name: "Restablecer contraseña de Marcos" }));
   return within(await screen.findByRole("dialog", { name: "Nueva contraseña para Marcos" }));
 };
 
@@ -43,8 +47,8 @@ describe("the Users page: resetting a password", () => {
   it("offers it on every row but the admin's own", () => {
     renderUsers();
 
-    expect(screen.getByRole("button", { name: "Restablecer contraseña de Marcos" })).toBeEnabled();
-    const own = screen.getByRole("button", { name: "Restablecer contraseña de Laura" });
+    expect(table().getByRole("button", { name: "Restablecer contraseña de Marcos" })).toBeEnabled();
+    const own = table().getByRole("button", { name: "Restablecer contraseña de Laura" });
     expect(own).toBeDisabled();
     expect(own).toHaveAttribute("title", "Tu propia contraseña se cambia desde Ajustes › Cambiar contraseña.");
   });
@@ -123,7 +127,7 @@ describe("the Users page: two-step verification", () => {
   ] satisfies Row[];
   const rowOf = (name: string) => within(screen.getByRole("cell", { name }).closest("tr")!);
   const openRemove = async () => {
-    await userEvent.click(screen.getByRole("button", { name: "Quitar verificación en dos pasos de Marcos" }));
+    await userEvent.click(table().getByRole("button", { name: "Quitar verificación en dos pasos de Marcos" }));
     return within(await screen.findByRole("alertdialog", { name: "¿Quitar la verificación en dos pasos de Marcos?" }));
   };
 
@@ -139,9 +143,9 @@ describe("the Users page: two-step verification", () => {
   it("offers removing it only where it is on, and never the admin's own", () => {
     renderUsers(withMfa);
 
-    expect(screen.getByRole("button", { name: "Quitar verificación en dos pasos de Marcos" })).toBeEnabled();
-    expect(screen.queryByRole("button", { name: "Quitar verificación en dos pasos de Inés" })).not.toBeInTheDocument();
-    const own = screen.getByRole("button", { name: "Quitar verificación en dos pasos de Laura" });
+    expect(table().getByRole("button", { name: "Quitar verificación en dos pasos de Marcos" })).toBeEnabled();
+    expect(table().queryByRole("button", { name: "Quitar verificación en dos pasos de Inés" })).not.toBeInTheDocument();
+    const own = table().getByRole("button", { name: "Quitar verificación en dos pasos de Laura" });
     expect(own).toBeDisabled();
     expect(own).toHaveAttribute(
       "title",
@@ -229,7 +233,7 @@ describe("the Users page: deactivating a user", () => {
 
   it("activates an inactive user straight away: nothing is lost", async () => {
     renderUsers([laura, { ...marcos, active: false }]);
-    await userEvent.click(screen.getByRole("button", { name: "Activar" }));
+    await userEvent.click(table().getByRole("button", { name: "Activar" }));
     expect(actions.toggleUserActive).toHaveBeenCalledWith(marcos.id, true);
     expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
   });
@@ -242,9 +246,9 @@ describe("the Users page: a staff user's phone", () => {
 
   it("shows each one's phone and saves the one the admin types", async () => {
     renderUsers();
-    expect(screen.getByText("+34 600 111 222")).toBeInTheDocument();
+    expect(table().getByText("+34 600 111 222")).toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole("button", { name: "Cambiar el teléfono de Marcos" }));
+    await userEvent.click(table().getByRole("button", { name: "Cambiar el teléfono de Marcos" }));
     const dialog = within(await screen.findByRole("dialog", { name: "Teléfono de Marcos" }));
     const input = dialog.getByLabelText("Teléfono");
     expect(input).toHaveValue("+34 600 111 222");
@@ -263,11 +267,33 @@ describe("the Users page: a staff user's phone", () => {
   it("keeps the dialog open with the refusal", async () => {
     vi.mocked(actions.updateUserPhoneAction).mockResolvedValue({ error: "invalid_phone" });
     renderUsers();
-    await userEvent.click(screen.getByRole("button", { name: "Cambiar el teléfono de Laura" }));
+    await userEvent.click(table().getByRole("button", { name: "Cambiar el teléfono de Laura" }));
     const dialog = within(await screen.findByRole("dialog", { name: "Teléfono de Laura" }));
     await userEvent.type(dialog.getByLabelText("Teléfono"), "abc");
     await userEvent.click(dialog.getByRole("button", { name: "Guardar" }));
 
     expect(await dialog.findByRole("alert")).toHaveTextContent("Introduce un teléfono válido.");
+  });
+});
+
+describe("the Users page on a phone", () => {
+  it("shows each user as a card with their details and every action of their row", async () => {
+    vi.mocked(actions.updateUserRole).mockClear();
+    renderUsers([laura, { ...marcos, mfaEnabled: true }]);
+    const card = cardOf("Marcos");
+
+    expect(card.getByText("marcos@vitah.es")).toBeInTheDocument();
+    expect(card.getByText("+34 600 111 222")).toBeInTheDocument();
+    expect(card.getByText("Visor", { selector: "span" })).toBeInTheDocument();
+    expect(card.getByText("Activo")).toBeInTheDocument();
+    expect(card.getByText("Activada")).toBeInTheDocument();
+    expect(card.getByRole("button", { name: "Cambiar el teléfono de Marcos" })).toBeEnabled();
+    expect(card.getByRole("button", { name: "Quitar verificación en dos pasos de Marcos" })).toBeEnabled();
+    expect(card.getByRole("button", { name: "Restablecer contraseña de Marcos" })).toBeEnabled();
+    expect(card.getByRole("button", { name: "Desactivar" })).toBeEnabled();
+    expect(cardOf("Laura").getByRole("combobox", { name: "Rol" })).toBeDisabled();
+
+    await userEvent.selectOptions(card.getByRole("combobox", { name: "Rol" }), "manager");
+    expect(actions.updateUserRole).toHaveBeenCalledWith(marcos.id, "manager");
   });
 });

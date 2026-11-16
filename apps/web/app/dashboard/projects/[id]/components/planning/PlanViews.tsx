@@ -14,6 +14,7 @@ import { daysBetween, useControlFormat } from "../construction/format";
 import { at, bar, MonthAxis, type Timeline } from "../construction/Gantt";
 import { ChapterStatePill } from "../construction/pills";
 import ScheduleStatusView from "../construction/ScheduleStatusView";
+import { stretchedLink, touchLink } from "../../../../components/touch";
 
 // Presentational: Obra › Planificación, the approved baseline: its key
 // figures, and each chapter's rule and dates on a timeline (a table from
@@ -85,7 +86,11 @@ export function PlanKpis({ baseline, completionDate }: { baseline: Baseline; com
   const delay = forecast.delayDays;
   const late = delay !== null && delay > 0;
   return (
-    <section aria-label={t("label")} className="grid grid-cols-[repeat(auto-fit,minmax(min(190px,100%),1fr))] gap-3">
+    // Two figures a row on a phone (from 360px), so the chapters come sooner.
+    <section
+      aria-label={t("label")}
+      className="grid gap-3 min-[360px]:grid-cols-2 sm:grid-cols-[repeat(auto-fit,minmax(min(190px,100%),1fr))]"
+    >
       <Kpi label={t("start")} value={f.date(baseline.startDate)} hints={[t("startHint")]} />
       <Kpi
         label={t("contract")}
@@ -105,6 +110,7 @@ export function PlanKpis({ baseline, completionDate }: { baseline: Baseline; com
         hints={[late && delay <= 14 ? t("penaltyFrom", { count: 15 - delay }) : t("penaltyHint")]}
       />
       <Kpi
+        className="min-[360px]:col-span-2 sm:col-span-1"
         label={t("critical")}
         value={critical.length > 0 ? t("criticalCount", { count: critical.length }) : t("criticalNone")}
         hints={critical.length > 0 ? [critical.map((r) => r.code).join(" → ")] : []}
@@ -261,7 +267,7 @@ export function PlanTable({
             <TableRow key={row.code} className={cn(row.spansWorks && "bg-raise/40")}>
               <TableCell className="num pl-[18px]">{row.code}</TableCell>
               <TableCell className="min-w-[220px] whitespace-normal">
-                <Link href={chapterHref(row.code)} className="font-semibold transition-colors hover:text-primary">
+                <Link href={chapterHref(row.code)} className={cn("font-semibold transition-colors hover:text-primary", touchLink)}>
                   {row.name}
                 </Link>
                 <RowNotes row={row} />
@@ -281,46 +287,101 @@ export function PlanTable({
   );
 }
 
-/** On phones: a card per chapter with its state, bar and dates. */
+/**
+ * Below 768px: a card per chapter in schedule order, the whole card its link:
+ * its state, how it stands against the plan (the late chapters of the obra's
+ * schedule status, as core lists them), the planned and real dates, its
+ * working days, what it waits for, when to order it, and the critical path.
+ */
 export function PlanCards({
   rows,
-  timeline,
-  today,
-  showBaseline,
+  schedule,
   chapterHref,
 }: {
   rows: PlanningRow[];
-  timeline: Timeline;
-  today: string;
-  showBaseline: boolean;
+  /** The obra's schedule status: which chapters are late to start or to finish. */
+  schedule: ScheduleStatus;
   chapterHref: (code: string) => string;
 }) {
   const t = useTranslations("planning.table");
+  const ts = useTranslations("construction.schedule");
+  const ruleText = useRuleText();
   const f = useControlFormat();
+  const lateToStart = new Map(schedule.lateToStart.map((c) => [c.code, c.days]));
+  const lateToFinish = new Map(schedule.lateToFinish.map((c) => [c.code, c.days]));
+  // In the order the works go; the chapters spanning them all last.
+  const ordered = [...rows].sort(
+    (a, b) => Number(a.spansWorks) - Number(b.spansWorks) || a.forecastStart.localeCompare(b.forecastStart) || a.code.localeCompare(b.code),
+  );
+  const term = "text-muted-foreground";
   return (
     <ul className="m-0 flex list-none flex-col gap-2.5 p-0 md:hidden" aria-label={t("label")}>
-      {rows.map((row) => {
+      {ordered.map((row) => {
         const slip = slipDays(row);
+        const startLate = lateToStart.get(row.code);
+        const finishLate = lateToFinish.get(row.code);
+        const moved = row.state !== "finished" && (row.forecastStart !== row.plannedStart || row.forecastEnd !== row.plannedEnd);
         return (
-          <li key={row.code} className={cn(cardVariants(), "gap-2")}>
+          <li key={row.code} className={cn(cardVariants(), "relative gap-2.5", row.spansWorks && "bg-raise/40")}>
             <div className="flex items-start gap-2.5">
               <span className="num pt-px font-semibold">{row.code}</span>
-              <Link href={chapterHref(row.code)} className="min-w-0 flex-1 leading-snug font-semibold">
+              <Link
+                href={chapterHref(row.code)}
+                className={cn("min-w-0 flex-1 leading-snug font-semibold", stretchedLink)}
+              >
                 {row.name}
               </Link>
               <ChapterStatePill state={row.state} />
             </div>
-            <PlanBar row={row} timeline={timeline} today={today} showBaseline={showBaseline} className="min-w-0" />
-            <div className="flex flex-wrap justify-between gap-2 text-meta">
-              <span className="num">
-                {f.date(row.forecastStart)} – {f.date(row.forecastEnd)}
-              </span>
-              {slip > 0 ? (
-                <span className="text-warn">{t("lateLong", { days: f.signedDays(slip) })}</span>
-              ) : (
-                row.critical && <span className="text-warn">{t("critical")}</span>
+            {(finishLate !== undefined || startLate !== undefined || slip > 0 || row.critical) && (
+              <div className="flex flex-wrap items-center gap-1.5">
+                {finishLate !== undefined && <Badge variant="warn">{ts("overdueLong", { days: f.signedDays(finishLate) })}</Badge>}
+                {startLate !== undefined && <Badge variant="warn">{ts("notStarted", { days: f.signedDays(startLate) })}</Badge>}
+                {slip > 0 && <Badge variant="yel">{t("late", { days: f.signedDays(slip) })}</Badge>}
+                {row.critical && <Badge variant="warn">{t("critical")}</Badge>}
+              </div>
+            )}
+            <dl className="m-0 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 text-sm">
+              <dt className={term}>{t("planned")}</dt>
+              <dd className="m-0 tabular-nums">
+                {f.date(row.plannedStart)} – {f.date(row.plannedEnd)}
+              </dd>
+              {moved && (
+                <>
+                  <dt className={term}>{t("dates")}</dt>
+                  <dd className={cn("m-0 tabular-nums", slip > 0 && "text-warn")}>
+                    {f.date(row.forecastStart)} – {f.date(row.forecastEnd)}
+                  </dd>
+                </>
               )}
-            </div>
+              {row.actualStart && (
+                <>
+                  <dt className={term}>{t("actual")}</dt>
+                  <dd className="m-0 tabular-nums">
+                    {row.actualEnd
+                      ? `${f.date(row.actualStart)} – ${f.date(row.actualEnd)}`
+                      : t("actualSince", { date: f.date(row.actualStart), pct: row.progressPct })}
+                  </dd>
+                </>
+              )}
+              {!row.spansWorks && (
+                <>
+                  <dt className={term}>{t("duration")}</dt>
+                  <dd className="m-0 tabular-nums">{t("workingDays", { count: row.durationDays })}</dd>
+                </>
+              )}
+              <dt className={term}>{t("waitsFor")}</dt>
+              <dd className="m-0">
+                {ruleText(row)}
+                {row.hitoCode && <> · {row.hitoCode}</>}
+              </dd>
+              {row.state === "pending" && row.leadDays > 0 && (
+                <>
+                  <dt className={term}>{t("order")}</dt>
+                  <dd className="m-0 tabular-nums">{f.date(orderByDate(row.plannedStart, row.leadDays))}</dd>
+                </>
+              )}
+            </dl>
           </li>
         );
       })}
@@ -346,7 +407,10 @@ export function DraftNotice({
         <Badge variant="yel">{t("badge", { number: draft.number })}</Badge>
         <span className={muted}>{t("text", { name: draft.createdBy ?? "—", date: f.date(draft.createdAt) })}</span>
       </span>
-      <Link href={href} className="text-sm font-semibold text-brand-ink hover:underline">
+      <Link
+        href={href}
+        className={cn("text-sm font-semibold text-brand-ink hover:underline", touchLink)}
+      >
         {canManage ? t("edit") : t("view")}
       </Link>
     </div>

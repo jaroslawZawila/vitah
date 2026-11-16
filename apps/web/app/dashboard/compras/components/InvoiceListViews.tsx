@@ -15,6 +15,7 @@ import { daysBetween } from "../../projects/[id]/components/construction/format"
 import { usePurchaseFormat } from "../../projects/[id]/components/purchasing/format";
 import { invoiceHref, orderHref, paymentFileUrl } from "../../projects/[id]/components/purchasing/links";
 import { InvoiceStatePill } from "../../projects/[id]/components/purchasing/pills";
+import { stretchedLink, touchLink } from "../../components/touch";
 
 // Presentational: Compras › Facturas (the figures and the list) and Compras ›
 // Pagos (the forecast and the payments). The containers filter and act.
@@ -80,54 +81,94 @@ export function InvoiceTable({
   const f = usePurchaseFormat();
   const vat = useVatLabel();
   if (invoices.length === 0) return <p className="px-[18px] py-6 text-center text-sm text-muted-foreground">{empty}</p>;
+  const order = (invoice: PurchaseInvoiceListItem) =>
+    `${orderLabel(invoice.orderNumber)}${invoice.milestoneConcept ? ` · ${invoice.milestoneConcept}` : ""}`;
   return (
-    <Table className="min-w-[900px]">
-      <TableHeader>
-        <TableRow>
-          <TableHead className="pl-[18px]">{t("dueOn")}</TableHead>
-          <TableHead>{t("number")}</TableHead>
-          <TableHead>{t("supplier")}</TableHead>
-          <TableHead>{t("order")}</TableHead>
-          <TableHead className="text-right">{t("base")}</TableHead>
-          <TableHead className="text-right">{vat(t("payable"), "incl")}</TableHead>
-          <TableHead className="text-right">{vat(t("outstanding"), "incl")}</TableHead>
-          <TableHead className="pr-[18px]">{t("state")}</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
+    <>
+      {/* Phones: one card per invoice, opening it; its order is linked from there. */}
+      <ul className="m-0 flex list-none flex-col gap-2.5 p-0 px-3 pb-3 md:hidden">
         {invoices.map((invoice) => (
-          <TableRow key={invoice.id}>
-            <TableCell className="pl-[18px]">
-              <span className="num">{f.date(invoice.dueOn)}</span>
-              <span className="block text-meta text-muted-foreground">
-                <DueNote invoice={invoice} today={today} />
-              </span>
-            </TableCell>
-            <TableCell>
-              <Link href={invoiceHref(invoice.id)} className="num font-semibold text-brand-ink hover:text-primary">
+          <li key={invoice.id} className="relative rounded-xl border bg-card px-4 py-3.5 shadow-card">
+            <div className="flex flex-wrap items-center justify-between gap-2.5">
+              <Link href={invoiceHref(invoice.id)} className={cn("num font-semibold text-brand-ink hover:text-primary", stretchedLink)}>
                 {invoice.number}
               </Link>
-            </TableCell>
-            <TableCell className="whitespace-normal">{invoice.supplierName}</TableCell>
-            <TableCell className="whitespace-normal">
-              <span className="num">{invoice.projectRef}</span>{" "}
-              <Link href={orderHref(invoice.projectId, invoice.orderId)} className="text-muted-foreground hover:text-primary">
-                · {orderLabel(invoice.orderNumber)}
-                {invoice.milestoneConcept && ` · ${invoice.milestoneConcept}`}
-              </Link>
-            </TableCell>
-            <TableCell className="num text-right">{f.amount(invoice.baseCents)}</TableCell>
-            <TableCell className="num text-right">{f.amount(invoice.payableCents)}</TableCell>
-            <TableCell className="num text-right font-semibold">
-              {invoice.kind === "credit_note" ? "—" : f.amount(Math.max(0, invoice.outstandingCents))}
-            </TableCell>
-            <TableCell className="pr-[18px]">
               <InvoiceStatePill state={invoice.state} />
-            </TableCell>
-          </TableRow>
+            </div>
+            <div className="mt-2 font-semibold">{invoice.supplierName}</div>
+            <div className="mt-0.5 text-meta text-muted-foreground">
+              <span className="num">{invoice.projectRef}</span> · {order(invoice)}
+            </div>
+            <div className="mt-2.5 flex flex-wrap items-end justify-between gap-2.5 text-sm">
+              <span>
+                <span className="block text-meta text-muted-foreground">{t("dueOn")}</span>
+                <span className="num">{f.date(invoice.dueOn)}</span>
+                <span className="block text-meta text-muted-foreground">
+                  <DueNote invoice={invoice} today={today} />
+                </span>
+              </span>
+              <span className="text-right">
+                <span className="block text-meta text-muted-foreground">
+                  {invoice.kind === "credit_note" ? vat(t("payable"), "incl") : vat(t("outstanding"), "incl")}
+                </span>
+                <span className="num font-semibold">
+                  {f.amount(invoice.kind === "credit_note" ? invoice.payableCents : Math.max(0, invoice.outstandingCents))}
+                </span>
+              </span>
+            </div>
+          </li>
         ))}
-      </TableBody>
-    </Table>
+      </ul>
+      <div className="hidden md:block">
+        <Table className="min-w-[900px]">
+          <TableHeader>
+            <TableRow>
+              <TableHead className="pl-[18px]">{t("dueOn")}</TableHead>
+              <TableHead>{t("number")}</TableHead>
+              <TableHead>{t("supplier")}</TableHead>
+              <TableHead>{t("order")}</TableHead>
+              <TableHead className="text-right">{t("base")}</TableHead>
+              <TableHead className="text-right">{vat(t("payable"), "incl")}</TableHead>
+              <TableHead className="text-right">{vat(t("outstanding"), "incl")}</TableHead>
+              <TableHead className="pr-[18px]">{t("state")}</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {invoices.map((invoice) => (
+              <TableRow key={invoice.id}>
+                <TableCell className="pl-[18px]">
+                  <span className="num">{f.date(invoice.dueOn)}</span>
+                  <span className="block text-meta text-muted-foreground">
+                    <DueNote invoice={invoice} today={today} />
+                  </span>
+                </TableCell>
+                <TableCell>
+                  <Link href={invoiceHref(invoice.id)} className={cn("num font-semibold text-brand-ink hover:text-primary", touchLink)}>
+                    {invoice.number}
+                  </Link>
+                </TableCell>
+                <TableCell className="whitespace-normal">{invoice.supplierName}</TableCell>
+                <TableCell className="whitespace-normal">
+                  <span className="num">{invoice.projectRef}</span>{" "}
+                  <Link href={orderHref(invoice.projectId, invoice.orderId)} className={cn("text-muted-foreground hover:text-primary", touchLink)}>
+                    · {orderLabel(invoice.orderNumber)}
+                    {invoice.milestoneConcept && ` · ${invoice.milestoneConcept}`}
+                  </Link>
+                </TableCell>
+                <TableCell className="num text-right">{f.amount(invoice.baseCents)}</TableCell>
+                <TableCell className="num text-right">{f.amount(invoice.payableCents)}</TableCell>
+                <TableCell className="num text-right font-semibold">
+                  {invoice.kind === "credit_note" ? "—" : f.amount(Math.max(0, invoice.outstandingCents))}
+                </TableCell>
+                <TableCell className="pr-[18px]">
+                  <InvoiceStatePill state={invoice.state} />
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    </>
   );
 }
 
@@ -157,7 +198,10 @@ export function PaymentForecast({ forecast }: { forecast: TenantPayments["foreca
               <ul className="m-0 flex list-none flex-col gap-1.5 p-0 text-sm">
                 {week.invoices.map((invoice) => (
                   <li key={invoice.id} className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
-                    <Link href={invoiceHref(invoice.id)} className="num font-semibold text-brand-ink hover:text-primary">
+                    <Link
+                      href={invoiceHref(invoice.id)}
+                      className={cn("num font-semibold text-brand-ink hover:text-primary", touchLink)}
+                    >
                       {invoice.number}
                     </Link>
                     <span>{invoice.supplierName}</span>
@@ -219,75 +263,145 @@ export function PaymentTable({
       {payments.length === 0 ? (
         <p className="px-[18px] pb-3 text-sm text-muted-foreground">{empty}</p>
       ) : (
-        <Table className={invoiceColumns ? "min-w-[900px]" : "min-w-[640px]"}>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="pl-[18px]">{t("paidOn")}</TableHead>
-              {invoiceColumns && <TableHead>{t("supplier")}</TableHead>}
-              {invoiceColumns && <TableHead>{t("invoice")}</TableHead>}
-              <TableHead className="text-right">{vat(t("amount"), "incl")}</TableHead>
-              <TableHead>{t("method")}</TableHead>
-              <TableHead>{t("proof")}</TableHead>
-              <TableHead className={onRemove ? undefined : "pr-[18px]"}>{t("by")}</TableHead>
-              {onRemove && <TableHead className="pr-[18px]" />}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
+        <>
+          {/* Phones: one card per payment; with its invoice, the card opens it. */}
+          <ul className="m-0 flex list-none flex-col gap-2.5 p-0 px-3 pb-3 md:hidden">
             {payments.map((payment) => (
-              <TableRow key={payment.id}>
-                <TableCell className="num pl-[18px]">{f.date(payment.paidOn)}</TableCell>
-                {invoiceColumns && <TableCell className="whitespace-normal">{payment.supplierName}</TableCell>}
+              <li key={payment.id} className="relative flex flex-col gap-1.5 rounded-xl border bg-card px-4 py-3.5 shadow-card">
+                <div className="flex flex-wrap items-end justify-between gap-2.5">
+                  <span>
+                    <span className="block text-meta text-muted-foreground">{t("paidOn")}</span>
+                    <span className="num">{f.date(payment.paidOn)}</span>
+                  </span>
+                  <span className="text-right">
+                    <span className="block text-meta text-muted-foreground">{vat(t("amount"), "incl")}</span>
+                    <span className="num font-semibold">{f.amount(payment.amountCents)}</span>
+                  </span>
+                </div>
                 {invoiceColumns && (
-                  <TableCell>
-                    <Link href={invoiceHref(payment.invoiceId)} className="num font-semibold text-brand-ink hover:text-primary">
-                      {payment.invoiceNumber}
-                    </Link>{" "}
-                    <span className="num text-meta text-muted-foreground">{payment.projectRef}</span>
-                  </TableCell>
+                  <>
+                    <div className="font-semibold">{payment.supplierName}</div>
+                    <div className="text-meta text-muted-foreground">
+                      <Link
+                        href={invoiceHref(payment.invoiceId)}
+                        className={cn("num font-semibold text-brand-ink hover:text-primary", stretchedLink)}
+                      >
+                        {payment.invoiceNumber}
+                      </Link>{" "}
+                      · <span className="num">{payment.projectRef}</span>
+                    </div>
+                  </>
                 )}
-                <TableCell className="num text-right">{f.amount(payment.amountCents)}</TableCell>
-                <TableCell>
+                <div className="text-sm">
                   {tm(payment.method)}
-                  {payment.reference && <span className="num block text-meta text-muted-foreground">{payment.reference}</span>}
-                </TableCell>
-                <TableCell>
-                  {payment.file ? (
-                    <a href={paymentFileUrl(payment.id)} download className="inline-flex items-center gap-1.5 font-medium text-brand-ink hover:text-primary">
-                      <FileText aria-hidden className="size-4" />
-                      {payment.file.name}
-                    </a>
-                  ) : (
-                    <span className="text-muted-foreground">—</span>
-                  )}
-                </TableCell>
-                <TableCell className={onRemove ? undefined : "pr-[18px]"}>{payment.by ?? "—"}</TableCell>
-                {onRemove && (
-                  <TableCell className="pr-[18px] text-right">
-                    <Button
-                      type="button"
-                      variant="ghost-destructive"
-                      size="sm"
-                      disabled={pending}
-                      aria-label={tr("removeOf", { date: f.date(payment.paidOn) })}
-                      onClick={() => onRemove(payment)}
-                    >
-                      {tr("remove")}
-                    </Button>
-                  </TableCell>
+                  {payment.reference && <span className="num text-meta text-muted-foreground"> · {payment.reference}</span>}
+                  {payment.by && <span className="text-meta text-muted-foreground"> · {payment.by}</span>}
+                </div>
+                {(payment.file || onRemove) && (
+                  <div className="flex flex-wrap items-center justify-between gap-2.5">
+                    {payment.file ? (
+                      <a
+                        href={paymentFileUrl(payment.id)}
+                        download
+                        className="relative z-10 inline-flex min-w-0 items-center gap-1.5 text-sm font-medium text-brand-ink hover:text-primary pointer-coarse:min-h-11"
+                      >
+                        <FileText aria-hidden className="size-4 flex-none" />
+                        <span className="wrap-anywhere">{payment.file.name}</span>
+                      </a>
+                    ) : (
+                      <span />
+                    )}
+                    {onRemove && (
+                      <Button
+                        type="button"
+                        variant="ghost-destructive"
+                        size="sm"
+                        className="relative z-10"
+                        disabled={pending}
+                        aria-label={tr("removeOf", { date: f.date(payment.paidOn) })}
+                        onClick={() => onRemove(payment)}
+                      >
+                        {tr("remove")}
+                      </Button>
+                    )}
+                  </div>
                 )}
-              </TableRow>
+              </li>
             ))}
-          </TableBody>
-          {footer && (
-            <TableFooter>
-              <TableRow className="hover:bg-transparent">
-                <TableCell colSpan={columns} className="pl-[18px]">
-                  {footer}
-                </TableCell>
-              </TableRow>
-            </TableFooter>
-          )}
-        </Table>
+          </ul>
+          {footer && <div className="px-[18px] pb-2 text-sm font-semibold md:hidden">{footer}</div>}
+          <div className="hidden md:block">
+            <Table className={invoiceColumns ? "min-w-[900px]" : "min-w-[640px]"}>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="pl-[18px]">{t("paidOn")}</TableHead>
+                  {invoiceColumns && <TableHead>{t("supplier")}</TableHead>}
+                  {invoiceColumns && <TableHead>{t("invoice")}</TableHead>}
+                  <TableHead className="text-right">{vat(t("amount"), "incl")}</TableHead>
+                  <TableHead>{t("method")}</TableHead>
+                  <TableHead>{t("proof")}</TableHead>
+                  <TableHead className={onRemove ? undefined : "pr-[18px]"}>{t("by")}</TableHead>
+                  {onRemove && <TableHead className="pr-[18px]" />}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {payments.map((payment) => (
+                  <TableRow key={payment.id}>
+                    <TableCell className="num pl-[18px]">{f.date(payment.paidOn)}</TableCell>
+                    {invoiceColumns && <TableCell className="whitespace-normal">{payment.supplierName}</TableCell>}
+                    {invoiceColumns && (
+                      <TableCell>
+                        <Link href={invoiceHref(payment.invoiceId)} className={cn("num font-semibold text-brand-ink hover:text-primary", touchLink)}>
+                          {payment.invoiceNumber}
+                        </Link>{" "}
+                        <span className="num text-meta text-muted-foreground">{payment.projectRef}</span>
+                      </TableCell>
+                    )}
+                    <TableCell className="num text-right">{f.amount(payment.amountCents)}</TableCell>
+                    <TableCell>
+                      {tm(payment.method)}
+                      {payment.reference && <span className="num block text-meta text-muted-foreground">{payment.reference}</span>}
+                    </TableCell>
+                    <TableCell>
+                      {payment.file ? (
+                        <a href={paymentFileUrl(payment.id)} download className="inline-flex items-center gap-1.5 font-medium text-brand-ink hover:text-primary pointer-coarse:min-h-11">
+                          <FileText aria-hidden className="size-4" />
+                          {payment.file.name}
+                        </a>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell className={onRemove ? undefined : "pr-[18px]"}>{payment.by ?? "—"}</TableCell>
+                    {onRemove && (
+                      <TableCell className="pr-[18px] text-right">
+                        <Button
+                          type="button"
+                          variant="ghost-destructive"
+                          size="sm"
+                          disabled={pending}
+                          aria-label={tr("removeOf", { date: f.date(payment.paidOn) })}
+                          onClick={() => onRemove(payment)}
+                        >
+                          {tr("remove")}
+                        </Button>
+                      </TableCell>
+                    )}
+                  </TableRow>
+                ))}
+              </TableBody>
+              {footer && (
+                <TableFooter>
+                  <TableRow className="hover:bg-transparent">
+                    <TableCell colSpan={columns} className="pl-[18px]">
+                      {footer}
+                    </TableCell>
+                  </TableRow>
+                </TableFooter>
+              )}
+            </Table>
+          </div>
+        </>
       )}
       {pager}
     </section>

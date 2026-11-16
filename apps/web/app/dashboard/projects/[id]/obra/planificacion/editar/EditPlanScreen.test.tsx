@@ -55,6 +55,18 @@ describe("EditPlanScreen", () => {
     expect(screen.getByText(/Durante toda la obra, hasta el .*: 17 Control de calidad/)).toBeInTheDocument();
   });
 
+  it("stacks each chapter's fields in a card on a phone, each beside its heading", () => {
+    renderScreen();
+    const painting = screen.getByRole("row", { name: /Pinturas/ });
+    // A grid card below 768px, a table row from it: the same inputs serve both.
+    expect(painting).toHaveClass("max-md:grid");
+    const labels = [...painting.querySelectorAll("span.md\\:hidden")].map((span) => span.textContent);
+    expect(labels).toEqual(["Empieza", "Desfase / fecha", "Días", "Inicio – fin", "Pedido", "Vs. v2"]);
+    const days = within(painting).getByLabelText("Días laborables del capítulo 04");
+    expect(days.closest("td")).toHaveClass("max-md:col-span-2", "max-md:flex");
+    expect(screen.getAllByLabelText("Días laborables del capítulo 04")).toHaveLength(1);
+  });
+
   it("recomputes the dates as staff type, then approves with the reason", async () => {
     renderScreen();
     const painting = () => row(/Pinturas/);

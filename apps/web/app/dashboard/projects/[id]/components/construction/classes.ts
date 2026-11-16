@@ -1,7 +1,12 @@
 // Tailwind class strings shared by the Obra tab's views.
+import { touchLink } from "../../../../components/touch";
 
 /** "Ver hitos →": a card's link to the page with the detail. */
-export const moreLink = "inline-flex min-h-11 items-center text-sm font-semibold text-brand-ink transition-colors hover:text-primary md:min-h-0";
+export const moreLink =
+  "inline-flex min-h-11 items-center text-sm font-semibold text-brand-ink transition-colors hover:text-primary md:min-h-0 md:pointer-coarse:min-h-11";
+
+/** A chapter's name linking to its page, in a table row. */
+export const chapterLink = `font-semibold transition-colors hover:text-primary ${touchLink}`;
 
 /** A card's heading row: title on the left, a link or action on the right. */
 export const cardTop = "flex flex-wrap items-center justify-between gap-x-4 gap-y-2";

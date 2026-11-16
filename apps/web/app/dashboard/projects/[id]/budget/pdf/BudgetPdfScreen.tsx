@@ -41,7 +41,7 @@ export default function BudgetPdfScreen({
               href={hrefs[key]}
               role="tab"
               aria-selected={key === kind}
-              className={cn("inline-flex min-h-9 items-center rounded-lg px-3.5 text-sm font-semibold text-rail-muted", key === kind && "bg-rail-foreground text-rail")}
+              className={cn("inline-flex min-h-9 items-center rounded-lg px-3.5 text-sm font-semibold text-rail-muted pointer-coarse:min-h-11", key === kind && "bg-rail-foreground text-rail")}
             >
               {t(key)}
             </Link>

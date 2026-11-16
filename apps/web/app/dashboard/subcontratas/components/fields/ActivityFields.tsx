@@ -232,7 +232,7 @@ export default function ActivityFields({
       <Section title={t("machinery")} hint={t("machineryHint")}>
         <div className={f.fields}>
           {MACHINERY.map((machine) => (
-            <label key={machine} className="flex min-h-11 cursor-pointer items-center gap-2.5 text-sm font-medium lg:min-h-9">
+            <label key={machine} className="flex min-h-11 cursor-pointer items-center gap-2.5 text-sm font-medium lg:min-h-9 lg:pointer-coarse:min-h-11">
               <input
                 type="checkbox"
                 className="size-[18px] accent-primary"

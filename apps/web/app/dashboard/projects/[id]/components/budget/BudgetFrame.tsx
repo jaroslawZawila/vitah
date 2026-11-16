@@ -1,15 +1,18 @@
 "use client";
 
 import Link from "next/link";
+import { useRef } from "react";
 import { FileText, Lock } from "lucide-react";
 import { useTranslations } from "next-intl";
 import type { BudgetRevision, BudgetRevisionSummary } from "@repo/core/contract";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useActiveInView } from "../../../../components/useActiveInView";
 import { useObraFormat } from "../obra/format";
 import Stepper, { type Step } from "../obra/Stepper";
 import { BUDGET_TABS, budgetHref, TAB_PATH, type BudgetTab } from "./links";
 import RevisionMenu from "./RevisionMenu";
+import { touchLink } from "../../../../components/touch";
 
 /** The process as the stepper shows it, from the newest revision. */
 function steps(newest: BudgetRevisionSummary, inputCount: number, t: ReturnType<typeof useTranslations<"budget">>, date: (d: string) => string): Step[] {
@@ -32,7 +35,8 @@ function steps(newest: BudgetRevisionSummary, inputCount: number, t: ReturnType<
 /**
  * Presentational: what every tab of the budget shares: title, status,
  * revision menu, actions (`actions`, from the container), the process
- * stepper, a banner for where the revision stands, and the tabs.
+ * stepper, a banner for where the revision stands, and the tabs. On a phone
+ * the tabs come straight after the title, then the actions, stepper and banner.
  */
 export default function BudgetFrame({
   projectId,
@@ -64,6 +68,8 @@ export default function BudgetFrame({
 }) {
   const t = useTranslations("budget");
   const f = useObraFormat();
+  const tabsRef = useRef<HTMLElement>(null);
+  useActiveInView(tabsRef, tab);
   const newest = revisions[0]!;
   const viewingOld = newest.id !== revision.id;
   const revisionParam = viewingOld ? revision.id : null;
@@ -79,9 +85,10 @@ export default function BudgetFrame({
 
   return (
     <div className="flex flex-col gap-5">
-      <header className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-end md:justify-between">
-        <div className="min-w-0">
-          <p className="eyebrow">{[projectRef, site].filter(Boolean).join(" · ")}</p>
+      <header className="flex flex-col gap-3 max-sm:contents md:flex-row md:flex-wrap md:items-end md:justify-between">
+        <div className="min-w-0 max-sm:-order-1">
+          {/* On a phone one line: the address is in full on the project's General tab. */}
+          <p className="eyebrow max-sm:truncate">{[projectRef, site].filter(Boolean).join(" · ")}</p>
           <div className="relative mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
             <h1>{t("title")}</h1>
             <RevisionMenu
@@ -93,7 +100,7 @@ export default function BudgetFrame({
               <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
                 <Lock aria-hidden className="size-3.5" />
                 {t("readOnly")}
-                <Link href={revisionHref(newest.id)} className="font-semibold text-brand-ink hover:underline">
+                <Link href={revisionHref(newest.id)} className={cn("font-semibold text-brand-ink hover:underline", touchLink)}>
                   {t("viewLatest", { number: newest.number })}
                 </Link>
               </span>
@@ -119,13 +126,16 @@ export default function BudgetFrame({
         </div>
       </header>
 
-      <div className="rounded-[14px] border bg-card px-4 py-3 shadow-card">
+      {/* On a phone the steps follow the tab's content: the pill beside the title and the banner already say where the
+          budget stands, and the tabs are not left a screen above what they switch. */}
+      <div className="rounded-[14px] border bg-card px-4 py-3 shadow-card max-sm:order-last">
         <Stepper label={t("steps.label")} steps={steps(newest, inputCount, t, f.date)} />
       </div>
 
       {banner}
 
-      <nav aria-label={t("tabs.label")} className="-mx-1 flex gap-0.5 overflow-x-auto border-b px-1">
+      {/* `relative` keeps anything absolute inside the strip, which clips it. */}
+      <nav ref={tabsRef} aria-label={t("tabs.label")} className="relative -mx-1 flex gap-0.5 overflow-x-auto border-b px-1 max-sm:-order-1">
         {BUDGET_TABS.map((key) => (
           <Link
             key={key}

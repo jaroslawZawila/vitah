@@ -25,6 +25,7 @@ import {
   PurchaseKindPill,
   PurchaseStatusPill,
 } from "./pills";
+import { touchLink } from "../../../../components/touch";
 
 /** A milestone's or invoice's row: concept, amount, state, invoices, payment (stacked on phones). */
 const row =
@@ -81,7 +82,7 @@ function InvoiceLink({ invoice }: { invoice: { id: string; number: string } }) {
   return (
     <Link
       href={invoiceHref(invoice.id)}
-      className="num inline-flex items-center gap-1 font-semibold text-brand-ink hover:text-primary"
+      className={cn("num inline-flex items-center gap-1 font-semibold text-brand-ink hover:text-primary", touchLink)}
     >
       <FileText aria-hidden className="size-3.5 flex-none" />
       {invoice.number}
@@ -147,7 +148,7 @@ function LineOrderCard({
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b px-3.5 py-2.5 text-sm">
         <Link
           href={orderHref(projectId, order.id)}
-          className="num font-semibold text-brand-ink hover:text-primary"
+          className={cn("num font-semibold text-brand-ink hover:text-primary", touchLink)}
         >
           {orderLabel(order.number)}
         </Link>
@@ -251,7 +252,7 @@ export function LineDetail({
         {newOrderHref && (
           <Link
             href={newOrderHref}
-            className="font-semibold text-brand-ink hover:text-primary"
+            className={cn("font-semibold text-brand-ink hover:text-primary", touchLink)}
           >
             {t("createOrder")}
           </Link>

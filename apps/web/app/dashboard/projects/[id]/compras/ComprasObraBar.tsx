@@ -12,7 +12,8 @@ export default function ComprasObraBar({ projectId, options, vista }: { projectI
   const router = useRouter();
   return (
     <ObraPicker
-      className="mb-[18px]"
+      // On a phone the layout's gap is enough.
+      className="sm:mb-[18px]"
       options={options}
       currentId={projectId}
       onSelect={(id) => router.push(`${purchasesHref(id)}${vista ? `?vista=${encodeURIComponent(vista)}` : ""}`)}

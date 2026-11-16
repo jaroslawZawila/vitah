@@ -10,6 +10,7 @@ import { cardVariants } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { DOC_STATE_VARIANT, useDates, useRequirementName } from "../../../../subcontratas/components/display";
 import { cardTop, footnote, kv, moreLink } from "./classes";
+import { touchLink } from "../../../../components/touch";
 import { useControlFormat } from "./format";
 import { IssueKindPill, MilestoneStatePill, Source, SourceLabel } from "./pills";
 
@@ -170,7 +171,7 @@ export function DocumentAlertsCard({ items, subcontractorsHref }: { items: Atten
       <p className={footnote}>
         {t.rich("note", {
           link: (chunks) => (
-            <Link href={subcontractorsHref} className="font-semibold text-brand-ink hover:text-primary">
+            <Link href={subcontractorsHref} className={cn("font-semibold text-brand-ink hover:text-primary", touchLink)}>
               {chunks}
             </Link>
           ),
@@ -187,6 +188,7 @@ export function RecentPhotosCard({
   thumbUrl,
   chapterName,
   canUpload,
+  className,
 }: {
   photos: ProjectPhoto[];
   count: number;
@@ -194,11 +196,12 @@ export function RecentPhotosCard({
   thumbUrl: (photo: ProjectPhoto) => string;
   chapterName: (code: string) => string | undefined;
   canUpload: boolean;
+  className?: string;
 }) {
   const t = useTranslations("construction.summary.photos");
   const f = useControlFormat();
   return (
-    <section className={cn(cardVariants(), "gap-3")} aria-labelledby="summary-photos">
+    <section className={cn(cardVariants(), "gap-3", className)} aria-labelledby="summary-photos">
       <div className={cardTop}>
         <h2 id="summary-photos">{t("title")}</h2>
         <div className="flex flex-wrap items-center gap-2">

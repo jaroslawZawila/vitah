@@ -25,8 +25,9 @@ function renderScreen({ canManage = true, search = "", list = invoices } = {}) {
   );
 }
 
+/** The invoice numbers of the table (from 768px). */
 const numbers = () =>
-  within(screen.getByRole("region", { name: "Facturas recibidas" }))
+  within(within(screen.getByRole("region", { name: "Facturas recibidas" })).getByRole("table"))
     .queryAllByRole("link")
     .map((link) => link.textContent)
     .filter((text) => /^[A-Z]{3}-/.test(text ?? ""));
@@ -54,14 +55,27 @@ describe("InvoicesScreen", () => {
     }
 
     expect(numbers()).toEqual(["SOC-2026/0912", "MSN-2026/148", "MSN-2026/112", "MSN-2026/R07"]);
-    const overdue = screen.getByRole("link", { name: "SOC-2026/0912" }).closest("tr")!;
+    const table = within(screen.getByRole("table"));
+    const overdue = table.getByRole("link", { name: "SOC-2026/0912" }).closest("tr")!;
     expect(within(overdue).getByText("hace 4 días")).toHaveClass("text-bad");
     expect(within(overdue).getByText("Vencida")).toBeInTheDocument();
-    const partial = screen.getByRole("link", { name: "MSN-2026/148" }).closest("tr")!;
+    const partial = table.getByRole("link", { name: "MSN-2026/148" }).closest("tr")!;
     expect(within(partial).getByText("en 3 días")).toBeInTheDocument();
     expect(within(partial).getByRole("link", { name: /PED-004 · Entrega en obra/ })).toHaveAttribute("href", "/dashboard/projects/p-1/compras/order-4");
-    const credit = screen.getByRole("link", { name: "MSN-2026/R07" }).closest("tr")!;
+    const credit = table.getByRole("link", { name: "MSN-2026/R07" }).closest("tr")!;
     expect(within(credit).getByText("rectifica MSN-2026/112")).toBeInTheDocument();
+
+    // Phones: a card per invoice, owed first, with its state, due date and what is owed.
+    const cards = within(screen.getByRole("region", { name: "Facturas recibidas" }))
+      .getAllByRole("listitem")
+      .filter((item) => item.closest("table") === null && item.querySelector("a[href^='/dashboard/compras/facturas/']"));
+    expect(cards.map((card) => within(card).getAllByRole("link")[0]!.textContent)).toEqual(["SOC-2026/0912", "MSN-2026/148", "MSN-2026/112", "MSN-2026/R07"]);
+    const overdueCard = within(cards[0]!);
+    expect(overdueCard.getByRole("link", { name: "SOC-2026/0912" })).toHaveAttribute("href", "/dashboard/compras/facturas/inv-912");
+    expect(overdueCard.getByText("Vencida")).toBeInTheDocument();
+    expect(overdueCard.getByText("hace 4 días")).toHaveClass("text-bad");
+    expect(overdueCard.getByText("Pendiente · IVA incl.")).toBeInTheDocument();
+    expect(within(cards[3]!).getByText("A pagar · IVA incl.")).toBeInTheDocument();
     // One page holds them all: no pager.
     expect(screen.queryByRole("navigation", { name: "Páginas" })).not.toBeInTheDocument();
   });

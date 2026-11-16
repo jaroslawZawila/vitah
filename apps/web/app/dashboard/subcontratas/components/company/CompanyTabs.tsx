@@ -1,7 +1,9 @@
 "use client";
 
+import { useRef } from "react";
 import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
+import { useActiveInView } from "../../../components/useActiveInView";
 import { COMPANY_TABS, type CompanyTab } from "./tabs";
 
 /** Presentational: the ficha's sections, with optional counts. */
@@ -18,8 +20,10 @@ export default function CompanyTabs({
   onChange: (tab: CompanyTab) => void;
 }) {
   const t = useTranslations("subcontractors.company.tabs");
+  const strip = useRef<HTMLDivElement>(null);
+  useActiveInView(strip, tab);
   return (
-    <div role="tablist" aria-label={t("label")} className="-mx-1 flex gap-0.5 overflow-x-auto border-b px-1">
+    <div ref={strip} role="tablist" aria-label={t("label")} className="relative -mx-1 flex gap-0.5 overflow-x-auto border-b px-1">
       {tabs.map((key) => {
         const on = key === tab;
         return (

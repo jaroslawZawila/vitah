@@ -33,7 +33,7 @@ export default function FileSlot({
 
   if (file) {
     return (
-      <div className="flex min-h-11 items-center gap-2 rounded-md border bg-raise px-2.5 text-sm lg:min-h-9">
+      <div className="flex min-h-11 items-center gap-2 rounded-md border bg-raise px-2.5 text-sm lg:min-h-9 lg:pointer-coarse:min-h-11">
         <FileText aria-hidden className="size-4 flex-none text-muted-foreground" />
         <span className="min-w-0 flex-1 truncate">{file.name}</span>
         <Button type="button" variant="ghost" size="icon-sm" aria-label={t("removeFile", { name: file.name })} onClick={() => onChange(null)}>

@@ -64,6 +64,10 @@ describe("PurchaseLinesScreen", () => {
     expect(within(structure).getByText("58.800,00")).toBeInTheDocument();
     expect(within(structure).getByText("42.360,00")).toBeInTheDocument();
     expect(within(structure).getByText("1 con factura")).toBeInTheDocument();
+    // On a phone the headings are hidden and each chapter is a card: each figure says what it is.
+    for (const label of ["Coste presup.", "Contratado", "Desviación", "Facturado", "Pagado"]) {
+      expect(within(structure).getByText(label)).toBeInTheDocument();
+    }
     // What needs a look, while folded.
     expect(within(chapter("02")).getByText("1 con factura vencida")).toBeInTheDocument();
     expect(within(chapter("10")).getByText("Pedir antes del 3 nov 2026")).toBeInTheDocument();

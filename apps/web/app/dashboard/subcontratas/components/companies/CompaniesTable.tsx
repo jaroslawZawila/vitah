@@ -14,7 +14,9 @@ import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { cardVariants } from "@/components/ui/card";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
+import { cn } from "@/lib/utils";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { touchLink, stretchedLink } from "../../../components/touch";
 import { CompanyStatusBadge, DocStateBadge } from "../Badges";
 import ToggleChip from "../fields/ToggleChip";
 import { companyHref } from "../display";
@@ -62,6 +64,12 @@ export default function CompaniesTable({
   const counted = filterCompanies(companies, { ...filter, status: "all" });
   const rows = filterCompanies(companies, filter);
   const set = (patch: Partial<CompanyFilter>) => onFilterChange({ ...filter, ...patch });
+  const status = (c: SubcontractorListItem) =>
+    c.suppliesOnly ? (
+      <Badge className="rounded-[9px] whitespace-normal">{ts("fields.types.supplier.label")}</Badge>
+    ) : (
+      <CompanyStatusBadge status={c.status} />
+    );
 
   return (
     <section className={cardVariants()} aria-labelledby="companies-title">
@@ -124,6 +132,50 @@ export default function CompaniesTable({
           {companies.length === 0 ? t("table.none") : t("table.empty")}
         </p>
       ) : (
+        <>
+        {/* Phones: one card per company, opening its ficha. */}
+        <ul className="m-0 flex list-none flex-col p-0 md:hidden">
+          {rows.map((c) => (
+            <li key={c.id} className="relative flex flex-col gap-1.5 border-t py-3.5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <Link href={companyHref(c.id)} className={cn("font-semibold hover:text-primary", stretchedLink)}>
+                  {c.legalName}
+                </Link>
+                {status(c)}
+              </div>
+              <div className="text-meta text-muted-foreground">
+                <span className="num">{c.taxIdMasked}</span> · {t("table.reaIn", { region: ts(`regions.${c.reaRegion}`) })}
+              </div>
+              <div className="text-sm">
+                {c.trades.map((trade) => ts(`trades.${trade}`)).join(" · ") || "—"}
+                <span className="text-muted-foreground"> · {ts(`fields.types.${companyType(c)}.label`)}</span>
+              </div>
+              {!c.suppliesOnly && (
+                <dl className="m-0 mt-1 flex flex-wrap gap-x-3 gap-y-1.5">
+                  {DOC_PILLARS.map((pillar) => (
+                    <div key={pillar} className="flex items-center gap-1.5">
+                      <dt className="text-meta text-muted-foreground">{t(`table.${pillar}`)}</dt>
+                      <dd className="m-0">
+                        <DocStateBadge state={c.pillars[pillar].state} daysLeft={c.pillars[pillar].daysLeft} short />
+                      </dd>
+                    </div>
+                  ))}
+                  <div className="flex items-center gap-1.5">
+                    <dt className="text-meta text-muted-foreground">{t("table.docs")}</dt>
+                    <dd className="num m-0 text-sm">
+                      {c.docsValid}/{c.docsTotal}
+                    </dd>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <dt className="text-meta text-muted-foreground">{t("table.workers")}</dt>
+                    <dd className="num m-0 text-sm">{c.workers}</dd>
+                  </div>
+                </dl>
+              )}
+            </li>
+          ))}
+        </ul>
+        <div className="hidden md:block">
         <Table className="min-w-[900px]">
           <TableHeader>
             <TableRow>
@@ -146,7 +198,7 @@ export default function CompaniesTable({
             {rows.map((c) => (
               <TableRow key={c.id}>
                 <TableCell className="whitespace-normal">
-                  <Link href={companyHref(c.id)} className="font-semibold hover:underline hover:underline-offset-3">
+                  <Link href={companyHref(c.id)} className={cn("font-semibold hover:underline hover:underline-offset-3", touchLink)}>
                     {c.legalName}
                   </Link>
                   <div className="text-meta text-muted-foreground">
@@ -178,11 +230,7 @@ export default function CompaniesTable({
                 )}
                 <TableCell>
                   {/* Wraps (as Oficio's "Proveedor de material" does) rather than widen the table past the card. */}
-                  {c.suppliesOnly ? (
-                    <Badge className="rounded-[9px] whitespace-normal">{ts("fields.types.supplier.label")}</Badge>
-                  ) : (
-                    <CompanyStatusBadge status={c.status} />
-                  )}
+                  {status(c)}
                 </TableCell>
                 <TableCell>
                   <Link
@@ -198,6 +246,8 @@ export default function CompaniesTable({
             ))}
           </TableBody>
         </Table>
+        </div>
+        </>
       )}
     </section>
   );

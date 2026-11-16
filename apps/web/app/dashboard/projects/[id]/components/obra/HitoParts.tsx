@@ -24,6 +24,7 @@ import { cardHead, checkLabel, checkRow, codeChip, muted } from "./classes";
 import { useObraFormat } from "./format";
 import PhotoStrip from "./PhotoStrip";
 import Stepper from "./Stepper";
+import { touchLink } from "../../../../components/touch";
 
 /** The steps shown: every status after "pending". */
 const STEPS = HITO_STATUSES.slice(1);
@@ -192,15 +193,21 @@ export function HitoFileCard({
       </div>
       {children}
       {href ? (
-        <div className="grid grid-flow-col auto-cols-auto grid-cols-[auto_minmax(0,1fr)] items-center gap-3 border-b py-2.5 text-sm last:border-b-0">
+        // On a phone the buttons wrap under the file rather than squeeze its name.
+        <div className="flex flex-wrap items-center gap-3 border-b py-2.5 text-sm last:border-b-0 sm:grid sm:grid-flow-col sm:auto-cols-auto sm:grid-cols-[auto_minmax(0,1fr)]">
           <span
             className="grid h-[42px] w-9 place-items-center rounded-sm border bg-raise text-xs font-semibold text-brand-ink"
             aria-hidden
           >
             PDF
           </span>
-          <div className="flex min-w-0 flex-col gap-0.5">
-            <a href={href} target="_blank" rel="noreferrer" className="font-medium text-info [overflow-wrap:anywhere] hover:underline">
+          <div className="flex min-w-0 flex-[1_1_160px] flex-col gap-0.5">
+            <a
+              href={href}
+              target="_blank"
+              rel="noreferrer"
+              className={cn("font-medium text-info [overflow-wrap:anywhere] hover:underline", touchLink)}
+            >
               {fileName}
             </a>
             <span className="text-meta text-muted-foreground">{detail}</span>

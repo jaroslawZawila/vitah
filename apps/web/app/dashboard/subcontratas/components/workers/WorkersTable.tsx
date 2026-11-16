@@ -15,7 +15,9 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
+import { cn } from "@/lib/utils";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { touchLink, stretchedLink } from "../../../components/touch";
 import { AccessBadge, DocStateBadge } from "../Badges";
 import ToggleChip from "../fields/ToggleChip";
 import { useAccessReason, workerHref } from "../display";
@@ -70,6 +72,21 @@ export default function WorkersTable({
   const t = useTranslations("subcontractors");
   const tw = useTranslations("subcontractors.workers");
   const reason = useAccessReason();
+  /** A worker's documents, as the table's columns: each heading with its pill. */
+  const docColumns = (w: WorkerListItem): [string, React.ReactNode][] => {
+    const waiver = w.docs.renuncia_vigilancia_salud;
+    const tpc = w.docs.tpc;
+    return [
+      [tw("table.ss"), <Cell key="ss" badge={w.docs.alta_ss} />],
+      [tw("table.tpc"), !tpc || tpc.state === "missing" ? <Badge key="tpc" variant="outline">{tw("noTpc")}</Badge> : <Cell key="tpc" badge={tpc} />],
+      [tw("table.training"), <Cell key="training" badge={worstBadge([w.docs.formacion_prl_inicial ?? MISSING, w.docs.formacion_prl_oficio ?? MISSING])} />],
+      [
+        tw("table.medical"),
+        waiver && isValid(waiver.state) ? <Badge key="medical" variant="outline">{tw("waiver")}</Badge> : <Cell key="medical" badge={w.docs.aptitud_medica} />,
+      ],
+      [tw("table.ppe"), <Cell key="ppe" badge={w.docs.entrega_epis} />],
+    ];
+  };
 
   return (
     <Card aria-labelledby="workers-title">
@@ -85,7 +102,7 @@ export default function WorkersTable({
             </ToggleChip>
           ))}
         </div>
-        <label className="flex min-h-11 min-w-0 flex-[1_1_220px] items-center gap-2 rounded-md border bg-raise px-3 text-muted-foreground lg:min-h-9">
+        <label className="flex min-h-11 min-w-0 flex-[1_1_220px] items-center gap-2 rounded-md border bg-raise px-3 text-muted-foreground lg:min-h-9 lg:pointer-coarse:min-h-11">
           <Search aria-hidden className="size-4" />
           <input
             type="search"
@@ -117,6 +134,41 @@ export default function WorkersTable({
       {workers.length === 0 ? (
         <p className="py-8 text-center text-sm text-muted-foreground">{tw("empty")}</p>
       ) : (
+        <>
+        {/* Phones: one card per worker, opening their page; their documents as labelled pills. */}
+        <ul className="m-0 flex list-none flex-col p-0 md:hidden">
+          {workers.map((w) => {
+            const firstReason = w.access.checks.find((c) => !c.ok)?.reasons[0];
+            return (
+              <li key={w.id} className="relative flex flex-col gap-1.5 border-t py-3.5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <Link href={workerHref(w.id)} className={cn("font-semibold hover:text-primary", stretchedLink)}>
+                    {workerName(w)}
+                  </Link>
+                  <AccessBadge status={w.access.status} />
+                </div>
+                <div className="text-meta text-muted-foreground">
+                  <span className="num">{w.idDocumentMasked}</span> · {w.subcontractorName}
+                </div>
+                <div className="text-sm">
+                  {w.trade ? t(`trades.${w.trade}`) : "—"}
+                  {w.category && <span className="text-muted-foreground"> · {t(`categories.${w.category}`)}</span>}
+                  {w.roles.length > 0 && <span className="text-muted-foreground"> · {w.roles.map((role) => t(`roles.${role}`)).join(", ")}</span>}
+                </div>
+                {firstReason && <div className="text-meta text-muted-foreground">{reason(firstReason, w.subcontractorKind)}</div>}
+                <dl className="m-0 mt-1 flex flex-wrap gap-x-3 gap-y-1.5">
+                  {docColumns(w).map(([label, badge]) => (
+                    <div key={label} className="flex items-center gap-1.5">
+                      <dt className="text-meta text-muted-foreground">{label}</dt>
+                      <dd className="m-0">{badge}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </li>
+            );
+          })}
+        </ul>
+        <div className="hidden md:block">
         <Table className="min-w-[900px]">
           <TableHeader>
             <TableRow>
@@ -136,12 +188,10 @@ export default function WorkersTable({
           <TableBody>
             {workers.map((w) => {
               const firstReason = w.access.checks.find((c) => !c.ok)?.reasons[0];
-              const waiver = w.docs.renuncia_vigilancia_salud;
-              const tpc = w.docs.tpc;
               return (
                 <TableRow key={w.id}>
                   <TableCell className="min-w-32 whitespace-normal">
-                    <Link href={workerHref(w.id)} className="font-semibold underline-offset-3 hover:underline">
+                    <Link href={workerHref(w.id)} className={cn("font-semibold underline-offset-3 hover:underline", touchLink)}>
                       {workerName(w)}
                     </Link>
                     <div className="num text-meta text-muted-foreground">{w.idDocumentMasked}</div>
@@ -151,29 +201,9 @@ export default function WorkersTable({
                     {w.trade ? t(`trades.${w.trade}`) : "—"}
                     <div className="text-meta text-muted-foreground">{w.category ? t(`categories.${w.category}`) : "—"}</div>
                   </TableCell>
-                  <TableCell>
-                    <Cell badge={w.docs.alta_ss} />
-                  </TableCell>
-                  <TableCell>
-                    {!tpc || tpc.state === "missing" ? (
-                      <Badge variant="outline">{tw("noTpc")}</Badge>
-                    ) : (
-                      <Cell badge={tpc} />
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <Cell badge={worstBadge([w.docs.formacion_prl_inicial ?? MISSING, w.docs.formacion_prl_oficio ?? MISSING])} />
-                  </TableCell>
-                  <TableCell>
-                    {waiver && isValid(waiver.state) ? (
-                      <Badge variant="outline">{tw("waiver")}</Badge>
-                    ) : (
-                      <Cell badge={w.docs.aptitud_medica} />
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <Cell badge={w.docs.entrega_epis} />
-                  </TableCell>
+                  {docColumns(w).map(([label, badge]) => (
+                    <TableCell key={label}>{badge}</TableCell>
+                  ))}
                   <TableCell className="min-w-24 text-meta whitespace-normal">
                     {w.roles.length > 0 ? w.roles.map((role) => t(`roles.${role}`)).join(", ") : "—"}
                   </TableCell>
@@ -190,6 +220,8 @@ export default function WorkersTable({
             })}
           </TableBody>
         </Table>
+        </div>
+        </>
       )}
       {pager}
     </Card>

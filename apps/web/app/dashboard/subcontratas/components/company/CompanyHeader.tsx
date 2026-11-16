@@ -8,6 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { CompanyStatusBadge } from "../Badges";
 import { companyHref, dossierUrl } from "../display";
+import { cn } from "@/lib/utils";
+import { touchLink } from "../../../components/touch";
 
 /** Presentational: the company's name, status and identity, with its actions. */
 export default function CompanyHeader({ company }: { company: SubcontractorDetail }) {
@@ -29,7 +31,7 @@ export default function CompanyHeader({ company }: { company: SubcontractorDetai
   return (
     <header className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-end md:justify-between">
       <div className="flex min-w-0 flex-col gap-2">
-        <Link href="/dashboard/subcontratas/empresas" className="text-meta text-muted-foreground hover:text-foreground">
+        <Link href="/dashboard/subcontratas/empresas" className={cn("w-fit text-meta text-muted-foreground hover:text-foreground", touchLink)}>
           {t("back")}
         </Link>
         <div className="flex flex-wrap items-center gap-x-3.5 gap-y-2">

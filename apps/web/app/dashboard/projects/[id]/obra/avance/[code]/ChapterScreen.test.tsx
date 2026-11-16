@@ -58,7 +58,9 @@ describe("ChapterScreen", () => {
     expect(hito.getByRole("link", { name: "Ver en Pagos →" })).toHaveAttribute("href", "/dashboard/projects/p-1/payments/hito-h4");
 
     const cost = within(screen.getByRole("region", { name: "Coste" }));
-    expect(cost.getByText("−440,00 € · −1,4 %")).toBeInTheDocument();
+    // Amount and % apart, so the % can go under the amount on a narrow phone.
+    expect(cost.getByText("Desviación").parentElement).toHaveTextContent("Desviación−440,00 € · −1,4 %");
+    expect(cost.getByText("−440,00 €")).toBeInTheDocument();
     expect(cost.getByText("· 6 de 9 cerradas · 1 abierta")).toBeInTheDocument();
     expect(cost.queryByText("Simulado")).not.toBeInTheDocument();
 
@@ -81,6 +83,14 @@ describe("ChapterScreen", () => {
     expect(history.getByText("Corrección de inicio real")).toBeInTheDocument();
     expect(history.getByText("«El montaje empezó el lunes 21»")).toBeInTheDocument();
     expect(history.getAllByText("22 sept 2026")).toHaveLength(2);
+
+    // On a phone the history is a list: each record with its dates before and now, when and by whom.
+    const phone = within(screen.getByRole("list", { name: "Historial" }));
+    const correction = phone.getByText("Corrección de inicio real").closest("li")!;
+    expect(correction).toHaveTextContent("«El montaje empezó el lunes 21»");
+    expect(within(correction).getByText("Antes").nextElementSibling).toHaveTextContent("22 sept 2026");
+    expect(within(correction).getByText("Ahora").nextElementSibling).toBeInTheDocument();
+    expect(correction).toHaveTextContent(/Registrado el .+ por /);
   });
 
   it("saves the lines' executed %, only what changed", async () => {

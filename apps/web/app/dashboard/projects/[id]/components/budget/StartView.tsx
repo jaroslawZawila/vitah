@@ -22,6 +22,7 @@ import FormError from "../../../../components/FormError";
 import { muted } from "../obra/classes";
 import { useObraFormat } from "../obra/format";
 import ProgressBar from "../obra/ProgressBar";
+import { touchLink } from "../../../../components/touch";
 
 const ACCEPT: Record<BudgetInput, string> = {
   plans: ".pdf,.jpg,.jpeg,.png,.webp",
@@ -104,7 +105,7 @@ export default function StartView({
                 {docs.map((doc) => (
                   <div key={doc.id} className="flex items-center gap-2.5 rounded-[10px] bg-raise px-3 py-2.5">
                     <FileText size={20} className="flex-none text-muted-foreground" aria-hidden />
-                    <a href={fileUrl(doc)} target="_blank" rel="noreferrer" className="min-w-0 flex-1 hover:underline">
+                    <a href={fileUrl(doc)} target="_blank" rel="noreferrer" className={cn("min-w-0 flex-1 hover:underline", touchLink, "pointer-coarse:flex-col pointer-coarse:items-stretch pointer-coarse:justify-center")}>
                       <span className="block truncate text-sm font-semibold">{doc.filename ?? doc.title}</span>
                       <span className="num text-meta text-muted-foreground">{f.fileSize(doc.sizeBytes)}</span>
                     </a>

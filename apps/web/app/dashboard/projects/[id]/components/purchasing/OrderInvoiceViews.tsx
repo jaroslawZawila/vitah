@@ -15,12 +15,21 @@ import { usePurchaseFormat } from "./format";
 import { InvoicingFoot } from "./LineOrders";
 import { invoiceHref } from "./links";
 import { InvoiceStatePill, ProgressPill } from "./pills";
+import { touchLink } from "../../../../components/touch";
+import { phoneFigures } from "../../../../components/phone-table";
 
 // Presentational: an order's payment schedule (milestones) and its invoices,
 // on its page. The container (OrderScreen) runs the actions.
 
 /** A milestone as typed: the amount in euros as written. */
 type Row = { id?: string; concept: string; amount: string; locked: boolean };
+
+/**
+ * Below 768px the milestones and invoices tables reflow into one block per row
+ * (the same elements): what it is on top, then its figures two by two, each
+ * under its column's name.
+ */
+const phone = phoneFigures;
 
 /**
  * The order's payment schedule: each milestone's share, where it stands and
@@ -88,8 +97,8 @@ export function MilestonesCard({
                 {t("gap", { sum: f.amount(scheduled), total: f.amount(amountCents) })}
               </p>
             )}
-            <Table className="min-w-[760px]">
-              <TableHeader>
+            <Table className={cn(phone.block, "md:min-w-[760px]")}>
+              <TableHeader className="max-md:hidden">
                 <TableRow>
                   <TableHead className="pl-[18px]">{t("concept")}</TableHead>
                   <TableHead className="text-right">{t("pct")}</TableHead>
@@ -99,42 +108,51 @@ export function MilestonesCard({
                   <TableHead className="pr-[18px] text-right">{t("payment")}</TableHead>
                 </TableRow>
               </TableHeader>
-              <TableBody>
+              <TableBody className={phone.block}>
                 {milestones.map((m, index) => (
-                  <TableRow key={m.id}>
-                    <TableCell className="pl-[18px] whitespace-normal">
+                  <TableRow key={m.id} className={phone.row}>
+                    <TableCell className="pl-[18px] whitespace-normal max-md:col-span-2 max-md:p-0">
                       <b>{index + 1}.</b> {m.concept}
                     </TableCell>
-                    <TableCell className="num text-right">{share(m.amountCents)}</TableCell>
-                    <TableCell className="num text-right">{f.amount(m.amountCents)}</TableCell>
-                    <TableCell>
+                    <TableCell className={cn("num text-right", phone.cell)}>
+                      <span className={phone.label}>{t("pct")}</span>
+                      {share(m.amountCents)}
+                    </TableCell>
+                    <TableCell className={cn("num text-right", phone.cell)}>
+                      <span className={phone.label}>{t("amount")}</span>
+                      {f.amount(m.amountCents)}
+                    </TableCell>
+                    <TableCell className={phone.cell}>
+                      <span className={phone.label}>{t("state")}</span>
                       <ProgressPill progress={m.progress} />
                     </TableCell>
-                    <TableCell className="whitespace-normal">
+                    <TableCell className={cn("whitespace-normal", phone.cell)}>
+                      <span className={phone.label}>{t("invoice")}</span>
                       {m.invoices.length === 0 ? (
                         <span className="text-muted-foreground">{t("noInvoice")}</span>
                       ) : (
                         <span className="flex flex-wrap gap-x-2.5 gap-y-1">
                           {m.invoices.map((invoice) => (
-                            <Link key={invoice.id} href={invoiceHref(invoice.id)} className="num font-semibold text-brand-ink hover:text-primary">
+                            <Link key={invoice.id} href={invoiceHref(invoice.id)} className={cn("num font-semibold text-brand-ink hover:text-primary", touchLink)}>
                               {invoice.number}
                             </Link>
                           ))}
                         </span>
                       )}
                     </TableCell>
-                    <TableCell className={cn("num pr-[18px] text-right", m.progress === "paid" ? "text-good" : m.outstandingCents > 0 && "text-warn")}>
+                    <TableCell className={cn("num pr-[18px] text-right", m.progress === "paid" ? "text-good" : m.outstandingCents > 0 && "text-warn", phone.cell, "max-md:col-span-2")}>
+                      <span className={phone.label}>{t("payment")}</span>
                       {m.invoicedCents === 0 ? "—" : `${f.amount(m.paidCents)} / ${f.amount(m.invoicedCents - m.retainedCents)}`}
                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
-              <TableFooter>
-                <TableRow className="hover:bg-transparent">
-                  <TableCell className="pl-[18px]">{t("total")}</TableCell>
-                  <TableCell className="num text-right">{share(scheduled)}</TableCell>
-                  <TableCell className="num text-right">{f.amount(scheduled)}</TableCell>
-                  <TableCell colSpan={3} className={cn("pr-[18px]", scheduled === amountCents ? "text-good" : "text-warn")}>
+              <TableFooter className={phone.block}>
+                <TableRow className={cn("hover:bg-transparent", phone.row)}>
+                  <TableCell className="pl-[18px] max-md:col-span-2 max-md:p-0">{t("total")}</TableCell>
+                  <TableCell className={cn("num text-right", phone.cell)}>{share(scheduled)}</TableCell>
+                  <TableCell className={cn("num text-right", phone.cell)}>{f.amount(scheduled)}</TableCell>
+                  <TableCell colSpan={3} className={cn("pr-[18px] max-md:col-span-2 max-md:p-0", scheduled === amountCents ? "text-good" : "text-warn")}>
                     {scheduled === amountCents ? t("matches") : ""}
                   </TableCell>
                 </TableRow>
@@ -239,7 +257,7 @@ export function OrderInvoices({ order, registerHref }: { order: PurchaseOrderDet
           {t("title")} <span className="num text-[16px] text-muted-foreground">{order.invoices.length}</span>
         </h2>
         {registerHref && (
-          <Link href={registerHref} className="text-sm font-semibold text-brand-ink hover:text-primary pointer-coarse:inline-flex pointer-coarse:min-h-11 pointer-coarse:items-center">
+          <Link href={registerHref} className={cn("text-sm font-semibold text-brand-ink hover:text-primary", touchLink)}>
             {t("register")}
           </Link>
         )}
@@ -248,8 +266,8 @@ export function OrderInvoices({ order, registerHref }: { order: PurchaseOrderDet
         <p className="px-[18px] pb-3 text-sm text-muted-foreground">{t("none")}</p>
       ) : (
         <>
-          <Table className="min-w-[860px]">
-            <TableHeader>
+          <Table className={cn(phone.block, "md:min-w-[860px]")}>
+            <TableHeader className="max-md:hidden">
               <TableRow>
                 <TableHead className="pl-[18px]">{t("number")}</TableHead>
                 <TableHead>{t("milestone")}</TableHead>
@@ -261,26 +279,42 @@ export function OrderInvoices({ order, registerHref }: { order: PurchaseOrderDet
                 <TableHead className="pr-[18px]">{t("state")}</TableHead>
               </TableRow>
             </TableHeader>
-            <TableBody>
+            <TableBody className={phone.block}>
               {order.invoices.map((invoice) => (
-                <TableRow key={invoice.id}>
-                  <TableCell className="pl-[18px]">
-                    <Link href={invoiceHref(invoice.id)} className="num font-semibold text-brand-ink hover:text-primary">
+                <TableRow key={invoice.id} className={phone.row}>
+                  <TableCell className="pl-[18px] max-md:-order-2 max-md:p-0">
+                    <Link href={invoiceHref(invoice.id)} className={cn("num font-semibold text-brand-ink hover:text-primary", touchLink)}>
                       {invoice.number}
                     </Link>
                     {invoice.rectifiesNumber && (
                       <span className="block text-meta text-muted-foreground">{ti("rectifies", { number: invoice.rectifiesNumber })}</span>
                     )}
                   </TableCell>
-                  <TableCell className="whitespace-normal">{invoice.milestoneConcept ?? "—"}</TableCell>
-                  <TableCell className="num">{f.date(invoice.issuedOn)}</TableCell>
-                  <TableCell className={cn("num", invoice.state === "overdue" && "font-semibold text-bad")}>
+                  <TableCell className={cn("whitespace-normal", phone.cell, "max-md:col-span-2", !invoice.milestoneConcept && "max-md:hidden")}>
+                    <span className={phone.label}>{t("milestone")}</span>
+                    {invoice.milestoneConcept ?? "—"}
+                  </TableCell>
+                  <TableCell className={cn("num", phone.cell)}>
+                    <span className={phone.label}>{t("issuedOn")}</span>
+                    {f.date(invoice.issuedOn)}
+                  </TableCell>
+                  <TableCell className={cn("num", invoice.state === "overdue" && "font-semibold text-bad", phone.cell)}>
+                    <span className={phone.label}>{t("dueOn")}</span>
                     {f.date(invoice.dueOn)}
                   </TableCell>
-                  <TableCell className="num text-right">{f.amount(invoice.baseCents)}</TableCell>
-                  <TableCell className="num text-right">{f.amount(invoice.payableCents)}</TableCell>
-                  <TableCell className="num text-right">{invoice.kind === "invoice" ? f.amount(invoice.paidCents) : "—"}</TableCell>
-                  <TableCell className="pr-[18px]">
+                  <TableCell className={cn("num text-right", phone.cell)}>
+                    <span className={phone.label}>{t("base")}</span>
+                    {f.amount(invoice.baseCents)}
+                  </TableCell>
+                  <TableCell className={cn("num text-right", phone.cell)}>
+                    <span className={phone.label}>{vat(t("payable"), "incl")}</span>
+                    {f.amount(invoice.payableCents)}
+                  </TableCell>
+                  <TableCell className={cn("num text-right", phone.cell)}>
+                    <span className={phone.label}>{vat(t("paid"), "incl")}</span>
+                    {invoice.kind === "invoice" ? f.amount(invoice.paidCents) : "—"}
+                  </TableCell>
+                  <TableCell className="pr-[18px] max-md:-order-1 max-md:justify-self-end max-md:p-0">
                     <InvoiceStatePill state={invoice.state} />
                   </TableCell>
                 </TableRow>

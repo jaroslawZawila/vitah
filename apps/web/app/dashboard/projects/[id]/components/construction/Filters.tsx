@@ -15,6 +15,8 @@ export type StateFilter = "all" | ChapterState;
 
 const bare = "min-h-9 cursor-pointer border-0 bg-transparent font-semibold outline-none pointer-coarse:min-h-11";
 
+const dateInput = "num w-[132px] font-normal max-sm:w-auto max-sm:min-w-0 max-sm:flex-1";
+
 /** A labelled native select inside a filter pill. */
 export function FilterSelect({
   id,
@@ -36,7 +38,7 @@ export function FilterSelect({
       <span aria-hidden className="text-muted-foreground">
         {label}
       </span>
-      <select id={id} aria-label={label} value={value} onChange={(event) => onChange(event.target.value)} className={cn(bare, "min-w-0 max-w-[260px] truncate")}>
+      <select id={id} aria-label={label} value={value} onChange={(event) => onChange(event.target.value)} className={cn(bare, "min-w-0 max-w-[260px] truncate pointer-coarse:min-w-11")}>
         {options.map((option) => (
           <option key={option.value} value={option.value}>
             {option.label}
@@ -90,23 +92,26 @@ export function PeriodFilter({
       <span aria-hidden className="text-muted-foreground">
         {name}
       </span>
-      <input
-        type="date"
-        aria-label={t("from")}
-        value={from}
-        max={to || undefined}
-        onChange={(event) => onChange({ from: event.target.value, to })}
-        className={cn(bare, "num w-[132px] font-normal")}
-      />
-      <span className="text-muted-foreground">–</span>
-      <input
-        type="date"
-        aria-label={t("to")}
-        value={to}
-        min={from || undefined}
-        onChange={(event) => onChange({ from, to: event.target.value })}
-        className={cn(bare, "num w-[132px] font-normal")}
-      />
+      {/* The two dates stay on one line: on a phone they take the line under the label, each half of it. */}
+      <span className="contents max-sm:flex max-sm:basis-full max-sm:items-center max-sm:gap-2">
+        <input
+          type="date"
+          aria-label={t("from")}
+          value={from}
+          max={to || undefined}
+          onChange={(event) => onChange({ from: event.target.value, to })}
+          className={cn(bare, dateInput)}
+        />
+        <span className="text-muted-foreground">–</span>
+        <input
+          type="date"
+          aria-label={t("to")}
+          value={to}
+          min={from || undefined}
+          onChange={(event) => onChange({ from, to: event.target.value })}
+          className={cn(bare, dateInput)}
+        />
+      </span>
     </div>
   );
 }

@@ -7,6 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { cardVariants } from "@/components/ui/card";
 import { cardHead, columns, muted, table } from "../obra/classes";
 import { useObraFormat } from "../obra/format";
+import { cn } from "@/lib/utils";
+import { touchLink } from "../../../../components/touch";
 
 const COLUMNS = "110px minmax(200px, 1fr) 130px 130px";
 export const OPTION_VARIANT = { extra: "default", alternative: "warn", deduction: "info" } as const;
@@ -22,7 +24,7 @@ export default function OptionSummary({ options, href }: { options: BudgetOption
         <h2 id="option-summary-title">
           {t("summaryTitle")} <span className={`${muted} font-sans font-normal`}>{t("summaryHint")}</span>
         </h2>
-        <Link href={href} className="text-sm font-semibold text-brand-ink hover:underline">{t("edit")}</Link>
+        <Link href={href} className={cn("text-sm font-semibold text-brand-ink hover:underline", touchLink)}>{t("edit")}</Link>
       </div>
       {options.length === 0 ? (
         <p className={muted}>{t("none")}</p>

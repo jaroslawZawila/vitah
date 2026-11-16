@@ -18,14 +18,18 @@ function renderScreen(canManage = true) {
   );
 }
 
+// The table (from 768px); the phone's cards are the list "Partidas", both in the DOM under CSS breakpoints.
+const table = () => within(screen.getByRole("region", { name: "Partidas" }));
+const cards = () => within(screen.getByRole("list", { name: "Partidas" }));
 const lines = () =>
-  within(screen.getByRole("region", { name: "Partidas" }))
+  table()
     .queryAllByRole("row")
     .map((row) => row.querySelector("td")?.textContent)
     .filter((code): code is string => !!code && /^\d+\.\d+$/.test(code));
 
-const row = (text: string) => screen.getByText(text).closest("tr")!;
-const chapter = (name: RegExp) => screen.getByRole("button", { name });
+const row = (text: string) => table().getByText(text).closest("tr")!;
+const chapter = (name: RegExp) => table().getByRole("button", { name });
+const card = (name: RegExp) => cards().getByRole("button", { name }).closest("li")!;
 const params = () => Object.fromEntries(new URLSearchParams(window.location.search));
 const goTo = (url: string) => window.history.replaceState(null, "", url);
 afterEach(() => goTo("/"));
@@ -50,7 +54,7 @@ describe("CostsScreen", () => {
     expect(within(folded).getByText("−1,1 %")).toBeInTheDocument();
     expect(within(chapter(/05\s*Cubierta/)).queryByText("En curso")).not.toBeInTheDocument();
 
-    const total = screen.getByText("Total · 6 partidas").closest("tr")!;
+    const total = table().getByText("Total · 6 partidas").closest("tr")!;
     expect(within(total).getByText("40.253,28")).toBeInTheDocument();
     expect(within(total).getByText("38.810,00")).toBeInTheDocument();
     expect(within(total).getByText("+816,72")).toHaveClass("text-bad");
@@ -165,6 +169,55 @@ describe("CostsScreen", () => {
 
     await userEvent.clear(screen.getByRole("searchbox", { name: "Buscar partida" }));
     await userEvent.type(screen.getByRole("searchbox", { name: "Buscar partida" }), "nada de esto");
-    expect(screen.getByText("Ninguna partida coincide con los filtros.")).toBeInTheDocument();
+    expect(table().getByText("Ninguna partida coincide con los filtros.")).toBeInTheDocument();
+  });
+
+  it("on a phone, shows a card per chapter with its money on screen and its lines folded under it", async () => {
+    renderScreen();
+
+    const envelope = card(/06\s*Envolvente/);
+    const toggle = within(envelope).getByRole("button", { name: /06\s*Envolvente/ });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(toggle).toHaveTextContent("5 partidas");
+    expect(within(toggle).getByText("2 con sobrecoste")).toBeInTheDocument();
+    expect(within(envelope).getByText("Coste presup.")).toBeInTheDocument();
+    expect(within(envelope).getByText("20.253,28")).toBeInTheDocument();
+    expect(within(envelope).getByText("17.810,00")).toBeInTheDocument();
+    expect(within(envelope).getByText("−183,28")).toHaveClass("text-good");
+    expect(within(envelope).getByText("−1,1 %")).toBeInTheDocument();
+    expect(envelope).toHaveTextContent("3 de 5 cerradas · 1 abierta");
+    expect(within(envelope).queryByText("Panel Thermochip de fachada")).not.toBeInTheDocument();
+
+    // The same fold as the table's: opening the card opens the chapter, in the URL too.
+    await userEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(chapter(/06\s*Envolvente/)).toHaveAttribute("aria-expanded", "true");
+    expect(params()).toEqual({ abierto: "06" });
+    const panel = within(document.getElementById(toggle.getAttribute("aria-controls")!)!);
+    const saving = panel.getByText("Panel Thermochip de fachada").closest("li")!;
+    expect(within(saving).getByText("12.600,00")).toBeInTheDocument();
+    expect(within(saving).getByText("−450,00")).toHaveClass("text-good");
+    expect(within(saving).getByRole("link", { name: "PED-041" })).toHaveAttribute("href", "/dashboard/projects/p-1/compras/order-41");
+    const open = panel.getByText("Estanqueidad al aire de la envolvente").closest("li")!;
+    expect(within(open).getByText("sin desviación hasta cerrarla")).toBeInTheDocument();
+    const none = panel.getByText("Perfilería de arranque y goterones").closest("li")!;
+    expect(within(none).getByText("Sin contratar")).toBeInTheDocument();
+    expect(within(none).queryByText(/^[+−]?0,00/)).not.toBeInTheDocument();
+
+    // The obra's total under the cards.
+    const total = screen.getAllByText("Total · 6 partidas").find((el) => !el.closest("tr"))!.parentElement!;
+    expect(within(total).getByText("40.253,28")).toBeInTheDocument();
+    expect(within(total).getByText("38.810,00")).toBeInTheDocument();
+    expect(within(total).getByText("+816,72")).toHaveClass("text-bad");
+  });
+
+  it("on a phone, filters by contracting with a select", async () => {
+    renderScreen();
+    const select = screen.getByRole("combobox", { name: "Contratación" });
+    expect(within(select).getByRole("option", { name: "Con sobrecoste · 3" })).toBeInTheDocument();
+    await userEvent.selectOptions(select, "overrun");
+    expect(params()).toEqual({ estado: "overrun" });
+    expect(screen.getByRole("button", { name: /^Con sobrecoste/ })).toHaveAttribute("aria-pressed", "true");
+    expect(cards().getAllByRole("button").map((b) => b.getAttribute("aria-controls"))).toEqual(["costs-card-06", "costs-card-05"]);
   });
 });

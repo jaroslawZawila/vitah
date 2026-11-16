@@ -12,6 +12,8 @@ import { obraHref, StagePill } from "../[id]/components/construction/ObraFrame";
 import type { ProjectRow } from "../project-list";
 import BudgetPill from "./budgets/BudgetPill";
 import { AttentionPill, AttentionText, ProgressFigure, SchedulePill } from "./ProjectSignals";
+import { cn } from "@/lib/utils";
+import { touchLink } from "../../components/touch";
 
 const projectHref = (id: string) => `/dashboard/projects/${id}`;
 
@@ -60,7 +62,7 @@ export default function ProjectsTable({ rows }: { rows: ProjectRow[] }) {
             {rows.map((row) => (
               <TableRow key={row.id}>
                 <TableCell className="min-w-44 whitespace-normal">
-                  <Link href={projectHref(row.id)} className="num font-semibold text-primary underline-offset-2 hover:underline pointer-coarse:inline-flex pointer-coarse:min-h-11 pointer-coarse:items-center">
+                  <Link href={projectHref(row.id)} className={cn("num font-semibold text-primary underline-offset-2 hover:underline", touchLink)}>
                     {row.ref}
                   </Link>
                   <span className="block">{row.address}</span>

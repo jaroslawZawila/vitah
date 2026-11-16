@@ -18,7 +18,7 @@ export default function Segmented<K extends string>({
     <div
       role="group"
       aria-label={label}
-      className={cn("inline-flex max-w-full gap-0.5 overflow-x-auto rounded-[10px] border bg-raise p-[3px]", className)}
+      className={cn("relative inline-flex max-w-full gap-0.5 overflow-x-auto rounded-[10px] border bg-raise p-[3px]", className)}
     >
       {options.map((option) => (
         <button
@@ -26,7 +26,7 @@ export default function Segmented<K extends string>({
           type="button"
           aria-pressed={value === option.key}
           onClick={() => onChange(option.key)}
-          className="inline-flex min-h-[34px] flex-none cursor-pointer items-center gap-1.5 rounded-[7px] px-3 text-sm whitespace-nowrap text-muted-foreground transition-colors hover:text-foreground pointer-coarse:min-h-11 aria-pressed:bg-card aria-pressed:font-semibold aria-pressed:text-foreground aria-pressed:shadow-card"
+          className="inline-flex min-h-[34px] flex-none cursor-pointer items-center justify-center gap-1.5 rounded-[7px] px-3 text-sm whitespace-nowrap text-muted-foreground transition-colors hover:text-foreground pointer-coarse:min-h-11 pointer-coarse:min-w-11 aria-pressed:bg-card aria-pressed:font-semibold aria-pressed:text-foreground aria-pressed:shadow-card"
         >
           {option.label}
           {option.count !== undefined && <span className="num text-muted-foreground">{option.count}</span>}

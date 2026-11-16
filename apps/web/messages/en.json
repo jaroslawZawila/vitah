@@ -45,7 +45,8 @@
       "payments": "Payments",
       "documents": "Documents",
       "purchases": "Purchasing",
-      "warranty": "Warranty"
+      "warranty": "Warranty",
+      "backToProjects": "Back to projects"
     },
     "network": "Network",
     "subcontractors": "Subcontractors",
@@ -1100,6 +1101,8 @@
       "after": "Now",
       "recorded": "Recorded",
       "by": "By",
+      "recordedOn": "Recorded on <num>{date}</num>",
+      "recordedOnBy": "Recorded on <num>{date}</num> by {by}",
       "row": {
         "start": "Actual start",
         "finish": "Actual end",
@@ -1479,8 +1482,14 @@
       "onlyCritical": "Critical path only",
       "critical": "Critical",
       "late": "{days} vs. baseline",
-      "lateLong": "{days} past the baseline",
-      "barLabel": "Forecast {forecast}; baseline {baseline}"
+      "barLabel": "Forecast {forecast}; baseline {baseline}",
+      "planned": "Baseline",
+      "actual": "Actual",
+      "actualSince": "since {date} · {pct} %",
+      "duration": "Duration",
+      "workingDays": "{count, plural, one {# working day} other {# working days}}",
+      "waitsFor": "Starts",
+      "order": "Order by"
     },
     "legend": {
       "finished": "Finished",
@@ -4236,7 +4245,8 @@
     "results": "Sites",
     "noMatch": "No site matches.",
     "current": "current site",
-    "count": "{count, plural, =0 {No site} one {# site} other {# sites}}"
+    "count": "{count, plural, =0 {No site} one {# site} other {# sites}}",
+    "change": "Change site"
   },
   "budgetsOverview": {
     "pill": {

@@ -29,8 +29,8 @@ describe("SupplierScreen", () => {
 
     const orders = within(screen.getByRole("region", { name: /Pedidos/ }));
     expect(orders.getAllByRole("link", { name: "PED-004" })[0]).toHaveAttribute("href", "/dashboard/projects/p-1/compras/order-4");
-    expect(within(screen.getByRole("region", { name: /Facturas/ })).getByRole("link", { name: "MSN-2026/148" })).toBeInTheDocument();
-    expect(within(screen.getByRole("region", { name: /Pagos/ })).getByText("15.000,00")).toBeInTheDocument();
+    expect(within(screen.getByRole("region", { name: /Facturas/ })).getAllByRole("link", { name: "MSN-2026/148" })).toHaveLength(2);
+    expect(within(screen.getByRole("region", { name: /Pagos/ })).getAllByText("15.000,00")).toHaveLength(2);
     expect(screen.getByRole("link", { name: /Volver/ })).toHaveAttribute("href", "/dashboard/compras/proveedores");
   });
 });

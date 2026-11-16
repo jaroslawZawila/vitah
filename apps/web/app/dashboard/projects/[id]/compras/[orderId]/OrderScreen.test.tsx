@@ -69,6 +69,10 @@ describe("OrderScreen", () => {
     expect(within(row).getByText("400,00")).toBeInTheDocument();
     expect(within(row).getByText("Sí")).toBeInTheDocument();
     expect(within(row).getByText(/\+196,00/)).toHaveClass("text-bad");
+    // On a phone the headings are hidden and the row is a card: each figure says what it is.
+    for (const label of ["Coste presup.", "Otros pedidos", "Este pedido", "Cierra", "Desviación"]) {
+      expect(within(row).getByText(label)).toBeInTheDocument();
+    }
 
     const data = within(screen.getByRole("region", { name: "Datos" }));
     expect(data.getByText("3 oct 2026")).toBeInTheDocument();
@@ -253,7 +257,8 @@ describe("OrderScreen", () => {
       const schedule = within(screen.getByRole("region", { name: "Hitos de pago del contrato" }));
       const second = schedule.getByText("Entrega en obra").closest("tr")!;
       expect(within(second).getByText("34,48")).toBeInTheDocument();
-      expect(within(second).getByText("Factura")).toBeInTheDocument();
+      // Its state pill, and the phone's name for the invoice column.
+      expect(within(second).getAllByText("Factura")).toHaveLength(2);
       expect(within(second).getByRole("link", { name: "MSN-2026/148" })).toHaveAttribute("href", "/dashboard/compras/facturas/inv-148");
       expect(schedule.getByText("✓ Cuadra con el pedido")).toBeInTheDocument();
       expect(schedule.getByText("28.200,00")).toBeInTheDocument();

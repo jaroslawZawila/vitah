@@ -5,6 +5,8 @@ import { useTranslations } from "next-intl";
 import type { BudgetRevision } from "@repo/core/contract";
 import { Badge } from "@/components/ui/badge";
 import { cardVariants } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
+import { touchStretch } from "../../../../components/touch";
 import { cardHead, codeChip, columns, muted, table } from "../obra/classes";
 import { useObraFormat } from "../obra/format";
 import InlinePct from "./InlinePct";
@@ -53,7 +55,7 @@ export default function ChapterSummary({
           const { computed: contingency, lineCount } = chapter;
           const estimated = chapter.lines.filter((l) => l.source === "estimated").length;
           return (
-            <div role="row" key={chapter.id} className={table.row}>
+            <div role="row" key={chapter.id} className={cn(table.row, "pointer-coarse:relative")}>
               <span role="cell" className={codeChip}>{chapter.code}</span>
               <span role="cell" className={table.name}>
                 {contingency ? (
@@ -61,7 +63,8 @@ export default function ChapterSummary({
                     {chapter.name} <span className={muted}>{t("contingencyHint")}</span>
                   </>
                 ) : (
-                  <Link href={hrefOf(chapter.code)} className={table.nameLink}>{chapter.name}</Link>
+                  // On a touch screen the whole row opens the chapter.
+                  <Link href={hrefOf(chapter.code)} className={cn(table.nameLink, touchStretch)}>{chapter.name}</Link>
                 )}
               </span>
               <span role="cell" className={`num text-muted-foreground ${table.right}`}>

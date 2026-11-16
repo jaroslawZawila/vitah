@@ -75,6 +75,17 @@ describe("WorkersTable", () => {
     expect(within(row).getByText("Falta: Recibo de entrega de EPIs")).toBeInTheDocument();
   });
 
+  it("shows each worker as a card on phones, opening their page, with the documents labelled", () => {
+    wrap(<WorkersTable {...props} workers={[marcos]} />);
+    const card = within(screen.getAllByRole("link", { name: "Marcos Revuelta Gil" })[0]!.closest("li")!);
+
+    expect(card.getByRole("link", { name: "Marcos Revuelta Gil" })).toHaveAttribute("href", "/dashboard/subcontratas/trabajadores/w-1");
+    expect(card.getByText("72•••018Z")).toBeInTheDocument();
+    expect(card.getByText("Pendiente")).toBeInTheDocument();
+    expect(card.getByText("Falta: Recibo de entrega de EPIs")).toBeInTheDocument();
+    for (const heading of ["Alta SS", "TPC", "EPIs"]) expect(card.getByText(heading)).toBeInTheDocument();
+  });
+
   it("asks the container to filter", async () => {
     wrap(<WorkersTable {...props} workers={[marcos, sergio]} />);
     await userEvent.click(screen.getByRole("button", { name: /Bloqueados/ }));

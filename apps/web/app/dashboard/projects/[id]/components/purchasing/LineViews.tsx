@@ -18,6 +18,8 @@ import {
   requestsViewHref,
   purchasesHref,
 } from "./links";
+import { cn } from "@/lib/utils";
+import { touchLink } from "../../../../components/touch";
 
 // Presentational: the project's Compras by budget line (the four states), its
 // figures and its invoices due. The container (PurchaseLinesScreen) filters.
@@ -158,7 +160,7 @@ export function DueBanner({
       </div>
       <Link
         href={INVOICES_HREF}
-        className="font-semibold whitespace-nowrap underline"
+        className={cn("font-semibold whitespace-nowrap underline", touchLink)}
       >
         {t("link")}
       </Link>

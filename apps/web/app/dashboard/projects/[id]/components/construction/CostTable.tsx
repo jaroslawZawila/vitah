@@ -8,19 +8,20 @@ import { Badge } from "@/components/ui/badge";
 import { cardVariants } from "@/components/ui/card";
 import { Table, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import { touchLink } from "../../../../components/touch";
 import type { CostRollup } from "./cost-rollup";
 import FoldRow from "./FoldRow";
 import { deviationTone, useControlFormat } from "./format";
 import { ChapterStatePill, Dot } from "./pills";
 
 /** The orders that contract a line, each linked; a late delivery flagged. */
-function LineOrders({ line, orderHref }: { line: CostLine; orderHref: (orderId: string) => string }) {
+export function LineOrders({ line, orderHref }: { line: CostLine; orderHref: (orderId: string) => string }) {
   const t = useTranslations("construction.costs");
   return (
     <ul className="m-0 flex list-none flex-col gap-0.5 p-0 text-meta">
       {line.orders.map((order) => (
         <li key={order.id} className="flex flex-wrap items-center gap-x-1.5">
-          <Link href={orderHref(order.id)} className="num font-medium text-brand-ink hover:text-primary">
+          <Link href={orderHref(order.id)} className={cn("num font-medium text-brand-ink hover:text-primary", touchLink)}>
             {orderLabel(order.number)}
           </Link>
           <span>{order.supplierName}</span>
@@ -45,6 +46,67 @@ function LineOrders({ line, orderHref }: { line: CostLine; orderHref: (orderId: 
 }
 
 export type CostChapter = ConstructionCosts["chapters"][number] & { rollup: CostRollup };
+
+/** A folded chapter's name, its line count and what needs a look (in progress, overruns, late deliveries). */
+export function ChapterLabel({ chapter }: { chapter: CostChapter }) {
+  const t = useTranslations("construction.costs");
+  const { rollup } = chapter;
+  return (
+    <>
+      <b className="min-w-0">{chapter.name}</b>
+      <span className="text-meta text-muted-foreground">{t("lineCount", { count: rollup.lines })}</span>
+      {chapter.state === "in_progress" && <ChapterStatePill state={chapter.state} />}
+      {rollup.overruns > 0 && (
+        <Badge variant="destructive" className="px-2 py-px">
+          <Dot />
+          {t("overruns", { count: rollup.overruns })}
+        </Badge>
+      )}
+      {rollup.lateOrders > 0 && (
+        <Badge variant="warn" className="px-2 py-px">
+          <Dot />
+          {t("lateOrders", { count: rollup.lateOrders })}
+        </Badge>
+      )}
+    </>
+  );
+}
+
+/** How far a chapter's lines are contracted: a bar, "3 of 7 closed · 1 open", and "Pedir" while nothing is. */
+export function ChapterContracting({
+  chapter,
+  newOrderHref,
+  className,
+}: {
+  chapter: CostChapter;
+  newOrderHref?: (chapterCode: string) => string;
+  className?: string;
+}) {
+  const t = useTranslations("construction.costs");
+  const { closed, open } = chapter.rollup;
+  const share = (n: number) => `${(n / (chapter.lines.length || 1)) * 100}%`;
+  return (
+    <span className={cn("flex items-center gap-x-2 text-meta whitespace-nowrap text-muted-foreground", className)}>
+      <span aria-hidden className="relative flex h-1.5 w-12 flex-none overflow-hidden rounded-full bg-border">
+        <span className="bg-primary" style={{ width: share(closed) }} />
+        <span className="bg-primary/40" style={{ width: share(open) }} />
+      </span>
+      <span>
+        {t("closedOf", { closed, total: chapter.lines.length })}
+        {open > 0 && ` · ${t("openCount", { count: open })}`}
+      </span>
+      {newOrderHref && closed + open === 0 && (
+        <Link
+          href={newOrderHref(chapter.code)}
+          onClick={(event) => event.stopPropagation()}
+          className={cn("font-semibold text-brand-ink hover:text-primary pointer-coarse:justify-center", touchLink)}
+        >
+          {t("order")}
+        </Link>
+      )}
+    </span>
+  );
+}
 
 /** A chapter's (or the obra's) figures folded: its cost, what is contracted, `orders`, its deviation and its share. */
 function RollupCells({ rollup, orders }: { rollup: CostRollup; orders?: ReactNode }) {
@@ -97,7 +159,8 @@ export default function CostTable({
   const f = useControlFormat();
 
   return (
-    <section className={cn(cardVariants({ size: "flush" }), "py-1.5")} aria-label={t("tableLabel")}>
+    // From 768px; below it, CostCards.
+    <section className={cn(cardVariants({ size: "flush" }), "hidden py-1.5 md:flex")} aria-label={t("tableLabel")}>
       {chapters.length === 0 ? (
         <p className="px-[18px] py-6 text-center text-sm text-muted-foreground">{t("noMatch")}</p>
       ) : (
@@ -116,8 +179,6 @@ export default function CostTable({
           {chapters.map((chapter) => {
             const open = expanded(chapter.code);
             const { rollup } = chapter;
-            const { closed, open: opened } = rollup;
-            const share = (n: number) => `${(n / (chapter.lines.length || 1)) * 100}%`;
             const body = `costs-chapter-${chapter.code}`;
             return (
               <Fragment key={chapter.code}>
@@ -128,50 +189,9 @@ export default function CostTable({
                     controls={body}
                     onToggle={() => onToggle(chapter.code)}
                     colSpan={2}
-                    label={
-                      <>
-                        <b className="min-w-0">{chapter.name}</b>
-                        <span className="text-meta text-muted-foreground">{t("lineCount", { count: rollup.lines })}</span>
-                        {chapter.state === "in_progress" && <ChapterStatePill state={chapter.state} />}
-                        {rollup.overruns > 0 && (
-                          <Badge variant="destructive" className="px-2 py-px">
-                            <Dot />
-                            {t("overruns", { count: rollup.overruns })}
-                          </Badge>
-                        )}
-                        {rollup.lateOrders > 0 && (
-                          <Badge variant="warn" className="px-2 py-px">
-                            <Dot />
-                            {t("lateOrders", { count: rollup.lateOrders })}
-                          </Badge>
-                        )}
-                      </>
-                    }
+                    label={<ChapterLabel chapter={chapter} />}
                   >
-                    <RollupCells
-                      rollup={rollup}
-                      orders={
-                        <span className="flex items-center gap-x-2 text-meta whitespace-nowrap text-muted-foreground">
-                          <span aria-hidden className="relative flex h-1.5 w-12 flex-none overflow-hidden rounded-full bg-border">
-                            <span className="bg-primary" style={{ width: share(closed) }} />
-                            <span className="bg-primary/40" style={{ width: share(opened) }} />
-                          </span>
-                          <span>
-                            {t("closedOf", { closed, total: chapter.lines.length })}
-                            {opened > 0 && ` · ${t("openCount", { count: opened })}`}
-                          </span>
-                          {newOrderHref && closed + opened === 0 && (
-                            <Link
-                              href={newOrderHref(chapter.code)}
-                              onClick={(event) => event.stopPropagation()}
-                              className="font-semibold text-brand-ink hover:text-primary pointer-coarse:inline-flex pointer-coarse:min-h-11 pointer-coarse:items-center"
-                            >
-                              {t("order")}
-                            </Link>
-                          )}
-                        </span>
-                      }
-                    />
+                    <RollupCells rollup={rollup} orders={<ChapterContracting chapter={chapter} newOrderHref={newOrderHref} />} />
                   </FoldRow>
                 </tbody>
                 <tbody id={body}>

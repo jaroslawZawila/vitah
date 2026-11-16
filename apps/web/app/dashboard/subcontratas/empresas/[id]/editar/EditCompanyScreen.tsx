@@ -17,6 +17,8 @@ import { companyHref } from "../../../components/display";
 import ActivityFields from "../../../components/fields/ActivityFields";
 import CompanyDataFields from "../../../components/fields/CompanyDataFields";
 import { activityComplete, companyDataComplete, type CompanyFormDraft } from "../../../components/fields/draft";
+import { cn } from "@/lib/utils";
+import { touchLink } from "../../../../components/touch";
 
 export default function EditCompanyScreen({ id, initial }: { id: string; initial: CompanyFormDraft }) {
   const t = useTranslations("subcontractors.edit");
@@ -40,7 +42,7 @@ export default function EditCompanyScreen({ id, initial }: { id: string; initial
   return (
     <form className="flex max-w-[860px] flex-col gap-5" onSubmit={handleSubmit} aria-labelledby="edit-company-title">
       <header className="flex flex-col gap-1.5">
-        <Link className="text-meta text-muted-foreground hover:text-foreground" href={companyHref(id)}>
+        <Link className={cn("w-fit text-meta text-muted-foreground hover:text-foreground", touchLink)} href={companyHref(id)}>
           ← {initial.legalName}
         </Link>
         <h1 id="edit-company-title">{t("title")}</h1>

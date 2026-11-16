@@ -160,6 +160,10 @@ describe("ComprasScreen", () => {
     const stone = table.getByRole("link", { name: "Piedra de Liébana" });
     expect(stone).toHaveAttribute("href", "/dashboard/subcontratas/empresas/sup-liebana");
     expect(stone.closest("tr")).toHaveTextContent("Proveedor de material");
+    // On a phone the headings are hidden and each row is a card: each figure says what it is.
+    for (const label of ["Pedidos", "Obras", "Contratado · sin IVA", "Abierto · sin IVA"]) {
+      expect(within(stone.closest("tr")!).getByText(label)).toBeInTheDocument();
+    }
     expect(screen.queryByRole("navigation", { name: "Páginas" })).not.toBeInTheDocument();
   });
 

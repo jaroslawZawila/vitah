@@ -12,6 +12,8 @@ import { Label } from "@/components/ui/label";
 import FormError from "../../../../components/FormError";
 import FileSlot from "../../../../subcontratas/empresas/nueva/steps/FileSlot";
 import { day, usePurchaseFormat } from "./format";
+import { cn } from "@/lib/utils";
+import { touchLink } from "../../../../components/touch";
 
 // Presentational: an order's documents (the order, the signed contract, its
 // annexes, the offer…), each in versions. The container (OrderScreen) runs
@@ -177,7 +179,7 @@ export function OrderDocuments({
                 </div>
                 {current && (
                   <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-                    <a href={documentUrl(document.id)} download className="inline-flex items-center gap-1.5 font-medium text-brand-ink hover:text-primary">
+                    <a href={documentUrl(document.id)} download className={cn("inline-flex items-center gap-1.5 font-medium text-brand-ink hover:text-primary", touchLink)}>
                       <FileText aria-hidden className="size-4 flex-none" />
                       {current.filename}
                     </a>
@@ -192,7 +194,7 @@ export function OrderDocuments({
                   <ul className="m-0 flex list-none flex-col gap-1 p-0 pl-5 text-meta text-muted-foreground">
                     {older.map((version) => (
                       <li key={version.id} className="flex flex-wrap items-center gap-x-2">
-                        <a href={documentUrl(document.id, version.id)} download className="inline-flex items-center gap-1 hover:text-foreground">
+                        <a href={documentUrl(document.id, version.id)} download className={cn("inline-flex items-center gap-1 hover:text-foreground", touchLink)}>
                           <FileText aria-hidden className="size-3.5 flex-none" />
                           {t("version", { version: version.version })} · {version.filename}
                         </a>

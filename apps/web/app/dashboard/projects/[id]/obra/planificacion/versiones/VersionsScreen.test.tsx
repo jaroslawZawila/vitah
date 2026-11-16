@@ -39,6 +39,15 @@ describe("VersionsScreen", () => {
     expect(painting.getByText("+7 d")).toBeInTheDocument();
   });
 
+  it("lists on a phone the chapters whose dates changed, both versions' dates under each", () => {
+    renderScreen();
+    const changes = within(screen.getByRole("list", { name: "1 capítulo cambia de fechas" }));
+    const painting = within(changes.getByText("Pinturas y varios").closest("li")!);
+    expect(painting.getByText("v1: 16 nov 2026 – 3 dic 2026")).toBeInTheDocument();
+    expect(painting.getByText("v2: 23 nov 2026 – 10 dic 2026")).toBeInTheDocument();
+    expect(painting.getByText("+7 d")).toHaveClass("text-warn");
+  });
+
   it("shows the first version on its own, and the draft against the baseline", async () => {
     renderScreen();
     await userEvent.click(list().getByRole("button", { name: /Línea base v1/ }));

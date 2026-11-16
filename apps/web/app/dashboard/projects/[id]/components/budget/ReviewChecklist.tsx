@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { cardHead, muted } from "../obra/classes";
 import { useObraFormat } from "../obra/format";
 import ProgressBar from "../obra/ProgressBar";
+import { touchLink } from "../../../../components/touch";
 
 const KIND_VARIANT = { inconsistency: "warn", assumption: "info", estimated: "yel", ratio: "outline" } as const;
 const KINDS = ["inconsistency", "assumption", "estimated", "ratio"] as const;
@@ -151,7 +152,7 @@ export default function ReviewChecklist({
         })}
       </ul>
       {limit && checks.length > limit && allHref && (
-        <Link href={allHref} className="border-t pt-2.5 text-sm font-semibold text-brand-ink hover:underline">
+        <Link href={allHref} className={cn("border-t pt-2.5 text-sm font-semibold text-brand-ink hover:underline", touchLink)}>
           {t("all", { count: checks.length })}
         </Link>
       )}

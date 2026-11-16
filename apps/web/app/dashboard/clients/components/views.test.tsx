@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
 import type { ReactNode } from "react";
@@ -66,13 +66,17 @@ describe("ClientForm", () => {
 });
 
 describe("ClientList", () => {
-  it("shows the client's details", () => {
+  it("shows the client's details in the table and, for phones, in a card", () => {
     wrap(<ClientList clients={[ana]} onSetPassword={() => {}} onClearDeletionRequest={() => {}} />);
 
-    expect(screen.getByText("Ana García López")).toBeInTheDocument();
-    expect(screen.getByText("+34 600 123 456")).toBeInTheDocument();
-    expect(screen.getByText("Calle del Sol 5")).toBeInTheDocument();
-    expect(screen.getByText("Activo")).toBeInTheDocument();
+    for (const view of [within(screen.getByRole("table")), within(screen.getByRole("list"))]) {
+      expect(view.getByText("Ana García López")).toBeInTheDocument();
+      expect(view.getByText("ana@example.com")).toBeInTheDocument();
+      expect(view.getByText("+34 600 123 456")).toBeInTheDocument();
+      expect(view.getByText("Calle del Sol 5")).toBeInTheDocument();
+      expect(view.getByText("Activo")).toBeInTheDocument();
+      expect(view.getByRole("button", { name: "Cambiar contraseña de Ana García López" })).toBeInTheDocument();
+    }
   });
 
   it("asks to set the password of the chosen client", async () => {
@@ -80,9 +84,13 @@ describe("ClientList", () => {
     wrap(<ClientList clients={[ana]} onSetPassword={onSetPassword} onClearDeletionRequest={() => {}} />);
 
     await userEvent.click(
-      screen.getByRole("button", { name: "Cambiar contraseña de Ana García López" }),
+      within(screen.getByRole("table")).getByRole("button", { name: "Cambiar contraseña de Ana García López" }),
+    );
+    await userEvent.click(
+      within(screen.getByRole("list")).getByRole("button", { name: "Cambiar contraseña de Ana García López" }),
     );
 
+    expect(onSetPassword).toHaveBeenCalledTimes(2);
     expect(onSetPassword).toHaveBeenCalledWith(ana);
   });
 
@@ -91,11 +99,15 @@ describe("ClientList", () => {
     const luis = { ...ana, id: "client-2", firstName: "Luis", deletionRequestedAt: "2026-11-12T09:30:00.000Z" };
     wrap(<ClientList clients={[ana, luis]} onSetPassword={() => {}} onClearDeletionRequest={onClear} />);
 
-    expect(screen.getAllByText(/^Baja solicitada · /)).toHaveLength(1);
-    expect(screen.getByText("Baja solicitada · 12 nov 2026")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Marcar como atendida la baja de Ana García López" })).toBeNull();
+    for (const view of [within(screen.getByRole("table")), within(screen.getByRole("list"))]) {
+      expect(view.getAllByText(/^Baja solicitada · /)).toHaveLength(1);
+      expect(view.getByText("Baja solicitada · 12 nov 2026")).toBeInTheDocument();
+      expect(view.queryByRole("button", { name: "Marcar como atendida la baja de Ana García López" })).toBeNull();
+    }
 
-    await userEvent.click(screen.getByRole("button", { name: "Marcar como atendida la baja de Luis García López" }));
+    await userEvent.click(
+      within(screen.getByRole("list")).getByRole("button", { name: "Marcar como atendida la baja de Luis García López" }),
+    );
 
     expect(onClear).toHaveBeenCalledWith(luis);
   });

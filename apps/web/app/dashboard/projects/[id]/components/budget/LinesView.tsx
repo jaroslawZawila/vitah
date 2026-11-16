@@ -71,14 +71,14 @@ export default function LinesView({
     <div className="flex flex-col gap-4.5 xl:flex-row xl:items-start">
       <nav aria-label={t("chapters")} className={cn(cardVariants(), "gap-0.5 p-2.5 xl:w-[240px] xl:flex-none")}>
         <span className="eyebrow px-2.5 pt-1.5 pb-2">{t("chapters")}</span>
-        <div className="flex gap-1 overflow-x-auto xl:flex-col xl:overflow-visible">
+        <div className="relative flex gap-1 overflow-x-auto xl:flex-col xl:overflow-visible">
           {revision.chapters.map((c) => (
             <Link
               key={c.id}
               href={hrefOf(c.code)}
               aria-current={c.code === chapter.code ? "page" : undefined}
               className={cn(
-                "grid min-h-10 flex-none grid-cols-[34px_minmax(0,1fr)_auto] items-center gap-2 rounded-[9px] border-l-[3px] border-transparent px-2.5 text-sm hover:bg-raise xl:flex-auto",
+                "grid min-h-10 flex-none grid-cols-[34px_minmax(0,1fr)_auto] items-center gap-2 rounded-[9px] border-l-[3px] pointer-coarse:min-h-11 border-transparent px-2.5 text-sm hover:bg-raise xl:flex-auto",
                 c.code === chapter.code && "border-l-primary bg-brand-soft font-semibold",
               )}
             >
@@ -88,7 +88,7 @@ export default function LinesView({
             </Link>
           ))}
           <span className="my-1.5 hidden border-t xl:block" />
-          <Link href={optionsHref} className="grid min-h-10 flex-none grid-cols-[34px_minmax(0,1fr)_auto] items-center gap-2 rounded-[9px] px-2.5 text-sm hover:bg-raise xl:flex-auto">
+          <Link href={optionsHref} className="grid min-h-10 flex-none grid-cols-[34px_minmax(0,1fr)_auto] items-center gap-2 rounded-[9px] px-2.5 pointer-coarse:min-h-11 text-sm hover:bg-raise xl:flex-auto">
             <span className="num text-muted-foreground">OP</span>
             <span className="hidden truncate xl:block">{t("options")}</span>
             <span className="num hidden text-xs text-muted-foreground xl:block">{revision.options.length}</span>

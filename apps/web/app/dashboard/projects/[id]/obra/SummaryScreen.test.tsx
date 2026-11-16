@@ -143,6 +143,44 @@ describe("SummaryScreen", () => {
     expect(within(roof).getByText("+2.544,00")).toContainElement(within(roof).getByText("+4,6 %"));
   });
 
+  it("on a phone, lists the chapters as items: name linking over the item, state, dates, schedule and money", async () => {
+    renderScreen();
+
+    // The phone's list sits beside the table (CSS picks one), grouped by state the same way.
+    const phone = (name: string) =>
+      screen
+        .getAllByRole("link", { name })
+        .find((link) => !link.closest("table"))!
+        .closest("li")!;
+    expect(screen.getAllByRole("region", { name: "En curso · 2" })).toHaveLength(1);
+    expect(screen.getAllByRole("heading", { level: 3, name: "En curso · 2" })).toHaveLength(1);
+
+    const envelope = phone("Envolvente térmica Thermochip");
+    expect(within(envelope).getByRole("link")).toHaveAttribute("href", "/dashboard/projects/p-1/obra/avance/06");
+    expect(within(envelope).getByRole("link").className).toContain("after:inset-0");
+    expect(envelope).toHaveClass("relative");
+    expect(within(envelope).getByText("En curso")).toBeInTheDocument();
+    expect(within(envelope).getByText("Fin superado +8 d")).toBeInTheDocument();
+    expect(envelope).toHaveTextContent("Hito H4");
+    expect(envelope).toHaveTextContent("Plan14 sept 2026 – 9 oct 2026");
+    expect(envelope).toHaveTextContent("Real21 sept 2026 – …");
+    expect(within(envelope).getByText("Coste presup.").nextElementSibling).toHaveTextContent("34.840,00");
+    expect(within(envelope).getByText("Contratado").nextElementSibling).toHaveTextContent("30.400,00 6/9");
+    expect(within(envelope).getByText("−440,00").closest("span.block")).toHaveClass("text-good");
+    expect(within(envelope).getByText("· −1,4 %")).toBeInTheDocument();
+
+    // Pending: no actual dates, nothing contracted (a dash, never a zero).
+    const pending = phone("Electricidad e iluminación");
+    expect(pending).not.toHaveTextContent("Real");
+    expect(within(pending).getByText("empieza en 2 d")).toBeInTheDocument();
+    expect(within(pending).getByText("Contratado").nextElementSibling).toHaveTextContent("—");
+
+    // Filtering applies to the list too.
+    await userEvent.click(within(screen.getByRole("group", { name: "Estado" })).getByRole("button", { name: "Finalizado" }));
+    expect(screen.queryAllByRole("link", { name: "Envolvente térmica Thermochip" })).toHaveLength(0);
+    expect(screen.getAllByRole("link", { name: "Cubierta inclinada" })).toHaveLength(2);
+  });
+
   it("filters the chapters by chapter, state and period", async () => {
     renderScreen();
     expect(chapterRows()).toHaveLength(6);

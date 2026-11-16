@@ -27,6 +27,30 @@ import { usePurchaseFormat } from "./format";
 import type { LineRollup } from "./line-rollup";
 import { InvoiceStatePill, PROGRESS_TONE, ProgressPill } from "./pills";
 import { LineDetail } from "./LineOrders";
+import { phoneLabel } from "../../../../components/phone-table";
+
+/**
+ * Below 768px the table reflows (the same elements): each row a block whose
+ * first cell (the chapter's or line's button) and last (its states) take the
+ * width, and its figures go two by two, each under its column's name.
+ */
+const phone = {
+  table: "max-md:block",
+  body: "max-md:block max-md:[&>tr]:grid max-md:[&>tr]:grid-cols-2 max-md:[&>tr]:gap-x-3 max-md:[&>tr]:gap-y-2 max-md:[&>tr]:pb-3 max-md:[&>tr>td:first-child]:col-span-2 max-md:[&>tr>td:last-child]:col-span-2",
+  figure: "max-md:flex max-md:flex-col max-md:items-start max-md:px-[18px] max-md:py-0 max-md:text-left",
+  wide: "max-md:px-[18px] max-md:py-0",
+  label: phoneLabel,
+};
+
+/** A figure's cell, named on phones. */
+function FigureCell({ label, className, children }: { label: string; className?: string; children: React.ReactNode }) {
+  return (
+    <TableCell className={cn("num text-right", className, phone.figure)}>
+      <span className={phone.label}>{label}</span>
+      {children}
+    </TableCell>
+  );
+}
 
 export type LineChapter = ProjectPurchaseLines["chapters"][number] & {
   rollup: LineRollup;
@@ -36,32 +60,31 @@ export type LineChapter = ProjectPurchaseLines["chapters"][number] & {
 
 /** A chapter's money folded (or the obra's): cost, contracted, deviation, invoiced and paid. */
 function RollupCells({ rollup }: { rollup: LineRollup }) {
+  const t = useTranslations("purchasing.lines");
   const f = usePurchaseFormat();
   const amount = (cents: number) => (cents ? f.amount(cents) : "—");
   return (
     <>
-      <TableCell className="num text-right font-semibold">
+      <FigureCell label={t("cost")} className="font-semibold">
         {f.amount(rollup.costCents)}
-      </TableCell>
-      <TableCell className="num text-right font-semibold">
+      </FigureCell>
+      <FigureCell label={t("contracted")} className="font-semibold">
         {amount(rollup.contractedCents)}
-      </TableCell>
-      <TableCell
-        className={cn(
-          "num text-right font-semibold",
-          deviationTone(rollup.deviationCents),
-        )}
+      </FigureCell>
+      <FigureCell
+        label={t("deviation")}
+        className={cn("font-semibold", deviationTone(rollup.deviationCents))}
       >
         {rollup.deviationCents === null
           ? "—"
           : f.signedAmount(rollup.deviationCents)}
-      </TableCell>
-      <TableCell className="num text-right font-semibold">
+      </FigureCell>
+      <FigureCell label={t("invoiced")} className="font-semibold">
         {amount(rollup.invoicedCents)}
-      </TableCell>
-      <TableCell className="num text-right font-semibold">
+      </FigureCell>
+      <FigureCell label={t("paid")} className="font-semibold">
         {amount(rollup.paidCents)}
-      </TableCell>
+      </FigureCell>
     </>
   );
 }
@@ -118,7 +141,7 @@ function ChapterRow({
       }
     >
       <RollupCells rollup={rollup} />
-      <TableCell className="pr-[18px] whitespace-normal">
+      <TableCell className={cn("pr-[18px] whitespace-normal", phone.wide)}>
         <span className="flex flex-wrap items-center gap-1">
           {PURCHASE_PROGRESS.filter((key) => rollup.counts[key] > 0).map(
             (key) => (
@@ -177,8 +200,8 @@ export function LineTable({
       </p>
     );
   return (
-    <Table className="min-w-[940px]">
-      <TableHeader>
+    <Table className={cn(phone.table, "md:min-w-[940px]")}>
+      <TableHeader className="max-md:hidden">
         <TableRow>
           <TableHead className="pl-[18px]">{t("line")}</TableHead>
           <TableHead className="text-right">{t("cost")}</TableHead>
@@ -194,7 +217,7 @@ export function LineTable({
         const folded = !open(chapter.code);
         return (
           <Fragment key={chapter.code}>
-            <tbody>
+            <tbody className={phone.body}>
               <ChapterRow
                 chapter={chapter}
                 open={!folded}
@@ -202,7 +225,7 @@ export function LineTable({
                 onToggle={() => onToggleChapter(chapter.code)}
               />
             </tbody>
-            <tbody id={body}>
+            <tbody id={body} className={phone.body}>
               {!folded &&
                 chapter.lines.map((line) => {
                   const lineOpen = expanded(line.lineageId);
@@ -235,21 +258,21 @@ export function LineTable({
                             <span className="min-w-0">{line.description}</span>
                           </button>
                         </TableCell>
-                        <TableCell className="num text-right">
+                        <FigureCell label={t("cost")}>
                           {f.amount(line.costCents)}
-                        </TableCell>
-                        <TableCell className="num text-right">
+                        </FigureCell>
+                        <FigureCell label={t("contracted")}>
                           {line.contracting === "none"
                             ? "—"
                             : f.amount(line.contractedCents)}
-                        </TableCell>
-                        <TableCell
-                          className={cn(
-                            "num text-right",
+                        </FigureCell>
+                        <FigureCell
+                          label={t("deviation")}
+                          className={
                             line.deviationCents === null
                               ? "text-muted-foreground"
-                              : deviationTone(line.deviationCents),
-                          )}
+                              : deviationTone(line.deviationCents)
+                          }
                         >
                           {line.deviationCents !== null ? (
                             f.signedAmount(line.deviationCents)
@@ -262,16 +285,16 @@ export function LineTable({
                           ) : (
                             "—"
                           )}
-                        </TableCell>
-                        <TableCell className="num text-right">
+                        </FigureCell>
+                        <FigureCell label={t("invoiced")}>
                           {line.invoicedCents
                             ? f.amount(line.invoicedCents)
                             : "—"}
-                        </TableCell>
-                        <TableCell className="num text-right">
+                        </FigureCell>
+                        <FigureCell label={t("paid")}>
                           {line.paidCents ? f.amount(line.paidCents) : "—"}
-                        </TableCell>
-                        <TableCell className="pr-[18px]">
+                        </FigureCell>
+                        <TableCell className={cn("pr-[18px]", phone.wide)}>
                           <span className="flex flex-wrap items-center gap-1.5">
                             <ProgressPill progress={line.progress} />
                             {line.overdue && (
@@ -284,7 +307,7 @@ export function LineTable({
                         <TableRow className="hover:bg-transparent">
                           <TableCell
                             colSpan={7}
-                            className="bg-raise/40 py-3 pr-[18px] pl-[44px] whitespace-normal"
+                            className="bg-raise/40 py-3 pr-[18px] pl-[44px] whitespace-normal max-md:pl-[18px]"
                           >
                             <LineDetail
                               projectId={projectId}
@@ -303,13 +326,13 @@ export function LineTable({
         );
       })}
       {total && (
-        <TableFooter>
+        <TableFooter className={phone.body}>
           <TableRow className="hover:bg-transparent">
-            <TableCell className="pl-[18px]">
+            <TableCell className="pl-[18px] max-md:pt-3">
               {t("total", { count: total.lines })}
             </TableCell>
             <RollupCells rollup={total} />
-            <TableCell className="pr-[18px] text-meta font-normal text-muted-foreground">
+            <TableCell className={cn("pr-[18px] text-meta font-normal text-muted-foreground", phone.wide)}>
               {t("closedNote", { count: total.closedLines })}
             </TableCell>
           </TableRow>

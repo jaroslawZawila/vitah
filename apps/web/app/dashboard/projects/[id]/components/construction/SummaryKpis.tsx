@@ -12,7 +12,7 @@ import { Source, SourceLabel } from "./pills";
 import ScheduleStatusView from "./ScheduleStatusView";
 
 /** Presentational: the Resumen's four key figures: chapters, cost, sales and schedule. */
-export default function SummaryKpis({ control }: { control: ConstructionControl }) {
+export default function SummaryKpis({ control, className }: { control: ConstructionControl; className?: string }) {
   const t = useTranslations("construction.summary.kpis");
   const ts = useTranslations("construction.sources");
   const f = useControlFormat();
@@ -33,7 +33,7 @@ export default function SummaryKpis({ control }: { control: ConstructionControl 
   const revision = budget ? t("revision", { number: budget.number }) : "";
 
   return (
-    <section aria-label={t("label")} className="grid grid-cols-[repeat(auto-fit,minmax(min(250px,100%),1fr))] gap-3.5">
+    <section aria-label={t("label")} className={cn("grid grid-cols-[repeat(auto-fit,minmax(min(250px,100%),1fr))] gap-3.5", className)}>
       <div className={cn(cardVariants(), "gap-2.5")}>
         <span className="eyebrow">{t("chapters")}</span>
         <div className="flex items-baseline gap-2">

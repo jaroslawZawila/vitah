@@ -61,6 +61,29 @@ describe("AvanceScreen", () => {
     expect(recent.getByText("Admin ViTAH · «La teja de cumbrera se remató el 9»")).toBeInTheDocument();
   });
 
+  it("on a phone, makes the whole card the chapter's link, its buttons above it, and wraps a long plan", () => {
+    renderScreen();
+    const card = (name: string) =>
+      screen
+        .getAllByRole("link", { name })
+        .find((link) => !link.closest("table"))!
+        .closest("article")!;
+
+    const envelope = card("Envolvente térmica Thermochip");
+    expect(envelope).toHaveClass("relative");
+    expect(within(envelope).getByRole("link").className).toContain("after:inset-0");
+    expect(within(envelope).getByRole("link")).toHaveAttribute("href", "/dashboard/projects/p-1/obra/avance/06");
+    const finish = within(envelope).getByRole("button", { name: "Finalizar 06" });
+    expect(finish.closest("div.relative")).not.toBeNull();
+
+    // "· en 2 d" is its own piece, free to go to the next line, and the dates break after the dash.
+    const pending = card("Electricidad e iluminación");
+    const soon = within(pending).getByText("· en 2 d");
+    expect(soon.closest(".num")).toBeNull();
+    expect(soon.parentElement).toHaveTextContent("19 oct 2026 – 27 nov 2026 · en 2 d");
+    expect(within(pending).getByText("19 oct 2026 –")).toHaveClass("num");
+  });
+
   it("filters by state", async () => {
     renderScreen();
     await userEvent.click(within(screen.getByRole("group", { name: "Estado" })).getByRole("button", { name: /Pendiente/ }));

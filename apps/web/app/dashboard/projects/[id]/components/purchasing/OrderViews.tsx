@@ -28,6 +28,8 @@ import { deviationTone } from "../construction/format";
 import { day, usePurchaseFormat } from "./format";
 import { requestHref } from "./links";
 import { PurchaseKindPill, PurchaseStatusPill, SupplierCaePill } from "./pills";
+import { touchLink } from "../../../../components/touch";
+import { phoneLabel, phoneLine } from "../../../../components/phone-table";
 
 
 // Presentational: an order's page (heading, late warning, status steps,
@@ -47,7 +49,7 @@ export function OrderHeading({ order, actions }: { order: PurchaseOrderDetail; a
         </div>
         <h1 className="mt-1.5 [overflow-wrap:anywhere]">{order.description}</h1>
         <p className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[14px] text-muted-foreground">
-          <Link href={companyHref(order.subcontractorId)} className="font-semibold text-brand-ink hover:text-primary">
+          <Link href={companyHref(order.subcontractorId)} className={cn("font-semibold text-brand-ink hover:text-primary", touchLink)}>
             {order.supplierName}
           </Link>
           <span>· {order.suppliesOnly ? ty("supplier.label") : t("subcontractor")}</span>
@@ -89,7 +91,7 @@ export function LateBanner({ order, issuesHref }: { order: PurchaseOrderDetail; 
         {running.length > 0 && t("late.running", { count: running.length, codes: running.join(", ") })}{" "}
         {t("late.onlyWarning")}
       </p>
-      <Link href={issuesHref} className="font-semibold whitespace-nowrap underline">
+      <Link href={issuesHref} className={cn("font-semibold whitespace-nowrap underline", touchLink)}>
         {t("late.recordIssue")}
       </Link>
     </div>
@@ -171,13 +173,20 @@ export function StatusSteps({ order }: { order: PurchaseOrderDetail }) {
 
   return (
     <section className={cardVariants()} aria-label={t("order.steps")}>
-      <ol className="m-0 grid list-none gap-2 p-0" style={{ gridTemplateColumns: `repeat(${flow.length}, minmax(0, 1fr))` }}>
+      <ol
+        className="m-0 grid list-none gap-2 p-0 sm:grid-cols-[repeat(var(--steps),minmax(0,1fr))]"
+        style={{ "--steps": flow.length } as React.CSSProperties}
+      >
         {flow.map((status, index) => {
           const done = current === -1 ? status in reached : index < current || (index === current && index === last);
           const now = index === current && index !== last;
           const date = (current === -1 || index <= current) && reached[status];
           return (
-            <li key={status} className="flex min-w-0 flex-col gap-1.5" aria-current={index === current ? "step" : undefined}>
+            <li
+              key={status}
+              className="grid min-w-0 grid-cols-[40px_minmax(0,1fr)_auto] items-center gap-x-3 sm:flex sm:flex-col sm:items-stretch sm:gap-1.5"
+              aria-current={index === current ? "step" : undefined}
+            >
               <span aria-hidden className="relative block h-1 overflow-hidden rounded-full bg-border">
                 {(done || now) && <span className={cn("absolute inset-y-0 left-0 bg-primary", now ? "w-1/2" : "w-full")} />}
               </span>
@@ -202,6 +211,18 @@ export function StatusSteps({ order }: { order: PurchaseOrderDetail }) {
   );
 }
 
+/**
+ * Below 768px a table of figures reflows into one block per row (the same
+ * elements): the line on top, then each figure on its own row with its column's
+ * name, which the table says in its hidden heading.
+ */
+const phone = {
+  block: "max-md:block",
+  row: "max-md:grid max-md:grid-cols-[52px_minmax(0,1fr)] max-md:gap-x-2 max-md:gap-y-1 max-md:px-[18px] max-md:py-2.5",
+  cell: `max-md:col-start-2 ${phoneLine}`,
+  label: phoneLabel,
+};
+
 /** The order's lines against the budget's cost, with what other orders add and the deviation once closed. */
 export function OrderLines({ order }: { order: PurchaseOrderDetail }) {
   const t = useTranslations("purchasing.order.lines");
@@ -218,8 +239,8 @@ export function OrderLines({ order }: { order: PurchaseOrderDetail }) {
           {order.budgetNumber !== null ? t("atCostRevision", { number: order.budgetNumber }) : t("atCost")}
         </span>
       </div>
-      <Table className="min-w-[760px]">
-        <TableHeader>
+      <Table className={cn(phone.block, "md:min-w-[760px]")}>
+        <TableHeader className="max-md:hidden">
           <TableRow>
             <TableHead className="pl-[18px]">{t("line")}</TableHead>
             <TableHead>{t("description")}</TableHead>
@@ -230,11 +251,11 @@ export function OrderLines({ order }: { order: PurchaseOrderDetail }) {
             <TableHead className="pr-[18px] text-right">{t("deviation")}</TableHead>
           </TableRow>
         </TableHeader>
-        <TableBody>
+        <TableBody className={phone.block}>
           {order.lines.map((line) => (
-            <TableRow key={line.id}>
-              <TableCell className="num pl-[18px]">{line.code ?? "—"}</TableCell>
-              <TableCell className="min-w-[240px] whitespace-normal">
+            <TableRow key={line.id} className={phone.row}>
+              <TableCell className="num pl-[18px] max-md:p-0">{line.code ?? "—"}</TableCell>
+              <TableCell className="min-w-[240px] whitespace-normal max-md:min-w-0 max-md:p-0">
                 {line.description ?? <span className="text-muted-foreground">{t("gone")}</span>}
                 {line.quantity !== null && (
                   <span className="num text-meta text-muted-foreground">
@@ -243,32 +264,43 @@ export function OrderLines({ order }: { order: PurchaseOrderDetail }) {
                   </span>
                 )}
               </TableCell>
-              <TableCell className="num text-right">{line.costCents === null ? "—" : f.amount(line.costCents)}</TableCell>
-              <TableCell className="num text-right text-muted-foreground">{line.otherCents ? f.amount(line.otherCents) : "—"}</TableCell>
-              <TableCell className="num text-right font-semibold">{f.amount(line.amountCents)}</TableCell>
-              <TableCell>
+              <TableCell className={cn("num text-right", phone.cell)}>
+                <span className={phone.label}>{t("cost")}</span>
+                {line.costCents === null ? "—" : f.amount(line.costCents)}
+              </TableCell>
+              <TableCell className={cn("num text-right text-muted-foreground", phone.cell, !line.otherCents && "max-md:hidden")}>
+                <span className={phone.label}>{t("others")}</span>
+                {line.otherCents ? f.amount(line.otherCents) : "—"}
+              </TableCell>
+              <TableCell className={cn("num text-right font-semibold", phone.cell)}>
+                <span className={phone.label}>{t("this")}</span>
+                {f.amount(line.amountCents)}
+              </TableCell>
+              <TableCell className={phone.cell}>
+                <span className={phone.label}>{t("closes")}</span>
                 <Badge variant={line.closesLine ? "default" : "outline"}>{line.closesLine ? t("yes") : t("no")}</Badge>
               </TableCell>
-              <TableCell className={cn("num pr-[18px] text-right", deviationTone(line.deviationCents))}>
+              <TableCell className={cn("num pr-[18px] text-right", deviationTone(line.deviationCents), phone.cell)}>
+                <span className={phone.label}>{t("deviation")}</span>
                 {line.deviationCents === null ? (
                   <span className="font-sans text-meta text-muted-foreground">{t("open")}</span>
                 ) : (
-                  <>
+                  <span className={deviationTone(line.deviationCents)}>
                     {f.signedAmount(line.deviationCents)}
                     {line.deviationBp !== null && <span className="text-meta"> ({f.signedPercent(line.deviationBp)})</span>}
-                  </>
+                  </span>
                 )}
               </TableCell>
             </TableRow>
           ))}
         </TableBody>
-        <TableFooter>
-          <TableRow className="hover:bg-transparent">
-            <TableCell colSpan={4} className="pl-[18px]">
+        <TableFooter className={phone.block}>
+          <TableRow className="hover:bg-transparent max-md:flex max-md:items-center max-md:justify-between max-md:gap-3 max-md:px-[18px] max-md:py-2.5">
+            <TableCell colSpan={4} className="pl-[18px] max-md:p-0">
               {t("total")}
             </TableCell>
-            <TableCell className="num text-right">{f.amount(order.amountCents)}</TableCell>
-            <TableCell colSpan={2} className="pr-[18px]" />
+            <TableCell className="num text-right max-md:p-0">{f.amount(order.amountCents)}</TableCell>
+            <TableCell colSpan={2} className="pr-[18px] max-md:hidden" />
           </TableRow>
         </TableFooter>
       </Table>
@@ -293,7 +325,7 @@ export function OrderData({
   const works =
     order.workStart || order.workEnd ? `${f.date(order.workStart)} – ${f.date(order.workEnd)}` : "—";
   const change = editHref && (
-    <Link href={editHref} className="ml-1.5 inline-block text-meta font-medium text-brand-ink hover:text-primary">
+    <Link href={editHref} className={cn("ml-1.5 inline-block text-meta font-medium text-brand-ink hover:text-primary", touchLink)}>
       {t("change")}
     </Link>
   );

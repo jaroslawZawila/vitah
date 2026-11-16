@@ -41,8 +41,9 @@ export function DatesCard({
   const f = useControlFormat();
   const delay = (days: number | null) =>
     days !== null && days !== 0 && (
-      <span className={cn("ml-1.5", days > 0 ? "text-warn" : "text-good")}>{f.signedDays(days)}</span>
+      <span className={cn("num ml-1.5", days > 0 ? "text-warn" : "text-good")}>{f.signedDays(days)}</span>
     );
+  const rowLabel = "col-span-2 text-muted-foreground sm:col-span-1";
 
   return (
     <section className={cn(cardVariants(), "gap-3")} aria-labelledby="dates-title">
@@ -54,26 +55,27 @@ export function DatesCard({
           </Button>
         )}
       </div>
-      <div className="grid grid-cols-[auto_minmax(0,1fr)_minmax(0,1fr)] gap-x-4 gap-y-2 text-sm">
-        <span />
+      {/* Below 640px two dates and a label don't fit a row: each row's label goes above its dates. */}
+      <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm sm:grid-cols-[auto_minmax(0,1fr)_minmax(0,1fr)]">
+        <span className="hidden sm:block" />
         <span className="eyebrow">{t("plan")}</span>
         <span className="eyebrow">{t("actual")}</span>
 
-        <span className="text-muted-foreground">{t("startRow")}</span>
+        <span className={rowLabel}>{t("startRow")}</span>
         <span className="num">{f.date(chapter.plannedStart)}</span>
-        <span className="num">
-          {chapter.actualStart ? f.date(chapter.actualStart) : <span className="font-sans whitespace-normal text-muted-foreground">{t("notRecorded")}</span>}
+        <span className="flex flex-wrap items-baseline">
+          {chapter.actualStart ? <span className="num">{f.date(chapter.actualStart)}</span> : <span className="text-muted-foreground">{t("notRecorded")}</span>}
           {delay(chapter.startDelayDays)}
         </span>
 
-        <span className="text-muted-foreground">{t("endRow")}</span>
+        <span className={rowLabel}>{t("endRow")}</span>
         <span className="num">{f.date(chapter.plannedEnd)}</span>
-        <span className="num">
-          {chapter.actualEnd ? f.date(chapter.actualEnd) : <span className="font-sans whitespace-normal text-muted-foreground">{t("notRecorded")}</span>}
+        <span className="flex flex-wrap items-baseline">
+          {chapter.actualEnd ? <span className="num">{f.date(chapter.actualEnd)}</span> : <span className="text-muted-foreground">{t("notRecorded")}</span>}
           {delay(chapter.endDelayDays)}
         </span>
 
-        <span className="text-muted-foreground">{t("durationRow")}</span>
+        <span className={rowLabel}>{t("durationRow")}</span>
         <span className="num">{chapter.plannedDays !== null ? t("days", { days: chapter.plannedDays }) : "—"}</span>
         <span className="num">
           {chapter.actualDays === null
@@ -204,8 +206,22 @@ export function CostCard({
       </div>
       <div className={kv}>
         <span className="font-semibold">{t("deviation")}</span>
-        <span className={cn("num font-semibold", deviationTone(chapter.deviationCents))}>
-          {chapter.deviationCents === null ? "—" : `${f.signedMoney(chapter.deviationCents)}${bp !== null ? ` · ${f.signedPercent(bp)}` : ""}`}
+        {/* The % goes under the amount when the card is narrow. */}
+        <span className={cn("text-right font-semibold", deviationTone(chapter.deviationCents))}>
+          {chapter.deviationCents === null ? (
+            <span className="num">—</span>
+          ) : (
+            <>
+              <span className="num">{f.signedMoney(chapter.deviationCents)}</span>
+              {bp !== null && (
+                <>
+                  {/* A space that may break, as wide as the figures'. */}
+                  <span className="font-mono"> </span>
+                  <span className="num">· {f.signedPercent(bp)}</span>
+                </>
+              )}
+            </>
+          )}
         </span>
       </div>
       {chapter.contractedLines > 0 && (

@@ -22,7 +22,8 @@ const options = () => within(screen.getByRole("listbox", { name: "Obras" })).get
 describe("ObraPicker", () => {
   it("shows the obra on screen, and finds any obra by client, address or code", async () => {
     const onSelect = renderPicker();
-    expect(screen.getByText("VTH-26-001")).toBeInTheDocument();
+    // Once on the phone's one-line bar, once beside the search (from `sm`).
+    expect(screen.getAllByText("VTH-26-001")).toHaveLength(2);
     expect(screen.getByText("Barrio Caviedes 12, Valdáliga")).toBeInTheDocument();
     await userEvent.click(box());
     expect(options()).toHaveLength(3);
@@ -63,6 +64,37 @@ describe("ObraPicker", () => {
     expect(options()).toHaveLength(1);
     await userEvent.keyboard("{Enter}");
     expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it("is one line on a phone, the obra's code and client, that opens the search and focuses it", async () => {
+    const onSelect = renderPicker();
+    const bar = screen.getByRole("button", { name: /Cambiar de obra/ });
+    expect(bar).toHaveTextContent("ObraVTH-26-001 · Ana Peña Ruiz");
+    expect(bar).toHaveClass("sm:hidden");
+    expect(bar).toHaveAttribute("aria-expanded", "false");
+    // Closed, the search is hidden on a phone only; from `sm` it is always there.
+    const search = document.getElementById(bar.getAttribute("aria-controls")!)!;
+    expect(search).toContainElement(box());
+    expect(search).toHaveClass("max-sm:hidden");
+
+    await userEvent.click(bar);
+    expect(bar).toHaveAttribute("aria-expanded", "true");
+    expect(search).not.toHaveClass("max-sm:hidden");
+    expect(box()).toHaveFocus();
+    expect(options()).toHaveLength(3);
+
+    await userEvent.click(options()[1]!);
+    expect(onSelect).toHaveBeenCalledWith("p-2");
+    expect(bar).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("names an obra without a client by its code alone on the phone's bar", () => {
+    render(
+      <NextIntlClientProvider locale="es" messages={messages}>
+        <ObraPicker options={obraOptions} currentId="p-3" onSelect={vi.fn()} />
+      </NextIntlClientProvider>,
+    );
+    expect(screen.getByRole("button", { name: /Cambiar de obra/ })).toHaveTextContent(/^ObraVTH-26-003Cambiar de obra$/);
   });
 
   it("says so when nothing matches", async () => {

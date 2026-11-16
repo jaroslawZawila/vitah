@@ -136,7 +136,7 @@ export default function ProjectHeader({
 
   return (
     <Card>
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="font-heading text-[26px] leading-[1.05] font-bold tracking-[0.01em] text-brand-ink">
             {project.ref}
@@ -149,7 +149,7 @@ export default function ProjectHeader({
           <Button
             type="button"
             variant="outline"
-            className="self-start"
+            className="flex-none self-start"
             onClick={() => setEditing(true)}
           >
             {t("edit")}

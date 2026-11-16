@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { openGroups, openParam, parseOpen, useUrlState } from "../../../../components/useUrlState";
 import { footnote, moreLink } from "../../components/construction/classes";
 import { rollUpCosts } from "../../components/construction/cost-rollup";
+import CostCards from "../../components/construction/CostCards";
 import CostTable from "../../components/construction/CostTable";
 import { FilterSelect, FoldAllButtons } from "../../components/construction/Filters";
 import ObraFrame, { obraHref, type ObraHeader } from "../../components/construction/ObraFrame";
@@ -99,6 +100,15 @@ export default function CostsScreen({
   const fallback = filtering || chapter !== "all" ? codes : [];
   const groups = openGroups(view.open, codes, fallback, (open) => setView({ ...view, open }));
   const filter = (change: Partial<Omit<CostsView, "open">>) => setView({ ...view, ...change, open: null });
+  // The table from 768px, the cards below it: the same chapters, folds and links.
+  const tableProps = {
+    chapters: shown,
+    total: filtering || chapter !== "all" ? undefined : total,
+    expanded: groups.isOpen,
+    onToggle: groups.toggle,
+    orderHref: (id: string) => orderHref(projectId, id),
+    newOrderHref: canManage ? (code: string) => newOrderHref(projectId, code) : undefined,
+  };
 
   return (
     <ObraFrame
@@ -130,11 +140,21 @@ export default function CostsScreen({
           onChange={(value) => filter({ chapter: value })}
           options={[{ value: "all", label: tf("all") }, ...costs.chapters.map((c) => ({ value: c.code, label: `${c.code} · ${c.name}` }))]}
         />
+        {/* On a phone the five options don't fit a row: a select, as the project list does. */}
+        <FilterSelect
+          id="costs-contracting"
+          label={t("contracting")}
+          value={contracting}
+          onChange={(value) => filter({ contracting: CONTRACTING.find((key) => key === value) ?? "all" })}
+          options={CONTRACTING.map((key) => ({ value: key, label: `${t(`filter.${key}`)} · ${counts[key]}` }))}
+          className="sm:hidden"
+        />
         <Segmented
           label={t("contracting")}
           value={contracting}
           onChange={(value) => filter({ contracting: value })}
           options={CONTRACTING.map((key) => ({ key, label: t(`filter.${key}`), count: counts[key] }))}
+          className="hidden sm:inline-flex"
         />
         <Input
           type="search"
@@ -142,7 +162,7 @@ export default function CostsScreen({
           onChange={(event) => filter({ query: event.target.value })}
           placeholder={t("search")}
           aria-label={t("search")}
-          className="h-10 w-full max-w-[240px] bg-card"
+          className="h-10 w-full bg-card sm:max-w-[240px]"
         />
         <FoldAllButtons
           allOpen={groups.allOpen}
@@ -155,14 +175,8 @@ export default function CostsScreen({
         </Link>
       </div>
 
-      <CostTable
-        chapters={shown}
-        total={filtering || chapter !== "all" ? undefined : total}
-        expanded={groups.isOpen}
-        onToggle={groups.toggle}
-        orderHref={(id) => orderHref(projectId, id)}
-        newOrderHref={canManage ? (code) => newOrderHref(projectId, code) : undefined}
-      />
+      <CostTable {...tableProps} />
+      <CostCards {...tableProps} className="md:hidden" />
 
       <p className={footnote}>{t("footnote")}</p>
     </ObraFrame>

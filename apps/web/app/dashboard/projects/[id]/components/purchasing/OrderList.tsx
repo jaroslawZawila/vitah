@@ -10,6 +10,8 @@ import { Dash } from "../construction/SummaryTable";
 import { usePurchaseFormat } from "./format";
 import { contractedCents } from "./orders";
 import { LatePill, PurchaseStatusPill } from "./pills";
+import { cn } from "@/lib/utils";
+import { stretchedLink, touchLink } from "../../../../components/touch";
 
 /**
  * Which list: a project's Compras tab, every order of the company (with the
@@ -84,14 +86,14 @@ export default function OrderList({
 
   const ref = (order: PurchaseOrderListItem) =>
     projectHref ? (
-      <Link href={projectHref(order)} className="num text-meta text-muted-foreground hover:text-primary">
+      <Link href={projectHref(order)} className={cn("num text-meta text-muted-foreground hover:text-primary", touchLink)}>
         {order.projectRef}
       </Link>
     ) : (
       <span className="num text-meta text-muted-foreground">{order.projectRef}</span>
     );
   const number = (order: PurchaseOrderListItem) => (
-    <Link href={orderHref(order)} className="num font-semibold text-brand-ink hover:text-primary">
+    <Link href={orderHref(order)} className={cn("num font-semibold text-brand-ink hover:text-primary", touchLink)}>
       {orderLabel(order.number)}
     </Link>
   );
@@ -104,10 +106,10 @@ export default function OrderList({
       <ul className="m-0 flex list-none flex-col gap-2.5 p-0 px-3 pb-3 md:hidden" aria-label={t("cards")}>
         {orders.map((order) => (
           <li key={order.id} className="relative rounded-xl border bg-card px-4 py-3.5 shadow-card">
-            <div className="flex items-center justify-between gap-2.5">
-              <span className="num font-semibold text-brand-ink">
+            <div className="flex flex-wrap items-center justify-between gap-2.5">
+              <span className="num min-w-0 font-semibold text-brand-ink">
                 {!inProject && <span className="font-normal text-muted-foreground">{order.projectRef} · </span>}
-                <Link href={orderHref(order)} className="after:absolute after:inset-0 hover:text-primary">
+                <Link href={orderHref(order)} className={cn("hover:text-primary", stretchedLink)}>
                   {orderLabel(order.number)}
                 </Link>
                 {order.chapterCodes.length > 0 && (

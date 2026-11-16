@@ -16,6 +16,10 @@ type Version = PlanningVersions["versions"][number];
 
 const STATUS_TONE: Record<PlanningStatus, "yel" | "good" | "outline"> = { draft: "yel", approved: "good", superseded: "outline" };
 
+/** A chapter's end moving later (warn), sooner (good), or not / new (muted). */
+const endTone = (delta: number | null) =>
+  delta === null || delta === 0 ? "text-muted-foreground" : delta > 0 ? "text-warn" : "text-good";
+
 /** The versions, newest first; picking one compares it with the one before. */
 export function VersionList({ versions, picked, onPick }: { versions: Version[]; picked: string; onPick: (id: string) => void }) {
   const t = useTranslations("planning.versions");
@@ -77,7 +81,7 @@ export function VersionCompare({ version, previous }: { version: Version; previo
           <p className={muted}>{previous ? t("changed", { count: changes.length }) : t("first")}</p>
         </div>
         {previous && (
-          <p className="num m-0 flex items-baseline gap-2">
+          <p className="num m-0 flex flex-wrap items-baseline gap-x-2">
             <span className="text-muted-foreground">{f.date(previous.endDate)}</span>
             <span aria-hidden className="text-muted-foreground">→</span>
             <span className="text-[17px] font-semibold">{f.date(version.endDate)}</span>
@@ -86,7 +90,33 @@ export function VersionCompare({ version, previous }: { version: Version; previo
         )}
       </div>
       {previous && changes.length > 0 && (
-        <Table className="min-w-[560px]">
+        <ul className="m-0 flex list-none flex-col border-t p-0 md:hidden" aria-label={t("changed", { count: changes.length })}>
+          {changes.map((row) => {
+            const old = before.get(row.code);
+            const delta = old ? daysBetween(old.plannedEnd, row.plannedEnd) : null;
+            return (
+              <li key={row.code} className="flex flex-col gap-1 border-b px-[18px] py-3 text-sm last:border-b-0">
+                <span className="flex items-baseline justify-between gap-3">
+                  <span className="min-w-0 font-semibold">
+                    <span className="num">{row.code}</span> {row.name}
+                  </span>
+                  <span className={cn("num flex-none font-semibold", endTone(delta))}>
+                    {delta === null ? t("added") : delta === 0 ? t("same") : f.signedDays(delta)}
+                  </span>
+                </span>
+                <span className="text-muted-foreground tabular-nums">
+                  {t("version", { number: previous.number })}: {old ? `${f.date(old.plannedStart)} – ${f.date(old.plannedEnd)}` : "—"}
+                </span>
+                <span className="tabular-nums">
+                  {t("version", { number: version.number })}: {f.date(row.plannedStart)} – {f.date(row.plannedEnd)}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {previous && changes.length > 0 && (
+        <Table className="min-w-[560px] max-md:hidden">
           <TableHeader>
             <TableRow>
               <TableHead className="pl-[18px]">{t("code")}</TableHead>
@@ -108,12 +138,7 @@ export function VersionCompare({ version, previous }: { version: Version; previo
                   <TableCell className="num">
                     {f.date(row.plannedStart)} – {f.date(row.plannedEnd)}
                   </TableCell>
-                  <TableCell
-                    className={cn(
-                      "num pr-[18px] text-right font-semibold",
-                      delta === null || delta === 0 ? "text-muted-foreground" : delta > 0 ? "text-warn" : "text-good",
-                    )}
-                  >
+                  <TableCell className={cn("num pr-[18px] text-right font-semibold", endTone(delta))}>
                     {delta === null ? t("added") : delta === 0 ? t("same") : f.signedDays(delta)}
                   </TableCell>
                 </TableRow>

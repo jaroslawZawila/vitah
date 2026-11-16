@@ -9,6 +9,8 @@ import { cardVariants } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AccessBadge, DocStateBadge } from "../Badges";
 import { useAccessReason, workerHref } from "../display";
+import { cn } from "@/lib/utils";
+import { stretchedLink, touchLink } from "../../../components/touch";
 
 /** Presentational: the company's workers and their site access. */
 export default function WorkersTab({
@@ -43,6 +45,38 @@ export default function WorkersTab({
       {workers.length === 0 ? (
         <p className="py-6 text-center text-sm text-muted-foreground">{t("empty")}</p>
       ) : (
+        <>
+        {/* Phones: one card per worker, opening their page. */}
+        <ul className="m-0 flex list-none flex-col p-0 md:hidden">
+          {workers.map((w) => {
+            const failing = w.access.checks.find((c) => !c.ok)?.reasons[0];
+            const tpc = w.docs.tpc;
+            return (
+              <li key={w.id} className="relative flex flex-col gap-1.5 border-t py-3.5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <Link href={workerHref(w.id)} className={cn("font-semibold hover:text-primary", stretchedLink)}>
+                    {workerName(w)}
+                  </Link>
+                  <AccessBadge status={w.access.status} />
+                </div>
+                <div className="text-meta text-muted-foreground">
+                  <span className="num">{w.idDocumentMasked}</span>
+                  {[w.trade && ts(`trades.${w.trade}`), w.category && ts(`categories.${w.category}`), ...w.roles.map((role) => ts(`roles.${role}`))]
+                    .filter(Boolean)
+                    .map((text) => ` · ${text}`)}
+                </div>
+                {failing && <div className="text-meta text-muted-foreground">{reason(failing, kind)}</div>}
+                {tpc && (
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-meta text-muted-foreground">{t("tpc")}</span>
+                    <DocStateBadge state={tpc.state} daysLeft={tpc.daysLeft} short />
+                  </div>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+        <div className="hidden md:block">
         <Table className="min-w-[760px]">
           <TableHeader>
             <TableRow>
@@ -60,7 +94,7 @@ export default function WorkersTab({
               return (
                 <TableRow key={w.id}>
                   <TableCell>
-                    <Link href={workerHref(w.id)} className="font-semibold hover:underline hover:underline-offset-3">
+                    <Link href={workerHref(w.id)} className={cn("font-semibold hover:underline hover:underline-offset-3", touchLink)}>
                       {workerName(w)}
                     </Link>
                     <div className="num text-meta text-muted-foreground">{w.idDocumentMasked}</div>
@@ -83,6 +117,8 @@ export default function WorkersTab({
             })}
           </TableBody>
         </Table>
+        </div>
+        </>
       )}
     </section>
   );

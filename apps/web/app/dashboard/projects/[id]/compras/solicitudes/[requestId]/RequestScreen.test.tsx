@@ -37,10 +37,11 @@ describe("RequestScreen", () => {
     expect(screen.getByRole("status")).toHaveTextContent("2 días tarde Hacía falta para el 15 oct 2026 y todavía no hay pedido.");
 
     const lines = within(screen.getByRole("region", { name: "Partidas" }));
+    // Each figure carries its column's name, shown on phones where the heading row is hidden.
     expect(lines.getAllByRole("row").map((row) => row.textContent)).toEqual([
       "PartidaCosteYa contratadoEstimado",
-      "07.01 Trasdosado de placa de yeso 310,00 m²7.440,00—6.250,00",
-      "07.04 Placa hidrófuga en baños 54,00 m²2.660,001.000,001.000,00",
+      "07.01 Trasdosado de placa de yeso 310,00 m²Coste7.440,00Ya contratado—Estimado6.250,00",
+      "07.04 Placa hidrófuga en baños 54,00 m²Coste2.660,00Ya contratado1.000,00Estimado1.000,00",
       "Total estimado7.250,00",
     ]);
     expect(screen.getByRole("link", { name: "Yesos y Placas del Norte S.L." })).toHaveAttribute("href", "/dashboard/subcontratas/empresas/sup-yesos");

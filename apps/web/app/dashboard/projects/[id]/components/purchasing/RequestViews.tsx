@@ -31,6 +31,8 @@ import { day, usePurchaseFormat } from "./format";
 import { requestHref } from "./links";
 import { EventText } from "./OrderHistory";
 import { LatePill, PurchaseKindPill, RequestStatusPill } from "./pills";
+import { stretchedLink, touchLink } from "../../../../components/touch";
+import { phoneFigures } from "../../../../components/phone-table";
 
 // Presentational: purchase requests (Compras › Solicitudes): the lists, a
 // request's heading, decision, lines and data. The containers run the actions.
@@ -101,7 +103,7 @@ export function RequestBoard({
     REQUEST_GROUPS.map((key) => [key, key === "all" ? inProject.length : inProject.filter((r) => groupOf(r) === key).length]),
   ) as Record<RequestGroup, number>;
   const number = (request: PurchaseRequestListItem) => (
-    <Link href={hrefOf(request)} className="num font-semibold text-brand-ink hover:text-primary">
+    <Link href={hrefOf(request)} className={cn("num font-semibold text-brand-ink hover:text-primary", touchLink)}>
       {requestLabel(request.number)}
     </Link>
   );
@@ -140,7 +142,7 @@ export function RequestBoard({
                 <div className="flex items-center justify-between gap-2.5">
                   <span className="num font-semibold text-brand-ink">
                     {company && <span className="font-normal text-muted-foreground">{request.projectRef} · </span>}
-                    <Link href={hrefOf(request)} className="after:absolute after:inset-0 hover:text-primary">
+                    <Link href={hrefOf(request)} className={cn("hover:text-primary", stretchedLink)}>
                       {requestLabel(request.number)}
                     </Link>
                   </span>
@@ -340,7 +342,7 @@ export function DecisionCard({
         <p className="m-0 text-sm">
           {t("ordered")}{" "}
           {orderHref ? (
-            <Link href={orderHref} className="num font-semibold text-brand-ink hover:text-primary">
+            <Link href={orderHref} className={cn("num font-semibold text-brand-ink hover:text-primary", touchLink)}>
               {orderLabel(request.order.number)}
             </Link>
           ) : (
@@ -363,8 +365,8 @@ export function RequestLines({ request }: { request: PurchaseRequestDetail }) {
       <h2 id="request-lines-title" className="px-[18px] pb-3 text-[22px]">
         {t("lines")}
       </h2>
-      <Table className="min-w-[680px]">
-        <TableHeader>
+      <Table className={cn(phoneFigures.block, "md:min-w-[680px]")}>
+        <TableHeader className="max-md:hidden">
           <TableRow>
             <TableHead className="pl-[18px]">{t("line")}</TableHead>
             <TableHead className="text-right">{t("cost")}</TableHead>
@@ -372,10 +374,10 @@ export function RequestLines({ request }: { request: PurchaseRequestDetail }) {
             <TableHead className="pr-[18px] text-right">{t("estimate")}</TableHead>
           </TableRow>
         </TableHeader>
-        <TableBody>
+        <TableBody className={phoneFigures.block}>
           {request.lines.map((line) => (
-            <TableRow key={line.id}>
-              <TableCell className="max-w-[380px] min-w-[260px] pl-[18px] whitespace-normal">
+            <TableRow key={line.id} className={phoneFigures.row}>
+              <TableCell className="pl-[18px] whitespace-normal max-md:col-span-2 max-md:p-0 md:max-w-[380px] md:min-w-[260px]">
                 <span className="num font-semibold">{line.code ?? line.chapterCode}</span> {line.description ?? t("notInBudget")}{" "}
                 {line.quantity !== null && (
                   <span className="num text-meta text-muted-foreground">
@@ -383,18 +385,27 @@ export function RequestLines({ request }: { request: PurchaseRequestDetail }) {
                   </span>
                 )}
               </TableCell>
-              <TableCell className="num text-right">{line.costCents === null ? <Dash /> : f.amount(line.costCents)}</TableCell>
-              <TableCell className="num text-right text-muted-foreground">{line.contractedCents ? f.amount(line.contractedCents) : <Dash />}</TableCell>
-              <TableCell className="num pr-[18px] text-right font-semibold">{f.amount(line.amountCents)}</TableCell>
+              <TableCell className={cn("num text-right", phoneFigures.cell)}>
+                <span className={phoneFigures.label}>{t("cost")}</span>
+                {line.costCents === null ? <Dash /> : f.amount(line.costCents)}
+              </TableCell>
+              <TableCell className={cn("num text-right text-muted-foreground", phoneFigures.cell)}>
+                <span className={phoneFigures.label}>{t("contracted")}</span>
+                {line.contractedCents ? f.amount(line.contractedCents) : <Dash />}
+              </TableCell>
+              <TableCell className={cn("num pr-[18px] text-right font-semibold", phoneFigures.cell)}>
+                <span className={phoneFigures.label}>{t("estimate")}</span>
+                {f.amount(line.amountCents)}
+              </TableCell>
             </TableRow>
           ))}
         </TableBody>
-        <TableFooter>
-          <TableRow className="hover:bg-transparent">
-            <TableCell className="pl-[18px]" colSpan={3}>
+        <TableFooter className={phoneFigures.block}>
+          <TableRow className="hover:bg-transparent max-md:flex max-md:items-center max-md:justify-between max-md:px-[18px] max-md:py-3">
+            <TableCell className="pl-[18px] max-md:p-0" colSpan={3}>
               {t("total")}
             </TableCell>
-            <TableCell className="num pr-[18px] text-right">{f.amount(request.amountCents)}</TableCell>
+            <TableCell className="num pr-[18px] text-right max-md:p-0">{f.amount(request.amountCents)}</TableCell>
           </TableRow>
         </TableFooter>
       </Table>
@@ -411,7 +422,7 @@ export function RequestData({ request }: { request: PurchaseRequestDetail }) {
     [
       t("supplier"),
       request.subcontractorId && request.supplierName ? (
-        <Link href={companyHref(request.subcontractorId)} className="font-semibold text-brand-ink hover:text-primary">
+        <Link href={companyHref(request.subcontractorId)} className={cn("font-semibold text-brand-ink hover:text-primary", touchLink)}>
           {request.supplierName}
         </Link>
       ) : (

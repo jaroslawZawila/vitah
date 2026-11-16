@@ -10,7 +10,9 @@ import { Button } from "@/components/ui/button";
 import { cardVariants } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
-import { groupRow } from "./classes";
+import { DateRange } from "../../../../components/DateRange";
+import { chapterLink, groupRow } from "./classes";
+import { stretchedLink } from "../../../../components/touch";
 import { daysBetween, useControlFormat } from "./format";
 import { GanttBar, MonthAxis, type Timeline } from "./Gantt";
 import { ChapterStatePill, SCHEDULE_TONE } from "./pills";
@@ -176,7 +178,7 @@ export function ProgressTable({
                   {/* The code beside the name, not a column of its own: the table fits the card. */}
                   <TableCell className="min-w-[200px] pl-[18px] whitespace-normal">
                     <span className="num mr-2 text-muted-foreground">{chapter.code}</span>
-                    <Link href={chapterHref(chapter.code)} className="font-semibold transition-colors hover:text-primary">
+                    <Link href={chapterHref(chapter.code)} className={chapterLink}>
                       {chapter.name}
                     </Link>
                     <ChapterNotes chapter={chapter} today={today} />
@@ -259,31 +261,40 @@ export function ProgressCards({
               const actual = dateSpan(f, chapter.actualStart, chapter.actualEnd);
               const soon = chapter.state === "pending" && chapter.plannedStart ? daysBetween(today, chapter.plannedStart) : null;
               return (
-                <article key={chapter.code} className={cn(cardVariants(), "gap-2.5 p-3.5")}>
+                // The name's link covers the card; the buttons sit above it.
+                <article key={chapter.code} className={cn(cardVariants(), "relative gap-2.5 p-3.5")}>
                   <div className="flex items-start gap-2.5">
                     <span className="num pt-0.5 font-semibold">{chapter.code}</span>
-                    <Link href={chapterHref(chapter.code)} className="min-w-0 flex-1 leading-snug font-semibold">
+                    <Link href={chapterHref(chapter.code)} className={cn("min-w-0 flex-1 leading-snug font-semibold", stretchedLink)}>
                       {chapter.name}
                     </Link>
                     <ChapterStatePill state={chapter.state} />
                   </div>
                   <ChapterNotes chapter={chapter} today={today} />
+                  {/* A date span, or the "· in 1 d" after it, goes on to the next line rather than past the card. */}
                   <dl className="m-0 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-0.5 text-sm">
                     <dt className="text-muted-foreground">{t("plan")}</dt>
-                    <dd className="num m-0">
-                      {plan ?? "—"}
-                      {soon !== null && soon >= 0 && soon <= 14 && <span className="text-muted-foreground"> · {t("inDays", { count: soon })}</span>}
+                    <dd className="m-0">
+                      {plan ? <DateRange text={plan} /> : "—"}
+                      {soon !== null && soon >= 0 && soon <= 14 && (
+                        <>
+                          {" "}
+                          <span className="whitespace-nowrap text-muted-foreground">· {t("inDays", { count: soon })}</span>
+                        </>
+                      )}
                     </dd>
                     {actual && (
                       <>
                         <dt className="text-muted-foreground">{t("actual")}</dt>
-                        <dd className="num m-0">{actual}</dd>
+                        <dd className="m-0">
+                          <DateRange text={actual} />
+                        </dd>
                       </>
                     )}
                   </dl>
                   {timeline && chapter.state !== "pending" && <GanttBar chapter={chapter} timeline={timeline} today={today} className="min-w-0" />}
                   {actions && (
-                    <div className="flex justify-end">
+                    <div className="relative flex justify-end">
                       <RowActions chapter={chapter} actions={actions} phone />
                     </div>
                   )}

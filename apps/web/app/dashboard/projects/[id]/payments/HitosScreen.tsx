@@ -5,14 +5,15 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import type { ProjectObra } from "@repo/core/contract";
+import type { Hito, ProjectObra } from "@repo/core/contract";
 import { Button } from "@/components/ui/button";
 import { cardVariants } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 import { savePlanAction } from "../../../../actions/obra";
 import Modal from "../components/Modal";
 import { muted } from "../components/obra/classes";
 import { useObraFormat } from "../components/obra/format";
-import HitoTable from "../components/obra/HitoTable";
+import HitoTable, { HitoCards } from "../components/obra/HitoTable";
 import Kpi from "../components/obra/Kpi";
 import PlanForm from "../components/obra/PlanForm";
 import { useObraAction } from "../components/obra/useObraAction";
@@ -40,6 +41,7 @@ export default function HitosScreen({
   const { hitos } = obra;
   const count = (status: string) => hitos.filter((h) => h.status === status).length;
   const invoiced = hitos.find((h) => h.status === "invoiced");
+  const hitoHref = (hito: Hito) => `/dashboard/projects/${projectId}/payments/${hito.id}`;
 
   return (
     <div className="flex flex-col gap-5">
@@ -94,13 +96,10 @@ export default function HitosScreen({
           {t("pctWarning", { pct: f.share(obra.planPctBp) })}
         </p>
       )}
-      <section className={cardVariants()}>
-        <HitoTable
-          hitos={hitos}
-          totalCents={total}
-          hitoHref={(hito) => `/dashboard/projects/${projectId}/payments/${hito.id}`}
-        />
+      <section className={cn(cardVariants(), "max-md:hidden")}>
+        <HitoTable hitos={hitos} totalCents={total} hitoHref={hitoHref} />
       </section>
+      <HitoCards className="md:hidden" hitos={hitos} totalCents={total} hitoHref={hitoHref} />
       <p className={muted}>
         <strong className="font-semibold text-foreground">{t("pipelineLabel")}</strong> {t("pipeline")}
       </p>

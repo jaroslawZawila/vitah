@@ -66,6 +66,62 @@ describe("PlanningScreen", () => {
     expect(screen.getByRole("link", { name: "Versiones" })).toHaveAttribute("href", "/dashboard/projects/p-1/obra/planificacion/versiones");
   });
 
+  it("gives phones a card per chapter in the order the works go, each the way into its chapter", () => {
+    renderScreen();
+    const cards = within(screen.getByRole("list", { name: "Plan por capítulo" }));
+    // By forecast start; 17 spans the whole works, so it comes last.
+    expect(cards.getAllByRole("link").map((a) => a.textContent)).toEqual([
+      "Actuaciones previas y movimiento de tierras",
+      "Cimentación y estructura",
+      "Revestimientos interiores y falsos techos",
+      "Pinturas y varios",
+      "Control de calidad",
+    ]);
+
+    const link = cards.getByRole("link", { name: "Revestimientos interiores y falsos techos" });
+    expect(link).toHaveAttribute("href", "/dashboard/projects/p-1/obra/avance/03");
+    // The link covers its card, so a finger can tap anywhere on it.
+    expect(link).toHaveClass("after:absolute", "after:inset-0");
+    const card = link.closest("li")!;
+    expect(card).toHaveClass("relative");
+    const pending = within(card);
+    expect(pending.getByText("Pendiente")).toBeInTheDocument();
+    expect(pending.getByText("+7 d vs. línea base")).toBeInTheDocument();
+    expect(pending.getByText("Crítica")).toBeInTheDocument();
+    const value = (term: string) => pending.getByText(term, { selector: "dt" }).nextElementSibling?.textContent;
+    expect(value("Línea base")).toBe("26 oct 2026 – 20 nov 2026");
+    expect(value("Previsto")).toBe("2 nov 2026 – 27 nov 2026");
+    expect(value("Duración")).toBe("20 días laborables");
+    expect(value("Empieza")).toBe("Tras 02 · H8");
+    expect(value("Pedir antes del")).toBe("12 oct 2026");
+    expect(pending.queryByText("Real")).not.toBeInTheDocument();
+
+    const started = within(cards.getByRole("link", { name: "Cimentación y estructura" }).closest("li")!);
+    expect(started.getByText("Real", { selector: "dt" }).nextElementSibling).toHaveTextContent("desde el 17 mar 2026 · 70 %");
+    expect(started.queryByText("Pedir antes del")).not.toBeInTheDocument();
+    const finished = within(cards.getByRole("link", { name: "Actuaciones previas y movimiento de tierras" }).closest("li")!);
+    expect(finished.getByText("Real", { selector: "dt" }).nextElementSibling).toHaveTextContent("2 mar 2026 – 16 mar 2026");
+  });
+
+  it("says on a phone's card which chapters the schedule status finds late", () => {
+    renderScreen({
+      planning: {
+        ...planning,
+        schedule: {
+          ...planning.schedule,
+          status: "late",
+          lateToStart: [{ code: "03", name: "Revestimientos interiores y falsos techos", plannedDate: "2026-10-26", days: 3 }],
+          lateToFinish: [{ code: "02", name: "Cimentación y estructura", plannedDate: "2026-10-23", days: 2 }],
+        },
+      },
+    });
+    const cards = within(screen.getByRole("list", { name: "Plan por capítulo" }));
+    const card = (name: string) => within(cards.getByRole("link", { name }).closest("li")!);
+    expect(card("Revestimientos interiores y falsos techos").getByText("Inicio previsto superado · +3 d")).toBeInTheDocument();
+    expect(card("Cimentación y estructura").getByText("Fin previsto superado · +2 d")).toBeInTheDocument();
+    expect(card("Pinturas y varios").queryByText(/previsto superado/)).not.toBeInTheDocument();
+  });
+
   it("filters to the critical path and hides the baseline bars", async () => {
     renderScreen();
     await userEvent.click(screen.getByRole("button", { name: "Solo ruta crítica" }));

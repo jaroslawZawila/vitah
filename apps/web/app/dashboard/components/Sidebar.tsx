@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useParams, usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { ArchiveRestore, Building2, Contact, FolderKanban, HardHat, KeyRound, LogOut, Settings, ShieldCheck, ShoppingCart, UserCog } from "lucide-react";
@@ -21,6 +21,8 @@ import { cn } from "@/lib/utils";
 import ChangePasswordDialog, { type PasswordChangeResult } from "./ChangePasswordDialog";
 import { PROJECT_TABS } from "./place";
 import TwoStepDialog, { type TwoStepActions } from "./TwoStepDialog";
+import { useActiveInView } from "./useActiveInView";
+import ProjectsBackLink from "../projects/components/ProjectsBackLink";
 import {
   COMPANY_PURCHASES_HREF,
   INVOICES_HREF,
@@ -61,14 +63,31 @@ const PURCHASE_TABS = [
 
 const navLinkClass = (active: boolean) =>
   cn(
-    "relative flex min-h-11 items-center gap-2 rounded-[9px] px-2.5 text-sm font-medium text-rail-foreground transition-colors hover:bg-white/6 lg:min-h-10 lg:gap-[11px] lg:px-3 lg:text-[14.5px]",
+    "relative flex min-h-11 items-center gap-2 rounded-[9px] px-2.5 text-sm font-medium text-rail-foreground transition-colors hover:bg-white/6 max-lg:flex-none max-lg:whitespace-nowrap lg:min-h-10 lg:gap-[11px] lg:pointer-coarse:min-h-11 lg:px-3 lg:text-[14.5px]",
     active &&
       "bg-white/8 text-white lg:before:absolute lg:before:inset-y-2 lg:before:-left-3.5 lg:before:w-[3px] lg:before:rounded-r-[3px] lg:before:bg-rail-accent",
   );
 
 /**
- * The grafito rail. From `lg` up it is a sticky column; below, a top bar whose sections and
- * project tabs scroll sideways.
+ * Below `lg`, a strip of the top bar that scrolls sideways (by touch or trackpad, no bar of its own).
+ * scroll-ok: not positioned on purpose, so the second row under it anchors to the bar and is not clipped by the strip;
+ * every badge's hidden text sits in a positioned link instead.
+ */
+const stripClass = "max-lg:overflow-x-auto max-lg:[scrollbar-width:none]";
+
+/**
+ * Below `lg`, the top bar's second row (a project's tabs, Subcontratas' or Compras' pages). It is
+ * nested in the sections' strip (under its section, as the column shows it from `lg` up), so it is
+ * placed at the foot of the bar, absolute to it and not clipped by that strip. Whatever renders one
+ * marks it `data-sub-row`, and the bar then keeps room for it (`has-[[data-sub-row]]`).
+ */
+const subRowClass = "max-lg:absolute max-lg:inset-x-0 max-lg:bottom-0 max-lg:px-2 max-lg:pb-1 sm:max-lg:px-3";
+
+/**
+ * The grafito rail. From `lg` up it is a sticky column; below, a top bar of at most two rows: the
+ * brand mark, the sections scrolling sideways and the settings menu; then, inside a project, its
+ * tabs (or Subcontratas' or Compras' pages), also scrolling sideways. The section and the tab the
+ * user is on are scrolled into view.
  */
 export default function Sidebar({
   name,
@@ -107,14 +126,18 @@ export default function Sidebar({
   const [passwordOpen, setPasswordOpen] = useState(false);
   const [twoStepOpen, setTwoStepOpen] = useState(false);
   const onTwoStep = twoStep ? () => setTwoStepOpen(true) : undefined;
+  const sections = useRef<HTMLElement>(null);
+  useActiveInView(sections, pathname, "[data-active]");
 
   return (
-    <aside className="flex flex-col gap-3 bg-rail px-4 py-3 text-rail-foreground lg:sticky lg:top-0 lg:h-svh lg:gap-[18px] lg:overflow-y-auto lg:px-3.5 lg:py-[22px]">
-      <div className="flex items-center gap-[11px] lg:px-2">
-        <div className="grid size-8 flex-none place-items-center rounded-full border-2 border-rail-accent font-heading text-sm font-bold text-rail-accent lg:size-10">
+    <aside
+      className="relative flex flex-col gap-3 bg-rail px-4 py-3 text-rail-foreground max-lg:flex-row max-lg:items-center max-lg:gap-1 max-lg:px-2 max-lg:py-1 max-lg:has-[[data-sub-row]]:pb-[52px] sm:max-lg:px-3 lg:sticky lg:top-0 lg:h-svh lg:gap-[18px] lg:overflow-y-auto lg:px-3.5 lg:py-[22px]"
+    >
+      <div className="flex items-center gap-[11px] max-lg:contents lg:px-2">
+        <div className="grid size-8 flex-none place-items-center rounded-full border-2 border-rail-accent font-heading text-sm font-bold text-rail-accent max-lg:mx-1 lg:size-10">
           V
         </div>
-        <div>
+        <div className="max-lg:hidden">
           <div className="font-heading text-lg leading-none font-bold tracking-[0.16em] text-white lg:text-[21px]">
             ViTAH
           </div>
@@ -122,26 +145,15 @@ export default function Sidebar({
             OS Platform
           </div>
         </div>
-        <SettingsMenu
-          name={name}
-          email={email}
-          isAdmin={isAdmin}
-          language={language}
-          onLanguageChange={onLanguageChange}
-          onChangePassword={() => setPasswordOpen(true)}
-          onTwoStep={onTwoStep}
-          onSignOut={onSignOut}
-          className="ml-auto max-w-[60%] lg:hidden"
-        />
       </div>
 
-      <nav className="-mx-1 flex flex-wrap gap-0.5 lg:mx-0 lg:flex-col lg:flex-nowrap">
+      <nav ref={sections} className={cn("flex gap-0.5 max-lg:min-w-0 max-lg:flex-1 lg:flex-col", stripClass)}>
         {NAV_ITEMS.filter((item) => isAdmin || !item.adminOnly).map((item) => {
           const active = pathname.startsWith(item.href);
           const Icon = item.icon;
           return (
             <div key={item.key} className="max-lg:contents">
-              <Link href={item.href} className={navLinkClass(active)}>
+              <Link href={item.href} className={navLinkClass(active)} data-active={active || undefined}>
                 <Icon
                   aria-hidden
                   className={cn("size-[19px] flex-none opacity-85", active && "text-rail-accent opacity-100")}
@@ -158,6 +170,19 @@ export default function Sidebar({
         <SubcontractorsNav pathname={pathname} counts={subcontractors} />
         <PurchasesNav pathname={pathname} counts={purchases} />
       </nav>
+      {/* The phone's top bar ends with the avatar; from `lg` up the menu is at the foot of the rail. */}
+      <SettingsMenu
+        name={name}
+        email={email}
+        isAdmin={isAdmin}
+        language={language}
+        onLanguageChange={onLanguageChange}
+        onChangePassword={() => setPasswordOpen(true)}
+        onTwoStep={onTwoStep}
+        onSignOut={onSignOut}
+        compact
+        className="flex-none lg:hidden"
+      />
 
       <div className="mt-auto hidden border-t border-white/8 pt-3 lg:block">
         <SettingsMenu
@@ -183,7 +208,7 @@ export default function Sidebar({
 /**
  * Who is signed in, opening their settings (the portal's language, saved on their account,
  * changing their password, and signing out): at the foot of the rail on desktop, in the top bar's
- * corner on phones (avatar only below `sm`).
+ * corner below `lg` (the avatar alone, `compact`; its menu then starts with who is signed in).
  */
 function SettingsMenu({
   name,
@@ -194,8 +219,11 @@ function SettingsMenu({
   onChangePassword,
   onTwoStep,
   onSignOut,
+  compact = false,
   className,
 }: {
+  /** The avatar alone (the phone's top bar). */
+  compact?: boolean;
   name: string | null;
   email: string | null;
   /** Admins also reach what users deleted, to restore it. */
@@ -217,21 +245,36 @@ function SettingsMenu({
     <DropdownMenu>
       <DropdownMenuTrigger
         className={cn(
-          "flex min-h-11 min-w-0 items-center gap-2.5 rounded-[9px] px-2 text-left transition-colors hover:bg-white/6 data-popup-open:bg-white/8",
+          "relative flex min-h-11 min-w-0 items-center gap-2.5 rounded-[9px] px-2 text-left transition-colors hover:bg-white/6 data-popup-open:bg-white/8",
+          compact && "min-w-11 justify-center",
           className,
         )}
       >
         <span className="grid size-[30px] flex-none place-items-center rounded-full bg-verde-oliva-dark text-sm font-bold text-white">
           {displayName.charAt(0).toUpperCase()}
         </span>
-        <span className="min-w-0 max-sm:hidden">
-          <span className="block truncate text-sm font-semibold text-white">{displayName}</span>
-          {name && email && <span className="block truncate text-xs text-rail-muted">{email}</span>}
-        </span>
-        <Settings aria-hidden className="ml-auto size-4 flex-none text-rail-muted" strokeWidth={1.8} />
+        {!compact && (
+          <>
+            <span className="min-w-0">
+              <span className="block truncate text-sm font-semibold text-white">{displayName}</span>
+              {name && email && <span className="block truncate text-xs text-rail-muted">{email}</span>}
+            </span>
+            <Settings aria-hidden className="ml-auto size-4 flex-none text-rail-muted" strokeWidth={1.8} />
+          </>
+        )}
         <span className="sr-only">{t("settings")}</span>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
+        {compact && (
+          <>
+            {/* Who is signed in: the avatar alone does not say it. */}
+            <div className="px-2 py-1.5">
+              <div className="truncate text-sm font-semibold">{displayName}</div>
+              {name && email && <div className="truncate text-meta text-muted-foreground">{email}</div>}
+            </div>
+            <DropdownMenuSeparator />
+          </>
+        )}
         <DropdownMenuGroup>
           <DropdownMenuLabel>{t("language.label")}</DropdownMenuLabel>
           <DropdownMenuRadioGroup
@@ -302,7 +345,12 @@ function SubcontractorsNav({ pathname, counts }: { pathname: string; counts: Sub
       <p className="hidden px-3 pt-3 pb-1 text-xs font-semibold tracking-[0.12em] text-rail-muted uppercase lg:block">
         {t("network")}
       </p>
-      <Link href={`${SUBCONTRACTORS_HREF}/empresas`} className={navLinkClass(active)} aria-expanded={active}>
+      <Link
+        href={`${SUBCONTRACTORS_HREF}/empresas`}
+        className={navLinkClass(active)}
+        aria-expanded={active}
+        data-active={active || undefined}
+      >
         <HardHat
           aria-hidden
           className={cn("size-[19px] flex-none opacity-85", active && "text-rail-accent opacity-100")}
@@ -317,23 +365,13 @@ function SubcontractorsNav({ pathname, counts }: { pathname: string; counts: Sub
         )}
       </Link>
       {active && (
-        <ul
-          className="order-last -mx-3 flex basis-full gap-1 overflow-x-auto px-3 lg:mx-0 lg:mt-0.5 lg:mb-1.5 lg:ml-[21px] lg:flex-col lg:gap-0 lg:overflow-visible lg:border-l lg:border-white/10 lg:px-0"
-          aria-label={t("subcontractorTabs.label")}
-        >
+        <SubList label={t("subcontractorTabs.label")} pathname={pathname} subRow>
           {SUBCONTRACTOR_TABS.map((tab) => {
             const current = tab.key !== "expiries" && pathname.startsWith(tab.href);
             const count = counts?.[tab.key];
             return (
               <li key={tab.key} className="flex-none">
-                <Link
-                  href={tab.href}
-                  className={cn(
-                    "relative flex min-h-11 items-center gap-2 rounded-full px-3 text-sm whitespace-nowrap text-rail-muted transition-colors hover:text-rail-foreground lg:-ml-px lg:min-h-9 lg:rounded-none lg:border-l-2 lg:border-transparent lg:px-3.5",
-                    current && "bg-white/10 font-semibold text-white lg:border-rail-accent lg:bg-transparent",
-                  )}
-                  aria-current={current ? "page" : undefined}
-                >
+                <Link href={tab.href} className={cn(subLinkClass(current), "gap-2")} aria-current={current ? "page" : undefined}>
                   {t(`subcontractorTabs.${tab.key}`)}
                   {count !== undefined && (tab.key !== "expiries" || count > 0) && (
                     <span
@@ -352,7 +390,7 @@ function SubcontractorsNav({ pathname, counts }: { pathname: string; counts: Sub
               </li>
             );
           })}
-        </ul>
+        </SubList>
       )}
     </div>
   );
@@ -370,7 +408,7 @@ function PurchasesNav({ pathname, counts }: { pathname: string; counts: Purchasi
 
   return (
     <div className="max-lg:contents">
-      <Link href={COMPANY_PURCHASES_HREF} className={navLinkClass(active)} aria-expanded={active}>
+      <Link href={COMPANY_PURCHASES_HREF} className={navLinkClass(active)} aria-expanded={active} data-active={active || undefined}>
         <ShoppingCart
           aria-hidden
           className={cn("size-[19px] flex-none opacity-85", active && "text-rail-accent opacity-100")}
@@ -385,23 +423,13 @@ function PurchasesNav({ pathname, counts }: { pathname: string; counts: Purchasi
         )}
       </Link>
       {active && (
-        <ul
-          className="order-last -mx-3 flex basis-full gap-1 overflow-x-auto px-3 lg:mx-0 lg:mt-0.5 lg:mb-1.5 lg:ml-[21px] lg:flex-col lg:gap-0 lg:overflow-visible lg:border-l lg:border-white/10 lg:px-0"
-          aria-label={t("purchaseTabs.label")}
-        >
+        <SubList label={t("purchaseTabs.label")} pathname={pathname} subRow>
           {PURCHASE_TABS.map((tab) => {
             const here = current(tab.href);
             const count = counts?.[tab.key];
             return (
               <li key={tab.key} className="flex-none">
-                <Link
-                  href={tab.href}
-                  className={cn(
-                    "relative flex min-h-11 items-center gap-2 rounded-full px-3 text-sm whitespace-nowrap text-rail-muted transition-colors hover:text-rail-foreground lg:-ml-px lg:min-h-9 lg:rounded-none lg:border-l-2 lg:border-transparent lg:px-3.5",
-                    here && "bg-white/10 font-semibold text-white lg:border-rail-accent lg:bg-transparent",
-                  )}
-                  aria-current={here ? "page" : undefined}
-                >
+                <Link href={tab.href} className={cn(subLinkClass(here), "gap-2")} aria-current={here ? "page" : undefined}>
                   {t(`purchaseTabs.${tab.key}`)}
                   {count !== undefined && (
                     <span className="ml-auto rounded-full bg-white/9 px-1.5 font-mono text-xs text-rail-foreground">{count}</span>
@@ -410,38 +438,78 @@ function PurchasesNav({ pathname, counts }: { pathname: string; counts: Purchasi
               </li>
             );
           })}
-        </ul>
+        </SubList>
       )}
     </div>
   );
 }
 
-const subListClass =
-  "order-last -mx-3 flex basis-full gap-1 overflow-x-auto px-3 lg:mx-0 lg:mt-0.5 lg:mb-1.5 lg:ml-[21px] lg:flex-col lg:gap-0 lg:overflow-visible lg:border-l lg:border-white/10 lg:px-0";
-
 const subLinkClass = (current: boolean) =>
   cn(
-    "relative flex min-h-11 items-center rounded-full px-3 text-sm whitespace-nowrap text-rail-muted transition-colors hover:text-rail-foreground lg:-ml-px lg:min-h-9 lg:rounded-none lg:border-l-2 lg:border-transparent lg:px-3.5",
+    "relative flex min-h-11 items-center rounded-full px-3 text-sm whitespace-nowrap text-rail-muted transition-colors hover:text-rail-foreground lg:-ml-px lg:min-h-9 lg:rounded-none lg:pointer-coarse:min-h-11 lg:border-l-2 lg:border-transparent lg:px-3.5",
     current && "bg-white/10 font-semibold text-white lg:border-rail-accent lg:bg-transparent",
   );
+
+/** A section's pages: nested under it in the column; the second row of the phone's top bar. */
+function SubList({
+  label,
+  pathname,
+  subRow = false,
+  className,
+  children,
+}: {
+  label: string;
+  pathname: string;
+  /** It is itself the second row of the phone's top bar (a project's tabs sit in a row with the way back). */
+  subRow?: boolean;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  const strip = useRef<HTMLUListElement>(null);
+  useActiveInView(strip, pathname);
+  return (
+    <ul
+      ref={strip}
+      aria-label={label}
+      data-sub-row={subRow ? "" : undefined}
+      className={cn(
+        "flex gap-1 lg:mt-0.5 lg:mb-1.5 lg:ml-[21px] lg:flex-col lg:gap-0 lg:border-l lg:border-white/10",
+        stripClass,
+        subRow && subRowClass,
+        className,
+      )}
+    >
+      {children}
+    </ul>
+  );
+}
 
 function ProjectTabs({ projectId, pathname }: { projectId: string; pathname: string }) {
   const t = useTranslations("sidebar.projectTabs");
 
   return (
-    <ul className={subListClass} aria-label={t("label")}>
-      {PROJECT_TABS.map((tab) => {
-        const href = `/dashboard/projects/${projectId}${tab.path}`;
-        // A tab's own pages (e.g. a chapter under Obra) keep it current.
-        const active = pathname === href || (tab.path !== "" && pathname.startsWith(`${href}/`));
-        return (
-          <li key={tab.key} className="flex-none">
-            <Link href={href} className={subLinkClass(active)} aria-current={active ? "page" : undefined}>
-              {t(tab.key)}
-            </Link>
-          </li>
-        );
-      })}
-    </ul>
+    <div data-sub-row="" className={cn("max-lg:flex max-lg:items-center max-lg:gap-1 lg:contents", subRowClass)}>
+      {/* Below `lg` the project layout's "← Volver a proyectos" gives way to this arrow (and, like it,
+          to a page's own way back). */}
+      <ProjectsBackLink
+        label={t("backToProjects")}
+        iconOnly
+        className="grid min-h-11 min-w-11 flex-none place-items-center rounded-full text-rail-muted transition-colors hover:text-rail-foreground lg:hidden"
+      />
+      <SubList label={t("label")} pathname={pathname} className="max-lg:min-w-0 max-lg:flex-1">
+        {PROJECT_TABS.map((tab) => {
+          const href = `/dashboard/projects/${projectId}${tab.path}`;
+          // A tab's own pages (e.g. a chapter under Obra) keep it current.
+          const active = pathname === href || (tab.path !== "" && pathname.startsWith(`${href}/`));
+          return (
+            <li key={tab.key} className="flex-none">
+              <Link href={href} className={subLinkClass(active)} aria-current={active ? "page" : undefined}>
+                {t(tab.key)}
+              </Link>
+            </li>
+          );
+        })}
+      </SubList>
+    </div>
   );
 }

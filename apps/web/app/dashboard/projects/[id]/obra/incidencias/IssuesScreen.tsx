@@ -7,6 +7,8 @@
 import { useRef, useState, useTransition } from "react";
 import { useTranslations } from "next-intl";
 import type { IssueFile, IssueKind, ObraError, ObraIssue } from "@repo/core/contract";
+import { buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import {
   addIssueFileAction,
   createIssueAction,
@@ -183,6 +185,12 @@ export default function IssuesScreen({
     <ObraFrame projectId={projectId} header={header} current="issues" title={t("title")} description={t("description")}>
       <div className="grid items-start gap-[18px] lg:grid-cols-[minmax(0,1fr)_380px]">
         <section aria-label={t("records")} className="flex min-w-0 flex-col gap-3">
+          {canManage && (
+            // Below 1024px the form comes after the records: on site, the way to it is at the top.
+            <a href="#issue-form" className={cn(buttonVariants(), "w-full sm:w-fit lg:hidden")}>
+              {t("newTitle")}
+            </a>
+          )}
           <div className="flex flex-wrap items-center gap-2.5">
             <Segmented
               label={t("kind")}
@@ -233,7 +241,7 @@ export default function IssuesScreen({
         </section>
 
         {canManage && (
-          <div ref={formRef} className="scroll-mt-4 lg:sticky lg:top-4">
+          <div ref={formRef} id="issue-form" className="scroll-mt-4 lg:sticky lg:top-4">
             <IssueEditor
               key={`${editing ?? "new"}-${formKey}`}
               projectId={projectId}

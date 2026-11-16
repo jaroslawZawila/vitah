@@ -93,13 +93,13 @@ export default function ObrasTab({
                 </div>
               )}
             </div>
-            <dl className="m-0 grid grid-cols-[minmax(120px,32%)_1fr] gap-x-3.5 gap-y-2.5 text-sm">
+            <dl className="m-0 grid grid-cols-1 gap-x-3.5 gap-y-1 text-sm sm:grid-cols-[minmax(120px,32%)_minmax(0,1fr)] sm:gap-y-2.5">
               <dt className="text-muted-foreground">{t("chapters")}</dt>
               <dd className="m-0 flex flex-wrap gap-1.5">
                 {a.chapterCodes.length === 0
                   ? t("noChapters")
                   : a.chapterCodes.map((code) => (
-                      <Badge key={code} variant="outline">
+                      <Badge key={code} variant="outline" className="max-w-full whitespace-normal">
                         <span className="num">{code}</span> {chapterName(a.projectId, code)}
                       </Badge>
                     ))}

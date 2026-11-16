@@ -11,6 +11,7 @@ import { Field, FormMessage } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useFormat } from "@/lib/format";
+import { cn } from "@/lib/utils";
 import {
   NativeSelect,
   NativeSelectOption,
@@ -125,6 +126,136 @@ export function UsersClient({
       {t(`roles.${role}`)}
     </NativeSelectOption>
   ));
+
+  const phoneCell = (user: UserRow) => (
+    <div className="flex items-center gap-1.5">
+      <span className="num whitespace-nowrap text-muted-foreground">{user.phone ?? "—"}</span>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        aria-label={t("actions.editPhoneFor", { name: label(user) })}
+        onClick={() => {
+          clearDone();
+          setPhoneFor(user);
+        }}
+      >
+        {t("actions.editPhone")}
+      </Button>
+    </div>
+  );
+
+  const roleBadge = (user: UserRow) => (
+    <Badge variant={ROLE_BADGE[user.role]}>{t(`roles.${user.role}`)}</Badge>
+  );
+
+  const statusBadge = (user: UserRow) => (
+    <Badge variant={user.active ? "good" : "outline"}>
+      {user.active ? t("statuses.active") : t("statuses.inactive")}
+    </Badge>
+  );
+
+  const twoStep = (user: UserRow) => (
+    <div className="flex items-center gap-1.5">
+      <Badge variant={user.mfaEnabled ? "good" : "outline"}>
+        {user.mfaEnabled ? t("twoStep.on") : t("twoStep.off")}
+      </Badge>
+      {/* Beside what it removes: for a colleague who lost their phone. */}
+      {user.mfaEnabled && (
+        <Button
+          type="button"
+          variant="ghost-destructive"
+          size="sm"
+          className="disabled:pointer-events-auto disabled:cursor-not-allowed"
+          disabled={user.id === currentUserId}
+          title={
+            user.id === currentUserId
+              ? t("errors.cannot_remove_own_mfa")
+              : undefined
+          }
+          aria-label={t("actions.removeTwoStepFor", { name: label(user) })}
+          onClick={() => askToRemoveMfa(user)}
+        >
+          {t("actions.removeTwoStep")}
+        </Button>
+      )}
+    </div>
+  );
+
+  /** The row's actions; on the phone's card they wrap. */
+  const actions = (user: UserRow, wrap = false) => (
+    <div className={cn("flex items-center gap-1.5", wrap && "flex-wrap")}>
+      <NativeSelect
+        size="sm"
+        className="w-fit"
+        aria-label={t("table.role")}
+        value={user.role}
+        disabled={user.id === currentUserId}
+        title={
+          user.id === currentUserId
+            ? t("errors.cannot_modify_self")
+            : undefined
+        }
+        onChange={(e) =>
+          runRowAction(
+            updateUserRole(
+              user.id,
+              e.target.value as Role,
+            ),
+          )
+        }
+      >
+        {roleOptions}
+      </NativeSelect>
+      {user.active ? (
+        <Button
+          type="button"
+          variant="ghost-destructive"
+          size="sm"
+          className="disabled:pointer-events-auto disabled:cursor-not-allowed"
+          disabled={user.id === currentUserId}
+          title={
+            user.id === currentUserId
+              ? t("errors.cannot_modify_self")
+              : undefined
+          }
+          onClick={() => askToDeactivate(user)}
+        >
+          {t("actions.deactivate")}
+        </Button>
+      ) : (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() =>
+            runRowAction(toggleUserActive(user.id, true))
+          }
+        >
+          {t("actions.activate")}
+        </Button>
+      )}
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="disabled:pointer-events-auto disabled:cursor-not-allowed"
+        disabled={user.id === currentUserId}
+        title={
+          user.id === currentUserId
+            ? t("errors.cannot_reset_own_password")
+            : undefined
+        }
+        aria-label={t("actions.resetPasswordFor", { name: label(user) })}
+        onClick={() => {
+          clearDone();
+          setResetFor(user);
+        }}
+      >
+        {t("actions.resetPassword")}
+      </Button>
+    </div>
+  );
 
   return (
     <>
@@ -266,7 +397,32 @@ export function UsersClient({
       )}
 
       <Card size="list">
-        <Table>
+        {/* Phones: one card per user. */}
+        <ul className="m-0 flex list-none flex-col p-0 md:hidden">
+          {users.map((user) => (
+            <li key={user.id} className="flex flex-col gap-2.5 border-b py-3.5 last:border-b-0">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="font-semibold">{user.name ?? "—"}</span>
+                <span className="flex flex-wrap gap-1.5">
+                  {roleBadge(user)}
+                  {statusBadge(user)}
+                </span>
+              </div>
+              <dl className="m-0 grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-1.5 text-sm">
+                <dt className="text-muted-foreground">{t("table.email")}</dt>
+                <dd className="m-0 wrap-anywhere">{user.email}</dd>
+                <dt className="text-muted-foreground">{t("table.phone")}</dt>
+                <dd className="m-0">{phoneCell(user)}</dd>
+                <dt className="text-muted-foreground">{t("table.twoStep")}</dt>
+                <dd className="m-0">{twoStep(user)}</dd>
+                <dt className="text-muted-foreground">{t("table.created")}</dt>
+                <dd className="num m-0">{format.date(user.createdAt)}</dd>
+              </dl>
+              {actions(user, true)}
+            </li>
+          ))}
+        </ul>
+        <Table className="hidden md:table">
           <TableHeader>
             <TableRow>
               <TableHead>{t("table.name")}</TableHead>
@@ -286,136 +442,14 @@ export function UsersClient({
                 <TableCell className="text-muted-foreground">
                   {user.email}
                 </TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-1.5">
-                    <span className="num whitespace-nowrap text-muted-foreground">{user.phone ?? "—"}</span>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      aria-label={t("actions.editPhoneFor", { name: label(user) })}
-                      onClick={() => {
-                        clearDone();
-                        setPhoneFor(user);
-                      }}
-                    >
-                      {t("actions.editPhone")}
-                    </Button>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <Badge variant={ROLE_BADGE[user.role]}>
-                    {t(`roles.${user.role}`)}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  <Badge variant={user.active ? "good" : "outline"}>
-                    {user.active
-                      ? t("statuses.active")
-                      : t("statuses.inactive")}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-1.5">
-                    <Badge variant={user.mfaEnabled ? "good" : "outline"}>
-                      {user.mfaEnabled ? t("twoStep.on") : t("twoStep.off")}
-                    </Badge>
-                    {/* Beside what it removes: for a colleague who lost their phone. */}
-                    {user.mfaEnabled && (
-                      <Button
-                        type="button"
-                        variant="ghost-destructive"
-                        size="sm"
-                        className="disabled:pointer-events-auto disabled:cursor-not-allowed"
-                        disabled={user.id === currentUserId}
-                        title={
-                          user.id === currentUserId
-                            ? t("errors.cannot_remove_own_mfa")
-                            : undefined
-                        }
-                        aria-label={t("actions.removeTwoStepFor", { name: label(user) })}
-                        onClick={() => askToRemoveMfa(user)}
-                      >
-                        {t("actions.removeTwoStep")}
-                      </Button>
-                    )}
-                  </div>
-                </TableCell>
+                <TableCell>{phoneCell(user)}</TableCell>
+                <TableCell>{roleBadge(user)}</TableCell>
+                <TableCell>{statusBadge(user)}</TableCell>
+                <TableCell>{twoStep(user)}</TableCell>
                 <TableCell className="num text-muted-foreground">
                   {format.date(user.createdAt)}
                 </TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-1.5">
-                    <NativeSelect
-                      size="sm"
-                      className="w-fit"
-                      value={user.role}
-                      disabled={user.id === currentUserId}
-                      title={
-                        user.id === currentUserId
-                          ? t("errors.cannot_modify_self")
-                          : undefined
-                      }
-                      onChange={(e) =>
-                        runRowAction(
-                          updateUserRole(
-                            user.id,
-                            e.target.value as Role,
-                          ),
-                        )
-                      }
-                    >
-                      {roleOptions}
-                    </NativeSelect>
-                    {user.active ? (
-                      <Button
-                        type="button"
-                        variant="ghost-destructive"
-                        size="sm"
-                        className="disabled:pointer-events-auto disabled:cursor-not-allowed"
-                        disabled={user.id === currentUserId}
-                        title={
-                          user.id === currentUserId
-                            ? t("errors.cannot_modify_self")
-                            : undefined
-                        }
-                        onClick={() => askToDeactivate(user)}
-                      >
-                        {t("actions.deactivate")}
-                      </Button>
-                    ) : (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                          runRowAction(toggleUserActive(user.id, true))
-                        }
-                      >
-                        {t("actions.activate")}
-                      </Button>
-                    )}
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="disabled:pointer-events-auto disabled:cursor-not-allowed"
-                      disabled={user.id === currentUserId}
-                      title={
-                        user.id === currentUserId
-                          ? t("errors.cannot_reset_own_password")
-                          : undefined
-                      }
-                      aria-label={t("actions.resetPasswordFor", { name: label(user) })}
-                      onClick={() => {
-                        clearDone();
-                        setResetFor(user);
-                      }}
-                    >
-                      {t("actions.resetPassword")}
-                    </Button>
-                  </div>
-                </TableCell>
+                <TableCell>{actions(user)}</TableCell>
               </TableRow>
             ))}
           </TableBody>

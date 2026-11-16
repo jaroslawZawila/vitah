@@ -87,17 +87,20 @@ export default function PlanningScreen({
         <PlanKpis baseline={baseline} completionDate={planning.completionDate} />
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap gap-2">
-            <button type="button" className={chip} aria-pressed={showBaseline} onClick={() => setShowBaseline((on) => !on)}>
+            {/* The bars are drawn from 768px; the phone's cards say the dates in words. */}
+            <button type="button" className={cn(chip, "max-md:hidden")} aria-pressed={showBaseline} onClick={() => setShowBaseline((on) => !on)}>
               {t("table.compare")}
             </button>
             <button type="button" className={chip} aria-pressed={onlyCritical} onClick={() => setOnlyCritical((on) => !on)}>
               {t("table.onlyCritical")}
             </button>
           </div>
-          <PlanLegend today={today} showBaseline={showBaseline} />
+          <div className="hidden md:block">
+            <PlanLegend today={today} showBaseline={showBaseline} />
+          </div>
         </div>
         <PlanTable rows={rows} timeline={timeline} today={today} showBaseline={showBaseline} chapterHref={(code) => chapterHref(projectId, code)} />
-        <PlanCards rows={rows} timeline={timeline} today={today} showBaseline={showBaseline} chapterHref={(code) => chapterHref(projectId, code)} />
+        <PlanCards rows={rows} schedule={planning.schedule} chapterHref={(code) => chapterHref(projectId, code)} />
         <p className={cn(muted, "max-w-[90ch] leading-normal")}>{t("footnote", { calendar: calendarText(baseline.calendar) })}</p>
       </>
     );

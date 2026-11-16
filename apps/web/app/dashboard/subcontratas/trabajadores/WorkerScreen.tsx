@@ -40,6 +40,8 @@ import AccessCard from "../components/worker/AccessCard";
 import WorkerForm from "../components/worker/WorkerForm";
 import { documentFacts, emptyWorkerDraft, workerDraftFrom, type CompanyChoice } from "../components/worker/draft";
 import { useDocumentActions, type DocumentActions } from "../useDocumentActions";
+import { cn } from "@/lib/utils";
+import { touchLink } from "../../components/touch";
 
 /** The document buttons' server actions, handed to useDocumentActions. */
 const DOCUMENT_ACTIONS: DocumentActions = {
@@ -118,7 +120,7 @@ export default function WorkerScreen({
         </div>
         {worker && (
           <p className="m-0 text-sm text-muted-foreground">
-            <Link className="underline-offset-3 hover:underline" href={companyHref(worker.subcontractorId)}>
+            <Link className={cn("underline-offset-3 hover:underline", touchLink)} href={companyHref(worker.subcontractorId)}>
               {worker.subcontractorName}
             </Link>
             {worker.trade && ` · ${tr(`trades.${worker.trade}`)}`}

@@ -137,10 +137,25 @@ mockups don't cover, extend the same visual language. Concept B on the canvas wa
 `apps/web` must always be mobile-friendly:
 - Design mobile layout first, enhance for desktop with `min-width` media queries
 - Test at 320px, 480px, 768px, 1024px breakpoints
-- The grafito sidebar is a sticky column from `lg`; below that it becomes a top bar whose sections and
-  project tabs scroll sideways
-- Touch targets minimum 44px (`Button`, `Input` and `NativeSelect` grow to 44px on `pointer-coarse`)
-- No horizontal scroll at any viewport width
+- The grafito sidebar is a sticky column from `lg`; below that it is a top bar of at most two rows: the brand mark,
+  the sections scrolling sideways and the avatar's menu; then a project's tabs (led by the arrow back to the project
+  list) or Subcontratas' / Compras' pages, also scrolling sideways. A section with pages of its own renders that
+  second row marked `data-sub-row` (`SubList subRow`), and the bar makes room for it. The place strip (`Topbar`) and
+  the project layout's "Volver a proyectos" show from `lg` only. A strip that scrolls sideways brings its current item
+  into view (`useActiveInView`)
+- Touch targets minimum 44px (`Button`, `Input` and `NativeSelect` grow to 44px on `pointer-coarse`). A text link in a
+  cell or a card line takes `touchLink`, a card's or row's main link is stretched over it (`stretchedLink`, or
+  `touchStretch` on touch only; the card or row is `relative`): all in `app/dashboard/components/touch.ts`, and
+  `app/phone-layout.test.ts` fails when `touchLink`'s classes are pasted elsewhere. Mouse users keep the desktop's density
+- No horizontal scroll at any viewport width. A strip that scrolls sideways (`overflow-x-auto`) is `relative`: an
+  `sr-only` or absolute child of an unpositioned one escapes its clip and widens the whole page
+  (`app/phone-layout.test.ts` fails without it, or without a `scroll-ok:` comment saying why)
+- Below `md` (768px) a wide table is never the phone's only view. Either the same table reflows into cards
+  (`max-md:` classes on its rows and cells, each figure named with `phoneLabel`; `phoneFigures` and `phoneLine` in
+  `app/dashboard/components/phone-table.ts` are the two usual arrangements): use this when the rows hold inputs or state, so there is one set of
+  them; or a list of cards (`md:hidden`) beside the table (`max-md:hidden`) when the card is arranged differently
+  (Obra › Resumen, Costes, Planificación, Pagos). A card shows the record's name as its link, its status and its key
+  figures labelled with their VAT basis; nothing the desktop shows becomes unreachable
 - Use `clamp()` for fluid typography where appropriate
 
 ### ViTAH Brand Identity

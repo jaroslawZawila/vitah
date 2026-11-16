@@ -6,6 +6,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useTranslations } from "next-intl";
+import { cn } from "@/lib/utils";
 import type { ConstructionControl } from "@repo/core/contract";
 import { reviewChangesAction } from "../../../../actions/construction";
 import EmptyState from "../components/EmptyState";
@@ -23,6 +24,9 @@ import { inPeriod } from "../components/construction/schedule";
 import { DocumentAlertsCard, MilestonesCard, OpenIssuesCard, RecentPhotosCard } from "../components/construction/SummaryCards";
 import SummaryKpis from "../components/construction/SummaryKpis";
 import SummaryTable from "../components/construction/SummaryTable";
+
+/** Moved after the chapters below 768px (the page is a flex column). */
+const phoneLater = "max-md:order-1";
 
 /** The works at a glance: key figures, the chapters (filtered here), hitos, issues, documents, photos. */
 export default function SummaryScreen({
@@ -122,7 +126,8 @@ export default function SummaryScreen({
             <ReadOnlyNote className="md:ml-auto" />
           </form>
 
-          <SummaryKpis control={control} />
+          {/* On a phone the chapters come first, under the filters that pick them; the key figures follow. */}
+          <SummaryKpis control={control} className={phoneLater} />
 
           <SummaryTable
             chapters={shown}
@@ -131,7 +136,7 @@ export default function SummaryScreen({
             progressHref={obraHref(projectId, "progress")}
           />
 
-          <div className="grid grid-cols-[repeat(auto-fit,minmax(min(300px,100%),1fr))] gap-3.5">
+          <div className={cn("grid grid-cols-[repeat(auto-fit,minmax(min(300px,100%),1fr))] gap-3.5", phoneLater)}>
             <MilestonesCard milestones={control.milestones} href={obraHref(projectId, "milestones")} />
             <OpenIssuesCard issues={control.issues} href={obraHref(projectId, "issues")} />
             <DocumentAlertsCard items={control.documentAlerts} subcontractorsHref="/dashboard/subcontratas/empresas" />
@@ -144,6 +149,7 @@ export default function SummaryScreen({
             thumbUrl={(photo) => projectPhotoUrl(projectId, photo.id, "thumb")}
             chapterName={(code) => names.get(code)}
             canUpload={canManage}
+            className={phoneLater}
           />
         </>
       )}

@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import type { ComponentProps, ReactNode } from "react";
+import { useRef, type ComponentProps, type ReactNode } from "react";
 import { useTranslations } from "next-intl";
 import type { ObraStage } from "@repo/core/contract";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { useActiveInView } from "../../../../components/useActiveInView";
 import { Dot } from "./pills";
 
 /** The Obra tab's pages, in the order of its sub-navigation. */
@@ -69,6 +70,9 @@ export function StageEyebrow({ label, stage }: { label: string; stage?: ObraStag
  * Presentational: an Obra page's header (ref and stage, title, what the page
  * is for, and its sources or actions on the right) above the sub-navigation
  * Resumen · Planificación · Avance · Costes · Hitos · Incidencias · Fotos.
+ * On a phone the sub-navigation comes straight after the title and the aside
+ * after it, as the page's first content (the header box gives way:
+ * `max-sm:contents`, and the title and tabs go first: `max-sm:-order-1`).
  */
 export default function ObraFrame({
   projectId,
@@ -88,11 +92,13 @@ export default function ObraFrame({
   children: React.ReactNode;
 }) {
   const t = useTranslations("construction.tabs");
+  const tabs = useRef<HTMLElement>(null);
+  useActiveInView(tabs, current);
 
   return (
     <div className="flex flex-col gap-[18px]">
-      <header className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4">
-        <div className="min-w-0">
+      <header className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4 max-sm:contents">
+        <div className="min-w-0 max-sm:-order-1">
           <StageEyebrow label={header.ref} stage={header.stage} />
           <h1 className="mt-1.5">{title}</h1>
           {description && <div className="mt-1 max-w-[80ch] text-[14px] text-muted-foreground">{description}</div>}
@@ -100,7 +106,8 @@ export default function ObraFrame({
         {aside}
       </header>
 
-      <nav aria-label={t("label")} className="-mx-1 flex gap-1 overflow-x-auto border-b px-1">
+      {/* `relative`: the count's screen-reader text (absolute) stays inside the strip, which clips it. */}
+      <nav ref={tabs} aria-label={t("label")} className="relative -mx-1 flex gap-1 overflow-x-auto border-b px-1 max-sm:-order-1">
         {OBRA_TABS.map((tab) => {
           const on = tab === current;
           return (

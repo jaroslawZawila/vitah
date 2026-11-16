@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { cardTop } from "../construction/classes";
 import { MockBadge } from "../construction/pills";
 import { usePurchaseFormat } from "./format";
+import { touchLink } from "../../../../components/touch";
 
 /**
  * Presentational: chapters whose orders must go out soon (or are late) with
@@ -52,7 +53,7 @@ export default function UpcomingCard({
               <span className="num font-semibold">{chapter.code}</span>
               <div className="min-w-0">
                 {newOrderHref ? (
-                  <Link href={newOrderHref(chapter.code)} className="font-semibold hover:text-primary">
+                  <Link href={newOrderHref(chapter.code)} className={cn("font-semibold hover:text-primary", touchLink)}>
                     {chapter.name}
                   </Link>
                 ) : (
@@ -77,7 +78,7 @@ export default function UpcomingCard({
                     chapter.pendingOrders.map((order, index) => (
                       <span key={order.id}>
                         {index > 0 && ", "}
-                        <Link href={orderHref(order.id)} className="num font-medium text-brand-ink hover:text-primary">
+                        <Link href={orderHref(order.id)} className={cn("num font-medium text-brand-ink hover:text-primary", touchLink)}>
                           {orderLabel(order.number)}
                         </Link>
                       </span>

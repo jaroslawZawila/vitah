@@ -145,11 +145,19 @@ describe("CompaniesTable", () => {
   it("lists the companies with their document columns", () => {
     wrap(<CompaniesTable companies={companies} projects={[]} filter={NO_FILTER} onFilterChange={() => {}} />);
 
-    const row = screen.getByRole("link", { name: "Electricidad Saja S.L." }).closest("tr")!;
+    const table = within(screen.getByRole("table"));
+    const row = table.getByRole("link", { name: "Electricidad Saja S.L." }).closest("tr")!;
     expect(within(row).getByText("Caducado")).toBeInTheDocument();
     expect(within(row).getByText("6/7")).toBeInTheDocument();
     expect(within(row).getByText("Bloqueada")).toBeInTheDocument();
-    expect(screen.getAllByText("18 días")).toHaveLength(2);
+    expect(table.getAllByText("18 días")).toHaveLength(2);
+
+    // Phones: a card per company opening its ficha, with its status and each document column labelled.
+    const card = within(screen.getAllByRole("link", { name: "Electricidad Saja S.L." })[0]!.closest("li")!);
+    expect(card.getByRole("link", { name: "Electricidad Saja S.L." })).toHaveAttribute("href", "/dashboard/subcontratas/empresas/c-2");
+    expect(card.getByText("Bloqueada")).toBeInTheDocument();
+    expect(card.getByText("Caducado")).toBeInTheDocument();
+    expect(card.getByText("6/7")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Abrir la ficha de Javier Ruiz Pellón" })).toHaveAttribute(
       "href",
       "/dashboard/subcontratas/empresas/c-3",
@@ -183,10 +191,13 @@ describe("CompaniesTable", () => {
     const supplier = company({ id: "c-9", legalName: "Piedra de Liébana S.L.", suppliesOnly: true, workers: 0 });
     wrap(<CompaniesTable companies={[...companies, supplier]} projects={[]} filter={NO_FILTER} onFilterChange={() => {}} />);
 
-    const row = screen.getByRole("link", { name: "Piedra de Liébana S.L." }).closest("tr")!;
+    const row = within(screen.getByRole("table")).getByRole("link", { name: "Piedra de Liébana S.L." }).closest("tr")!;
     expect(within(row).getAllByText("Proveedor de material")).toHaveLength(2);
     expect(within(row).getByText("Sin documentación CAE")).toBeInTheDocument();
     expect(within(row).queryByText("Apta")).not.toBeInTheDocument();
+    const card = within(screen.getAllByRole("link", { name: "Piedra de Liébana S.L." })[0]!.closest("li")!);
+    expect(card.getAllByText(/Proveedor de material/)).toHaveLength(2);
+    expect(card.queryByText("Apta")).not.toBeInTheDocument();
     expect(filterCompanies([supplier], { ...NO_FILTER, status: "apta" })).toEqual([]);
     expect(filterCompanies([supplier], NO_FILTER)).toEqual([supplier]);
   });

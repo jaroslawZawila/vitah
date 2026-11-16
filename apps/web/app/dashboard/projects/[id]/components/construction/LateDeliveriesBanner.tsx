@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { Clock } from "lucide-react";
 import { orderLabel, type PurchaseOrderListItem } from "@repo/core/contract";
+import { cn } from "@/lib/utils";
+import { touchLink } from "../../../../components/touch";
 import { useControlFormat } from "./format";
 
 /**
@@ -30,7 +32,7 @@ export default function LateDeliveriesBanner({
         {orders.map((order, index) => (
           <span key={order.id}>
             {index > 0 && "; "}
-            <Link href={orderHref(order.id)} className="num underline">
+            <Link href={orderHref(order.id)} className={cn("num underline", touchLink)}>
               {orderLabel(order.number)}
             </Link>{" "}
             {order.supplierName}

@@ -19,6 +19,7 @@ import { orderTotals, type LineDraft, type ParseAmount } from "./draft";
 import { day, usePurchaseFormat } from "./format";
 import { Lines } from "./OrderSteps";
 import { EventText } from "./OrderHistory";
+import { touchLink } from "../../../../components/touch";
 
 // Presentational: an order's modificados (the card on its page) and the form
 // that records one. The containers (OrderScreen, AmendmentFormScreen) run the
@@ -80,7 +81,7 @@ export function OrderAmendments({
                   </p>
                   <p className="m-0 flex flex-wrap items-center gap-x-2 text-meta text-muted-foreground">
                     {amendment.document && (
-                      <a href={documentUrl(amendment.document.id)} download className="inline-flex items-center gap-1 font-medium text-brand-ink hover:text-primary">
+                      <a href={documentUrl(amendment.document.id)} download className={cn("inline-flex items-center gap-1 font-medium text-brand-ink hover:text-primary", touchLink)}>
                         <FileText aria-hidden className="size-3.5 flex-none" />
                         {amendment.document.title}
                       </a>

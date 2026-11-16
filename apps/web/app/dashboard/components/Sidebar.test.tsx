@@ -96,6 +96,77 @@ describe("Sidebar", () => {
     expect(tabs.getByRole("link", { current: "page" })).toHaveTextContent(current);
   });
 
+  it("starts a project's tabs with the way back to the project list, on the phone's top bar only", () => {
+    renderAt("/dashboard/projects/p-1/obra");
+    const back = screen.getByRole("link", { name: "Volver a proyectos" });
+    expect(back).toHaveAttribute("href", "/dashboard/projects");
+    expect(back).toHaveClass("lg:hidden");
+    // It gives way to a page's own "← Volver", like the project layout's link.
+    expect(back.className).toContain("[:root:has([data-back-link])_&]:hidden");
+    // Before the tabs, outside their list.
+    expect(within(projectTabs()!).queryByRole("link", { name: "Volver a proyectos" })).not.toBeInTheDocument();
+    expect(back.compareDocumentPosition(projectTabs()!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it.each([
+    ["/dashboard/projects", false],
+    ["/dashboard/projects/new", false],
+    ["/dashboard/clients", false],
+    ["/dashboard/projects/p-1/budget", true],
+    ["/dashboard/subcontratas/empresas", true],
+    ["/dashboard/compras/facturas", true],
+  ])("on %s, the phone's top bar keeps room for a second row: %s", (pathname, second) => {
+    const { container } = renderAt(pathname);
+    // The bar makes room for whatever marks itself as its second row (`has-[[data-sub-row]]`).
+    expect(container.querySelector("aside")!.className).toContain("max-lg:has-[[data-sub-row]]:pb-[52px]");
+    expect(container.querySelector("aside [data-sub-row]") !== null).toBe(second);
+  });
+
+  it.each([
+    ["/dashboard/projects/p-1/obra", /^Proyectos/],
+    ["/dashboard/clients", /^Clientes/],
+    ["/dashboard/subcontratas/trabajadores", /^Subcontratas/],
+    ["/dashboard/compras/pagos", /^Compras/],
+  ])("marks the section of %s, for the phone's top bar to scroll it into view", (pathname, name) => {
+    renderAt(pathname);
+    const sections = within(screen.getByRole("navigation"));
+    const marked = sections.getAllByRole("link").filter((link) => link.hasAttribute("data-active"));
+    expect(marked).toHaveLength(1);
+    expect(marked[0]).toHaveAccessibleName(name);
+  });
+
+  it("scrolls the section the user is in into view when the top bar is narrower than its sections", () => {
+    const widths = vi.spyOn(HTMLElement.prototype, "scrollWidth", "get").mockReturnValue(600);
+    const client = vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(300);
+    const rects = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+      const left = this.tagName === "NAV" ? 0 : this.hasAttribute("data-active") ? 450 : 0;
+      const width = this.tagName === "NAV" ? 300 : 100;
+      return { left, right: left + width, width, top: 0, bottom: 44, height: 44, x: left, y: 0, toJSON: () => ({}) };
+    });
+    try {
+      renderAt("/dashboard/compras");
+      // Centred: 450 − 0 − (300 − 100) / 2.
+      expect(screen.getByRole("navigation").scrollLeft).toBe(350);
+    } finally {
+      widths.mockRestore();
+      client.mockRestore();
+      rects.mockRestore();
+    }
+  });
+
+  it("shows the avatar alone on the phone's top bar, its menu saying who is signed in", async () => {
+    renderAt("/dashboard/projects");
+    const [phone, desktop] = screen.getAllByRole("button", { name: /Ajustes/ });
+    expect(phone).toHaveClass("lg:hidden");
+    expect(phone).not.toHaveTextContent("laura@vitah.es");
+    expect(desktop).toHaveTextContent("laura@vitah.es");
+
+    fireEvent.click(phone!);
+    const menu = await screen.findByRole("menu");
+    expect(menu).toHaveTextContent("Laura");
+    expect(menu).toHaveTextContent("laura@vitah.es");
+  });
+
   it("lists no sections under Proyectos: the project list filters by budget and obra instead", () => {
     renderAt("/dashboard/projects");
     expect(screen.getByRole("link", { name: "Proyectos" })).toHaveAttribute("href", "/dashboard/projects");

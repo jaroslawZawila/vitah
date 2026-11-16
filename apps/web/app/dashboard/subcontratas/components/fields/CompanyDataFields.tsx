@@ -13,7 +13,7 @@ import { taxIdValid, type CompanyFormDraft } from "./draft";
 export const segmentStyles = {
   group: "m-0 flex w-fit flex-wrap gap-[3px] rounded-[10px] border bg-raise p-[3px]",
   option:
-    "flex min-h-11 cursor-pointer items-center rounded-[7px] px-4 text-sm font-semibold text-muted-foreground transition-colors has-checked:bg-card has-checked:text-foreground has-checked:shadow-card has-disabled:cursor-not-allowed has-disabled:opacity-45 lg:min-h-9 [&>input]:sr-only",
+    "flex min-h-11 cursor-pointer items-center rounded-[7px] px-4 text-sm font-semibold text-muted-foreground transition-colors has-checked:bg-card has-checked:text-foreground has-checked:shadow-card has-disabled:cursor-not-allowed has-disabled:opacity-45 lg:min-h-9 lg:pointer-coarse:min-h-11 [&>input]:sr-only",
 };
 
 /** The first choice of the company form: on-site company, self-employed, or a material supplier (no CAE). */

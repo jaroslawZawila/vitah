@@ -47,6 +47,24 @@ describe("IssuesScreen", () => {
     expect(within(screen.getByRole("article", { name: "CAM-004" })).getByText("+2.350,00 € est.")).toBeInTheDocument();
   });
 
+  it("leads below 1024px with the way to the form, which comes after the records there", () => {
+    const { unmount } = renderScreen();
+    const jump = screen.getByRole("link", { name: "Nuevo registro" });
+    expect(jump).toHaveAttribute("href", "#issue-form");
+    expect(jump).toHaveClass("lg:hidden");
+    expect(document.getElementById("issue-form")).toContainElement(screen.getByRole("form", { name: "Nuevo registro" }));
+    unmount();
+
+    renderScreen({ canManage: false });
+    expect(screen.queryByRole("link", { name: "Nuevo registro" })).not.toBeInTheDocument();
+  });
+
+  it("gives an attachment 44px to a finger", () => {
+    renderScreen();
+    const record = within(screen.getByRole("article", { name: "INC-007" }));
+    expect(record.getByRole("link", { name: "albaran.pdf" })).toHaveClass("pointer-coarse:min-h-11");
+  });
+
   it("filters by kind, chapter and status", async () => {
     renderScreen();
 

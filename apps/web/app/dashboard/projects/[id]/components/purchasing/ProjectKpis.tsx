@@ -8,6 +8,7 @@ import { useVatLabel } from "../../../../components/vat-basis";
 import Kpi from "../obra/Kpi";
 import { deviationTone } from "../construction/format";
 import { usePurchaseFormat } from "./format";
+import { touchLink } from "../../../../components/touch";
 
 /** The deviation over the closed lines (contracted − cost: an overrun is positive), or why there is none yet. */
 export function DeviationKpi({ summary }: { summary: Pick<ProjectPurchases["summary"], "deviationCents" | "deviationBp" | "closedLines"> }) {
@@ -76,7 +77,7 @@ export default function ProjectKpis({
         hints={[
           first ? (
             <>
-              <Link href={orderHref(first)} className="font-semibold text-brand-ink hover:text-primary">
+              <Link href={orderHref(first)} className={cn("font-semibold text-brand-ink hover:text-primary", touchLink)}>
                 {orderLabel(first.number)}
               </Link>{" "}
               {t("lateHint", {

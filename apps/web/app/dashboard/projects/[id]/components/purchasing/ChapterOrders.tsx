@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { cardTop, moreLink } from "../construction/classes";
 import { usePurchaseFormat } from "./format";
 import { LatePill, PurchaseStatusPill } from "./pills";
+import { touchLink } from "../../../../components/touch";
 
 /** Presentational: a chapter's orders (Compras) on its Obra page, with a way to order more. */
 export default function ChapterOrders({
@@ -57,7 +58,7 @@ export default function ChapterOrders({
             >
               <Link
                 href={orderHref(order)}
-                className="num font-semibold text-brand-ink hover:text-primary"
+                className={cn("num font-semibold text-brand-ink hover:text-primary", touchLink)}
               >
                 {orderLabel(order.number)}
               </Link>

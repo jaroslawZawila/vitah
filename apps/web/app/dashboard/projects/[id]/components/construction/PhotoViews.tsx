@@ -111,9 +111,10 @@ export function PhotoGroups({
                     </a>
                     <figcaption className="flex flex-col gap-0.5 text-sm">
                       <span className="font-semibold wrap-anywhere">{name}</span>
-                      <span className="flex items-center justify-between gap-1 text-muted-foreground">
+                      {/* The buttons wrap under the date when the tile is too narrow for both (a phone's two columns). */}
+                      <span className="flex flex-wrap items-center justify-between gap-x-1 text-muted-foreground">
                         <span className="num">{meta}</span>
-                        <span className="flex items-center">
+                        <span className="ml-auto flex items-center">
                           {onToggleVisibility && (
                             <Button
                               type="button"
@@ -244,7 +245,7 @@ export function PhotoUploadForm({
           pick(Array.from(event.dataTransfer.files));
         }}
         className={cn(
-          "flex min-h-[120px] cursor-pointer flex-col items-center justify-center gap-1.5 rounded-xl border-[1.5px] border-dashed bg-raise px-4 py-5 text-center text-sm text-muted-foreground transition-colors hover:border-primary",
+          "relative flex min-h-[120px] cursor-pointer flex-col items-center justify-center gap-1.5 rounded-xl border-[1.5px] border-dashed bg-raise px-4 py-5 text-center text-sm text-muted-foreground transition-colors hover:border-primary",
           dragging && "border-primary bg-brand-soft",
         )}
       >
@@ -255,15 +256,16 @@ export function PhotoUploadForm({
           {t("orPick")}
         </span>
         {files.length > 0 && <span className="font-semibold text-foreground">{t("picked", { count: files.length })}</span>}
+        {/* Hidden: the whole box (at least 120px tall) is what a finger taps; inside it, so the box is its hit area. */}
+        <input
+          id="photo-files"
+          type="file"
+          multiple
+          accept={PHOTO_TYPES.join(",")}
+          className="sr-only"
+          onChange={(event) => pick(Array.from(event.target.files ?? []))}
+        />
       </label>
-      <input
-        id="photo-files"
-        type="file"
-        multiple
-        accept={PHOTO_TYPES.join(",")}
-        className="sr-only"
-        onChange={(event) => pick(Array.from(event.target.files ?? []))}
-      />
       <Field>
         <Label htmlFor="photo-date">{t("date")}</Label>
         <Input id="photo-date" type="date" className="num" required max={today} value={takenOn} onChange={(event) => setTakenOn(event.target.value)} />

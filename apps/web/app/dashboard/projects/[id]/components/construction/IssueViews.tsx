@@ -31,9 +31,13 @@ import FormError from "../../../../components/FormError";
 import { useControlFormat } from "./format";
 import { IssueKindPill, IssueStatusPill } from "./pills";
 import { useImpact, useIssueRef } from "./SummaryCards";
+import { touchLink } from "../../../../components/touch";
 
 // Presentational: the issues and changes log (records and the form that
 // creates or edits one).
+
+/** An attachment or a budget revision in a record's footer: 44px tall for a finger. */
+const fileLink = `font-medium text-info hover:underline ${touchLink}`;
 
 /** One record: what happened, who, its estimated impact and attachments. */
 export function IssueCard({
@@ -93,7 +97,7 @@ export function IssueCard({
                 href={fileUrl(issue, file)}
                 target="_blank"
                 rel="noreferrer"
-                className="font-medium text-info hover:underline"
+                className={fileLink}
               >
                 {file.filename}
               </a>
@@ -105,7 +109,7 @@ export function IssueCard({
             {t("pricedIn")}
             {issue.revisions.map((revision) =>
               revisionHref ? (
-                <Link key={revision.id} href={revisionHref(revision.id)} className="font-medium text-info hover:underline">
+                <Link key={revision.id} href={revisionHref(revision.id)} className={fileLink}>
                   {t("revision", { number: revision.number })}
                 </Link>
               ) : (
@@ -345,7 +349,7 @@ export function IssueForm({
             {issue.files.map((file) => (
               <li key={file.id} className="flex items-center justify-between gap-2 rounded-md bg-raise px-2.5 py-1">
                 {fileUrl ? (
-                  <a href={fileUrl(file)} target="_blank" rel="noreferrer" className="truncate font-medium text-info hover:underline">
+                  <a href={fileUrl(file)} target="_blank" rel="noreferrer" className="block min-w-0 truncate font-medium text-info hover:underline pointer-coarse:leading-11">
                     {file.filename}
                   </a>
                 ) : (

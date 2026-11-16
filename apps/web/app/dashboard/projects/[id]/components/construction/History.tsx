@@ -6,6 +6,7 @@ import { cardVariants } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { useControlFormat } from "./format";
+import { Figure } from "./SummaryTable";
 
 // Presentational: the record of every start, finish and correction of a
 // chapter's dates (with the value before, who and when).
@@ -67,7 +68,7 @@ export function HistoryTable({ events }: { events: ProgressEvent[] }) {
       {events.length === 0 ? (
         <p className="px-[18px] pb-4 text-sm text-muted-foreground">{t("empty")}</p>
       ) : (
-        <Table className="min-w-[720px]" aria-labelledby="history-title">
+        <Table className="hidden min-w-[720px] md:table" aria-labelledby="history-title">
           <TableHeader>
             <TableRow>
               <TableHead className="pl-[18px]">{t("record")}</TableHead>
@@ -96,6 +97,34 @@ export function HistoryTable({ events }: { events: ProgressEvent[] }) {
             ))}
           </TableBody>
         </Table>
+      )}
+      {/* Below 768px the table as a list: each record with its dates before and now, then when and by whom. */}
+      {events.length > 0 && (
+        <ul className="m-0 list-none p-0 md:hidden" aria-labelledby="history-title">
+          {events.map((event) => (
+            <li key={event.id} className="flex flex-col gap-1.5 border-t px-[18px] py-3 text-sm">
+              <div>
+                <b>{t(`row.${event.kind}`)}</b>
+                <div className="text-muted-foreground">
+                  {isCorrection(event)
+                    ? event.note && `«${event.note}»`
+                    : t(event.kind === "start" ? "pendingToInProgress" : "inProgressToFinished")}
+                </div>
+              </div>
+              <dl className="m-0 grid grid-cols-2 gap-x-3 gap-y-1.5">
+                <Figure label={t("before")}>{event.previousDate ? <span className="num">{f.date(event.previousDate)}</span> : <Muted />}</Figure>
+                <Figure label={t("after")}>{event.newDate ? <span className="num">{f.date(event.newDate)}</span> : <Muted text={t("cleared")} />}</Figure>
+              </dl>
+              <p className="text-meta text-muted-foreground">
+                {t.rich(event.recordedBy ? "recordedOnBy" : "recordedOn", {
+                  date: f.dateTime(event.recordedAt),
+                  by: event.recordedBy ?? "",
+                  num: (chunks) => <span className="num">{chunks}</span>,
+                })}
+              </p>
+            </li>
+          ))}
+        </ul>
       )}
     </section>
   );

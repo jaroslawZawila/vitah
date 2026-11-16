@@ -45,7 +45,8 @@
       "payments": "Pagos",
       "documents": "Documentos",
       "purchases": "Compras",
-      "warranty": "Garantía"
+      "warranty": "Garantía",
+      "backToProjects": "Volver a proyectos"
     },
     "network": "Red",
     "subcontractors": "Subcontratas",
@@ -1100,6 +1101,8 @@
       "after": "Ahora",
       "recorded": "Registrado",
       "by": "Por",
+      "recordedOn": "Registrado el <num>{date}</num>",
+      "recordedOnBy": "Registrado el <num>{date}</num> por {by}",
       "row": {
         "start": "Inicio real",
         "finish": "Fin real",
@@ -1479,8 +1482,14 @@
       "onlyCritical": "Solo ruta crítica",
       "critical": "Crítica",
       "late": "{days} vs. línea base",
-      "lateLong": "{days} sobre la línea base",
-      "barLabel": "Previsto {forecast}; línea base {baseline}"
+      "barLabel": "Previsto {forecast}; línea base {baseline}",
+      "planned": "Línea base",
+      "actual": "Real",
+      "actualSince": "desde el {date} · {pct} %",
+      "duration": "Duración",
+      "workingDays": "{count, plural, one {# día laborable} other {# días laborables}}",
+      "waitsFor": "Empieza",
+      "order": "Pedir antes del"
     },
     "legend": {
       "finished": "Terminado",
@@ -4236,7 +4245,8 @@
     "results": "Obras",
     "noMatch": "Ninguna obra coincide.",
     "current": "obra actual",
-    "count": "{count, plural, =0 {Ninguna obra} one {# obra} other {# obras}}"
+    "count": "{count, plural, =0 {Ninguna obra} one {# obra} other {# obras}}",
+    "change": "Cambiar de obra"
   },
   "budgetsOverview": {
     "pill": {

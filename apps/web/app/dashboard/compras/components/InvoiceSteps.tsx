@@ -29,6 +29,10 @@ import {
   type InvoiceDraft,
   type Parse,
 } from "./invoice-draft";
+import { phoneLabel, phoneLine } from "../../components/phone-table";
+
+/** The lines table's cells as rows of a card below 768px, each with its column's name. */
+const phoneCell = phoneLine;
 
 export const section = cn(cardVariants(), "gap-3.5");
 const option =
@@ -320,8 +324,9 @@ export function Split({
         )}
       </div>
       <div className="-mx-[18px]">
-        <Table className="min-w-[640px]">
-          <TableHeader>
+        {/* Below 768px each line is a card (the same elements): the line, then each figure with its column's name. */}
+        <Table className="max-md:block md:min-w-[640px]">
+          <TableHeader className="max-md:hidden">
             <TableRow>
               <TableHead className="pl-[18px]">{t("line")}</TableHead>
               <TableHead className="text-right">{t("contracted")}</TableHead>
@@ -329,15 +334,22 @@ export function Split({
               <TableHead className="pr-[18px] text-right">{t("thisInvoice")}</TableHead>
             </TableRow>
           </TableHeader>
-          <TableBody>
+          <TableBody className="max-md:block">
             {order.lines.map((line) => (
-              <TableRow key={line.lineageId}>
-                <TableCell className="pl-[18px] whitespace-normal">
+              <TableRow key={line.lineageId} className="max-md:flex max-md:flex-col max-md:gap-1 max-md:px-[18px] max-md:py-2.5">
+                <TableCell className="pl-[18px] whitespace-normal max-md:p-0">
                   <span className="num text-muted-foreground">{line.code ?? line.chapterCode}</span> {line.description ?? "—"}
                 </TableCell>
-                <TableCell className="num text-right">{f.amount(line.amountCents)}</TableCell>
-                <TableCell className="num text-right">{f.amount(line.invoicedCents)}</TableCell>
-                <TableCell className="pr-[18px] text-right">
+                <TableCell className={cn("num text-right", phoneCell)}>
+                  <span className={phoneLabel}>{t("contracted")}</span>
+                  {f.amount(line.amountCents)}
+                </TableCell>
+                <TableCell className={cn("num text-right", phoneCell)}>
+                  <span className={phoneLabel}>{t("invoiced")}</span>
+                  {f.amount(line.invoicedCents)}
+                </TableCell>
+                <TableCell className={cn("pr-[18px] text-right", phoneCell)}>
+                  <span className={phoneLabel}>{t("thisInvoice")}</span>
                   <Input
                     aria-label={t("amountOf", { code: line.code ?? line.chapterCode })}
                     className="num ml-auto w-[140px] text-right"
