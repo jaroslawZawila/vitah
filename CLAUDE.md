@@ -882,7 +882,8 @@ ANTHROPIC_API_KEY=<key>                                         # apps/web only,
 
 On Vercel, `POSTGRES_URL` is injected automatically from the linked Vercel Postgres store, and Blob
 credentials from the connected private Blob store. `ANTHROPIC_API_KEY` is set by hand; Vercel Workflow runs the
-budget AI (no extra config beyond `withWorkflow` in `next.config.js`).
+budget AI (no extra config beyond `withWorkflow` in `next.config.js`). The functions run in Frankfurt (`fra1`,
+`apps/web/vercel.json`), beside the database.
 
 ## Brand Reference
 

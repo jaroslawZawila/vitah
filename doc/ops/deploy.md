@@ -7,6 +7,8 @@
 3. The build runs `db:sql:deploy` before `next build`. With `MIGRATE_ON_DEPLOY=1` on the Production environment it applies pending migration files and fails the build if one fails; without it, it only prints how many are pending.
 4. When Vercel reports the deployment successful, the **smoke** workflow (`smoke.yml`) runs `scripts/smoke.sh` against production.
 
+The functions run in Frankfurt (`fra1`), beside the database (Neon `eu-central-1`): `apps/web/vercel.json` › `regions`, which wins over the project's dashboard setting and applies to previews too. To check: `curl -sI https://portal.vitah.es/api/health | grep -i x-vercel-id` answers `<entry>::fra1::…` (the first part is the entry point nearest the caller). If the database ever moves, move this with it.
+
 ## Before you push
 
 - The local commit gate has passed (it runs on every commit made through Claude Code; otherwise run `pnpm exec turbo run test check-types lint` and `pnpm exec turbo run build --filter=web`).
