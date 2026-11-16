@@ -612,6 +612,8 @@ describe("BudgetScreen: a change to the contract and the client's approval in th
     await userEvent.click(card().getByRole("button", { name: "Vincular" }));
     expect(actions.linkChangeAction).toHaveBeenCalledWith("p-1", "rev-1", "cam-4");
 
+    // The card's buttons are off while the link is saved: a click before that ends would do nothing.
+    await waitFor(() => expect(card().getByRole("button", { name: "Pedir aprobación en la app" })).toBeEnabled());
     await userEvent.click(card().getByRole("button", { name: "Pedir aprobación en la app" }));
     const dialog = await openedDialog("Pedir al cliente que apruebe la Rev.1");
     await userEvent.type(dialog.getByLabelText(/Mensaje al cliente/), "La piscina que hablamos");
