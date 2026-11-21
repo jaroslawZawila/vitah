@@ -39,6 +39,8 @@ describe("/api/v1/projects/:id/obra/control", () => {
     expect(control.sources).toEqual({ planning: "mock", purchasing: "live" });
     // No approved plan, and a project without dates to simulate them from: never called on time.
     expect(control.schedule).toMatchObject({ status: "no_dates", planning: "mock", forecast: null });
+    // The latest records and photos stay in the API's answer (the portal no longer shows them).
+    expect(control).toMatchObject({ events: [], photos: [], photoCount: 0 });
 
     const header = await (await getHeader(apiRequest(token), routeParams({ id: project.id }))).json();
     expect(header).toMatchObject({ ref: project.ref, openIssues: 0, today: "2026-10-17" });

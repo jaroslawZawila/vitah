@@ -1,22 +1,21 @@
 "use client";
 
 import Link from "next/link";
-import { Fragment } from "react";
 import { useTranslations } from "next-intl";
 import { Camera, MessageSquareWarning } from "lucide-react";
-import type { ChapterState, ControlChapter } from "@repo/core/contract";
+import type { ControlChapter } from "@repo/core/contract";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cardVariants } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { DateRange } from "../../../../components/DateRange";
-import { chapterLink, groupRow } from "./classes";
+import { chapterLink } from "./classes";
 import { stretchedLink } from "../../../../components/touch";
 import { daysBetween, useControlFormat } from "./format";
 import { GanttBar, MonthAxis, type Timeline } from "./Gantt";
 import { ChapterStatePill, SCHEDULE_TONE } from "./pills";
-import { groupByState, scheduleOf } from "./schedule";
+import { scheduleOf } from "./schedule";
 import { DateSpan, dateSpan } from "./SummaryTable";
 
 // Presentational: Obra › Avance, the chapters with their plan against what
@@ -124,7 +123,7 @@ function RowActions({
   );
 }
 
-/** From 768px: the chapters grouped by state, with plan and actual dates and a mini Gantt. */
+/** From 768px: the chapters in one list, with plan and actual dates and a mini Gantt. */
 export function ProgressTable({
   chapters,
   timeline,
@@ -139,9 +138,7 @@ export function ProgressTable({
   actions?: ProgressActions;
 }) {
   const t = useTranslations("construction.progress");
-  const tg = useTranslations("construction.groups");
   const f = useControlFormat();
-  const columns = 4 + (timeline ? 1 : 0) + (actions ? 1 : 0);
 
   return (
     <section className={cn(cardVariants({ size: "flush" }), "hidden py-1.5 md:flex")} aria-label={t("tableLabel")}>
@@ -166,41 +163,32 @@ export function ProgressTable({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {groupByState(chapters).map((group) => (
-            <Fragment key={group.state}>
-              <TableRow className={groupRow}>
-                <TableCell colSpan={columns} className="pl-[18px]">
-                  {tg(group.state, { count: group.chapters.length })}
+          {chapters.map((chapter) => (
+            <TableRow key={chapter.code}>
+              {/* The code beside the name, not a column of its own: the table fits the card. */}
+              <TableCell className="min-w-[200px] pl-[18px] whitespace-normal">
+                <span className="num mr-2 text-muted-foreground">{chapter.code}</span>
+                <Link href={chapterHref(chapter.code)} className={chapterLink}>
+                  {chapter.name}
+                </Link>
+                <ChapterNotes chapter={chapter} today={today} />
+              </TableCell>
+              <TableCell>
+                <ChapterStatePill state={chapter.state} />
+              </TableCell>
+              <TableCell><DateSpan f={f} start={chapter.plannedStart} end={chapter.plannedEnd} /></TableCell>
+              <TableCell><DateSpan f={f} start={chapter.actualStart} end={chapter.actualEnd} /></TableCell>
+              {timeline && (
+                <TableCell className="hidden xl:table-cell">
+                  <GanttBar chapter={chapter} timeline={timeline} today={today} className="min-w-[240px]" />
                 </TableCell>
-              </TableRow>
-              {group.chapters.map((chapter) => (
-                <TableRow key={chapter.code}>
-                  {/* The code beside the name, not a column of its own: the table fits the card. */}
-                  <TableCell className="min-w-[200px] pl-[18px] whitespace-normal">
-                    <span className="num mr-2 text-muted-foreground">{chapter.code}</span>
-                    <Link href={chapterHref(chapter.code)} className={chapterLink}>
-                      {chapter.name}
-                    </Link>
-                    <ChapterNotes chapter={chapter} today={today} />
-                  </TableCell>
-                  <TableCell>
-                    <ChapterStatePill state={chapter.state} />
-                  </TableCell>
-                  <TableCell><DateSpan f={f} start={chapter.plannedStart} end={chapter.plannedEnd} /></TableCell>
-                  <TableCell><DateSpan f={f} start={chapter.actualStart} end={chapter.actualEnd} /></TableCell>
-                  {timeline && (
-                    <TableCell className="hidden xl:table-cell">
-                      <GanttBar chapter={chapter} timeline={timeline} today={today} className="min-w-[240px]" />
-                    </TableCell>
-                  )}
-                  {actions && (
-                    <TableCell className="pr-[18px] text-right">
-                      <RowActions chapter={chapter} actions={actions} />
-                    </TableCell>
-                  )}
-                </TableRow>
-              ))}
-            </Fragment>
+              )}
+              {actions && (
+                <TableCell className="pr-[18px] text-right">
+                  <RowActions chapter={chapter} actions={actions} />
+                </TableCell>
+              )}
+            </TableRow>
           ))}
         </TableBody>
       </Table>
@@ -208,105 +196,68 @@ export function ProgressTable({
   );
 }
 
-/** How many of each group a phone shows while no state is picked (the rest is a tap away). */
-const PHONE_LIMIT: Record<ChapterState, number | null> = { in_progress: null, pending: 2, finished: 1 };
-
-/**
- * On phones: a card per chapter. With every state shown, all chapters in
- * progress, the next pending ones and the last finished; picking a state
- * shows all of it.
- */
+/** On phones: a card per chapter, all of them in one list in their order. */
 export function ProgressCards({
   chapters,
   timeline,
   today,
   chapterHref,
   actions,
-  showingAll,
-  onShowState,
 }: {
   chapters: ControlChapter[];
   timeline: Timeline | null;
   today: string;
   chapterHref: (code: string) => string;
   actions?: ProgressActions;
-  /** No state filter: groups are shortened. */
-  showingAll: boolean;
-  onShowState: (state: ChapterState) => void;
 }) {
   const t = useTranslations("construction.progress");
-  const tg = useTranslations("construction.groups");
   const f = useControlFormat();
 
   return (
-    <div className="flex flex-col gap-3 md:hidden">
-      {groupByState(chapters).map((group) => {
-        let list = group.chapters;
-        const limit = showingAll ? PHONE_LIMIT[group.state] : null;
-        if (limit !== null) {
-          // The next to start, or the last to finish.
-          list =
-            group.state === "finished"
-              ? [...list].sort((a, b) => (b.actualEnd ?? "").localeCompare(a.actualEnd ?? "")).slice(0, limit)
-              : list.slice(0, limit);
-        }
-        const hidden = group.chapters.length - list.length;
+    <div className="flex flex-col gap-2.5 md:hidden">
+      {chapters.map((chapter) => {
+        const plan = dateSpan(f, chapter.plannedStart, chapter.plannedEnd);
+        const actual = dateSpan(f, chapter.actualStart, chapter.actualEnd);
+        const soon = chapter.state === "pending" && chapter.plannedStart ? daysBetween(today, chapter.plannedStart) : null;
         return (
-          <section key={group.state} className="flex flex-col gap-2.5" aria-label={tg(group.state, { count: group.chapters.length })}>
-            <h2 className="eyebrow mt-1 font-sans">
-              {limit !== null ? tg(`${group.state}Phone`, { count: list.length }) : tg(group.state, { count: group.chapters.length })}
-            </h2>
-            {list.map((chapter) => {
-              const plan = dateSpan(f, chapter.plannedStart, chapter.plannedEnd);
-              const actual = dateSpan(f, chapter.actualStart, chapter.actualEnd);
-              const soon = chapter.state === "pending" && chapter.plannedStart ? daysBetween(today, chapter.plannedStart) : null;
-              return (
-                // The name's link covers the card; the buttons sit above it.
-                <article key={chapter.code} className={cn(cardVariants(), "relative gap-2.5 p-3.5")}>
-                  <div className="flex items-start gap-2.5">
-                    <span className="num pt-0.5 font-semibold">{chapter.code}</span>
-                    <Link href={chapterHref(chapter.code)} className={cn("min-w-0 flex-1 leading-snug font-semibold", stretchedLink)}>
-                      {chapter.name}
-                    </Link>
-                    <ChapterStatePill state={chapter.state} />
-                  </div>
-                  <ChapterNotes chapter={chapter} today={today} />
-                  {/* A date span, or the "· in 1 d" after it, goes on to the next line rather than past the card. */}
-                  <dl className="m-0 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-0.5 text-sm">
-                    <dt className="text-muted-foreground">{t("plan")}</dt>
-                    <dd className="m-0">
-                      {plan ? <DateRange text={plan} /> : "—"}
-                      {soon !== null && soon >= 0 && soon <= 14 && (
-                        <>
-                          {" "}
-                          <span className="whitespace-nowrap text-muted-foreground">· {t("inDays", { count: soon })}</span>
-                        </>
-                      )}
-                    </dd>
-                    {actual && (
-                      <>
-                        <dt className="text-muted-foreground">{t("actual")}</dt>
-                        <dd className="m-0">
-                          <DateRange text={actual} />
-                        </dd>
-                      </>
-                    )}
-                  </dl>
-                  {timeline && chapter.state !== "pending" && <GanttBar chapter={chapter} timeline={timeline} today={today} className="min-w-0" />}
-                  {actions && (
-                    <div className="relative flex justify-end">
-                      <RowActions chapter={chapter} actions={actions} phone />
-                    </div>
-                  )}
-                </article>
-              );
-            })}
-            {hidden > 0 && (
-              <Button type="button" variant="ghost" className="self-start text-brand-ink" onClick={() => onShowState(group.state)}>
-                {t("showAll", { count: group.chapters.length, state: tg(`${group.state}Name`) })}
-              </Button>
+          // The name's link covers the card; the buttons sit above it.
+          <article key={chapter.code} className={cn(cardVariants(), "relative gap-2.5 p-3.5")}>
+            <div className="flex items-start gap-2.5">
+              <span className="num pt-0.5 font-semibold">{chapter.code}</span>
+              <Link href={chapterHref(chapter.code)} className={cn("min-w-0 flex-1 leading-snug font-semibold", stretchedLink)}>
+                {chapter.name}
+              </Link>
+              <ChapterStatePill state={chapter.state} />
+            </div>
+            <ChapterNotes chapter={chapter} today={today} />
+            {/* A date span, or the "· in 1 d" after it, goes on to the next line rather than past the card. */}
+            <dl className="m-0 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-0.5 text-sm">
+              <dt className="text-muted-foreground">{t("plan")}</dt>
+              <dd className="m-0">
+                {plan ? <DateRange text={plan} /> : "—"}
+                {soon !== null && soon >= 0 && soon <= 14 && (
+                  <>
+                    {" "}
+                    <span className="whitespace-nowrap text-muted-foreground">· {t("inDays", { count: soon })}</span>
+                  </>
+                )}
+              </dd>
+              {actual && (
+                <>
+                  <dt className="text-muted-foreground">{t("actual")}</dt>
+                  <dd className="m-0">
+                    <DateRange text={actual} />
+                  </dd>
+                </>
+              )}
+            </dl>
+            {timeline && chapter.state !== "pending" && <GanttBar chapter={chapter} timeline={timeline} today={today} className="min-w-0" />}
+            {actions && (
+              <div className="relative flex justify-end">
+                <RowActions chapter={chapter} actions={actions} phone />
+              </div>
             )}
-          </section>
+          </article>
         );
       })}
     </div>

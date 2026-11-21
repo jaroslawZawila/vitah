@@ -49,18 +49,17 @@ export function FilterSelect({
   );
 }
 
-/** The chapter states as a segmented filter, with how many of each. */
+const STATE_FILTERS: StateFilter[] = ["all", "in_progress", "pending", "finished"];
+
+/** The chapter states as a segmented filter, what is happening now first, with how many of each. */
 export function StateFilterBar({
   value,
   onChange,
   counts,
-  order = ["all", "pending", "in_progress", "finished"],
 }: {
   value: StateFilter;
   onChange: (value: StateFilter) => void;
-  /** Shown beside each option when given. */
-  counts?: Record<StateFilter, number>;
-  order?: StateFilter[];
+  counts: Record<StateFilter, number>;
 }) {
   const t = useTranslations("construction.filters");
   return (
@@ -68,7 +67,7 @@ export function StateFilterBar({
       label={t("state")}
       value={value}
       onChange={onChange}
-      options={order.map((key) => ({ key, label: t(`states.${key}`), count: counts?.[key] }))}
+      options={STATE_FILTERS.map((key) => ({ key, label: t(`states.${key}`), count: counts[key] }))}
     />
   );
 }

@@ -13,48 +13,6 @@ import { Figure } from "./SummaryTable";
 
 const isCorrection = (event: ProgressEvent) => event.kind === "correct_start" || event.kind === "correct_finish";
 
-/** Avance's "Últimos registros": the latest recorded dates across chapters. */
-export function RecentEvents({ events }: { events: ProgressEvent[] }) {
-  const t = useTranslations("construction.history");
-  const f = useControlFormat();
-  return (
-    <section className={cn(cardVariants(), "gap-2.5")} aria-labelledby="recent-events">
-      <h2 id="recent-events">{t("recentTitle")}</h2>
-      {events.length === 0 ? (
-        <p className="text-sm text-muted-foreground">{t("empty")}</p>
-      ) : (
-        <ul className="m-0 flex list-none flex-col p-0">
-          {events.map((event) => (
-            <li key={event.id} className="flex flex-col gap-0.5 border-t py-2.5 text-sm first:border-t-0 first:pt-0">
-              <div className="flex flex-wrap items-baseline justify-between gap-x-3">
-                <span>
-                  <b>{t(`kind.${event.kind}`, { code: event.chapterCode })}</b> ·{" "}
-                  <span className="num">
-                    {isCorrection(event)
-                      ? `${f.date(event.previousDate)} → ${f.date(event.newDate)}`
-                      : event.newDate && f.date(event.newDate)}
-                  </span>
-                </span>
-                <span className="num text-muted-foreground">{f.dateTime(event.recordedAt)}</span>
-              </div>
-              <span className="text-muted-foreground">
-                {[
-                  event.recordedBy,
-                  isCorrection(event)
-                    ? event.note && `«${event.note}»`
-                    : t(event.kind === "start" ? "becameInProgress" : "becameFinished", { code: event.chapterCode }),
-                ]
-                  .filter(Boolean)
-                  .join(" · ")}
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
-  );
-}
-
 /** A chapter's page: its whole history. */
 export function HistoryTable({ events }: { events: ProgressEvent[] }) {
   const t = useTranslations("construction.history");

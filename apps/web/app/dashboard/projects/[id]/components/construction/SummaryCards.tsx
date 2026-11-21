@@ -2,15 +2,15 @@
 
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { Upload } from "lucide-react";
-import type { AttentionItem, ControlMilestone, ObraIssue, ProjectPhoto } from "@repo/core/contract";
+import type { AttentionItem, ControlMilestone, ObraIssue } from "@repo/core/contract";
+import { nextMilestone } from "@repo/core/control-calc";
 import { Badge } from "@/components/ui/badge";
-import { buttonVariants } from "@/components/ui/button";
 import { cardVariants } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { DOC_STATE_VARIANT, useDates, useRequirementName } from "../../../../subcontratas/components/display";
 import { cardTop, footnote, kv, moreLink } from "./classes";
 import { touchLink } from "../../../../components/touch";
+import { useVatLabel } from "../../../../components/vat-basis";
 import { useControlFormat } from "./format";
 import { IssueKindPill, MilestoneStatePill, Source, SourceLabel } from "./pills";
 
@@ -34,9 +34,17 @@ export function useImpact() {
   };
 }
 
-export function MilestonesCard({ milestones, href }: { milestones: ControlMilestone[]; href: string }) {
+/**
+ * The next hito to be paid: the first in the plan not yet collected, with its amount and how many of its chapters
+ * are done. Later hitos already reached, requested or invoiced are counted under it, so none owed goes unseen.
+ */
+export function NextMilestoneCard({ milestones, href }: { milestones: ControlMilestone[]; href: string }) {
   const t = useTranslations("construction.summary.milestones");
   const ts = useTranslations("construction.sources");
+  const f = useControlFormat();
+  const vat = useVatLabel();
+  const next = nextMilestone(milestones);
+  const alsoDue = milestones.filter((m) => m !== next && (m.state === "reached" || m.state === "requested" || m.state === "invoiced")).length;
   return (
     <section className={cn(cardVariants(), "gap-2.5")} aria-labelledby="summary-milestones">
       <div className={cardTop}>
@@ -47,23 +55,35 @@ export function MilestonesCard({ milestones, href }: { milestones: ControlMilest
       </div>
       {milestones.length === 0 ? (
         <p className="text-sm text-muted-foreground">{t("empty")}</p>
+      ) : !next ? (
+        <p className="text-sm text-muted-foreground">{t("allCollected")}</p>
       ) : (
-        <ul className="m-0 flex list-none flex-col p-0">
-          {milestones.map((m) => {
-            const done = m.chapters.filter((c) => c.state === "finished").length;
-            return (
-              <li key={m.id} className={kv}>
-                <span className="min-w-0">
-                  <span className="num font-semibold">{m.code}</span> {m.name}
-                  {m.state === "pending" && done > 0 && (
-                    <span className="text-muted-foreground"> · {t("chaptersDone", { done, total: m.chapters.length })}</span>
-                  )}
-                </span>
-                <MilestoneStatePill state={m.state} />
-              </li>
-            );
-          })}
-        </ul>
+        <div className="flex flex-col">
+          <div className={kv}>
+            <span className="min-w-0">
+              <span className="num font-semibold">{next.code}</span> {next.name}
+            </span>
+            <MilestoneStatePill state={next.state} />
+          </div>
+          <div className={kv}>
+            <span className="text-muted-foreground">{vat(t("amount"), "excl")}</span>
+            <span className="num">{f.money(next.amountCents)}</span>
+          </div>
+          {/* H0 and H1 close no chapters: no "0 de 0". */}
+          {next.chapters.length > 0 && (
+            <div className={kv}>
+              <span className="text-muted-foreground">{t("chapters")}</span>
+              <span className="num">
+                {t("chaptersDone", { done: next.chapters.filter((c) => c.state === "finished").length, total: next.chapters.length })}
+              </span>
+            </div>
+          )}
+          {alsoDue > 0 && (
+            <div className={kv}>
+              <span className="font-semibold text-warn">{t("alsoDue", { count: alsoDue })}</span>
+            </div>
+          )}
+        </div>
       )}
       <SourceLabel>
         {t("amounts")} <Source name={ts("budget")} /> · {t("invoices")} <Source name={ts("sales")} />
@@ -177,67 +197,6 @@ export function DocumentAlertsCard({ items, subcontractorsHref }: { items: Atten
           ),
         })}
       </p>
-    </section>
-  );
-}
-
-export function RecentPhotosCard({
-  photos,
-  count,
-  href,
-  thumbUrl,
-  chapterName,
-  canUpload,
-  className,
-}: {
-  photos: ProjectPhoto[];
-  count: number;
-  href: string;
-  thumbUrl: (photo: ProjectPhoto) => string;
-  chapterName: (code: string) => string | undefined;
-  canUpload: boolean;
-  className?: string;
-}) {
-  const t = useTranslations("construction.summary.photos");
-  const f = useControlFormat();
-  return (
-    <section className={cn(cardVariants(), "gap-3", className)} aria-labelledby="summary-photos">
-      <div className={cardTop}>
-        <h2 id="summary-photos">{t("title")}</h2>
-        <div className="flex flex-wrap items-center gap-2">
-          {count > 0 && (
-            <Link href={href} className={moreLink}>
-              {t("seeAll", { count })} →
-            </Link>
-          )}
-          {canUpload && (
-            <Link href={href} className={buttonVariants()}>
-              <Upload aria-hidden />
-              {t("upload")}
-            </Link>
-          )}
-        </div>
-      </div>
-      {photos.length === 0 ? (
-        <p className="text-sm text-muted-foreground">{t("empty")}</p>
-      ) : (
-        <ul className="m-0 grid list-none grid-cols-2 gap-2 p-0 sm:grid-cols-3">
-          {photos.map((photo) => {
-            const caption = [f.date(photo.takenOn), photo.chapterCode, photo.caption ?? (photo.chapterCode && chapterName(photo.chapterCode))]
-              .filter(Boolean)
-              .join(" · ");
-            return (
-              <li key={photo.id} className="flex min-w-0 flex-col gap-1">
-                {/* Served by our authenticated API, so next/image can't optimise it. */}
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={thumbUrl(photo)} alt={caption} loading="lazy" className="aspect-[4/3] w-full rounded-lg bg-raise object-cover" />
-                <span className="truncate text-xs text-muted-foreground">{caption}</span>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-      <p className={footnote}>{t("note")}</p>
     </section>
   );
 }

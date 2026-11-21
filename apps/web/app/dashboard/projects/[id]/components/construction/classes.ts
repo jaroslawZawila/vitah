@@ -17,10 +17,6 @@ export const kpiFigure = "font-heading text-[40px] leading-none font-semibold ta
 /** A label–value row in a card, ruled above (not the first). */
 export const kv = "flex items-baseline justify-between gap-3 border-t py-[7px] text-sm first:border-t-0";
 
-/** A table row that heads a group ("En curso · 6"). */
-export const groupRow =
-  "bg-raise hover:bg-raise [&>td]:py-[7px] [&>td]:text-xs [&>td]:font-semibold [&>td]:tracking-[0.08em] [&>td]:text-muted-foreground [&>td]:uppercase";
-
 /** A table's total row: a heavy rule over it. */
 export const totalRow = "border-t-2 border-t-foreground font-bold hover:bg-transparent";
 

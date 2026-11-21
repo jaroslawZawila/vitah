@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { Fragment } from "react";
 import { useTranslations } from "next-intl";
 import type { ConstructionControl, ControlChapter } from "@repo/core/contract";
 import { Badge } from "@/components/ui/badge";
@@ -9,11 +8,11 @@ import { cardVariants } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { DateRange } from "../../../../components/DateRange";
-import { cardTop, chapterLink, footnote, groupRow, moreLink, totalRow } from "./classes";
+import { cardTop, chapterLink, footnote, moreLink, totalRow } from "./classes";
 import { stretchedLink } from "../../../../components/touch";
 import { deviationTone, useControlFormat, type ControlFormat } from "./format";
 import { ChapterStatePill, SCHEDULE_TONE, Source, SourceLabel } from "./pills";
-import { groupByState, scheduleOf } from "./schedule";
+import { scheduleOf } from "./schedule";
 
 /** "14/09 – 09/10", "21/09 – …" or "—". */
 export function dateSpan(f: ControlFormat, start: string | null, end: string | null) {
@@ -56,8 +55,8 @@ export function Deviation({ cents, bp }: { cents: number | null; bp: number | nu
 }
 
 /**
- * Presentational: the Resumen's chapters, grouped by state (now, next,
- * done), with plan vs actual dates, cost and contract deviation.
+ * Presentational: the Resumen's chapters as one list in their order, each
+ * with its state, plan vs actual dates, cost and contract deviation.
  */
 export default function SummaryTable({
   chapters,
@@ -73,7 +72,6 @@ export default function SummaryTable({
 }) {
   const t = useTranslations("construction.summary.table");
   const ts = useTranslations("construction.sources");
-  const tg = useTranslations("construction.groups");
   const f = useControlFormat();
   const { today, sources, cost } = control;
 
@@ -126,53 +124,44 @@ export default function SummaryTable({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {groupByState(chapters).map((group) => (
-              <Fragment key={group.state}>
-                <TableRow className={groupRow}>
-                  <TableCell colSpan={9} className="pl-[18px]">
-                    {tg(group.state, { count: group.chapters.length })}
-                  </TableCell>
-                </TableRow>
-                {group.chapters.map((chapter) => (
-                  <TableRow key={chapter.code}>
-                    {/* The code beside the name, not a column of its own: the table fits the card. */}
-                    <TableCell className="min-w-[200px] pl-[18px] whitespace-normal">
-                      <span className="num mr-2 text-muted-foreground">{chapter.code}</span>
-                      <Link href={chapterHref(chapter.code)} className={chapterLink}>
-                        {chapter.name}
-                      </Link>
-                    </TableCell>
-                    <TableCell>
-                      <ChapterStatePill state={chapter.state} />
-                    </TableCell>
-                    <TableCell><DateSpan f={f} start={chapter.plannedStart} end={chapter.plannedEnd} /></TableCell>
-                    <TableCell><DateSpan f={f} start={chapter.actualStart} end={chapter.actualEnd} /></TableCell>
-                    <TableCell>
-                      <SchedulePill chapter={chapter} today={today} />
-                    </TableCell>
-                    <TableCell className="num">{chapter.hitoCode ?? <Dash />}</TableCell>
-                    <TableCell className="num text-right">{f.amount(chapter.costCents)}</TableCell>
-                    <TableCell className="text-right">
-                      {chapter.contractedCents === null ? (
-                        <Dash />
-                      ) : (
-                        <span className="num">
-                          {f.amount(chapter.contractedCents)}
-                          {chapter.contractedLines < chapter.lineCount && (
-                            <span className="text-muted-foreground" title={t("contractedLines", { contracted: chapter.contractedLines, total: chapter.lineCount })}>
-                              {" "}
-                              {chapter.contractedLines}/{chapter.lineCount}
-                            </span>
-                          )}
+            {chapters.map((chapter) => (
+              <TableRow key={chapter.code}>
+                {/* The code beside the name, not a column of its own: the table fits the card. */}
+                <TableCell className="min-w-[200px] pl-[18px] whitespace-normal">
+                  <span className="num mr-2 text-muted-foreground">{chapter.code}</span>
+                  <Link href={chapterHref(chapter.code)} className={chapterLink}>
+                    {chapter.name}
+                  </Link>
+                </TableCell>
+                <TableCell>
+                  <ChapterStatePill state={chapter.state} />
+                </TableCell>
+                <TableCell><DateSpan f={f} start={chapter.plannedStart} end={chapter.plannedEnd} /></TableCell>
+                <TableCell><DateSpan f={f} start={chapter.actualStart} end={chapter.actualEnd} /></TableCell>
+                <TableCell>
+                  <SchedulePill chapter={chapter} today={today} />
+                </TableCell>
+                <TableCell className="num">{chapter.hitoCode ?? <Dash />}</TableCell>
+                <TableCell className="num text-right">{f.amount(chapter.costCents)}</TableCell>
+                <TableCell className="text-right">
+                  {chapter.contractedCents === null ? (
+                    <Dash />
+                  ) : (
+                    <span className="num">
+                      {f.amount(chapter.contractedCents)}
+                      {chapter.contractedLines < chapter.lineCount && (
+                        <span className="text-muted-foreground" title={t("contractedLines", { contracted: chapter.contractedLines, total: chapter.lineCount })}>
+                          {" "}
+                          {chapter.contractedLines}/{chapter.lineCount}
                         </span>
                       )}
-                    </TableCell>
-                    <TableCell className="pr-[18px] text-right">
-                      <Deviation cents={chapter.deviationCents} bp={chapter.deviationBp} />
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </Fragment>
+                    </span>
+                  )}
+                </TableCell>
+                <TableCell className="pr-[18px] text-right">
+                  <Deviation cents={chapter.deviationCents} bp={chapter.deviationBp} />
+                </TableCell>
+              </TableRow>
             ))}
             <TableRow className={totalRow}>
               <TableCell colSpan={6} className="pl-[18px]">{t("total", { count: chapters.length })}</TableCell>
@@ -230,91 +219,82 @@ function SummaryChapterList({
   chapterHref: (code: string) => string;
 }) {
   const t = useTranslations("construction.summary.table");
-  const tg = useTranslations("construction.groups");
   const f = useControlFormat();
 
   return (
     <div className="md:hidden">
-      {groupByState(chapters).map((group) => {
-        const heading = tg(group.state, { count: group.chapters.length });
-        return (
-          <section key={group.state} aria-label={heading}>
-            <h3 className="eyebrow border-t bg-raise px-[18px] py-[7px] font-sans">{heading}</h3>
-            <ul className="m-0 list-none p-0">
-              {group.chapters.map((chapter) => (
-                <li key={chapter.code} className="relative flex flex-col gap-2 border-t px-[18px] py-3">
-                  <div className="flex items-start gap-2.5">
-                    <span className="num pt-px text-muted-foreground">{chapter.code}</span>
-                    <Link href={chapterHref(chapter.code)} className={cn("min-w-0 flex-1 leading-snug font-semibold", stretchedLink)}>
-                      {chapter.name}
-                    </Link>
-                    <ChapterStatePill state={chapter.state} />
-                  </div>
-                  {(scheduleOf(chapter, today) || chapter.hitoCode) && (
-                    <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-meta text-muted-foreground">
-                      <SchedulePill chapter={chapter} today={today} />
-                      {chapter.hitoCode && (
-                        <span>
-                          {t("hito")} <span className="num">{chapter.hitoCode}</span>
-                        </span>
-                      )}
-                    </div>
-                  )}
-                  <dl className="m-0 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-0.5 text-sm">
-                    <dt className="text-muted-foreground">{t("plan")}</dt>
-                    <dd className="m-0">
-                      <DateSpan f={f} start={chapter.plannedStart} end={chapter.plannedEnd} />
-                    </dd>
-                    {(chapter.actualStart || chapter.actualEnd) && (
+      <ul className="m-0 list-none p-0">
+        {chapters.map((chapter) => (
+          <li key={chapter.code} className="relative flex flex-col gap-2 border-t px-[18px] py-3">
+            <div className="flex items-start gap-2.5">
+              <span className="num pt-px text-muted-foreground">{chapter.code}</span>
+              <Link href={chapterHref(chapter.code)} className={cn("min-w-0 flex-1 leading-snug font-semibold", stretchedLink)}>
+                {chapter.name}
+              </Link>
+              <ChapterStatePill state={chapter.state} />
+            </div>
+            {(scheduleOf(chapter, today) || chapter.hitoCode) && (
+              <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-meta text-muted-foreground">
+                <SchedulePill chapter={chapter} today={today} />
+                {chapter.hitoCode && (
+                  <span>
+                    {t("hito")} <span className="num">{chapter.hitoCode}</span>
+                  </span>
+                )}
+              </div>
+            )}
+            <dl className="m-0 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-0.5 text-sm">
+              <dt className="text-muted-foreground">{t("plan")}</dt>
+              <dd className="m-0">
+                <DateSpan f={f} start={chapter.plannedStart} end={chapter.plannedEnd} />
+              </dd>
+              {(chapter.actualStart || chapter.actualEnd) && (
+                <>
+                  <dt className="text-muted-foreground">{t("actual")}</dt>
+                  <dd className="m-0">
+                    <DateSpan f={f} start={chapter.actualStart} end={chapter.actualEnd} />
+                  </dd>
+                </>
+              )}
+            </dl>
+            <dl className="m-0 grid grid-cols-2 gap-x-3 text-sm">
+              <Figure label={t("cost")}>
+                <span className="num">{f.amount(chapter.costCents)}</span>
+              </Figure>
+              <Figure label={t("contracted")}>
+                {chapter.contractedCents === null ? (
+                  <Dash />
+                ) : (
+                  <span>
+                    <span className="num">{f.amount(chapter.contractedCents)}</span>
+                    {chapter.contractedLines < chapter.lineCount && (
                       <>
-                        <dt className="text-muted-foreground">{t("actual")}</dt>
-                        <dd className="m-0">
-                          <DateSpan f={f} start={chapter.actualStart} end={chapter.actualEnd} />
-                        </dd>
+                        {" "}
+                        <span className="num text-meta text-muted-foreground" title={t("contractedLines", { contracted: chapter.contractedLines, total: chapter.lineCount })}>
+                          {chapter.contractedLines}/{chapter.lineCount}
+                        </span>
                       </>
                     )}
-                  </dl>
-                  <dl className="m-0 grid grid-cols-2 gap-x-3 text-sm">
-                    <Figure label={t("cost")}>
-                      <span className="num">{f.amount(chapter.costCents)}</span>
-                    </Figure>
-                    <Figure label={t("contracted")}>
-                      {chapter.contractedCents === null ? (
-                        <Dash />
-                      ) : (
-                        <span>
-                          <span className="num">{f.amount(chapter.contractedCents)}</span>
-                          {chapter.contractedLines < chapter.lineCount && (
-                            <>
-                              {" "}
-                              <span className="num text-meta text-muted-foreground" title={t("contractedLines", { contracted: chapter.contractedLines, total: chapter.lineCount })}>
-                                {chapter.contractedLines}/{chapter.lineCount}
-                              </span>
-                            </>
-                          )}
-                        </span>
-                      )}
-                      {/* The deviation under what it is of, its % breaking to the next line on a narrow phone. */}
-                      {chapter.deviationCents !== null && (
-                        <span className={cn("block text-meta", deviationTone(chapter.deviationCents))}>
-                          <span className="sr-only">{t("deviation")} </span>
-                          <span className="num">{f.signedAmount(chapter.deviationCents)}</span>
-                          {chapter.deviationBp !== null && (
-                            <>
-                              {" "}
-                              <span className="num">· {f.signedPercent(chapter.deviationBp)}</span>
-                            </>
-                          )}
-                        </span>
-                      )}
-                    </Figure>
-                  </dl>
-                </li>
-              ))}
-            </ul>
-          </section>
-        );
-      })}
+                  </span>
+                )}
+                {/* The deviation under what it is of, its % breaking to the next line on a narrow phone. */}
+                {chapter.deviationCents !== null && (
+                  <span className={cn("block text-meta", deviationTone(chapter.deviationCents))}>
+                    <span className="sr-only">{t("deviation")} </span>
+                    <span className="num">{f.signedAmount(chapter.deviationCents)}</span>
+                    {chapter.deviationBp !== null && (
+                      <>
+                        {" "}
+                        <span className="num">· {f.signedPercent(chapter.deviationBp)}</span>
+                      </>
+                    )}
+                  </span>
+                )}
+              </Figure>
+            </dl>
+          </li>
+        ))}
+      </ul>
       <div className="flex flex-col gap-2.5 border-t-2 border-t-foreground px-[18px] py-3 text-sm">
         <p className="font-bold">{t("total", { count: chapters.length })}</p>
         <dl className="m-0 grid grid-cols-2 gap-x-3 gap-y-2.5 [&_dd]:font-bold">

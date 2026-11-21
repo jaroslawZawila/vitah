@@ -476,6 +476,14 @@ describe("BudgetScreen", () => {
     renderScreen({ tab: "options" });
 
     const tabs = screen.getByRole("navigation", { name: "Secciones del presupuesto" });
+    // Each tab's name, then the count some carry (4 partidas, 1 option).
+    expect(within(tabs).getAllByRole("link").map((link) => link.textContent)).toEqual([
+      "Resumen",
+      "Partidas4",
+      "Opcionales1",
+      "Comentarios IA",
+      "Condiciones",
+    ]);
     expect(within(tabs).queryByRole("link", { name: /Revisiones/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("dialog", { name: "Revisiones" })).not.toBeInTheDocument();
 
@@ -556,7 +564,7 @@ describe("the project's client and address", () => {
     renderScreen({ budget: differing() });
 
     expect(screen.getByText(/no coinciden con los del proyecto/)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Revisar en Textos" })).toHaveAttribute("href", "/dashboard/projects/p-1/budget/texts");
+    expect(screen.getByRole("link", { name: "Revisar en Comentarios IA" })).toHaveAttribute("href", "/dashboard/projects/p-1/budget/texts");
     expect(screen.queryByRole("button", { name: "Usar los datos del proyecto" })).not.toBeInTheDocument();
   });
 

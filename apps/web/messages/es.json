@@ -866,17 +866,6 @@
       "live": "Real",
       "liveHint": "Dato real del módulo Compras."
     },
-    "groups": {
-      "in_progress": "En curso · {count}",
-      "pending": "Pendientes · {count}",
-      "finished": "Finalizados · {count}",
-      "in_progressPhone": "En curso · {count}",
-      "pendingPhone": "Próximos pendientes",
-      "finishedPhone": "{count, plural, one {Último finalizado} other {Últimos finalizados}}",
-      "in_progressName": "en curso",
-      "pendingName": "pendientes",
-      "finishedName": "finalizados"
-    },
     "schedule": {
       "late": "{days}",
       "onTime": "En plazo",
@@ -1006,10 +995,14 @@
         "footnote": "Importes en euros, a coste y sin IVA. Imprevistos (cap. 20, {contingency} €) quedan como reserva, fuera del total. Desviación = contratado − coste presupuestado, solo sobre partidas cerradas: positivo es sobrecoste, negativo ahorro."
       },
       "milestones": {
-        "title": "Hitos de pago",
+        "title": "Próximo hito de pago",
         "more": "Ver hitos",
         "empty": "Este proyecto no tiene hitos de pago.",
-        "chaptersDone": "{done} de {total} cap.",
+        "allCollected": "Todos los hitos están cobrados.",
+        "amount": "Importe",
+        "chapters": "Capítulos finalizados",
+        "chaptersDone": "{done} de {total}",
+        "alsoDue": "{count, plural, one {# hito más alcanzado o facturado sin cobrar} other {# hitos más alcanzados o facturados sin cobrar}}",
         "amounts": "Importes:",
         "invoices": "facturas y cobros:"
       },
@@ -1026,13 +1019,6 @@
         "ok": "Al día",
         "empty": "La documentación de las subcontratas de esta obra está al día.",
         "note": "Solo aviso. Los actualiza Administración en <link>Subcontratas</link>."
-      },
-      "photos": {
-        "title": "Fotos de obra",
-        "seeAll": "{count, plural, one {Ver la foto} other {Ver las #}}",
-        "upload": "Subir fotos",
-        "empty": "Todavía no hay fotos de la obra.",
-        "note": "Lo único que se sube desde el resumen. Cada foto lleva fecha, descripción opcional y, si quieres, su capítulo."
       }
     },
     "review": {
@@ -1071,27 +1057,10 @@
       "correctLabel": "Corregir fechas de {code}",
       "issueLabel": "Registrar incidencia en {code}",
       "photoLabel": "Subir foto a {code}",
-      "inDays": "{count, plural, =0 {hoy} other {en # d}}",
-      "showAll": "Ver los {count} {state}",
-      "howTitle": "Cómo funciona",
-      "how": {
-        "start": "<b>Iniciar</b> pide la fecha real de inicio (puede ser anterior a hoy) y pasa el capítulo a En curso.",
-        "finish": "<b>Finalizar</b> pide la fecha real de fin y lo pasa a Finalizado. Si cierra un hito, se pide la factura a Administración.",
-        "cancel": "Cancelar no guarda nada. Que pase una fecha prevista nunca cambia un estado.",
-        "planning": "Las fechas reales mueven la previsión de Planificación; la línea base aprobada no cambia."
-      }
+      "inDays": "{count, plural, =0 {hoy} other {en # d}}"
     },
     "history": {
-      "recentTitle": "Últimos registros",
       "empty": "Todavía no hay nada registrado.",
-      "kind": {
-        "start": "Inicio real {code}",
-        "finish": "Fin real {code}",
-        "correct_start": "Corrección inicio real {code}",
-        "correct_finish": "Corrección fin real {code}"
-      },
-      "becameInProgress": "cap. {code} pasa a En curso",
-      "becameFinished": "cap. {code} pasa a Finalizado",
       "title": "Historial",
       "hint": "Cada registro y cada corrección quedan guardados: valor anterior, nuevo, quién y cuándo.",
       "record": "Registro",
@@ -1670,8 +1639,8 @@
       "label": "Secciones del presupuesto",
       "summary": "Resumen",
       "lines": "Partidas",
-      "options": "Opciones",
-      "texts": "Justificación técnica",
+      "options": "Opcionales",
+      "texts": "Comentarios IA",
       "conditions": "Condiciones"
     },
     "deleteDraft": "Eliminar borrador",
@@ -1785,7 +1754,7 @@
     "options": {
       "summaryTitle": "Partidas opcionales",
       "summaryHint": "· debajo de los 20 capítulos, fuera del PEC",
-      "edit": "Editar opciones →",
+      "edit": "Editar opcionales →",
       "none": "Todavía no hay opciones.",
       "kinds": {
         "extra": "Adicional",
@@ -1857,7 +1826,7 @@
         "confirm": "Borrar partida"
       },
       "chapters": "20 capítulos",
-      "options": "Opciones · fuera del PEC",
+      "options": "Opcionales · fuera del PEC",
       "name": "Nombre del capítulo",
       "stats": "{count, plural, one {# partida} other {# partidas}} · {share} del PEC",
       "perM2": "{amount}/m²c",
@@ -1906,7 +1875,7 @@
         "projectLacks": "El proyecto aún no tiene {field, select, promoter {cliente} other {dirección}}; el presupuesto dice «{value}». Si es correcto, añádelo al proyecto.",
         "openGeneral": "Ir a la pestaña General",
         "summary": "El cliente o la dirección del presupuesto no coinciden con los del proyecto.",
-        "review": "Revisar en Textos",
+        "review": "Revisar en Comentarios IA",
         "frozen": "Los datos del proyecto no coinciden con los de esta revisión: {list}. Ya se entregó al cliente y no cambia; una nueva revisión tomará los del proyecto.",
         "field": "{field, select, promoter {cliente} other {dirección}} «{value}»"
       },

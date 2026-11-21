@@ -554,14 +554,31 @@ describe("photos", () => {
     const { tenant, ctx, project } = await setup();
     const kept = await createTestPhoto(tenant.id, project.id, { chapterCode: "02" });
     const deleted = await createTestPhoto(tenant.id, project.id, { chapterCode: "02" });
-    expect((await svc.getControl(ctx, project.id)).photoCount).toBe(2);
+    expect((await svc.getControlResponse(ctx, project.id)).photoCount).toBe(2);
 
     await photosService.deletePhoto(ctx, project.id, deleted.id);
 
-    const control = await svc.getControl(ctx, project.id);
+    const control = await svc.getControlResponse(ctx, project.id);
     expect(control.photos.map((p) => p.id)).toEqual([kept.id]);
     expect(control.photoCount).toBe(1);
     expect((await svc.getControlChapter(ctx, project.id, "02")).photos.map((p) => p.id)).toEqual([kept.id]);
+  });
+
+  it("adds the latest photos and records only to the API's response: the portal's control has none", async () => {
+    const { tenant, ctx, project } = await setup();
+    await createTestPhoto(tenant.id, project.id, { chapterCode: "02" });
+    await svc.startChapter(ctx, project.id, "01", { date: "2026-06-03" });
+
+    const control = await svc.getControl(ctx, project.id);
+    expect(control).not.toHaveProperty("photos");
+    expect(control).not.toHaveProperty("events");
+
+    const response = await svc.getControlResponse(ctx, project.id);
+    const { events, photos, photoCount, ...rest } = response;
+    expect(rest).toEqual(control);
+    expect(photoCount).toBe(1);
+    expect(photos).toHaveLength(1);
+    expect(events).toMatchObject([{ kind: "start", chapterCode: "01", chapterName: expect.any(String) }]);
   });
 });
 

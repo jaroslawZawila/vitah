@@ -13,7 +13,6 @@ import { cn } from "@/lib/utils";
 import Modal from "../../components/Modal";
 import { StateFilterBar, type StateFilter } from "../../components/construction/Filters";
 import { GanttLegend, timelineOf } from "../../components/construction/Gantt";
-import { RecentEvents } from "../../components/construction/History";
 import ObraFrame, { chapterHref, type ObraHeader } from "../../components/construction/ObraFrame";
 import { Source } from "../../components/construction/pills";
 import { ProgressCards, ProgressTable, type ProgressActions } from "../../components/construction/ProgressViews";
@@ -75,7 +74,6 @@ export default function AvanceScreen({
         <StateFilterBar
           value={state}
           onChange={setState}
-          order={["all", "in_progress", "pending", "finished"]}
           counts={{ all: chapters.length, in_progress: count("in_progress"), pending: count("pending"), finished: count("finished") }}
         />
         {timeline && (
@@ -110,23 +108,9 @@ export default function AvanceScreen({
             today={today}
             chapterHref={(code) => chapterHref(projectId, code)}
             actions={actions}
-            showingAll={state === "all"}
-            onShowState={setState}
           />
         </>
       )}
-
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(min(340px,100%),1fr))] gap-3.5">
-        <RecentEvents events={control.events} />
-        <section className={cn(cardVariants(), "gap-2.5")} aria-labelledby="how-it-works">
-          <h2 id="how-it-works">{t("howTitle")}</h2>
-          <ul className="m-0 flex list-disc flex-col gap-1.5 pl-5 text-sm leading-snug">
-            {(["start", "finish", "cancel", "planning"] as const).map((key) => (
-              <li key={key}>{t.rich(`how.${key}`, { b: (chunks) => <b>{chunks}</b> })}</li>
-            ))}
-          </ul>
-        </section>
-      </div>
 
       {canManage && (
         <>

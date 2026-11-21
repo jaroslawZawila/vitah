@@ -62,6 +62,15 @@ export function milestoneState(hito: {
   return milestoneMet(hito.chapterStates) ? "reached" : "pending";
 }
 
+/**
+ * The next payment hito staff follow (Obra › Resumen): the first in the plan not yet collected, whatever its state,
+ * so it shows what comes next even before anything is owed. The client's app asks something else, what is owed now
+ * (`isAwaitingPayment`: acta signed or invoiced, not paid). `undefined` when every hito is collected or there are none.
+ */
+export function nextMilestone<M extends { state: MilestoneState }>(milestones: M[]): M | undefined {
+  return milestones.find((m) => m.state !== "collected");
+}
+
 /** Every chapter of a hito is finished: it can be invoiced. */
 export function milestoneMet(states: ChapterState[]) {
   return states.length > 0 && states.every((s) => s === "finished");

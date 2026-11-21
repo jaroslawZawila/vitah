@@ -123,12 +123,12 @@ describe("SummaryScreen", () => {
     expect(within(banner).getByRole("link", { name: "PED-049" })).toHaveAttribute("href", "/dashboard/projects/p-1/compras/order-49");
   });
 
-  it("groups the chapters by state, with schedule and deviation", () => {
+  it("lists the chapters in one list, in their order, with schedule and deviation", () => {
     renderScreen();
 
     const table = screen.getByRole("table", { name: "Capítulos del presupuesto" });
-    expect(within(table).getByText("En curso · 2")).toBeInTheDocument();
-    expect(within(table).getByText("Pendientes · 2")).toBeInTheDocument();
+    // One list, not grouped by state: every chapter in the order it comes.
+    expect(chapterRows()).toEqual(control.chapters.map((c) => c.name));
     const row = within(table).getByRole("link", { name: "Envolvente térmica Thermochip" }).closest("tr")!;
     expect(row.querySelector("a")).toHaveAttribute("href", "/dashboard/projects/p-1/obra/avance/06");
     expect(within(row).getByText("Fin superado +8 d")).toBeInTheDocument();
@@ -143,17 +143,17 @@ describe("SummaryScreen", () => {
     expect(within(roof).getByText("+2.544,00")).toContainElement(within(roof).getByText("+4,6 %"));
   });
 
-  it("on a phone, lists the chapters as items: name linking over the item, state, dates, schedule and money", async () => {
+  it("on a phone, lists the chapters as items: name linking over the item, state, dates, schedule and money", () => {
     renderScreen();
 
-    // The phone's list sits beside the table (CSS picks one), grouped by state the same way.
+    // The phone's list sits beside the table (CSS picks one): one list too, in the same order.
     const phone = (name: string) =>
       screen
         .getAllByRole("link", { name })
         .find((link) => !link.closest("table"))!
         .closest("li")!;
-    expect(screen.getAllByRole("region", { name: "En curso · 2" })).toHaveLength(1);
-    expect(screen.getAllByRole("heading", { level: 3, name: "En curso · 2" })).toHaveLength(1);
+    const items = screen.getAllByRole("listitem").filter((item) => item.querySelector("a[href*='/obra/avance/']"));
+    expect(items.map((item) => item.querySelector("a")!.textContent)).toEqual(control.chapters.map((c) => c.name));
 
     const envelope = phone("Envolvente térmica Thermochip");
     expect(within(envelope).getByRole("link")).toHaveAttribute("href", "/dashboard/projects/p-1/obra/avance/06");
@@ -175,35 +175,36 @@ describe("SummaryScreen", () => {
     expect(within(pending).getByText("empieza en 2 d")).toBeInTheDocument();
     expect(within(pending).getByText("Contratado").nextElementSibling).toHaveTextContent("—");
 
-    // Filtering applies to the list too.
-    await userEvent.click(within(screen.getByRole("group", { name: "Estado" })).getByRole("button", { name: "Finalizado" }));
+    // The period filter applies to the list too.
+    fireEvent.change(screen.getByLabelText("Desde"), { target: { value: "2026-11-01" } });
     expect(screen.queryAllByRole("link", { name: "Envolvente térmica Thermochip" })).toHaveLength(0);
-    expect(screen.getAllByRole("link", { name: "Cubierta inclinada" })).toHaveLength(2);
+    expect(screen.getAllByRole("link", { name: "Electricidad e iluminación" })).toHaveLength(2);
   });
 
-  it("filters the chapters by chapter, state and period", async () => {
+  it("filters the chapters by period only: no chapter or state filter", () => {
     renderScreen();
     expect(chapterRows()).toHaveLength(6);
+    expect(screen.queryByRole("group", { name: "Estado" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "Capítulo" })).not.toBeInTheDocument();
 
-    await userEvent.click(within(screen.getByRole("group", { name: "Estado" })).getByRole("button", { name: "Finalizado" }));
-    expect(chapterRows()).toEqual(["Cubierta inclinada", "Carpintería exterior e interior"]);
-
-    await userEvent.click(within(screen.getByRole("group", { name: "Estado" })).getByRole("button", { name: "Todos" }));
-    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Capítulo" }), "13");
-    expect(chapterRows()).toEqual(["Electricidad e iluminación"]);
-
-    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Capítulo" }), "all");
     fireEvent.change(screen.getByLabelText("Desde"), { target: { value: "2026-11-01" } });
     // Only what runs after 1 Nov: 04 (to 27 Nov), 13 and 12; finished and late 06 don't.
     expect(chapterRows()).toEqual(["Albañilería y saneamiento", "Electricidad e iluminación", "Climatización y VMC"]);
   });
 
-  it("shows hitos, open issues, document alerts and recent photos", () => {
+  it("shows the next payment hito, open issues and document alerts, and no photos", () => {
     renderScreen();
 
-    const hitos = within(screen.getByRole("region", { name: "Hitos de pago" }));
-    expect(hitos.getByText("· 2 de 3 cap.")).toBeInTheDocument();
-    expect(hitos.getByRole("link", { name: "Ver hitos →" })).toHaveAttribute("href", "/dashboard/projects/p-1/obra/hitos");
+    // H3 is invoiced but not collected yet: it is the next payment; H4 and H6 come after it.
+    const hito = within(screen.getByRole("region", { name: "Próximo hito de pago" }));
+    expect(hito.getByText("H3")).toBeInTheDocument();
+    expect(hito.getByText("Estructura Steel Frame")).toBeInTheDocument();
+    expect(hito.getByText("Facturado")).toBeInTheDocument();
+    expect(hito.getByText("Importe · sin IVA").nextElementSibling).toHaveTextContent("93.222,00 €");
+    expect(hito.getByText("Capítulos finalizados").nextElementSibling).toHaveTextContent("1 de 1");
+    expect(hito.queryByText("H4")).not.toBeInTheDocument();
+    expect(hito.queryByText("H6")).not.toBeInTheDocument();
+    expect(hito.getByRole("link", { name: "Ver hitos →" })).toHaveAttribute("href", "/dashboard/projects/p-1/obra/hitos");
 
     const issues = within(screen.getByRole("region", { name: "Incidencias y cambios abiertos" }));
     expect(issues.getByText(/Corredera elevable/)).toBeInTheDocument();
@@ -213,13 +214,33 @@ describe("SummaryScreen", () => {
     expect(documents.getByText("1 caduca")).toBeInTheDocument();
     expect(documents.getByText("Cubiertas del Saja")).toBeInTheDocument();
 
-    const photos = within(screen.getByRole("region", { name: "Fotos de obra" }));
-    expect(photos.getByRole("link", { name: "Ver las 148 →" })).toHaveAttribute("href", "/dashboard/projects/p-1/obra/fotos");
-    expect(photos.getByRole("link", { name: "Subir fotos" })).toHaveAttribute("href", "/dashboard/projects/p-1/obra/fotos");
-    expect(photos.getByRole("img", { name: "17 oct 2026 · 06 · Fachada norte" })).toHaveAttribute(
-      "src",
-      "/api/v1/projects/p-1/photos/photo-1?size=thumb",
-    );
+    // Photos are on Obra › Fotos only.
+    expect(screen.queryByRole("region", { name: "Fotos de obra" })).not.toBeInTheDocument();
+    expect(document.querySelector("img")).toBeNull();
+  });
+
+  it("counts the later hitos already owed, and leaves out the chapters of a hito that closes none", () => {
+    const [h3, h4, h6] = control.milestones;
+    renderScreen({
+      control: {
+        ...control,
+        milestones: [
+          { ...h3!, state: "pending", chapters: [] },
+          { ...h4!, state: "requested" },
+          { ...h6!, state: "invoiced" },
+        ],
+      },
+    });
+    const hito = within(screen.getByRole("region", { name: "Próximo hito de pago" }));
+    expect(hito.getByText("H3")).toBeInTheDocument();
+    expect(hito.queryByText("Capítulos finalizados")).not.toBeInTheDocument();
+    expect(hito.getByText("2 hitos más alcanzados o facturados sin cobrar")).toBeInTheDocument();
+  });
+
+  it("says so when every hito is collected", () => {
+    renderScreen({ control: { ...control, milestones: control.milestones.map((m) => ({ ...m, state: "collected" as const })) } });
+    const hito = within(screen.getByRole("region", { name: "Próximo hito de pago" }));
+    expect(hito.getByText("Todos los hitos están cobrados.")).toBeInTheDocument();
   });
 
   it("asks to review chapters the accepted revision added or removed", async () => {
@@ -249,7 +270,6 @@ describe("SummaryScreen", () => {
   it("is read-only for viewers", () => {
     renderScreen({ canManage: false, control: { ...control, reviewPending: true } });
     expect(screen.queryByRole("button", { name: "Marcar como revisado" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Subir fotos" })).not.toBeInTheDocument();
   });
 
   it("points to the budget before one is accepted", () => {

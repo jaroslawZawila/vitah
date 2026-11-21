@@ -5,9 +5,11 @@ import {
   daysBetween,
   deviation,
   milestoneState,
+  nextMilestone,
   plannedDates,
   spanDays,
 } from "../src/control-calc";
+import type { MilestoneState } from "../src/contract";
 
 describe("chapterState", () => {
   it("follows only the recorded dates", () => {
@@ -72,6 +74,16 @@ describe("milestoneState", () => {
 
   it("is never reached without chapters", () => {
     expect(milestoneState({ ...base, chapterStates: [] })).toBe("pending");
+  });
+});
+
+describe("nextMilestone", () => {
+  it("is the first hito in the plan not yet collected, even one nothing is owed on yet", () => {
+    const h = (code: string, state: MilestoneState) => ({ code, state });
+    expect(nextMilestone([h("H0", "collected"), h("H1", "invoiced"), h("H2", "pending")])?.code).toBe("H1");
+    expect(nextMilestone([h("H0", "collected"), h("H1", "pending"), h("H2", "requested")])?.code).toBe("H1");
+    expect(nextMilestone([h("H0", "collected")])).toBeUndefined();
+    expect(nextMilestone([])).toBeUndefined();
   });
 });
 

@@ -1,9 +1,9 @@
-import { lateToStartDays, type ChapterState, type ControlChapter, type ControlMilestone, type ScheduleStatus } from "@repo/core/contract";
+import { lateToStartDays, type ControlChapter, type ControlMilestone, type ScheduleStatus } from "@repo/core/contract";
 import { finishRequestsInvoice } from "@repo/core/control-calc";
 import { daysBetween } from "./format";
 
-// Pure rules of the Obra tab's views: how a chapter stands against its plan,
-// what a chapter group is, and when finishing a chapter completes its hito.
+// Pure rules of the Obra tab's views: how a chapter stands against its plan
+// and when finishing a chapter completes its hito.
 
 /** A pending chapter whose planned start is this close shows "starts in n d". */
 const SOON_DAYS = 14;
@@ -59,16 +59,6 @@ export const TONE_TEXT: Record<ScheduleTone, string> = {
   warn: "text-warn",
   muted: "text-muted-foreground",
 };
-
-/** The order the tables group chapters in: what is happening now first. */
-export const STATE_ORDER: ChapterState[] = ["in_progress", "pending", "finished"];
-
-/** Chapters grouped by state, in `STATE_ORDER`, empty groups left out. */
-export function groupByState<T extends { state: ChapterState }>(chapters: T[]) {
-  return STATE_ORDER.map((state) => ({ state, chapters: chapters.filter((c) => c.state === state) })).filter(
-    (group) => group.chapters.length > 0,
-  );
-}
 
 /**
  * Whether finishing `code` completes its hito and asks Administration for

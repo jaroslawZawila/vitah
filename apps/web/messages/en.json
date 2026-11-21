@@ -866,17 +866,6 @@
       "live": "Live",
       "liveHint": "Live data from the Purchasing module."
     },
-    "groups": {
-      "in_progress": "In progress · {count}",
-      "pending": "Pending · {count}",
-      "finished": "Finished · {count}",
-      "in_progressPhone": "In progress · {count}",
-      "pendingPhone": "Up next",
-      "finishedPhone": "Last finished",
-      "in_progressName": "in progress",
-      "pendingName": "pending",
-      "finishedName": "finished"
-    },
     "schedule": {
       "late": "{days}",
       "onTime": "On time",
@@ -1006,10 +995,14 @@
         "footnote": "Amounts in euros, at cost, excl. VAT. Contingencies (ch. 20, {contingency} €) are kept as a reserve, outside the total. Deviation = contracted − budgeted cost, only on closed lines: positive is an overrun, negative a saving."
       },
       "milestones": {
-        "title": "Payment milestones",
+        "title": "Next payment milestone",
         "more": "See milestones",
         "empty": "This project has no payment milestones.",
-        "chaptersDone": "{done} of {total} ch.",
+        "allCollected": "Every milestone has been collected.",
+        "amount": "Amount",
+        "chapters": "Chapters finished",
+        "chaptersDone": "{done} of {total}",
+        "alsoDue": "{count, plural, one {# more milestone reached or invoiced, not yet collected} other {# more milestones reached or invoiced, not yet collected}}",
         "amounts": "Amounts:",
         "invoices": "invoices and payments:"
       },
@@ -1026,13 +1019,6 @@
         "ok": "Up to date",
         "empty": "The subcontractors' documents for this site are up to date.",
         "note": "For information only. Administration updates them in <link>Subcontractors</link>."
-      },
-      "photos": {
-        "title": "Site photos",
-        "seeAll": "{count, plural, one {See the photo} other {See all #}}",
-        "upload": "Upload photos",
-        "empty": "No site photos yet.",
-        "note": "The only thing uploaded from the summary. Each photo has a date, an optional description and, if you like, its chapter."
       }
     },
     "review": {
@@ -1071,27 +1057,10 @@
       "correctLabel": "Correct the dates of {code}",
       "issueLabel": "Log an issue on {code}",
       "photoLabel": "Upload a photo of {code}",
-      "inDays": "{count, plural, =0 {today} other {in # d}}",
-      "showAll": "See all {count} {state}",
-      "howTitle": "How it works",
-      "how": {
-        "start": "<b>Start</b> asks for the actual start date (it may be before today) and moves the chapter to In progress.",
-        "finish": "<b>Finish</b> asks for the actual end date and moves it to Finished. If it closes a milestone, Administration is asked for the invoice.",
-        "cancel": "Cancel saves nothing. A planned date passing never changes a state.",
-        "planning": "Actual dates move Planning's forecast; the approved baseline stays as it is."
-      }
+      "inDays": "{count, plural, =0 {today} other {in # d}}"
     },
     "history": {
-      "recentTitle": "Latest records",
       "empty": "Nothing recorded yet.",
-      "kind": {
-        "start": "Actual start {code}",
-        "finish": "Actual end {code}",
-        "correct_start": "Corrected actual start {code}",
-        "correct_finish": "Corrected actual end {code}"
-      },
-      "becameInProgress": "ch. {code} moves to In progress",
-      "becameFinished": "ch. {code} moves to Finished",
       "title": "History",
       "hint": "Every record and correction is kept: previous value, new value, who and when.",
       "record": "Record",
@@ -1670,8 +1639,8 @@
       "label": "Budget sections",
       "summary": "Summary",
       "lines": "Line items",
-      "options": "Options",
-      "texts": "Technical justification",
+      "options": "Optional items",
+      "texts": "AI comments",
       "conditions": "Terms"
     },
     "deleteDraft": "Delete draft",
@@ -1785,7 +1754,7 @@
     "options": {
       "summaryTitle": "Optional line items",
       "summaryHint": "· below the 20 chapters, outside the PEC",
-      "edit": "Edit options →",
+      "edit": "Edit optional items →",
       "none": "There are no options yet.",
       "kinds": {
         "extra": "Extra",
@@ -1857,7 +1826,7 @@
         "confirm": "Delete line item"
       },
       "chapters": "20 chapters",
-      "options": "Options · outside the PEC",
+      "options": "Optional items · outside the PEC",
       "name": "Chapter name",
       "stats": "{count, plural, one {# line item} other {# line items}} · {share} of the PEC",
       "perM2": "{amount}/m² built",
@@ -1906,7 +1875,7 @@
         "projectLacks": "The project has no {field, select, promoter {client} other {address}} yet; the budget says “{value}”. If that is right, add it to the project.",
         "openGeneral": "Go to the General tab",
         "summary": "The budget's client or address don't match the project's.",
-        "review": "Review in Texts",
+        "review": "Review in AI comments",
         "frozen": "The project's details don't match this revision's: {list}. It was already given to the client and doesn't change; a new revision will take the project's.",
         "field": "{field, select, promoter {client} other {address}} “{value}”"
       },

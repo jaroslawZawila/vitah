@@ -13,22 +13,21 @@ import EmptyState from "../components/EmptyState";
 import { SleepingCamera } from "../components/illustrations";
 import { textLink } from "../components/obra/classes";
 import { useObraAction } from "../components/obra/useObraAction";
-import { projectPhotoUrl } from "../components/photoUrl";
-import { FilterSelect, PeriodFilter, ReadOnlyNote, StateFilterBar, type StateFilter } from "../components/construction/Filters";
+import { PeriodFilter, ReadOnlyNote } from "../components/construction/Filters";
 import { useControlFormat } from "../components/construction/format";
 import ObraFrame, { chapterHref, obraHref, type ObraHeader } from "../components/construction/ObraFrame";
 import LateDeliveriesBanner from "../components/construction/LateDeliveriesBanner";
 import ReviewBanner from "../components/construction/ReviewBanner";
 import { orderHref } from "../components/purchasing/links";
 import { inPeriod } from "../components/construction/schedule";
-import { DocumentAlertsCard, MilestonesCard, OpenIssuesCard, RecentPhotosCard } from "../components/construction/SummaryCards";
+import { DocumentAlertsCard, NextMilestoneCard, OpenIssuesCard } from "../components/construction/SummaryCards";
 import SummaryKpis from "../components/construction/SummaryKpis";
 import SummaryTable from "../components/construction/SummaryTable";
 
 /** Moved after the chapters below 768px (the page is a flex column). */
 const phoneLater = "max-md:order-1";
 
-/** The works at a glance: key figures, the chapters (filtered here), hitos, issues, documents, photos. */
+/** The works at a glance: key figures, the chapters (filtered by period here), the next hito, issues, documents. */
 export default function SummaryScreen({
   projectId,
   header,
@@ -45,17 +44,9 @@ export default function SummaryScreen({
   const f = useControlFormat();
   const { state: reviewState, pending: reviewing, run } = useObraAction();
   const { project, budget, chapters, today } = control;
-  const [chapter, setChapter] = useState("all");
-  const [state, setState] = useState<StateFilter>("all");
   const [period, setPeriod] = useState({ from: project.startDate ?? "", to: project.completionDate ?? "" });
 
-  const shown = chapters.filter(
-    (c) =>
-      (chapter === "all" || c.code === chapter) &&
-      (state === "all" || c.state === state) &&
-      inPeriod(c, today, period.from, period.to),
-  );
-  const names = new Map(chapters.map((c) => [c.code, c.name]));
+  const shown = chapters.filter((c) => inPeriod(c, today, period.from, period.to));
 
   const facts = [
     { label: t("client"), value: project.clientName ?? "—" },
@@ -111,17 +102,6 @@ export default function SummaryScreen({
           <LateDeliveriesBanner orders={control.lateDeliveries} orderHref={(id) => orderHref(projectId, id)} />
 
           <form aria-label={tf("label")} className="flex flex-wrap items-center gap-x-3.5 gap-y-2.5" onSubmit={(e) => e.preventDefault()}>
-            <FilterSelect
-              id="summary-chapter"
-              label={tf("chapter")}
-              value={chapter}
-              onChange={setChapter}
-              options={[
-                { value: "all", label: tf("all") },
-                ...chapters.map((c) => ({ value: c.code, label: `${c.code} · ${c.name}` })),
-              ]}
-            />
-            <StateFilterBar value={state} onChange={setState} />
             <PeriodFilter from={period.from} to={period.to} onChange={setPeriod} />
             <ReadOnlyNote className="md:ml-auto" />
           </form>
@@ -137,20 +117,10 @@ export default function SummaryScreen({
           />
 
           <div className={cn("grid grid-cols-[repeat(auto-fit,minmax(min(300px,100%),1fr))] gap-3.5", phoneLater)}>
-            <MilestonesCard milestones={control.milestones} href={obraHref(projectId, "milestones")} />
+            <NextMilestoneCard milestones={control.milestones} href={obraHref(projectId, "milestones")} />
             <OpenIssuesCard issues={control.issues} href={obraHref(projectId, "issues")} />
             <DocumentAlertsCard items={control.documentAlerts} subcontractorsHref="/dashboard/subcontratas/empresas" />
           </div>
-
-          <RecentPhotosCard
-            photos={control.photos}
-            count={control.photoCount}
-            href={obraHref(projectId, "photos")}
-            thumbUrl={(photo) => projectPhotoUrl(projectId, photo.id, "thumb")}
-            chapterName={(code) => names.get(code)}
-            canUpload={canManage}
-            className={phoneLater}
-          />
         </>
       )}
     </ObraFrame>

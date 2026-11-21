@@ -140,7 +140,7 @@ export type ObraIssue = {
   updatedAt: string;
 };
 
-/** GET /api/v1/projects/:id/obra/control: the Obra tab's summary and progress. */
+/** The Obra tab's summary and progress, as the portal's pages read it. */
 export type ConstructionControl = {
   project: {
     ref: string;
@@ -179,12 +179,19 @@ export type ConstructionControl = {
   /** Material orders past their expected delivery: a warning only. */
   lateDeliveries: PurchaseOrderListItem[];
   issues: ObraIssue[];
-  events: (ProgressEvent & { chapterName: string | null })[];
-  photos: ProjectPhoto[];
-  photoCount: number;
   sources: ControlSources;
   /** On time or late: the same as GET …/planning's `schedule`. */
   schedule: ScheduleStatus;
+};
+
+/**
+ * GET /api/v1/projects/:id/obra/control: the control plus the obra's latest records and photos. The portal no longer
+ * shows them; the API keeps them for its clients.
+ */
+export type ConstructionControlResponse = ConstructionControl & {
+  events: (ProgressEvent & { chapterName: string | null })[];
+  photos: ProjectPhoto[];
+  photoCount: number;
 };
 
 /** GET /api/v1/projects/:id/obra/header: what every Obra page's header and forms need, cheaply. */

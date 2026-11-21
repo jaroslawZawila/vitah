@@ -56,9 +56,10 @@ describe("AvanceScreen", () => {
     // Planning's dates are simulated.
     expect(screen.getAllByText("Simulado").length).toBeGreaterThan(0);
 
-    const recent = within(screen.getByRole("region", { name: "Últimos registros" }));
-    expect(recent.getByText("Fin real 10")).toBeInTheDocument();
-    expect(recent.getByText("Admin ViTAH · «La teja de cumbrera se remató el 9»")).toBeInTheDocument();
+    // One list in the chapters' order, not grouped by state.
+    expect(table().getAllByRole("link").map((l) => l.textContent)).toEqual(control.chapters.map((c) => c.name));
+    // No "Últimos registros" card: a chapter's own page keeps its history.
+    expect(screen.queryByRole("region", { name: "Últimos registros" })).not.toBeInTheDocument();
   });
 
   it("on a phone, makes the whole card the chapter's link, its buttons above it, and wraps a long plan", () => {
@@ -68,6 +69,9 @@ describe("AvanceScreen", () => {
         .getAllByRole("link", { name })
         .find((link) => !link.closest("table"))!
         .closest("article")!;
+
+    // Every chapter, in order: none folded away under a group.
+    expect(screen.getAllByRole("article").map((a) => a.querySelector("a")!.textContent)).toEqual(control.chapters.map((c) => c.name));
 
     const envelope = card("Envolvente térmica Thermochip");
     expect(envelope).toHaveClass("relative");

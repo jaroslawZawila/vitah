@@ -35,6 +35,7 @@ import {
   MAX_ISSUE_FILE_BYTES,
   fileTypeOf,
   type ConstructionControl,
+  type ConstructionControlResponse,
   type ConstructionCosts,
   type ControlChapter,
   type ControlChapterDetail,
@@ -361,15 +362,9 @@ function countByChapter(issues: ObraIssue[]) {
 
 /** The Obra tab's summary and its chapters' progress. Read-only: nothing here changes data. */
 export async function getControl(ctx: Ctx, projectId: string): Promise<ConstructionControl> {
-  const [control, openIssues, events, photos, photoCount, documentAlerts] = await Promise.all([
+  const [control, openIssues, documentAlerts] = await Promise.all([
     loadControl(ctx, projectId),
     issueRows(ctx, projectId, isOpenIssue),
-    eventRows(ctx, projectId, { limit: RECENT_EVENTS }),
-    listPhotos(ctx, projectId, { limit: RECENT_PHOTOS }),
-    db.$count(
-      projectPhotos,
-      and(eq(projectPhotos.projectId, projectId), eq(projectPhotos.tenantId, ctx.tenantId), isNull(projectPhotos.deletedAt)),
-    ),
     listProjectAttention(ctx, projectId),
   ]);
   const { project, works, revision, items, hitos, previousCodes, dates } = control;
@@ -397,7 +392,6 @@ export async function getControl(ctx: Ctx, projectId: string): Promise<Construct
   const { contractCents } = control;
   const invoicedCents = sum(milestones.map((m) => m.invoicedCents));
   const collectedCents = sum(milestones.map((m) => m.collectedCents));
-  const names = new Map(items.map((c) => [c.code, c.name]));
 
   return {
     project: {
@@ -431,12 +425,29 @@ export async function getControl(ctx: Ctx, projectId: string): Promise<Construct
     documentAlerts,
     lateDeliveries: control.lateDeliveries,
     issues: openIssues,
-    events: events.map((e) => ({ ...e, chapterName: names.get(e.chapterCode) ?? null })),
-    photos,
-    photoCount,
     sources: control.sources,
     // On time or late: the same rule and inputs as Planificación's.
     schedule: obraSchedule(control.obra, works, control.today, control.contract),
+  };
+}
+
+/** `getControl` plus the obra's latest records and photos: GET /api/v1/projects/:id/obra/control (the portal shows neither). */
+export async function getControlResponse(ctx: Ctx, projectId: string): Promise<ConstructionControlResponse> {
+  const [control, events, photos, photoCount] = await Promise.all([
+    getControl(ctx, projectId),
+    eventRows(ctx, projectId, { limit: RECENT_EVENTS }),
+    listPhotos(ctx, projectId, { limit: RECENT_PHOTOS }),
+    db.$count(
+      projectPhotos,
+      and(eq(projectPhotos.projectId, projectId), eq(projectPhotos.tenantId, ctx.tenantId), isNull(projectPhotos.deletedAt)),
+    ),
+  ]);
+  const names = new Map(control.chapters.map((c) => [c.code, c.name]));
+  return {
+    ...control,
+    events: events.map((e) => ({ ...e, chapterName: names.get(e.chapterCode) ?? null })),
+    photos,
+    photoCount,
   };
 }
 
