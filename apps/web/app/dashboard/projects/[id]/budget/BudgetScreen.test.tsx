@@ -456,7 +456,7 @@ describe("BudgetScreen", () => {
     renderScreen({ tab: "options" });
 
     const option = screen.getByRole("region", { name: "Piscina desbordante" });
-    const name = within(option).getByLabelText("Nombre de la opción");
+    const name = within(option).getByLabelText("Nombre de la partida opcional");
     await userEvent.clear(name);
     await userEvent.type(name, "Piscina");
     await userEvent.tab();
@@ -670,7 +670,7 @@ describe("BudgetScreen: a change to the contract and the client's approval in th
     expect(dialog.getByText("Se guarda como prueba junto a la copia firmada.")).toBeInTheDocument();
 
     await userEvent.click(pool);
-    expect(dialog.getByText("Las opciones no son las que aprobó: su aprobación no constará como prueba.")).toBeInTheDocument();
+    expect(dialog.getByText("Las partidas opcionales no son las que aprobó: su aprobación no constará como prueba.")).toBeInTheDocument();
   });
 
   it("without an app client, says so instead of asking", () => {

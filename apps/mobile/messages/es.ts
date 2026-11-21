@@ -309,7 +309,7 @@ export const es = {
     vatNote: "Importes sin IVA. Con IVA ({rate}), la diferencia es de {amount}.",
     changes: "Qué cambia",
     changeRef: "CAM-{number}",
-    options: "Opciones incluidas",
+    options: "Partidas opcionales incluidas",
     document: "Presupuesto",
     documentName: "Presupuesto Rev.{number}",
     documentMeta: "PDF · lo que apruebas",

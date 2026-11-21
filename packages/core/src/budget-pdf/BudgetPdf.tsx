@@ -265,7 +265,7 @@ function OptionSummary({ d }: { d: BudgetPdfData }) {
       <Band small>Partidas opcionales — no incluidas en el PEC</Band>
       <Table
         cols={[{ w: 76, fixed: true }, { w: 1 }, { w: 80, fixed: true, right: true }]}
-        head={["Código", "Opción", "Importe (€)"]}
+        head={["Código", "Partida opcional", "Importe (€)"]}
         rows={d.revision.options.map((o) => [codeRange(o.lines), o.name, money(o.totalCents)])}
       />
       <Text style={[s.note, { marginTop: 6 }]}>Cada partida opcional se contrata solo si el promotor la acepta; su detalle figura en el presupuesto detallado.</Text>

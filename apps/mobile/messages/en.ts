@@ -306,7 +306,7 @@ export const en: Messages = {
     vatNote: "Amounts excl. VAT. With VAT ({rate}), the difference is {amount}.",
     changes: "What changes",
     changeRef: "CAM-{number}",
-    options: "Options included",
+    options: "Optional items included",
     document: "Budget",
     documentName: "Budget Rev.{number}",
     documentMeta: "PDF · what you approve",

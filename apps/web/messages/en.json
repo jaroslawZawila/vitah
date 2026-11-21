@@ -1646,7 +1646,7 @@
     "deleteDraft": "Delete draft",
     "deleteDraftDialog": {
       "title": "Delete draft Rev.{number}?",
-      "description": "It is deleted with all its line items, options and texts, and this cannot be undone. Earlier revisions do not change.",
+      "description": "It is deleted with all its line items (optional ones too) and its texts, and this cannot be undone. Earlier revisions do not change.",
       "confirm": "Delete draft"
     },
     "issueButton": "Issue to client",
@@ -1711,7 +1711,7 @@
       "work": "Works price",
       "workHint": "Cost {cost} · {count, plural, one {# line item} other {# line items}}",
       "withVat": "With VAT {rate}: {total}",
-      "contract": "Contract with the chosen options: {amount}",
+      "contract": "Contract with the chosen optional items: {amount}",
       "profit": "Industrial profit",
       "overhead": "Associated costs",
       "profitLabel": "Industrial profit percentage",
@@ -1755,7 +1755,7 @@
       "summaryTitle": "Optional line items",
       "summaryHint": "· below the 20 chapters, outside the PEC",
       "edit": "Edit optional items →",
-      "none": "There are no options yet.",
+      "none": "There are no optional items yet.",
       "kinds": {
         "extra": "Extra",
         "alternative": "Alternative",
@@ -1763,13 +1763,13 @@
       },
       "chosen": "Chosen",
       "declined": "Not chosen",
-      "intro": "Options go below the 20 chapters, with their own numbering OP.01, OP.02… They are not part of the PEC: they appear in both PDFs as “Optional line item” and the client chooses which ones they want when accepting. An option can add (a swimming pool) or subtract (an alternative, or a line item carried out by the owner).",
+      "intro": "Optional items go below the 20 chapters, with their own numbering OP.01, OP.02… They are not part of the PEC: they appear in both PDFs as “Optional line item” and the client chooses which ones they want when accepting. An optional item can add (a swimming pool) or subtract (an alternative, or a line item carried out by the owner).",
       "adding": "{count, plural, one {# adding} other {# adding}} · {amount}",
       "subtracting": "{count, plural, one {# subtracting} other {# subtracting}} · {amount}",
-      "fromBase": "Option from the price base",
-      "empty": "Empty option",
+      "fromBase": "Optional item from the price base",
+      "empty": "Empty optional item",
       "range": "Optional line item · {range}",
-      "name": "Option name",
+      "name": "Optional item name",
       "replaces": "Replaces line item {code}",
       "kind": "Type",
       "introLabel": "Introduction text",
@@ -1777,17 +1777,17 @@
       "editLine": "Edit text and note",
       "deleteLine": "Delete line item",
       "addLine": "Line item",
-      "delete": "Delete option",
+      "delete": "Delete optional item",
       "freeLine": "New line item",
       "total": "Total {name} at cost · {amount} · not included in the PEC",
       "pec": "PEC · 20 chapters",
-      "pecHint": "options do not change it",
+      "pecHint": "optional items do not change it",
       "withAdding": "With all the ones that add",
       "withSubtracting": "With all the ones that subtract",
       "deleteDialog": {
-        "title": "Delete the option “{name}”?",
+        "title": "Delete the optional item “{name}”?",
         "description": "It is deleted from the draft with all its line items, and this cannot be undone.",
-        "confirm": "Delete option"
+        "confirm": "Delete optional item"
       },
       "price": "price with margins"
     },
@@ -1816,8 +1816,8 @@
       "menu": "More actions for {code}",
       "edit": "Edit text and note",
       "duplicate": "Duplicate",
-      "deduction": "⚑ Offer as a deduction (creates an OP option)",
-      "alternative": "Create an alternative (OP option)",
+      "deduction": "⚑ Offer as a deduction (creates an OP optional item)",
+      "alternative": "Create an alternative (OP optional item)",
       "move": "Move to another chapter",
       "delete": "Delete line item",
       "deleteDialog": {
@@ -1914,12 +1914,12 @@
       }
     },
     "conditions": {
-      "planEyebrow": "After the options, in both PDFs",
+      "planEyebrow": "After the optional items, in both PDFs",
       "plan": "Payment plan by milestones H0–H9",
       "planOk": "Totals {pct} ✓",
       "planOff": "Totals {pct}: must be 100 %",
       "editPlan": "Edit the plan",
-      "planHint": "Each milestone is its percentage of the price: the PEC plus the options the client chooses. The plan is the one for the works (Payments tab).",
+      "planHint": "Each milestone is its percentage of the price: the PEC plus the optional items the client chooses. The plan is the one for the works (Payments tab).",
       "hito": "Milestone",
       "name": "Name",
       "amount": "Amount",
@@ -1971,11 +1971,11 @@
       "pdfs": "Saved in the project's Documents",
       "general": {
         "title": "General PDF",
-        "hint": "cover, justification, summary by chapter, options, payment plan and terms"
+        "hint": "cover, justification, summary by chapter, optional items, payment plan and terms"
       },
       "detailed": {
         "title": "Detailed PDF",
-        "hint": "everything above, the line items of the 20 chapters and of the options, and the works contract"
+        "hint": "everything above, the line items of the 20 chapters and the optional items, and the works contract"
       },
       "inApp": "In the client's app",
       "staffOnly": "Team only",
@@ -1993,27 +1993,27 @@
       "acceptedOn": "Acceptance date",
       "acceptedOnHint": "Between the day it was issued ({issued}) and today.",
       "acceptedBy": "Accepted by",
-      "options": "Which options has the client chosen?",
+      "options": "Which optional items has the client chosen?",
       "kinds": {
         "extra": "Extra",
         "alternative": "Alternative",
         "deduction": "⚑ Deduction"
       },
       "pec": "PEC Rev.{number} · 20 chapters",
-      "chosenOptions": "Chosen options",
+      "chosenOptions": "Chosen optional items",
       "contract": "Contract price (ex VAT)",
       "withVat": "With VAT {rate}",
       "signed": "Signed budget",
       "signedHint": "PDF, optional · saved in Documents",
       "signedTitle": "Budget {reference} · Rev.{number} · signed",
       "effect": "On acceptance, Rev.{number} becomes the contract.",
-      "effectHint": "The chosen options enter the contract as OP line items, below the 20 chapters; the others are discarded. This feeds the Works, the Payments (H0 = {first}) and the phases of the client's app.",
+      "effectHint": "The chosen optional items enter the contract as OP line items, below the 20 chapters; the others are discarded. This feeds the Works, the Payments (H0 = {first}) and the phases of the client's app.",
       "cancel": "Cancel",
       "accepting": "Saving…",
       "submit": "Accept as contract",
       "approvalProof": "{by} approved this revision in the app on {date}.",
       "approvalProofHint": "It is kept as proof beside the signed copy.",
-      "approvalDiffers": "These are not the options they approved: their approval won't count as proof."
+      "approvalDiffers": "These are not the optional items they approved: their approval won't count as proof."
     },
     "start": {
       "summary": "There is no budget yet. The AI prepares the first one from the project documentation; then you review and edit it.",
@@ -2234,7 +2234,7 @@
         "optional": "optional",
         "messagePlaceholder": "For example: here is the revision with the pool we talked about.",
         "messageHint": "Up to 1,000 characters.",
-        "options": "Options proposed as chosen",
+        "options": "Optional items proposed as chosen",
         "contract": "Contract with Rev.{number} (excl. VAT)",
         "shows": "What the client sees is fixed when you ask. Issuing a later revision, or registering the acceptance or the rejection by hand, closes the request.",
         "cancel": "Cancel",

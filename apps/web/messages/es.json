@@ -1646,7 +1646,7 @@
     "deleteDraft": "Eliminar borrador",
     "deleteDraftDialog": {
       "title": "¿Eliminar el borrador Rev.{number}?",
-      "description": "Se borra con todas sus partidas, opciones y textos, y no se puede deshacer. Las revisiones anteriores no cambian.",
+      "description": "Se borra con todas sus partidas, también las opcionales, y sus textos, y no se puede deshacer. Las revisiones anteriores no cambian.",
       "confirm": "Eliminar borrador"
     },
     "issueButton": "Emitir al cliente",
@@ -1711,7 +1711,7 @@
       "work": "Importe de la obra",
       "workHint": "Coste {cost} · {count, plural, one {# partida} other {# partidas}}",
       "withVat": "Con IVA {rate}: {total}",
-      "contract": "Contrato con las opciones elegidas: {amount}",
+      "contract": "Contrato con las partidas opcionales elegidas: {amount}",
       "profit": "Beneficio industrial",
       "overhead": "Gastos asociados",
       "profitLabel": "Porcentaje de beneficio industrial",
@@ -1754,8 +1754,8 @@
     "options": {
       "summaryTitle": "Partidas opcionales",
       "summaryHint": "· debajo de los 20 capítulos, fuera del PEC",
-      "edit": "Editar opcionales →",
-      "none": "Todavía no hay opciones.",
+      "edit": "Editar partidas opcionales →",
+      "none": "Todavía no hay partidas opcionales.",
       "kinds": {
         "extra": "Adicional",
         "alternative": "Alternativa",
@@ -1763,13 +1763,13 @@
       },
       "chosen": "Elegida",
       "declined": "No elegida",
-      "intro": "Las opciones van debajo de los 20 capítulos, con numeración propia OP.01, OP.02… No forman parte del PEC: salen en los dos PDF como «Partida opcional» y el cliente elige cuáles quiere al aceptar. Una opción puede sumar (una piscina) o restar (una alternativa o una partida que ejecuta la Propiedad).",
+      "intro": "Las partidas opcionales van debajo de los 20 capítulos, con numeración propia OP.01, OP.02… No forman parte del PEC: salen en los dos PDF como «Partida opcional» y el cliente elige cuáles quiere al aceptar. Una partida opcional puede sumar (una piscina) o restar (una alternativa o una partida que ejecuta la Propiedad).",
       "adding": "{count, plural, one {# que suma} other {# que suman}} · {amount}",
       "subtracting": "{count, plural, one {# que resta} other {# que restan}} · {amount}",
-      "fromBase": "Opción desde la base de precios",
-      "empty": "Opción vacía",
+      "fromBase": "Partida opcional desde la base de precios",
+      "empty": "Partida opcional vacía",
       "range": "Partida opcional · {range}",
-      "name": "Nombre de la opción",
+      "name": "Nombre de la partida opcional",
       "replaces": "Sustituye a la partida {code}",
       "kind": "Tipo",
       "introLabel": "Texto de presentación",
@@ -1777,17 +1777,17 @@
       "editLine": "Editar texto y nota",
       "deleteLine": "Borrar partida",
       "addLine": "Partida",
-      "delete": "Borrar opción",
+      "delete": "Borrar partida opcional",
       "freeLine": "Partida nueva",
       "total": "Total {name} a coste · {amount} · no incluida en el PEC",
       "pec": "PEC · 20 capítulos",
-      "pecHint": "las opciones no lo cambian",
+      "pecHint": "las partidas opcionales no lo cambian",
       "withAdding": "Con todas las que suman",
       "withSubtracting": "Con todas las que restan",
       "deleteDialog": {
-        "title": "¿Borrar la opción «{name}»?",
+        "title": "¿Borrar la partida opcional «{name}»?",
         "description": "Se borra del borrador con todas sus partidas, y no se puede deshacer.",
-        "confirm": "Borrar opción"
+        "confirm": "Borrar partida opcional"
       },
       "price": "precio con márgenes"
     },
@@ -1816,8 +1816,8 @@
       "menu": "Más acciones de {code}",
       "edit": "Editar texto y nota",
       "duplicate": "Duplicar",
-      "deduction": "⚑ Ofrecer como deducción (crea una opción OP)",
-      "alternative": "Crear una alternativa (opción OP)",
+      "deduction": "⚑ Ofrecer como deducción (crea una partida opcional OP)",
+      "alternative": "Crear una alternativa (partida opcional OP)",
       "move": "Mover a otro capítulo",
       "delete": "Borrar partida",
       "deleteDialog": {
@@ -1914,12 +1914,12 @@
       }
     },
     "conditions": {
-      "planEyebrow": "Después de las opciones, en los dos PDF",
+      "planEyebrow": "Después de las partidas opcionales, en los dos PDF",
       "plan": "Plan de pagos por hitos H0–H9",
       "planOk": "Suma {pct} ✓",
       "planOff": "Suma {pct}: debe ser 100 %",
       "editPlan": "Editar el plan",
-      "planHint": "Cada hito es su porcentaje del precio: el PEC más las opciones que elija el cliente. El plan es el de la obra (pestaña Pagos).",
+      "planHint": "Cada hito es su porcentaje del precio: el PEC más las partidas opcionales que elija el cliente. El plan es el de la obra (pestaña Pagos).",
       "hito": "Hito",
       "name": "Denominación",
       "amount": "Importe",
@@ -1971,11 +1971,11 @@
       "pdfs": "Se guardan en Documentos del proyecto",
       "general": {
         "title": "PDF general",
-        "hint": "portada, justificación, resumen por capítulos, opciones, plan de pagos y condiciones"
+        "hint": "portada, justificación, resumen por capítulos, partidas opcionales, plan de pagos y condiciones"
       },
       "detailed": {
         "title": "PDF detallado",
-        "hint": "todo lo anterior, las partidas de los 20 capítulos y de las opciones, y el contrato de obra"
+        "hint": "todo lo anterior, las partidas de los 20 capítulos y las opcionales, y el contrato de obra"
       },
       "inApp": "En la app del cliente",
       "staffOnly": "Solo equipo",
@@ -1993,27 +1993,27 @@
       "acceptedOn": "Fecha de aceptación",
       "acceptedOnHint": "Entre el día de emisión ({issued}) y hoy.",
       "acceptedBy": "Aceptado por",
-      "options": "¿Qué opciones ha elegido el cliente?",
+      "options": "¿Qué partidas opcionales ha elegido el cliente?",
       "kinds": {
         "extra": "Adicional",
         "alternative": "Alternativa",
         "deduction": "⚑ Deducción"
       },
       "pec": "PEC Rev.{number} · 20 capítulos",
-      "chosenOptions": "Opciones elegidas",
+      "chosenOptions": "Partidas opcionales elegidas",
       "contract": "Precio del contrato (sin IVA)",
       "withVat": "Con IVA {rate}",
       "signed": "Presupuesto firmado",
       "signedHint": "PDF, opcional · se guarda en Documentos",
       "signedTitle": "Presupuesto {reference} · Rev.{number} · firmado",
       "effect": "Al aceptar, la Rev.{number} se convierte en el contrato.",
-      "effectHint": "Las opciones elegidas entran en el contrato como partidas OP, debajo de los 20 capítulos; las demás quedan descartadas. Con eso se alimentan la Obra, los Pagos (H0 = {first}) y las fases de la app del cliente.",
+      "effectHint": "Las partidas opcionales elegidas entran en el contrato como partidas OP, debajo de los 20 capítulos; las demás quedan descartadas. Con eso se alimentan la Obra, los Pagos (H0 = {first}) y las fases de la app del cliente.",
       "cancel": "Cancelar",
       "accepting": "Guardando…",
       "submit": "Aceptar como contrato",
       "approvalProof": "{by} aprobó esta revisión en la app el {date}.",
       "approvalProofHint": "Se guarda como prueba junto a la copia firmada.",
-      "approvalDiffers": "Las opciones no son las que aprobó: su aprobación no constará como prueba."
+      "approvalDiffers": "Las partidas opcionales no son las que aprobó: su aprobación no constará como prueba."
     },
     "start": {
       "summary": "Todavía no hay presupuesto. El primero lo prepara la IA con la documentación del proyecto; después lo revisas y lo editas.",
@@ -2234,7 +2234,7 @@
         "optional": "opcional",
         "messagePlaceholder": "Por ejemplo: te enviamos la revisión con la piscina que hablamos.",
         "messageHint": "Hasta 1.000 caracteres.",
-        "options": "Opciones que se le proponen como elegidas",
+        "options": "Partidas opcionales que se le proponen como elegidas",
         "contract": "Contrato con la Rev.{number} (sin IVA)",
         "shows": "Lo que vea el cliente queda fijado al pedirlo. Si emites una revisión posterior o registras la aceptación o el rechazo a mano, la petición se cierra.",
         "cancel": "Cancelar",
