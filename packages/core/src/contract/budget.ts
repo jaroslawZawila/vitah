@@ -94,7 +94,6 @@ export type BudgetIdentity = {
 export type BudgetConditions = {
   validityDays: number;
   term: string;
-  penalty: string;
   signingPlace: string;
 };
 

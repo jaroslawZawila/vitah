@@ -232,23 +232,16 @@ export function DraftTable({
   );
 }
 
-/** Where the draft ends against the contract, and what that would cost. */
+/** Where the draft ends against the contract. */
 export function DraftCheck({ check, problem }: { check: PlanningCheck | null; problem: React.ReactNode }) {
   const t = useTranslations("planning.edit.check");
   const f = useControlFormat();
   const delay = check?.delayDays ?? null;
-  const tone = delay === null || delay <= 0 ? "" : delay > 14 ? "text-bad" : "text-warn";
-  let text: string;
-  if (!check) text = "";
-  else if (delay === null) text = t("noContract");
-  else if (delay <= 0) text = t("onTime");
-  else if (delay <= 14) text = t("late", { count: 14 - delay });
-  else text = t("penalized", { count: delay - 14 });
+  const late = delay !== null && delay > 0;
+  const tone = late ? "text-warn" : "";
+  const text = !check ? "" : delay === null ? t("noContract") : late ? t("late") : t("onTime");
   return (
-    <section
-      className={cn(cardVariants(), "gap-3", delay !== null && delay > 0 && (delay > 14 ? "border-bad/50" : "border-warn/50"))}
-      aria-labelledby="check-title"
-    >
+    <section className={cn(cardVariants(), "gap-3", late && "border-warn/50")} aria-labelledby="check-title">
       <h2 id="check-title">{t("title")}</h2>
       {problem ?? (
         <>
@@ -261,16 +254,10 @@ export function DraftCheck({ check, problem }: { check: PlanningCheck | null; pr
               <dt className={muted}>{t("contract")}</dt>
               <dd className="m-0 font-heading text-[26px] font-semibold">{f.date(check?.contractEnd)}</dd>
             </div>
-            <div>
+            <div className="col-span-2">
               <dt className={muted}>{t("delay")}</dt>
               <dd className={cn("num m-0 font-semibold", tone)}>
-                {delay === null ? "—" : delay <= 0 ? t("inTime") : t("days", { count: delay })}
-              </dd>
-            </div>
-            <div>
-              <dt className={muted}>{t("penalty")}</dt>
-              <dd className={cn("num m-0 font-semibold", check && check.penaltyCents > 0 && "text-bad")}>
-                {f.money(check?.penaltyCents ?? 0)}
+                {delay === null ? "—" : late ? t("days", { count: delay }) : t("inTime")}
               </dd>
             </div>
           </dl>

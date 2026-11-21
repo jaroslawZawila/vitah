@@ -158,15 +158,10 @@ describe("criticalPath", () => {
 });
 
 describe("planCheck", () => {
-  it("measures the end against the contract, with the penalty from day 15", () => {
-    expect(planCheck("2026-12-23", "2026-12-18", 100_000_00)).toEqual({
-      endDate: "2026-12-23",
-      contractEnd: "2026-12-18",
-      delayDays: 5,
-      penaltyCents: 0,
-    });
-    expect(planCheck("2027-01-10", "2026-12-18", 100_000_00).penaltyCents).toBe(9 * 150_00);
-    expect(planCheck("2026-12-01", "2026-12-18", 100_000_00).delayDays).toBe(-17);
-    expect(planCheck("2026-12-01", null, 100_000_00)).toMatchObject({ delayDays: null, penaltyCents: 0 });
+  it("measures the end against the contract, in days and nothing more", () => {
+    expect(planCheck("2026-12-23", "2026-12-18")).toEqual({ endDate: "2026-12-23", contractEnd: "2026-12-18", delayDays: 5 });
+    expect(planCheck("2027-01-10", "2026-12-18")).toEqual({ endDate: "2027-01-10", contractEnd: "2026-12-18", delayDays: 23 });
+    expect(planCheck("2026-12-01", "2026-12-18").delayDays).toBe(-17);
+    expect(planCheck("2026-12-01", null)).toEqual({ endDate: "2026-12-01", contractEnd: null, delayDays: null });
   });
 });

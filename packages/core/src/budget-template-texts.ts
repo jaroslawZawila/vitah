@@ -1,7 +1,7 @@
 // Company-wide fixed texts of the FRAMER budget: the standard sections printed in every budget PDF
 // (guarantees, handover documents and the contract's general conditions), generalised from the
 // template PreFRAMER_Caviedes_Valdadiga_V1.pdf. `{placeholders}` are filled per project: {contractor},
-// {promoter}, {site}, {basis}, {price}, {term}, {penalty}, {mediator} and {jurisdiction}.
+// {promoter}, {site}, {basis}, {price}, {term}, {mediator} and {jurisdiction}.
 
 export const LOE_GUARANTEES: { period: string; scope: string }[] = [
   {
@@ -43,7 +43,7 @@ export const CONTRACT_INTRO =
 export const CONTRACT_CLAUSES: { title: string; text: string }[] = [
   {
     title: "Objeto del Contrato",
-    text: "El presente contrato tiene por objeto la ejecución de las obras de construcción de una vivienda unifamiliar aislada industrializada mediante el sistema Steel Frame de acero ligero galvanizado, en {site}, conforme al {basis} y a la Memoria de Calidades aprobada por ambas partes, con la adaptación al sistema Steel Frame descrita en el apartado de Justificación Técnica de este presupuesto. El alcance comprende desde el movimiento de tierras hasta la entrega de llaves, en los términos descritos en el presupuesto. Las partidas opcionales solo forman parte del objeto del contrato cuando hayan sido aceptadas por el PROMOTOR; las no aceptadas quedan excluidas y solo podrán incorporarse mediante anejo firmado por ambas partes. Las mediciones del presupuesto se verificarán y ajustarán conforme a la Cláusula 5ª.",
+    text: "El presente contrato tiene por objeto la ejecución de las obras de construcción de una vivienda unifamiliar aislada industrializada mediante el sistema Steel Frame de acero ligero galvanizado, en {site}, conforme al {basis} y a la Memoria de Calidades aprobada por ambas partes, con la adaptación al sistema Steel Frame descrita en el apartado de Justificación Técnica de este presupuesto. El alcance comprende desde el movimiento de tierras hasta la entrega de llaves, en los términos descritos en el presupuesto. Las partidas opcionales solo forman parte del objeto del contrato cuando hayan sido aceptadas por el PROMOTOR; las no aceptadas quedan excluidas y solo podrán incorporarse mediante anejo firmado por ambas partes. Las mediciones del presupuesto se verificarán y ajustarán conforme a la Cláusula 4ª.",
   },
   {
     title: "Precio y Forma de Pago",
@@ -52,10 +52,6 @@ export const CONTRACT_CLAUSES: { title: string; text: string }[] = [
   {
     title: "Plazo de Ejecución",
     text: "El plazo de ejecución se estima en {term}, condicionado a la obtención de la Licencia Municipal de Obras y, en su caso, de las autorizaciones administrativas exigibles. El plazo comenzará a computarse en la fecha en que el PROMOTOR haga entrega de la parcela libre de cargas y con acceso garantizado para el camión de transporte de la estructura y los medios de elevación. Las causas de fuerza mayor (fenómenos meteorológicos de carácter extraordinario debidamente documentados, huelgas del sector, desabastecimiento de materiales certificado por el proveedor) podrán suspender el cómputo del plazo, previa notificación escrita en un plazo máximo de 48 horas desde la aparición de la causa. En ningún caso se considerará causa de fuerza mayor la simple lluvia en el contexto climático habitual de la zona.",
-  },
-  {
-    title: "Penalizaciones por Retraso",
-    text: "En caso de retraso imputable al CONTRATISTA en la entrega de la obra sobre la fecha pactada, se aplicará una penalización de {penalty}. Superado este límite, el PROMOTOR podrá optar entre resolver el contrato con devolución de las cantidades pagadas por trabajos no ejecutados o exigir el cumplimiento forzoso. Las penalizaciones serán descontadas del importe del Hito H9 (liquidación final).",
   },
   {
     title:

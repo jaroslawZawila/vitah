@@ -1,9 +1,11 @@
-import type { BudgetPdfKind, BudgetRevision } from "../contract";
+import { promoterName, type BudgetPdfKind, type BudgetRevision } from "../contract";
 import { formatAmount, formatDate, formatDecimal, formatPercent } from "../format";
 
 // What the budget PDF is drawn from, and the Spanish number formats it prints.
 
 export type Letterhead = { name: string; tagline: string; address: string; phone: string };
+/** The letterhead with what only the contract names. */
+export type ContractLetterhead = Letterhead & { jurisdiction: string; mediator: string };
 
 export type BudgetPdfData = {
   kind: BudgetPdfKind;
@@ -41,6 +43,23 @@ export const day = (value: string) => formatDate(value, "es");
 
 /** Basis points as a percentage with `decimals` decimals: 1246 → "12,46 %". */
 export const pct = (bp: number, decimals = 2) => formatPercent(bp, "es", { minDecimals: decimals });
+
+/** What fills the contract's `{placeholders}` (budget-template-texts): every one a clause uses must be here. */
+export function contractValues(revision: BudgetRevision, letterhead: ContractLetterhead, site: string): Record<string, string> {
+  const { cover } = revision.texts;
+  return {
+    contractor: [letterhead.name, letterhead.address ? `con domicilio en ${letterhead.address}` : "", letterhead.phone ? `Tel. ${letterhead.phone}` : ""]
+      .filter(Boolean)
+      .join(", "),
+    promoter: promoterName(cover.promoter),
+    site: [site, cover.cadastral].filter(Boolean).join(", "),
+    basis: cover.basis || "proyecto de referencia",
+    price: `${money(revision.totalCents)} €`,
+    term: revision.conditions.term,
+    jurisdiction: letterhead.jurisdiction || "la sede del CONTRATISTA",
+    mediator: letterhead.mediator || "Colegio Oficial de Aparejadores y Arquitectos Técnicos de la provincia de la obra",
+  };
+}
 
 /** Replaces `{name}` with `values.name` (unknown names stay, to be noticed). */
 export function fill(template: string, values: Record<string, string>) {

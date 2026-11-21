@@ -120,7 +120,6 @@ export const obra: ProjectObra = {
     week: 21,
     totalWeeks: 40,
     lateDays: 0,
-    penaltyCents: 0,
   },
   chapters: [
     { code: "04", name: "Estructura Steel Frame e Ingeniería BIM", totalCents: 6_639_485, executedCents: 6_639_485, progressPct: 100, status: "done", shareBp: 1481, hitoCode: "H3" },
@@ -202,7 +201,7 @@ export const budget: ProjectBudget = {
       includes: "El movimiento de tierras",
     },
     identity: { client: "Roberto Guzmán Mesa", address: "C/ de la Arboleda 3, Zarzalejo (Madrid)", differs: [], projectLacks: [] },
-    conditions: { validityDays: 90, term: "8 a 10 meses", penalty: "150 €/día", signingPlace: "Zarzalejo" },
+    conditions: { validityDays: 90, term: "8 a 10 meses", signingPlace: "Zarzalejo" },
     changeReason: "Mediciones del BC3",
     validUntil: null,
     acceptedOn: null,

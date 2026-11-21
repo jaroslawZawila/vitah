@@ -79,8 +79,8 @@ const toInput = (row: ItemRow): PlanningItemInput => ({
 type Obra = Awaited<ReturnType<typeof loadObra>>;
 type Works = { startDate: string | null; completionDate: string | null };
 
-/** What the plan is measured with: what Avance recorded, today, and the contract's end and price. */
-type Measure = { recorded: ReadonlyMap<string, Recorded>; today: string; completionDate: string | null; contractCents: number };
+/** What the plan is measured with: what Avance recorded, today, and the contract's end. */
+type Measure = { recorded: ReadonlyMap<string, Recorded>; today: string; completionDate: string | null };
 
 const recordedOf = (obra: Pick<Obra, "progressRows">) =>
   new Map<string, Recorded>(obra.progressRows.map((r) => [r.chapterCode, { actualStart: r.actualStart, actualEnd: r.actualEnd }]));
@@ -101,7 +101,6 @@ async function loadProject(tenantId: string, projectId: string) {
     completionDate: toCalendarDate(project.completionDate),
     chapters,
     recorded: recordedOf(obra),
-    contractCents: obra.progress.totalCents,
     today: todayInSpain(),
   };
 }
@@ -166,8 +165,8 @@ function baselineForecast(measure: Measure, approved: VersionRow, rows: ItemRow[
     planned,
     forecast,
     plannedEnd,
-    plannedCheck: planCheck(plannedEnd, measure.completionDate, measure.contractCents),
-    forecastCheck: planCheck(planEnd(forecast) ?? plannedEnd, measure.completionDate, measure.contractCents),
+    plannedCheck: planCheck(plannedEnd, measure.completionDate),
+    forecastCheck: planCheck(planEnd(forecast) ?? plannedEnd, measure.completionDate),
   };
 }
 
@@ -175,7 +174,6 @@ function baselineForecast(measure: Measure, approved: VersionRow, rows: ItemRow[
 type ScheduleObra = Pick<Obra, "progressRows" | "planDates" | "plan"> & {
   costChapters: { code: string; name: string }[];
   hitos: { pctBp: number; chapters: { code: string }[] }[];
-  progress: { totalCents: number };
 };
 
 /** The contract's chapters with their states and planned dates (control-calc's `contractSchedule`). */
@@ -209,7 +207,7 @@ function statusOf(
  * it already.
  */
 export function obraSchedule(obra: ScheduleObra, works: Works, today: string, contract: Contract = obraContract(obra, works)): ScheduleStatus {
-  const measure = { recorded: recordedOf(obra), today, completionDate: works.completionDate, contractCents: obra.progress.totalCents };
+  const measure = { recorded: recordedOf(obra), today, completionDate: works.completionDate };
   const forecast = obra.plan ? baselineForecast(measure, obra.plan.version, obra.plan.items).forecastCheck : null;
   return statusOf(contract, today, forecast);
 }
@@ -318,7 +316,6 @@ export async function getPlanningDraft(ctx: Ctx, projectId: string): Promise<Pla
       ? { number: approved.number, ends: Object.fromEntries((items.get(approved.id) ?? []).map((r) => [r.chapterCode, r.plannedEnd])) }
       : null,
     completionDate: loaded.completionDate,
-    contractCents: loaded.contractCents,
     today: loaded.today,
   };
 }

@@ -76,7 +76,7 @@ export function PlanSchedule({ schedule }: { schedule: ScheduleStatus }) {
   );
 }
 
-/** The figures that matter: when it started, when the contract ends, where the works are heading and what it costs. */
+/** The figures that matter: when it started, when the contract ends and where the works are heading. */
 export function PlanKpis({ baseline, completionDate }: { baseline: Baseline; completionDate: string | null }) {
   const t = useTranslations("planning.kpis");
   const tp = useTranslations("planning");
@@ -105,12 +105,6 @@ export function PlanKpis({ baseline, completionDate }: { baseline: Baseline; com
         ]}
       />
       <Kpi
-        label={t("penalty")}
-        value={<span className={cn(forecast.penaltyCents > 0 && "text-bad")}>{f.money(forecast.penaltyCents)}</span>}
-        hints={[late && delay <= 14 ? t("penaltyFrom", { count: 15 - delay }) : t("penaltyHint")]}
-      />
-      <Kpi
-        className="min-[360px]:col-span-2 sm:col-span-1"
         label={t("critical")}
         value={critical.length > 0 ? t("criticalCount", { count: critical.length }) : t("criticalNone")}
         hints={critical.length > 0 ? [critical.map((r) => r.code).join(" → ")] : []}

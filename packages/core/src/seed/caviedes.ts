@@ -332,7 +332,7 @@ export const CAVIEDES_BUDGET = {
         { title: "Elementos no ejecutados en Steel Frame", text: "Permanecen en sus materiales de proyecto, por ser incompatibles con el acero ligero o ajenos al sistema: cimentación y forjado sanitario, solera y pavimento del garaje, muro de cierre de mampostería de la parcela y vaso de la piscina (partida opcional)." },
       ],
     },
-    measurementCriterion: "La documentación facilitada es el conjunto de planos del Proyecto de Ejecución (51 planos, julio de 2025): situación, topográfico, plantas acotadas con cuadro de superficies, alzados, secciones, cimentación y estructura, instalaciones, acabados, carpinterías y detalles constructivos. No se ha facilitado el estado de mediciones ni el pliego del proyecto, por lo que FRAMER ha medido directamente sobre los planos acotados y sobre el cuadro oficial de superficies, que son los documentos métricos disponibles.\n\nLas mediciones de fachada, cubierta, tabiquería, urbanización y movimiento de tierras tienen por ello carácter estimativo y se cerrarán contra las mediciones reales del replanteo y del modelo BIM, aplicando los mismos precios unitarios conforme a la Cláusula 5ª del Contrato de Obra. El Capítulo 20, Imprevistos, equivalente al 5 % de los capítulos 01 a 19, está previsto precisamente para absorber esas desviaciones.",
+    measurementCriterion: "La documentación facilitada es el conjunto de planos del Proyecto de Ejecución (51 planos, julio de 2025): situación, topográfico, plantas acotadas con cuadro de superficies, alzados, secciones, cimentación y estructura, instalaciones, acabados, carpinterías y detalles constructivos. No se ha facilitado el estado de mediciones ni el pliego del proyecto, por lo que FRAMER ha medido directamente sobre los planos acotados y sobre el cuadro oficial de superficies, que son los documentos métricos disponibles.\n\nLas mediciones de fachada, cubierta, tabiquería, urbanización y movimiento de tierras tienen por ello carácter estimativo y se cerrarán contra las mediciones reales del replanteo y del modelo BIM, aplicando los mismos precios unitarios conforme a la Cláusula 4ª del Contrato de Obra. El Capítulo 20, Imprevistos, equivalente al 5 % de los capítulos 01 a 19, está previsto precisamente para absorber esas desviaciones.",
     annex: [
       { kind: "note" as const, title: "Documentación no facilitada", text: "Se ha trabajado únicamente con los 51 planos del Proyecto de Ejecución. No se dispone de memoria descriptiva, pliego de condiciones ni estado de mediciones, por lo que las mediciones son propias y estimativas. Se solicita el estado de mediciones del proyecto para contrastarlas antes de la firma." },
       { kind: "note" as const, title: "Datos del promotor", text: "Los planos no identifican al promotor; se ha tomado el nombre que figura como propiedad en el levantamiento topográfico de Alpha Tres. Debe confirmarse el nombre completo y el DNI para el contrato." },
@@ -361,7 +361,6 @@ export const CAVIEDES_BUDGET = {
   conditions: {
     validityDays: 90,
     term: "8 a 10 meses naturales desde el Acta de Inicio de Obras",
-    penalty: "150 €/día natural a partir del decimoquinto día de retraso, máximo 5 % del precio",
     signingPlace: "Herrera de Camargo",
   },
   hitos: [

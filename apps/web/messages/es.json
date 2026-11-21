@@ -739,7 +739,7 @@
       "appTitle": "En la app del cliente",
       "appText": "Lo ve como «{status}»: importe con IVA, vencimiento, las fotos del acta, el acta firmada y la factura.",
       "contractTitle": "Contrato",
-      "contractText": "Dos hitos vencidos e impagados seguidos permiten al constructor resolver el contrato (cl. 14ª). Los retrasos imputables al constructor se descuentan del H9 (cl. 4ª).",
+      "contractText": "Dos hitos vencidos e impagados seguidos permiten al constructor resolver el contrato (cláusula «Resolución del Contrato»).",
       "pickerTitle": "Fotos del acta",
       "pickerSave": "Guardar selección",
       "pickerEmpty": "El proyecto todavía no tiene fotos. Súbelas en la pestaña Fotos.",
@@ -911,8 +911,6 @@
       "forecastLate": "Fin previsto {date}: {count, plural, one {# día} other {# días}} después del contrato ({contract}).",
       "forecastWithin": "Fin previsto {date}, dentro del contrato ({contract}).",
       "forecastNoContract": "Fin previsto {date}. El proyecto no tiene fecha de fin: no se compara con el contrato.",
-      "penalty": "Penalización prevista: {amount}.",
-      "noPenalty": "Todavía sin penalización: empieza el día 15 de retraso.",
       "bySimulated": "Según las fechas simuladas:",
       "lateToFinish": "{count, plural, one {# capítulo en curso ha pasado su fin previsto} other {# capítulos en curso han pasado su fin previsto}}: {count, plural, one {} other {el que más, }}{code} {name}, fin previsto {date}.",
       "lateToStart": "{count, plural, one {# capítulo sin empezar ha pasado su inicio previsto} other {# capítulos sin empezar han pasado su inicio previsto}}: {count, plural, one {} other {el que más, }}{code} {name}, inicio previsto {date}."
@@ -1465,9 +1463,6 @@
       "forecast": "Fin previsto",
       "baselineEnd": "Línea base: {date}",
       "late": "{count, plural, one {# día} other {# días}} sobre el contrato",
-      "penalty": "Penalización prevista",
-      "penaltyFrom": "{count, plural, one {Empieza mañana} other {Empieza en # días}}: 150 €/día",
-      "penaltyHint": "150 €/día desde el día 15 de retraso",
       "critical": "Ruta crítica",
       "criticalCount": "{count, plural, one {# capítulo} other {# capítulos}}",
       "criticalNone": "Nada pendiente"
@@ -1560,13 +1555,11 @@
         "end": "Fin previsto",
         "contract": "Contrato",
         "delay": "Retraso",
-        "penalty": "Penalización",
         "inTime": "En plazo",
         "days": "{count, plural, one {+# día} other {+# días}}",
         "noContract": "El proyecto no tiene fecha de fin: no se puede comparar con el contrato.",
         "onTime": "Termina dentro del plazo del contrato.",
-        "late": "Termina después del contrato, pero dentro de los 14 días sin penalización. {count, plural, =0 {No queda margen.} one {Queda # día de margen.} other {Quedan # días de margen.}}",
-        "penalized": "Pasa del día 14 de retraso: {count, plural, one {# día} other {# días}} a 150 €, que se descuentan del H9 (máx. 5 % del precio)."
+        "late": "Termina después del plazo del contrato."
       },
       "calendar": {
         "title": "Calendario",
@@ -1976,7 +1969,7 @@
       "fixedItems": {
         "guarantees": "Garantías legales · LOE 38/1999",
         "documents": "Documentación técnica a entregar con la vivienda",
-        "contract": "Contrato de obra · condiciones generales · 16 cláusulas"
+        "contract": "Contrato de obra · condiciones generales · 15 cláusulas"
       },
       "fixedHints": {
         "guarantees": "1 año acabados · 3 años habitabilidad · 10 años estructura · 2 años equipos",
@@ -1988,7 +1981,6 @@
       "terms": {
         "validityDays": "Validez de la oferta (días)",
         "term": "Plazo de ejecución",
-        "penalty": "Penalización por retraso",
         "signingPlace": "Lugar de firma"
       }
     },

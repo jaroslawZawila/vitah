@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import type { PlanningCalendar } from "@repo/core/contract";
-import { isCalendarDate, planCheck, planEnd, schedulePlan, templateItems } from "@repo/core/planning-calc";
+import { isCalendarDate, planEnd, schedulePlan, templateItems } from "@repo/core/planning-calc";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cardVariants } from "@/components/ui/card";
@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 import CalendarFields from "./CalendarFields";
 import { muted } from "../obra/classes";
 import { bar, timelineSpanning } from "../construction/Gantt";
-import { useControlFormat } from "../construction/format";
+import { daysBetween, useControlFormat } from "../construction/format";
 
 // Presentational: a project's first plan: when the works start, where the
 // durations come from and the working calendar, with a preview of the
@@ -62,7 +62,7 @@ export default function GeneratePlanForm({
   const items = templateItems(chapters.map((c) => c.code));
   const dates = isCalendarDate(start) && from === "template" ? schedulePlan(items, { startDate: start, calendar, today }) : null;
   const end = dates && planEnd(dates);
-  const margin = end && completionDate ? -(planCheck(end, completionDate, 0).delayDays ?? 0) : null;
+  const margin = end && completionDate ? daysBetween(end, completionDate) : null;
   const timeline = dates && timelineSpanning([...dates.values()].flatMap((d) => [d.start, d.end]), start);
 
   return (

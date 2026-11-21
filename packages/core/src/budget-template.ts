@@ -78,7 +78,6 @@ export function defaultConditions(): BudgetConditions {
   return {
     validityDays: 90,
     term: "8 a 10 meses naturales desde el Acta de Inicio de Obras",
-    penalty: "150 €/día natural a partir del decimoquinto día de retraso, hasta un máximo del 5 % del precio",
     signingPlace: "",
   };
 }
@@ -104,6 +103,14 @@ export function readTexts(stored: unknown): BudgetTexts {
   };
 }
 
+/** Stored conditions over the defaults; a key the conditions no longer have is left out. */
 export function readConditions(stored: unknown): BudgetConditions {
-  return { ...defaultConditions(), ...(isRecord(stored) ? stored : {}) };
+  const base = defaultConditions();
+  if (!isRecord(stored)) return base;
+  const { validityDays, term, signingPlace } = stored as Partial<BudgetConditions>;
+  return {
+    validityDays: validityDays ?? base.validityDays,
+    term: term ?? base.term,
+    signingPlace: signingPlace ?? base.signingPlace,
+  };
 }

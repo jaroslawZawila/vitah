@@ -76,7 +76,7 @@ describe("SummaryScreen", () => {
         },
       });
     const schedule = () => within(screen.getByRole("region", { name: "Indicadores" }));
-    const withinContract = { endDate: "2027-03-01", contractEnd: "2027-03-31", delayDays: -30, penaltyCents: 0 };
+    const withinContract = { endDate: "2027-03-01", contractEnd: "2027-03-31", delayDays: -30 };
     const onPlan = [controlChapter({ overdueDays: null, plannedEnd: "2026-10-30" })];
     // Chapter 17 spans the works: planned from the start, never recorded as started.
     const notStarted = controlChapter({
@@ -106,12 +106,12 @@ describe("SummaryScreen", () => {
       ).toBeInTheDocument();
     });
 
-    it("leads with a forecast past the contract and its penalty", () => {
-      live([...onPlan, notStarted], { endDate: "2027-07-10", contractEnd: "2027-03-31", delayDays: 101, penaltyCents: 1_305_000 });
+    it("leads with a forecast past the contract, with no money put on the delay", () => {
+      live([...onPlan, notStarted], { endDate: "2027-07-10", contractEnd: "2027-03-31", delayDays: 101 });
       expect(schedule().getByText("+101 d")).toBeInTheDocument();
       expect(schedule().getByText("sobre el contrato")).toBeInTheDocument();
       expect(schedule().getByText("Fin previsto 10 jul 2027: 101 días después del contrato (31 mar 2027).")).toBeInTheDocument();
-      expect(schedule().getByText(/^Penalización prevista: 13\.050,00\s€\.$/)).toBeInTheDocument();
+      expect(schedule().queryByText(/penaliz/i)).not.toBeInTheDocument();
       expect(schedule().getByText(/^1 capítulo sin empezar ha pasado su inicio previsto/)).toBeInTheDocument();
     });
   });

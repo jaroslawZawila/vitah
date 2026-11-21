@@ -34,7 +34,7 @@ phases. Every project has the chapters of its own budget (Castrillón has 17, Za
 | **Promotor / cliente** | The homeowners, as *autopromotores* of their main home | Mobile app |
 | **Constructor** (contratista principal) | FRAMER Steel Frame (Herrera de Camargo, Cantabria) | Portal (staff: admin / manager / viewer) |
 | **Arquitecto autor del proyecto** | EAI Arquitectura S.L.P. | Outside the platform. Delivers the project |
-| **Dirección Facultativa (DF)** | Architect + arquitecto técnico. Their technical criteria prevail (cl. 7ª) | Outside the platform. Signs the CFO |
+| **Dirección Facultativa (DF)** | Architect + arquitecto técnico. Their technical criteria prevail (cl. 6ª) | Outside the platform. Signs the CFO |
 | **Coordinador de Seguridad y Salud** | Budget partida 16.02 | Outside the platform |
 
 ---
@@ -55,7 +55,7 @@ phases. Every project has the chapters of its own budget (Castrillón has 17, Za
 | 3 | **Presupuesto** | Study done | The client accepts a revision (Rev.0 → Rev.n). Valid 90 days from issue | — |
 | 4 | **Contrato y reserva** | Revision accepted | Contract signed and **H0** (5 %) invoiced. Locks the steel price and opens the BIM file and licence process | H0 |
 | 5 | **Ingeniería BIM y licencia** | H0 | BIM model (*gemelo digital*), signed structural calculation, execution project and **Licencia Municipal de Obras** delivered | H1 |
-| 6 | **Ejecución de obra** | *Acta de Inicio de Obras* (site handed over free of charges; the client's *seguro decenal* in place before foundations, cl. 10ª). Term 8–10 months | Every chapter at 100 % | H2 … H8 |
+| 6 | **Ejecución de obra** | *Acta de Inicio de Obras* (site handed over free of charges; the client's *seguro decenal* in place before foundations, cl. 9ª). Term 8–10 months | Every chapter at 100 % | H2 … H8 |
 | 7 | **Recepción y entrega** | End of works notified | *Acta de Recepción* (art. 6 LOE; client has 30 days to accept), keys, CFO and handover documents | H9 |
 | 8 | **Garantía** | Reception | 1 year finishes · 3 years habitability · 10 years structure (+2 years equipment) | — |
 
@@ -97,7 +97,7 @@ generate it from the project. Its sections are:
 | 5 | Gastos no incluidos (geotechnical study, fees ~8 % PEM, VAT, ICIO, seguro decenal, furniture…) | Shown with the budget |
 | 6 | Garantías legales LOE | App: Garantía screen |
 | 7 | Documentación técnica a entregar | H9 handover checklist |
-| 8 | Contrato de obra: 16 clauses | Rules below |
+| 8 | Contrato de obra: 15 clauses | Rules below |
 
 Rules from the budgets:
 - Unit prices already include overheads and profit, so every amount is PEC. VAT is **not** included:
@@ -117,7 +117,7 @@ The contract (§8) is signed against the accepted revision: closed price, H0–H
 Digital twin, structural calculation signed by a qualified engineer, execution project, workshop plans,
 anchor layout plan, and the **Licencia Municipal de Obras**. **H1 (7 %)** is invoiced when the BIM model
 and the licence are delivered. Before the foundations start, the client takes out the **seguro decenal**
-(cl. 10ª, a precondition for starting). The term starts on the **Acta de Inicio de Obras**, once the
+(cl. 9ª, a precondition for starting). The term starts on the **Acta de Inicio de Obras**, once the
 client hands over the site free of charges.
 
 ### 6 · Ejecución de obra: control
@@ -139,20 +139,19 @@ outside the platform, and staff upload the signed PDF to the portal. Then:
 ```
 
 Contract rules that apply during the works:
-- **Changes** (cl. 5ª): any change to the quality specification that alters price or term needs a written
+- **Changes** (cl. 4ª): any change to the quality specification that alters price or term needs a written
   *Anejo* signed by both parties **before** it is executed. It becomes a new budget revision.
-- **Brands** (cl. 6ª) are binding: Mitsubishi Ecodan, Uponor PEX-a, Roca Hall, Niessen Arco / Simon, Weber.pral Finish,
+- **Brands** (cl. 5ª) are binding: Mitsubishi Ecodan, Uponor PEX-a, Roca Hall, Niessen Arco / Simon, Weber.pral Finish,
   Thermochip, S350GD / Magnelis ZM310. A substitute needs written approval.
-- **Delay** (cl. 4ª): 150 €/calendar day from the 15th day of delay, capped at 5 % of the price,
-  **deducted from H9**. Ordinary rain in the north of Spain is not force majeure.
-- **Termination** (cl. 14ª): by the builder if two consecutive due hitos are unpaid.
+- **Term** (cl. 3ª): ordinary rain in the north of Spain is not force majeure.
+- **Termination** (cl. 13ª, «Resolución del Contrato»): by the builder if two consecutive due hitos are unpaid.
 - Tests along the way: provisional watertightness (H4), full water network test (H5), systems tested (H7),
   quality control (concrete, steel, waterproofing, Blower Door), all in Cap.16.
 
 ### 7 · Recepción y entrega (H9)
 The builder notifies the end of works. Reception is done with an **Acta de Recepción** (art. 6 LOE) with the
 DF present, and the client has 30 days to accept or reject with reasons. **H9 (3 %)** is paid against the keys
-and the CFO, minus any delay penalties. The handover documents (§7 of the budget) are:
+and the CFO. The handover documents (§7 of the budget) are:
 
 - Certificado Final de Obra (CFO), stamped by the DF
 - Libro del Edificio (minutes, list of installers, use and maintenance manual)
@@ -234,7 +233,7 @@ project ─┬─ stage (1–8), acta de inicio date, planned end date
 ```
 
 Derived, never stored: amounts (qty × price), chapter/overall %, hito amount (% × PEC), VAT, due date
-(acta + 5 business days), days of delay and penalty.
+(acta + 5 business days), days of delay.
 
 > **Prod note:** the reverted obra slice (`ab6047b`, `4389e03`) created tables in prod through
 > `packages/db/sql/2026-09-obra.sql` (`obras`, `budget_chapters`, `budget_lines`, …). They are still there.

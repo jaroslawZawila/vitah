@@ -3,7 +3,6 @@ import { projectSchedule, scheduleStatus, type ScheduleChapterInput } from "../s
 import { planCheck } from "../src/planning-calc";
 
 const TODAY = "2026-10-20";
-const CONTRACT_CENTS = 30_000_000;
 
 const chapter = (code: string, state: ScheduleChapterInput["state"], plannedStart: string | null, plannedEnd: string | null) => ({
   code,
@@ -19,7 +18,7 @@ const onPlan = [
   chapter("02", "in_progress", "2026-10-01", "2026-10-30"),
   chapter("03", "pending", "2026-11-02", "2026-11-30"),
 ];
-const forecastOnTime = planCheck("2027-03-01", "2027-03-31", CONTRACT_CENTS);
+const forecastOnTime = planCheck("2027-03-01", "2027-03-31");
 
 describe("scheduleStatus", () => {
   it("is on time with a baseline only when nothing contradicts it", () => {
@@ -57,8 +56,8 @@ describe("scheduleStatus", () => {
   });
 
   it("is late when the forecast ends after the contract, and leads with it", () => {
-    const forecast = planCheck("2027-07-10", "2027-03-31", CONTRACT_CENTS);
-    expect(forecast).toMatchObject({ delayDays: 101, penaltyCents: 1_305_000 });
+    const forecast = planCheck("2027-07-10", "2027-03-31");
+    expect(forecast.delayDays).toBe(101);
     const chapters = [...onPlan.slice(0, 2), chapter("17", "pending", "2026-02-13", "2027-03-01")];
     const status = scheduleStatus({ chapters, planning: "live", forecast, today: TODAY });
     expect(status).toMatchObject({ status: "late", worst: "forecast", forecast, lateToStart: [{ code: "17" }] });
@@ -102,12 +101,12 @@ describe("scheduleStatus", () => {
       chapter("02", "in_progress", "2026-10-01", TODAY),
       chapter("03", "pending", TODAY, "2026-11-30"),
     ];
-    const forecast = planCheck("2027-03-31", "2027-03-31", CONTRACT_CENTS);
+    const forecast = planCheck("2027-03-31", "2027-03-31");
     expect(scheduleStatus({ chapters, planning: "live", forecast, today: TODAY })).toMatchObject({ status: "on_time", worst: null });
   });
 
   it("can't compare with the contract without its date, but still sees late chapters", () => {
-    const forecast = planCheck("2027-07-10", null, CONTRACT_CENTS);
+    const forecast = planCheck("2027-07-10", null);
     expect(scheduleStatus({ chapters: onPlan, planning: "live", forecast, today: TODAY })).toMatchObject({
       status: "on_time",
       forecast: { contractEnd: null, delayDays: null },
@@ -123,7 +122,7 @@ describe("scheduleStatus", () => {
       chapters: [chapter("17", "pending", "2026-02-13", "2027-03-01")],
       planning: "mock",
       // A forecast is the baseline's: without one it is ignored.
-      forecast: planCheck("2027-07-10", "2027-03-31", CONTRACT_CENTS),
+      forecast: planCheck("2027-07-10", "2027-03-31"),
       today: TODAY,
     });
     expect(behind).toMatchObject({ status: "simulated", forecast: null, worst: "start", lateToStart: [{ code: "17", days: 249 }] });
@@ -149,7 +148,7 @@ describe("projectSchedule", () => {
       worst: "finish",
       days: 10,
     });
-    const overContract = planCheck("2027-04-30", "2027-03-31", CONTRACT_CENTS);
+    const overContract = planCheck("2027-04-30", "2027-03-31");
     expect(projectSchedule(scheduleStatus({ chapters: onPlan, planning: "live", forecast: overContract, today: TODAY }))).toEqual({
       status: "late",
       worst: "forecast",

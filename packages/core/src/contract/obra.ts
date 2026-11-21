@@ -110,8 +110,6 @@ export type ObraTerm = {
   totalWeeks: number;
   /** Days past the completion date. */
   lateDays: number;
-  /** Contract penalty for the delay so far (cl. 4ª). */
-  penaltyCents: number;
 };
 
 /** GET /api/v1/projects/:id/obra: the Obra page. */
@@ -172,7 +170,7 @@ export type MobileObra = {
   vatRateBp: number;
   paidCents: number;
   /** Between the dates the client is told: the approved plan's start and end, else the project's dates. */
-  term: Pick<ObraTerm, "startDate" | "completionDate" | "week" | "totalWeeks" | "lateDays"> | null;
+  term: ObraTerm | null;
   phases: MobilePhase[];
   /** The phase under way: the first one not done; null once all are. */
   currentPhaseKey: string | null;

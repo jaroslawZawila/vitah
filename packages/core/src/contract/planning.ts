@@ -73,14 +73,13 @@ export type PlanningVersionSummary = {
   approvedAt: string | null;
 };
 
-/** How a plan's end compares with the contract (delay penalty: 150 €/day from day 15, capped at 5 %). */
+/** How a plan's end compares with the contract. */
 export type PlanningCheck = {
   endDate: string;
   /** The contract's completion date; null when the project has none. */
   contractEnd: string | null;
   /** End − contract, calendar days (late > 0); null without a contract date. */
   delayDays: number | null;
-  penaltyCents: number;
 };
 
 /** A chapter behind its planned dates today: `plannedDate` is the start (late to start) or end (late to finish) it passed. */
@@ -143,7 +142,6 @@ export type PlanningDraft = {
   /** The baseline's ends by chapter, to show what the draft moves; null for a first plan. */
   baseline: { number: number; ends: Record<string, string> } | null;
   completionDate: string | null;
-  contractCents: number;
   today: string;
 };
 

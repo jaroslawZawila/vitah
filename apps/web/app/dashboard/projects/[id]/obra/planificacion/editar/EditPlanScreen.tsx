@@ -65,10 +65,10 @@ export default function EditPlanScreen({
     return {
       problem,
       dates,
-      check: end ? planCheck(end, draft.completionDate, draft.contractCents) : null,
+      check: end ? planCheck(end, draft.completionDate) : null,
       critical: dates ? criticalPath(rules, dates, recorded) : new Set<string>(),
     };
-  }, [rules, startDate, calendar, recorded, draft.today, draft.completionDate, draft.contractCents]);
+  }, [rules, startDate, calendar, recorded, draft.today, draft.completionDate]);
   const input = { items: rules, startDate, ...calendar };
   const back = planningHref(projectId);
 

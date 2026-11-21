@@ -14,14 +14,9 @@ import type {
 import { EXECUTION_STAGE, STAGE_HITOS, lineAmountCents } from "./contract";
 
 // ─── Obra arithmetic ─────────────────────────────────────────────────────────
-// Pure functions behind the budget, hitos and obra services: progress, dates,
-// the contract's penalty and the app's phases. No database.
+// Pure functions behind the budget, hitos and obra services: progress, dates
+// and the app's phases. No database.
 // ─────────────────────────────────────────────────────────────────────────────
-
-/** Contract cl. 4ª: 150 €/calendar day from the 15th day late, up to 5 % of the price. */
-const PENALTY_PER_DAY_CENTS = 150_00;
-const PENALTY_FREE_DAYS = 14;
-const PENALTY_CAP_BP = 500;
 
 /** Contract cl. 2ª: payment is due 5 business days after the acta. */
 const PAYMENT_TERM_BUSINESS_DAYS = 5;
@@ -210,26 +205,15 @@ export function progressOfTotals(t: LineTotals): Progress {
   };
 }
 
-/** The delay penalty for finishing `lateDays` calendar days after the contract's date. */
-export function delayPenaltyCents(lateDays: number, totalCents: number): number {
-  const penaltyDays = Math.max(0, lateDays - PENALTY_FREE_DAYS);
-  return Math.min(penaltyDays * PENALTY_PER_DAY_CENTS, ofBp(totalCents, PENALTY_CAP_BP));
-}
-
-/** Where the works stand against their dates, and the delay penalty so far. */
-export function obraTerm(
-  startDate: string,
-  completionDate: string,
-  today: string,
-  totalCents: number,
-): ObraTerm {
+/** Where the works stand against their dates. */
+export function obraTerm(startDate: string, completionDate: string, today: string): ObraTerm {
   const start = toTime(startDate);
   const end = toTime(completionDate);
   const now = toTime(today);
   const week = now < start ? 0 : Math.floor((now - start) / (7 * DAY_MS)) + 1;
   const totalWeeks = Math.max(1, Math.ceil((end - start) / (7 * DAY_MS)));
   const lateDays = Math.max(0, Math.round((now - end) / DAY_MS));
-  return { startDate, completionDate, week, totalWeeks, lateDays, penaltyCents: delayPenaltyCents(lateDays, totalCents) };
+  return { startDate, completionDate, week, totalWeeks, lateDays };
 }
 
 /**

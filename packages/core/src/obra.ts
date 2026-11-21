@@ -32,11 +32,15 @@ import { projectInTenant } from "./project-client";
 // portal's Obra page and the app's Obra tab read from here.
 // ─────────────────────────────────────────────────────────────────────────────
 
-function termOf(project: Pick<ObraProject, "startDate" | "completionDate">, totalCents: number) {
-  const start = toCalendarDate(project.startDate);
-  const end = toCalendarDate(project.completionDate);
-  return start && end ? obraTerm(start, end, todayInSpain(), totalCents) : null;
-}
+/** The works' calendar between two days, as of today; null without both. */
+const termOf = ({ startDate, completionDate }: { startDate: string | null; completionDate: string | null }) =>
+  startDate && completionDate ? obraTerm(startDate, completionDate, todayInSpain()) : null;
+
+/** The project's own dates, as calendar days. */
+const projectDates = (project: Pick<ObraProject, "startDate" | "completionDate">) => ({
+  startDate: toCalendarDate(project.startDate),
+  completionDate: toCalendarDate(project.completionDate),
+});
 
 /** What the hitos in `status` add up to, without VAT. */
 const sumAmounts = (hitos: Hito[], status: Hito["status"]) =>
@@ -74,7 +78,7 @@ export async function getObra(ctx: Ctx, projectId: string): Promise<ProjectObra>
     invoicedUnpaidCents,
     toInvoiceCents: progress.totalCents - paidCents - invoicedUnpaidCents,
     planPctBp: hitos.reduce((sum, h) => sum + h.pctBp, 0),
-    term: termOf(project, progress.totalCents),
+    term: termOf(projectDates(project)),
     chapters: chapters.map(({ code, name, totalCents, executedCents, progressPct, status }) => ({
       code,
       name,
@@ -150,12 +154,8 @@ export async function getClientObra(
     photosByChapter(tenantId, project.id),
   ]);
   // The client sees the calendar of the dates they're told (the approved plan's,
-  // else the project's), not the contract penalty.
-  const { startDate: start, completionDate: handover } = clientDates(planDates, {
-    startDate: toCalendarDate(project.startDate),
-    completionDate: toCalendarDate(project.completionDate),
-  });
-  const { penaltyCents: _, ...term } = (start && handover ? obraTerm(start, handover, todayInSpain(), progress.totalCents) : null) ?? {};
+  // else the project's).
+  const told = clientDates(planDates, projectDates(project));
   const phases = hitos.length > 0 ? buildPhases(stage, hitos, photos, planDates) : [];
 
   return {
@@ -164,7 +164,7 @@ export async function getClientObra(
     totalCents: progress.totalCents,
     vatRateBp,
     paidCents: sumAmounts(hitos, "paid"),
-    term: "startDate" in term ? term : null,
+    term: termOf(told),
     phases,
     currentPhaseKey: phases.find((p) => p.status !== "done")?.key ?? null,
     hitos,

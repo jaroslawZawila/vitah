@@ -373,7 +373,7 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
   stays in the Blob store, its pathname in the event. `getHito` returns the history (`events`) for the portal's hito
   page (Historial); staff-only, never in the hito list nor in `/api/mobile`. Prod SQL: `packages/db/sql/2026-11-hito-events.sql`
 - `obra.ts` builds the portal's Obra page and the app's phases (pre-construction + one per hito); the arithmetic
-  (progress, due dates, penalty, phases) is pure in `obra-calc.ts`, also used by the portal for live figures
+  (progress, due dates, phases) is pure in `obra-calc.ts`, also used by the portal for live figures
 - Portal tabs Obra (construction control, below), Presupuesto and Pagos (`payments/[hitoId]`); the stage stepper is on
   the project's General tab; app tab Obra with pushed screens under `app/(app)/obra/`. `pnpm db:seed` gives VTH-26-001 the real Caviedes budget (`seed/caviedes.ts`), its obra half built
 
@@ -520,7 +520,7 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
   and the optional August (4 weeks from its first Monday) and Christmas (24/12–6/1) closures, chosen per version
 - What Avance records wins: a finished chapter keeps its real dates, a started one its real start; nothing still to
   happen is placed before today. The baseline view adds that forecast and the critical path; both, and the draft, are
-  checked against `projects.completion_date` with the contract's delay penalty (`delayPenaltyCents` in `obra-calc.ts`)
+  checked against `projects.completion_date` in days (`planCheck`)
 - Each chapter also has a lead time (`lead_days`, calendar days): its orders must go out by planned start − lead
   time. Compras' "Por contratar pronto" lists the chapters with lines not ordered whose order-by date falls within
   `UPCOMING_DAYS` (30) or has passed (`orderLateDays`), soonest first; without a baseline the template's lead times

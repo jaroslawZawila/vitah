@@ -150,30 +150,27 @@ describe("progressOf", () => {
 });
 
 describe("obraTerm", () => {
-  const total = 44_820_505; // 448.205,05 €
-
   it("counts the week of the works", () => {
-    expect(obraTerm("2026-05-04", "2027-02-05", "2026-09-27", total)).toEqual({
+    expect(obraTerm("2026-05-04", "2027-02-05", "2026-09-27")).toEqual({
       startDate: "2026-05-04",
       completionDate: "2027-02-05",
       week: 21,
       totalWeeks: 40,
       lateDays: 0,
-      penaltyCents: 0,
     });
-    expect(obraTerm("2026-05-04", "2027-02-05", "2026-05-04", total).week).toBe(1);
-    expect(obraTerm("2026-05-04", "2027-02-05", "2026-04-30", total).week).toBe(0);
+    expect(obraTerm("2026-05-04", "2027-02-05", "2026-05-04").week).toBe(1);
+    expect(obraTerm("2026-05-04", "2027-02-05", "2026-04-30").week).toBe(0);
   });
 
-  it("charges 150 € a day from the 15th day late, up to 5 % of the price", () => {
-    const late = (days: number) => {
-      const today = addDays("2027-02-05", days);
-      return obraTerm("2026-05-04", "2027-02-05", today, total);
-    };
-    expect(late(14)).toMatchObject({ lateDays: 14, penaltyCents: 0 });
-    expect(late(15)).toMatchObject({ lateDays: 15, penaltyCents: 15_000 });
-    expect(late(20)).toMatchObject({ penaltyCents: 6 * 15_000 });
-    expect(late(400).penaltyCents).toBe(Math.round(total * 0.05));
+  it("counts the days past the completion date, and nothing else", () => {
+    expect(obraTerm("2026-05-04", "2027-02-05", "2027-02-05").lateDays).toBe(0);
+    expect(obraTerm("2026-05-04", "2027-02-05", addDays("2027-02-05", 20))).toEqual({
+      startDate: "2026-05-04",
+      completionDate: "2027-02-05",
+      week: 43,
+      totalWeeks: 40,
+      lateDays: 20,
+    });
   });
 });
 

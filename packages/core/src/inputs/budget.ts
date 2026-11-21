@@ -98,7 +98,6 @@ export type TextsChanges = z.output<typeof textsSchema>;
 const conditionsSchema = entry({
   validityDays: integer(1, 365).optional(),
   term: textOrBlank(MAX_NAME).optional(),
-  penalty: textOrBlank(MAX_NAME).optional(),
   signingPlace: textOrBlank(MAX_NAME).optional(),
 });
 

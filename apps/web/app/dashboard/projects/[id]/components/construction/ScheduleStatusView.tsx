@@ -37,11 +37,6 @@ export default function ScheduleStatusView({ schedule }: { schedule: ScheduleSta
       lines.push({
         text: t("forecastLate", { date: f.date(forecast.endDate), contract: f.date(forecast.contractEnd!), count: forecastDelay }),
       });
-      lines.push(
-        forecast.penaltyCents > 0
-          ? { text: t("penalty", { amount: f.money(forecast.penaltyCents) }), tone: "font-semibold text-bad" }
-          : { text: t("noPenalty") },
-      );
     } else if (forecast.contractEnd) {
       lines.push({ text: t("forecastWithin", { date: f.date(forecast.endDate), contract: f.date(forecast.contractEnd) }) });
     } else {

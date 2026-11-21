@@ -51,7 +51,7 @@ export const budgetRevisions = pgTable(
     quality: text("quality").$type<(typeof COLUMN_VALUES.budgetQuality)[number]>(),
     // What the PDFs print besides numbers (BudgetTexts in core's contract).
     texts: jsonb("texts"),
-    // Validity, term, penalty, signing place (BudgetConditions).
+    // Validity, term, signing place (BudgetConditions).
     conditions: jsonb("conditions"),
     // The pre-issue checklist: { done: string[] } (core budget-review.ts).
     review: jsonb("review"),

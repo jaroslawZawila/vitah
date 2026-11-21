@@ -1,5 +1,5 @@
 import type { PlanningCalendar, PlanningCheck, PlanningItemInput, PlanningRegion, PlanningRule } from "./contract";
-import { addDays, delayPenaltyCents } from "./obra-calc";
+import { addDays } from "./obra-calc";
 import { daysBetween } from "./subcontractor-rules";
 
 export { isCalendarDate } from "./calendar";
@@ -287,12 +287,6 @@ export function criticalPath(
 }
 
 /** How a plan ending on `endDate` stands against the contract. */
-export function planCheck(endDate: string, contractEnd: string | null, contractCents: number): PlanningCheck {
-  const delayDays = contractEnd ? daysBetween(contractEnd, endDate) : null;
-  return {
-    endDate,
-    contractEnd,
-    delayDays,
-    penaltyCents: delayDays === null ? 0 : delayPenaltyCents(delayDays, contractCents),
-  };
+export function planCheck(endDate: string, contractEnd: string | null): PlanningCheck {
+  return { endDate, contractEnd, delayDays: contractEnd ? daysBetween(contractEnd, endDate) : null };
 }

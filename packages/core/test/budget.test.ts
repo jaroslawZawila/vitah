@@ -19,6 +19,8 @@ import {
 } from "../src";
 import { lockProject } from "../src/budget-draft";
 import { CHAPTER_NAMES } from "../src/budget-template";
+import { contractValues, fill } from "../src/budget-pdf/format";
+import { CONTRACT_CLAUSES, CONTRACT_INTRO } from "../src/budget-template-texts";
 import * as storage from "../src/storage";
 import { files } from "../src/testing";
 import { framerDraft } from "./budget-fixture";
@@ -815,6 +817,40 @@ describe("revisions", () => {
     expect(revision.texts.justification.intro).toContain("FRAMER Steel Frame");
     await expect(svc.updateRevision(ctx, project.id, revisionId, { texts: { annex: [{ kind: "rumour", title: "", text: "" }] } })).rejects.toMatchObject({ code: "invalid_input" });
     await expect(svc.updateRevision(ctx, project.id, revisionId, { quality: "luxury" })).rejects.toMatchObject({ code: "invalid_input" });
+  });
+
+  it("has no delay penalty: one stored or sent before is never read, kept or printed", async () => {
+    const { project, ctx } = await setup();
+    const { revisionId } = await draftBudget(ctx, project.id);
+    const stored = async () => (await db.select({ conditions: budgetRevisions.conditions }).from(budgetRevisions).where(eq(budgetRevisions.id, revisionId)))[0]!.conditions;
+    expect(await stored()).toEqual({ validityDays: 90, term: expect.any(String), signingPlace: "" });
+
+    // A row written while the conditions had one.
+    await db.update(budgetRevisions).set({ conditions: { validityDays: 45, term: "9 meses", penalty: "150 €/día", signingPlace: "Zarzalejo" } }).where(eq(budgetRevisions.id, revisionId));
+    expect((await revisionOf(ctx, project.id)).conditions).toEqual({ validityDays: 45, term: "9 meses", signingPlace: "Zarzalejo" });
+
+    // An older client still sending it: dropped, not refused, and the next write leaves the row without it.
+    await svc.updateRevision(ctx, project.id, revisionId, { conditions: { term: "10 meses", penalty: "200 €/día" } as never });
+    expect(await stored()).toEqual({ validityDays: 45, term: "10 meses", signingPlace: "Zarzalejo" });
+
+    // A new revision copies the conditions as read, not as stored.
+    await db.update(budgetRevisions).set({ conditions: { validityDays: 45, term: "10 meses", penalty: "150 €/día", signingPlace: "Zarzalejo" } }).where(eq(budgetRevisions.id, revisionId));
+    await svc.acceptRevision(ctx, project.id, revisionId, {}, { unissued: true });
+    const { revisionId: copy } = await svc.createRevision(ctx, project.id);
+    const [copied] = await db.select({ conditions: budgetRevisions.conditions }).from(budgetRevisions).where(eq(budgetRevisions.id, copy));
+    expect(copied!.conditions).toEqual({ validityDays: 45, term: "10 meses", signingPlace: "Zarzalejo" });
+
+    // The contract: 15 clauses, and what the PDF fills them with leaves no placeholder behind.
+    const letterhead = { name: "Framer", tagline: "", address: "", phone: "", jurisdiction: "", mediator: "" };
+    const values = contractValues(await revisionOf(ctx, project.id), letterhead, "Calle Mayor 1, Santander");
+    expect(values).not.toHaveProperty("penalty");
+    const contract = [CONTRACT_INTRO, ...CONTRACT_CLAUSES.flatMap((c) => [c.title, c.text])].join("\n");
+    expect(CONTRACT_CLAUSES).toHaveLength(15);
+    expect(contract).not.toMatch(/penaliz/i);
+    expect(fill(contract, values)).not.toMatch(/[{}]/);
+    // The clause the first one points at is still the measurements'.
+    expect(CONTRACT_CLAUSES[0]!.text).toContain("conforme a la Cláusula 4ª");
+    expect(CONTRACT_CLAUSES[3]!.title).toMatch(/^Liquidación por Mediciones Reales/);
   });
 });
 

@@ -127,7 +127,7 @@ export default function ConditionsView({
           ))}
           <p className={muted}>{t("fixedNote")}</p>
           <div className="grid gap-3 sm:grid-cols-2">
-            {(["validityDays", "term", "penalty", "signingPlace"] as const).map((key) => (
+            {(["validityDays", "term", "signingPlace"] as const).map((key) => (
               <label key={key} className="flex flex-col gap-1.5 text-meta font-semibold text-muted-foreground">
                 {t(`terms.${key}`)}
                 <SaveOnBlur

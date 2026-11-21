@@ -55,6 +55,20 @@ describe("EditPlanScreen", () => {
     expect(screen.getByText(/Durante toda la obra, hasta el .*: 17 Control de calidad/)).toBeInTheDocument();
   });
 
+  it("compares the draft's end with the contract in days, with no money on a delay", () => {
+    const check = () => within(screen.getByRole("region", { name: "Este borrador" }));
+    const { unmount } = renderScreen({ draft: { ...planningDraft, completionDate: "2027-06-30" } });
+    expect(check().getByText("Termina dentro del plazo del contrato.")).toBeInTheDocument();
+    expect(check().getByText("En plazo")).toBeInTheDocument();
+    unmount();
+
+    renderScreen({ draft: { ...planningDraft, completionDate: "2026-06-30" } });
+    expect(check().getByText("Termina después del plazo del contrato.")).toBeInTheDocument();
+    expect(check().getByText(/^\+\d+ días$/)).toBeInTheDocument();
+    expect(check().queryByText(/€|enaliz/)).not.toBeInTheDocument();
+    expect(check().getAllByRole("term").map((term) => term.textContent)).toEqual(["Fin previsto", "Contrato", "Retraso"]);
+  });
+
   it("stacks each chapter's fields in a card on a phone, each beside its heading", () => {
     renderScreen();
     const painting = screen.getByRole("row", { name: /Pinturas/ });

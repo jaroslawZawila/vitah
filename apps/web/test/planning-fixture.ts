@@ -92,7 +92,7 @@ export const planningRows: PlanningRow[] = [
 
 const calendar = { region: "as" as const, augustClosure: true, christmasClosure: true };
 
-const forecast = { endDate: "2026-12-17", contractEnd: "2026-12-11", delayDays: 6, penaltyCents: 0 };
+const forecast = { endDate: "2026-12-17", contractEnd: "2026-12-11", delayDays: 6 };
 
 export const planning: ProjectPlanning = {
   ref: "VTH-26-001",
@@ -112,7 +112,7 @@ export const planning: ProjectPlanning = {
     approvedAt: "2026-10-12T09:00:00.000Z",
     calendar,
     rows: planningRows,
-    planned: { endDate: "2026-12-10", contractEnd: "2026-12-11", delayDays: -1, penaltyCents: 0 },
+    planned: { endDate: "2026-12-10", contractEnd: "2026-12-11", delayDays: -1 },
     forecast,
   },
   draft: null,
@@ -144,7 +144,6 @@ export const planningDraft: PlanningDraft = {
   rows: planningRows,
   baseline: { number: 2, ends: { "01": "2026-03-13", "02": "2026-10-23", "03": "2026-11-20", "04": "2026-12-10", "17": "2026-12-10" } },
   completionDate: "2026-12-11",
-  contractCents: 448_205_05,
   today: TODAY,
 };
 

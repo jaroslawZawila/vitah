@@ -3,10 +3,10 @@ import { and, asc, budgetRevisions, db, eq, isNull, lte, obraHitos, projectDocum
 import { getBudget } from "./budget";
 import { lapseApprovals, lockProjectRow } from "./budget-approvals";
 import { revisionInProject } from "./budget-draft";
-import { money, monthLabel, type BudgetPdfData, type Letterhead } from "./budget-pdf/format";
+import { contractValues, monthLabel, type BudgetPdfData, type ContractLetterhead } from "./budget-pdf/format";
 import { markChanged } from "./changes";
 import type { Ctx } from "./context";
-import { CONTINGENCY_CHAPTER, promoterName, type BudgetPdfKind, type BudgetRevision, type ProjectBudget } from "./contract";
+import { CONTINGENCY_CHAPTER, type BudgetPdfKind, type BudgetRevision, type ProjectBudget } from "./contract";
 import { newPdfDocument, openDocument } from "./documents";
 import { notifyProjectClient } from "./notifications";
 import { addDays, forClient, perM2Cents, todayInSpain } from "./obra-calc";
@@ -22,9 +22,9 @@ import { storeFiles, type StoredFile } from "./project-files";
 // Until then the PDFs are rendered on the fly, marked "BORRADOR".
 // ─────────────────────────────────────────────────────────────────────────────
 
-async function letterheadOf(tenantId: string): Promise<Letterhead & { jurisdiction: string; mediator: string }> {
+async function letterheadOf(tenantId: string): Promise<ContractLetterhead> {
   const tenant = await db.query.tenants.findFirst({ where: eq(tenants.id, tenantId), columns: { name: true, letterhead: true } });
-  const stored = (tenant?.letterhead ?? {}) as Partial<Letterhead & { jurisdiction: string; mediator: string }>;
+  const stored = (tenant?.letterhead ?? {}) as Partial<ContractLetterhead>;
   return {
     name: stored.name || tenant?.name || "",
     tagline: stored.tagline ?? "",
@@ -96,19 +96,7 @@ async function pdfData(
       reason: h.number === revision.number ? revision.changeReason : h.reason,
       totalCents: totals.get(h.id) ?? 0,
     })),
-    contractValues: {
-      contractor: [letterhead.name, letterhead.address ? `con domicilio en ${letterhead.address}` : "", letterhead.phone ? `Tel. ${letterhead.phone}` : ""]
-        .filter(Boolean)
-        .join(", "),
-      promoter: promoterName(cover.promoter),
-      site: [site, cover.cadastral].filter(Boolean).join(", "),
-      basis: cover.basis || "proyecto de referencia",
-      price: `${money(revision.totalCents)} €`,
-      term: revision.conditions.term,
-      penalty: revision.conditions.penalty,
-      jurisdiction: letterhead.jurisdiction || "la sede del CONTRATISTA",
-      mediator: letterhead.mediator || "Colegio Oficial de Aparejadores y Arquitectos Técnicos de la provincia de la obra",
-    },
+    contractValues: contractValues(revision, letterhead, site),
   };
 }
 

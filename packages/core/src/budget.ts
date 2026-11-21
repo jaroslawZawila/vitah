@@ -479,11 +479,13 @@ export async function createRevision(ctx: Ctx, projectId: string) {
     if (newest.status === "draft") fail("draft_exists");
 
     const { tenantId, reference, vatRateBp, builtAreaCm2, usefulAreaCm2, exclusions } = newest;
-    const { model, contingencyBp, overheadBp, profitBp, quality, conditions } = newest;
-    let { texts } = newest;
+    const { model, contingencyBp, overheadBp, profitBp, quality } = newest;
+    let { texts, conditions } = newest;
     if (model === BUDGET_MODEL) {
       const stored = readTexts(texts);
       texts = { ...stored, cover: withProjectIdentity(stored.cover, await projectIdentity(tenantId, projectId, tx)) };
+      // Read, not copied as stored: a key the conditions no longer have stays behind.
+      conditions = readConditions(conditions);
     }
     const [revision] = await tx
       .insert(budgetRevisions)

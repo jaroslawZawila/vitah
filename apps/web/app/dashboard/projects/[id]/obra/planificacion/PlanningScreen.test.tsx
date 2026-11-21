@@ -40,7 +40,7 @@ describe("PlanningScreen", () => {
     const kpis = within(screen.getByRole("region", { name: "Resumen del plan" }));
     expect(kpis.getByText("17 dic 2026")).toBeInTheDocument();
     expect(kpis.getByText("6 días sobre el contrato")).toBeInTheDocument();
-    expect(kpis.getByText("Empieza en 9 días: 150 €/día")).toBeInTheDocument();
+    expect(kpis.queryByText(/€/)).not.toBeInTheDocument();
     expect(kpis.getByText("02 → 03 → 04")).toBeInTheDocument();
 
     // The same status Obra › Resumen states: late, the forecast past the contract first.
@@ -48,7 +48,7 @@ describe("PlanningScreen", () => {
     expect(schedule.getByText("+6 d")).toBeInTheDocument();
     expect(schedule.getByText("sobre el contrato")).toBeInTheDocument();
     expect(schedule.getByText("Fin previsto 17 dic 2026: 6 días después del contrato (11 dic 2026).")).toBeInTheDocument();
-    expect(schedule.getByText("Todavía sin penalización: empieza el día 15 de retraso.")).toBeInTheDocument();
+    expect(schedule.queryByText(/€/)).not.toBeInTheDocument();
     expect(schedule.queryByText("En plazo")).not.toBeInTheDocument();
 
     expect(table().getByRole("link", { name: "Revestimientos interiores y falsos techos" })).toHaveAttribute(

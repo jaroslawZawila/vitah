@@ -56,7 +56,7 @@ ALTER TABLE budget_revisions
   ADD COLUMN contingency_bp integer NOT NULL DEFAULT 500,   -- chapter 20: 5 % of 01–19
   ADD COLUMN quality       text,          -- 'framer' | 'project' (the AI's "calidades")
   ADD COLUMN texts         jsonb,         -- everything the PDFs print besides numbers (§3.6)
-  ADD COLUMN conditions    jsonb,         -- validity, term, penalty, signing place, includes (§3.6)
+  ADD COLUMN conditions    jsonb,         -- validity, term, signing place, includes (§3.6)
   ADD COLUMN review        jsonb,         -- AI checklist state: { done: string[] } (§5.4)
   ADD COLUMN change_reason text,          -- "Motivo de la revisión", required to issue Rev ≥ 1
   ADD COLUMN issued_on     date,
@@ -176,7 +176,7 @@ type BudgetTexts = {
   exclusions: string[];                                               // replaces budget_revisions.exclusions (kept for v1)
   includes: string;                                                    // "Este presupuesto sí incluye…"
 };
-type BudgetConditions = { validityDays: number; term: string; penalty: string; signingPlace: string };
+type BudgetConditions = { validityDays: number; term: string; signingPlace: string };
 ```
 
 They are validated in core (lengths, counts) with plain parsers, matching the existing input helpers. Both are copied to each new revision.
@@ -189,7 +189,7 @@ They are validated in core (lengths, counts) with plain parsers, matching the ex
 
 ## 4. Fixed data in core
 
-- **`budget-template.ts`:** the 20 FRAMER chapters (code and default name, from Caviedes); default `texts` (justification intro, measurement criterion stub, exclusions, includes); LOE guarantees; handover documents; and the 16 contract clauses with `{placeholders}` (promoter, plot, price, term, penalty, signing place).
+- **`budget-template.ts`:** the 20 FRAMER chapters (code and default name, from Caviedes); default `texts` (justification intro, measurement criterion stub, exclusions, includes); LOE guarantees; handover documents; and the 15 contract clauses with `{placeholders}` (promoter, plot, price, term, signing place).
 - **`price-base.ts`:** the FRAMER 2026 base (≈230 rows: `code | description | unit | price`), taken from the reference artifact. It has a `searchPriceBase(query, chapter?)` function (accent-insensitive). Editing it in the portal is a later feature.
 - **Company letterhead** (logo, name, address, phone) for the PDFs: a `tenants.letterhead jsonb` column plus the logo in Blob. For now it's set by the seed and by SQL; there's no settings screen yet.
 
@@ -331,7 +331,7 @@ The documents contain personal data. Anthropic's API data terms apply, and the p
 | Gastos no incluidos + "sí incluye" | ✓ | ✓ |
 | Garantías LOE · Documentación a entregar | ✓ | ✓ |
 | Resumen de revisiones (Rev ≥ 1) | ✓ | ✓ |
-| Contrato de obra (16 clauses, signatures) | — | ✓ |
+| Contrato de obra (15 clauses, signatures) | — | ✓ |
 | Anexo: observaciones técnicas | ✓ | ✓ |
 
 - **Preview:** `GET /api/v1/projects/:id/budget/revisions/:rid/pdf?kind=…` renders on the fly (session cookie or Bearer). The portal's viewer page (artboards 12–13) shows it in an `<iframe>`, with the General/Detallado switch and a download button.
@@ -426,7 +426,7 @@ Draft edits, options, texts and generations → none: the app only sees accepted
 |---|---|
 | Core (Vitest, real DB) | 20-chapter creation; contingency sync on every write; OP renumbering; PEC vs contract totals; the status machine (issue/accept/reject/new revision, every forbidden transition); copying options/texts; accept with chosen options; progress carry-over; checklist + ratios; documents visibility and mobile filter; budget documents undeletable; tenant isolation for every new function; generation start rules, limit, cancel |
 | `budget-ai` (fake Claude) | Each step stores its result and is idempotent on retry; schema-invalid response, then one retry, then fail; refusal / max_tokens → failed with message; usage rows; post-processing (pure); BC3 and XLSX converters with fixture files; prompt building (the price base slice per group) |
-| PDF | Renders both kinds for the seed budget without error; page count and key strings (`TOTAL PEC`, `OP.01`, `Cláusula 16ª`) via `pdf-parse`; draft watermark present only on drafts |
+| PDF | Renders both kinds for the seed budget without error; page count and key strings (`TOTAL PEC`, `OP.01`, `Cláusula 15ª`) via `pdf-parse`; draft watermark present only on drafts |
 | Server actions + `/api/v1` | Happy path, errors, v1 backwards compatibility (old accept body, `chapters` shape), tenant isolation |
 | Workflow | Steps unit-tested as plain functions. The orchestration is 6 lines and is smoke-tested locally with `npx workflow web` |
 | Portal | Container/view tests in the existing style for every screen and dialog |
