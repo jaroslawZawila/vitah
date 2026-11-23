@@ -938,7 +938,7 @@
         "cost": "Current cost",
         "costHint": "Invoiced by suppliers in Purchasing",
         "global": "Global value",
-        "globalHint": "Total budgeted less current cost"
+        "globalHint": "Expected margin: total budgeted less expected cost ({cost})"
       },
       "table": {
         "title": "Budget chapters",

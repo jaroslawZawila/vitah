@@ -47,7 +47,9 @@ describe("SummaryScreen", () => {
     expect(card("Total presupuestado · sin IVA")).toHaveTextContent("Precio del contrato, con gastos asociados y beneficio industrial · Rev.1");
     expect(card("Coste actual · sin IVA")).toHaveTextContent("150.000,00 €");
     expect(card("Coste actual · sin IVA")).toHaveTextContent("Facturado por proveedores en Compras");
-    expect(card("Valor global · sin IVA")).toHaveTextContent("471.480,00 € · 75,86 %");
+    // Not the total less the current cost (that would just repeat the total before any invoice): the expected margin.
+    expect(card("Valor global · sin IVA")).toHaveTextContent("341.312,00 € · 54,92 %");
+    expect(card("Valor global · sin IVA")).toHaveTextContent("Margen previsto: total presupuestado menos coste previsto (280.168,00 €)");
     // The old four cards are gone: the chapters, cost, sales and schedule have their own tabs.
     expect(screen.queryByRole("region", { name: "Indicadores" })).not.toBeInTheDocument();
     expect(screen.queryByText("Coste · sin IVA")).not.toBeInTheDocument();
@@ -56,9 +58,9 @@ describe("SummaryScreen", () => {
     expect(screen.queryByText("de 6 finalizados")).not.toBeInTheDocument();
   });
 
-  it("shows a global value below zero when the cost passes the budget", () => {
+  it("shows a global value below zero when the expected cost passes the total", () => {
     renderScreen({
-      control: { ...control, cost: { ...control.cost, supplierInvoicedCents: 70_000_000 }, globalValue: { cents: -7_852_000, bp: -1_263 } },
+      control: { ...control, cost: { ...control.cost, forecastCents: 70_000_000 }, globalValue: { cents: -7_852_000, bp: -1_263 } },
     });
     const figures = within(screen.getByRole("region", { name: "Cifras de la obra" }));
     expect(figures.getByText("Valor global · sin IVA").parentElement).toHaveTextContent("−78.520,00 € · −12,63 %");

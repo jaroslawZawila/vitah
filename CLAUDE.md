@@ -402,8 +402,10 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
   `purchasing.ts`, below); a late delivery is a warning only. Sales is the hitos' invoices/payments
 - Resumen leads with three figures, all without VAT (`SummaryFigures`): the total budgeted (`sales.contractCents`, the
   contract price with its margins), the current cost (`cost.supplierInvoicedCents`, the suppliers' invoices so far,
-  summed from the project's orders) and the valor global (`globalValue`, the one less the other, in € and % of the
-  total; computed in `getControl`). Chapters, cost deviation, sales and schedule live on their own tabs
+  summed from the project's orders) and the valor global (`globalValue`, the expected margin: the total less the
+  expected final cost `cost.forecastCents` = budget at cost + chapter 20 + the closed lines' deviation, in € and % of
+  the total; computed in `getControl`; never total − current cost, which only repeats the total before any invoice).
+  Chapters, cost deviation, sales and schedule live on their own tabs
 - Issues and changes log (`obra_issues`, numbered per kind INC-/CAM-, files in `obra_issue_files`, private Blob,
   served as downloads): history only, never changes dates, amounts or invoices. Document warnings come from
   Subcontratas (`listProjectAttention`). Photos have a `taken_on` day. Staff only; viewers read

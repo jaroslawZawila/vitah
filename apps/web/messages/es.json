@@ -938,7 +938,7 @@
         "cost": "Coste actual",
         "costHint": "Facturado por proveedores en Compras",
         "global": "Valor global",
-        "globalHint": "Total presupuestado menos coste actual"
+        "globalHint": "Margen previsto: total presupuestado menos coste previsto ({cost})"
       },
       "table": {
         "title": "Capítulos del presupuesto",

@@ -651,6 +651,7 @@ describe("the obra's current cost (Obra › Resumen)", () => {
   it("is what suppliers have invoiced, without VAT, credit notes off and deleted invoices left out", async () => {
     const s = await setup();
     expect(await costOf(s.ctx, s.project.id)).toBe(0);
+    const before = await constructionService.getControl(s.ctx, s.project.id);
 
     const { invoiceId } = await svc.createInvoice(s.ctx, s.subId, invoice());
     const material = await svc.createInvoice(s.ctx, s.materialId, invoice({ number: "PL-77", baseCents: 20_000 }));
@@ -666,10 +667,14 @@ describe("the obra's current cost (Obra › Resumen)", () => {
 
     await svc.deleteInvoice(s.ctx, material.invoiceId);
     expect(await costOf(s.ctx, s.project.id)).toBe(39_000);
-    // Valor global: the contract (3 lines of 1.000 € at cost, priced with the margins) less that cost.
-    const { sales, globalValue } = await constructionService.getControl(s.ctx, s.project.id);
-    expect(globalValue.cents).toBe(sales.contractCents - 39_000);
-    expect(globalValue.bp).toBe(Math.round(((sales.contractCents - 39_000) * 10_000) / sales.contractCents));
+    // Valor global: the contract (lines at cost, priced with the margins) less its expected cost, so the margin from
+    // the start, never the whole contract while nothing is invoiced; invoices alone don't move it.
+    const { sales, cost, globalValue } = await constructionService.getControl(s.ctx, s.project.id);
+    expect(before.globalValue.cents).toBeGreaterThan(0);
+    expect(before.globalValue.cents).toBeLessThan(sales.contractCents);
+    expect(globalValue).toEqual(before.globalValue);
+    expect(globalValue.cents).toBe(sales.contractCents - cost.forecastCents);
+    expect(globalValue.bp).toBe(Math.round((globalValue.cents * 10_000) / sales.contractCents));
   });
 
   it("counts only this project's invoices, never another obra's or another tenant's", async () => {

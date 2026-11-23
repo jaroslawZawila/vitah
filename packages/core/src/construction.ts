@@ -394,6 +394,11 @@ export async function getControl(ctx: Ctx, projectId: string): Promise<Construct
   const { contractCents } = control;
   const invoicedCents = sum(milestones.map((m) => m.invoicedCents));
   const collectedCents = sum(milestones.map((m) => m.collectedCents));
+  const budgetedCents = sum(chapters.map((c) => c.costCents));
+  const deviationCents = total.deviationCents ?? 0;
+  // What the obra is expected to cost in the end: its budget at cost, the reserve (chapter 20) included, moved by
+  // the overruns and savings of the lines already closed.
+  const forecastCents = budgetedCents + control.contingencyCents + deviationCents;
 
   return {
     project: {
@@ -409,11 +414,12 @@ export async function getControl(ctx: Ctx, projectId: string): Promise<Construct
     removedChapters,
     reviewPending: previousCodes !== null && (chapters.some((c) => c.added) || removedChapters.some((c) => c.name !== null)),
     cost: {
-      budgetedCents: sum(chapters.map((c) => c.costCents)),
+      budgetedCents,
       contractedCents,
       contractedCostCents,
       supplierInvoicedCents: control.supplierInvoicedCents,
-      deviationCents: total.deviationCents ?? 0,
+      forecastCents,
+      deviationCents,
       deviationBp: total.deviationBp ?? 0,
       contingencyCents: control.contingencyCents,
     },
@@ -424,11 +430,8 @@ export async function getControl(ctx: Ctx, projectId: string): Promise<Construct
       outstandingCents: invoicedCents - collectedCents,
       toInvoiceCents: contractCents - invoicedCents,
     },
-    // Valor global: the total budgeted less the current cost, and that as a share of the total.
-    globalValue: {
-      cents: contractCents - control.supplierInvoicedCents,
-      bp: shareBp(contractCents - control.supplierInvoicedCents, contractCents),
-    },
+    // Valor global: the total budgeted less the expected cost (the margin the obra is heading for), and its share.
+    globalValue: { cents: contractCents - forecastCents, bp: shareBp(contractCents - forecastCents, contractCents) },
     milestones,
     documentAlerts,
     lateDeliveries: control.lateDeliveries,

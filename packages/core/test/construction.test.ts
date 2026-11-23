@@ -72,6 +72,7 @@ describe("getControl", () => {
       contractedCents: 0,
       contractedCostCents: 0,
       supplierInvoicedCents: 0,
+      forecastCents: 315_000,
       deviationCents: 0,
       deviationBp: 0,
       contingencyCents: 15_000,
@@ -83,8 +84,8 @@ describe("getControl", () => {
       outstandingCents: 0,
       toInvoiceCents: 315_000,
     });
-    // Valor global: the contract less what suppliers have invoiced (nothing yet), as a share of the contract.
-    expect(control.globalValue).toEqual({ cents: 315_000, bp: 10_000 });
+    // Valor global: the contract less its expected cost. This budget carries no margins, so there is none.
+    expect(control.globalValue).toEqual({ cents: 0, bp: 0 });
     expect(control.milestones.map((m) => [m.code, m.state])).toContainEqual(["H2", "pending"]);
     expect(control.sources).toEqual({ planning: "mock", purchasing: "live" });
     expect(control.lateDeliveries).toEqual([]);
@@ -381,6 +382,10 @@ describe("getCosts", () => {
     // The summary's deviation is over the contracted lines only.
     const { cost } = await svc.getControl(ctx, project.id);
     expect(cost).toMatchObject({ contractedCents: 104_000, contractedCostCents: 100_000, deviationCents: 4_000, deviationBp: 400 });
+    // The overrun raises the expected cost and so lowers the valor global by as much.
+    const control = await svc.getControl(ctx, project.id);
+    expect(control.cost.forecastCents).toBe(cost.budgetedCents + cost.contingencyCents + 4_000);
+    expect(control.globalValue.cents).toBe(control.sales.contractCents - control.cost.forecastCents);
   });
 });
 

@@ -9,7 +9,8 @@ import { useControlFormat } from "./format";
 
 /**
  * Presentational: the Resumen's first figures, all without VAT: the total budgeted (the contract price, margins in),
- * the current cost (what suppliers have invoiced) and the global value (core's: the one less the other, in € and %).
+ * the current cost (what suppliers have invoiced) and the global value (core's: the total less the expected final
+ * cost, i.e. the margin the obra is heading for, in € and %).
  */
 export default function SummaryFigures({ control, className }: { control: ConstructionControl; className?: string }) {
   const t = useTranslations("construction.summary.value");
@@ -32,7 +33,7 @@ export default function SummaryFigures({ control, className }: { control: Constr
             {f.money(globalValue.cents)} <small>· {f.share(globalValue.bp)}</small>
           </span>
         }
-        hints={[t("globalHint")]}
+        hints={[t("globalHint", { cost: f.money(cost.forecastCents) })]}
       />
     </section>
   );
