@@ -1398,10 +1398,7 @@
       "noContract": "The project has no completion date",
       "forecast": "Forecast end",
       "baselineEnd": "Baseline: {date}",
-      "late": "{count, plural, one {# day} other {# days}} past the contract",
-      "critical": "Critical path",
-      "criticalCount": "{count, plural, one {# chapter} other {# chapters}}",
-      "criticalNone": "Nothing left"
+      "late": "{count, plural, one {# day} other {# days}} past the contract"
     },
     "table": {
       "label": "Plan by chapter",

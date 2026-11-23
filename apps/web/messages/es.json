@@ -1398,10 +1398,7 @@
       "noContract": "El proyecto no tiene fecha de fin",
       "forecast": "Fin previsto",
       "baselineEnd": "Línea base: {date}",
-      "late": "{count, plural, one {# día} other {# días}} sobre el contrato",
-      "critical": "Ruta crítica",
-      "criticalCount": "{count, plural, one {# capítulo} other {# capítulos}}",
-      "criticalNone": "Nada pendiente"
+      "late": "{count, plural, one {# día} other {# días}} sobre el contrato"
     },
     "table": {
       "label": "Plan por capítulo",

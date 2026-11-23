@@ -70,7 +70,6 @@ export function PlanKpis({ baseline, completionDate }: { baseline: Baseline; com
   const tp = useTranslations("planning");
   const f = useControlFormat();
   const { forecast } = baseline;
-  const critical = baseline.rows.filter((r) => r.critical).sort((a, b) => a.forecastStart.localeCompare(b.forecastStart));
   const delay = forecast.delayDays;
   const late = delay !== null && delay > 0;
   return (
@@ -91,11 +90,6 @@ export function PlanKpis({ baseline, completionDate }: { baseline: Baseline; com
         hints={[
           delay === null ? t("baselineEnd", { date: f.date(baseline.planned.endDate) }) : late ? t("late", { count: delay }) : tp("margin", { count: -delay }),
         ]}
-      />
-      <Kpi
-        label={t("critical")}
-        value={critical.length > 0 ? t("criticalCount", { count: critical.length }) : t("criticalNone")}
-        hints={critical.length > 0 ? [critical.map((r) => r.code).join(" → ")] : []}
       />
     </section>
   );
