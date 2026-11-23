@@ -15,19 +15,19 @@ import { textLink } from "../components/obra/classes";
 import { useObraAction } from "../components/obra/useObraAction";
 import { PeriodFilter, ReadOnlyNote } from "../components/construction/Filters";
 import { useControlFormat } from "../components/construction/format";
+import SummaryFigures from "../components/construction/SummaryFigures";
 import ObraFrame, { chapterHref, obraHref, type ObraHeader } from "../components/construction/ObraFrame";
 import LateDeliveriesBanner from "../components/construction/LateDeliveriesBanner";
 import ReviewBanner from "../components/construction/ReviewBanner";
 import { orderHref } from "../components/purchasing/links";
 import { inPeriod } from "../components/construction/schedule";
 import { DocumentAlertsCard, NextMilestoneCard, OpenIssuesCard } from "../components/construction/SummaryCards";
-import SummaryKpis from "../components/construction/SummaryKpis";
 import SummaryTable from "../components/construction/SummaryTable";
 
 /** Moved after the chapters below 768px (the page is a flex column). */
 const phoneLater = "max-md:order-1";
 
-/** The works at a glance: key figures, the chapters (filtered by period here), the next hito, issues, documents. */
+/** The works at a glance: budget, cost and global value, the chapters (filtered by period here), the next hito, issues, documents. */
 export default function SummaryScreen({
   projectId,
   header,
@@ -107,7 +107,7 @@ export default function SummaryScreen({
           </form>
 
           {/* On a phone the chapters come first, under the filters that pick them; the key figures follow. */}
-          <SummaryKpis control={control} className={phoneLater} />
+          <SummaryFigures control={control} className={phoneLater} />
 
           <SummaryTable
             chapters={shown}

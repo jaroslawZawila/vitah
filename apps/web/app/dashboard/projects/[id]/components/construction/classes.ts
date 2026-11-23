@@ -11,7 +11,7 @@ export const chapterLink = `font-semibold transition-colors hover:text-primary $
 /** A card's heading row: title on the left, a link or action on the right. */
 export const cardTop = "flex flex-wrap items-center justify-between gap-x-4 gap-y-2";
 
-/** A key figure in a Resumen card: "4", "+8 d", "En plazo". */
+/** A key figure in a card: "+8 d", "En plazo" (the schedule status). */
 export const kpiFigure = "font-heading text-[40px] leading-none font-semibold tabular-nums";
 
 /** A label–value row in a card, ruled above (not the first). */

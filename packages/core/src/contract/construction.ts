@@ -162,6 +162,8 @@ export type ConstructionControl = {
     contractedCents: number;
     /** The budgeted cost of the closed lines: what the deviation is measured on. */
     contractedCostCents: number;
+    /** The obra's current cost: its suppliers' invoices registered so far, base without VAT, credit notes off. */
+    supplierInvoicedCents: number;
     deviationCents: number;
     deviationBp: number;
     /** Chapter 20, kept as a reserve and not tracked. */
@@ -174,6 +176,8 @@ export type ConstructionControl = {
     outstandingCents: number;
     toInvoiceCents: number;
   };
+  /** Valor global: `sales.contractCents` (margins in, without VAT) less `cost.supplierInvoicedCents`; `bp` of the contract. */
+  globalValue: { cents: number; bp: number };
   milestones: ControlMilestone[];
   documentAlerts: AttentionItem[];
   /** Material orders past their expected delivery: a warning only. */

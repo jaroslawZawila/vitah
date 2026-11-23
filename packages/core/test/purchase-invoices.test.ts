@@ -645,6 +645,46 @@ describe("getProjectPurchaseLines", () => {
   });
 });
 
+describe("the obra's current cost (Obra › Resumen)", () => {
+  const costOf = async (ctx: Ctx, projectId: string) => (await constructionService.getControl(ctx, projectId)).cost.supplierInvoicedCents;
+
+  it("is what suppliers have invoiced, without VAT, credit notes off and deleted invoices left out", async () => {
+    const s = await setup();
+    expect(await costOf(s.ctx, s.project.id)).toBe(0);
+
+    const { invoiceId } = await svc.createInvoice(s.ctx, s.subId, invoice());
+    const material = await svc.createInvoice(s.ctx, s.materialId, invoice({ number: "PL-77", baseCents: 20_000 }));
+    await svc.createInvoice(s.ctx, s.subId, {
+      kind: "credit_note",
+      number: "MSN-R07",
+      issuedOn: "2026-10-01",
+      rectifiesId: invoiceId,
+      baseCents: -10_000,
+    });
+    // 490 € + 200 € − 100 €: the base, never the VAT, IRPF or retention.
+    expect(await costOf(s.ctx, s.project.id)).toBe(59_000);
+
+    await svc.deleteInvoice(s.ctx, material.invoiceId);
+    expect(await costOf(s.ctx, s.project.id)).toBe(39_000);
+    // Valor global: the contract (3 lines of 1.000 € at cost, priced with the margins) less that cost.
+    const { sales, globalValue } = await constructionService.getControl(s.ctx, s.project.id);
+    expect(globalValue.cents).toBe(sales.contractCents - 39_000);
+    expect(globalValue.bp).toBe(Math.round(((sales.contractCents - 39_000) * 10_000) / sales.contractCents));
+  });
+
+  it("counts only this project's invoices, never another obra's or another tenant's", async () => {
+    const s = await setup();
+    await svc.createInvoice(s.ctx, s.subId, invoice());
+    const otherProject = await createTestProject(s.tenant.id);
+    expect(await costOf(s.ctx, otherProject.id)).toBe(0);
+
+    const other = await setup();
+    await svc.createInvoice(other.ctx, other.subId, invoice({ baseCents: 90_000 }));
+    expect(await costOf(s.ctx, s.project.id)).toBe(49_000);
+    await expect(costOf(other.ctx, s.project.id)).rejects.toMatchObject({ code: "project_not_found" });
+  });
+});
+
 describe("a deleted invoice or payment", () => {
   /** Everything Compras shows of the money, without the orders' history. */
   const figures = async (s: Setup) => {

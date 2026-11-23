@@ -301,6 +301,7 @@ export const control: ConstructionControl = {
     budgetedCents: 25_532_600,
     contractedCents: 20_480_000,
     contractedCostCents: 20_471_700,
+    supplierInvoicedCents: 15_000_000,
     deviationCents: 8_300,
     deviationBp: 4,
     contingencyCents: 2_475_900,
@@ -312,6 +313,7 @@ export const control: ConstructionControl = {
     outstandingCents: 9_322_200,
     toInvoiceCents: 37_910_280,
   },
+  globalValue: { cents: 47_148_000, bp: 7_586 },
   milestones,
   documentAlerts: [
     {

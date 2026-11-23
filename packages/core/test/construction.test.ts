@@ -71,6 +71,7 @@ describe("getControl", () => {
       budgetedCents: 300_000,
       contractedCents: 0,
       contractedCostCents: 0,
+      supplierInvoicedCents: 0,
       deviationCents: 0,
       deviationBp: 0,
       contingencyCents: 15_000,
@@ -82,6 +83,8 @@ describe("getControl", () => {
       outstandingCents: 0,
       toInvoiceCents: 315_000,
     });
+    // Valor global: the contract less what suppliers have invoiced (nothing yet), as a share of the contract.
+    expect(control.globalValue).toEqual({ cents: 315_000, bp: 10_000 });
     expect(control.milestones.map((m) => [m.code, m.state])).toContainEqual(["H2", "pending"]);
     expect(control.sources).toEqual({ planning: "mock", purchasing: "live" });
     expect(control.lateDeliveries).toEqual([]);

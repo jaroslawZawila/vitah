@@ -3,9 +3,8 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { scheduleStatus, type ControlChapter, type PlanningCheck } from "@repo/core/contract";
 import messages from "../../../../../messages/es.json";
-import { control, controlChapter, header } from "../../../../../test/construction-fixture";
+import { control, header } from "../../../../../test/construction-fixture";
 import SummaryScreen from "./SummaryScreen";
 
 vi.mock("../../../../actions/construction", () => ({ reviewChangesAction: vi.fn() }));
@@ -41,79 +40,33 @@ describe("SummaryScreen", () => {
     expect(tabs.getByRole("link", { current: "page" })).toHaveTextContent("Resumen");
     expect(tabs.getByRole("link", { name: /Incidencias\s*2/ })).toHaveAttribute("href", "/dashboard/projects/p-1/obra/incidencias");
 
-    const kpis = within(screen.getByRole("region", { name: "Indicadores" }));
-    expect(kpis.getByText("de 6 finalizados")).toBeInTheDocument();
-    // Planning is still simulated (labelled so): the schedule says so instead of "on time"; purchasing comes from Compras.
-    expect(kpis.getByText("Sin plan")).toBeInTheDocument();
-    expect(kpis.queryByText("En plazo")).not.toBeInTheDocument();
-    expect(kpis.getByText(/No hay plan aprobado, así que no se puede decir si la obra va en plazo/)).toBeInTheDocument();
-    expect(kpis.getByText("Según las fechas simuladas:")).toBeInTheDocument();
-    expect(
-      kpis.getByText("1 capítulo en curso ha pasado su fin previsto: 06 Envolvente térmica Thermochip, fin previsto 9 oct 2026."),
-    ).toBeInTheDocument();
-    expect(kpis.getAllByText("Simulado")).toHaveLength(1);
-    expect(kpis.getAllByText("Compras").length).toBeGreaterThan(0);
+    // The first figures, all without VAT: the total budgeted (margins in), the current cost, the global value.
+    const figures = within(screen.getByRole("region", { name: "Cifras de la obra" }));
+    const card = (label: string) => figures.getByText(label).parentElement!;
+    expect(card("Total presupuestado · sin IVA")).toHaveTextContent("621.480,00 €");
+    expect(card("Total presupuestado · sin IVA")).toHaveTextContent("Precio del contrato, con gastos asociados y beneficio industrial · Rev.1");
+    expect(card("Coste actual · sin IVA")).toHaveTextContent("150.000,00 €");
+    expect(card("Coste actual · sin IVA")).toHaveTextContent("Facturado por proveedores en Compras");
+    expect(card("Valor global · sin IVA")).toHaveTextContent("471.480,00 € · 75,86 %");
+    // The old four cards are gone: the chapters, cost, sales and schedule have their own tabs.
+    expect(screen.queryByRole("region", { name: "Indicadores" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Coste · sin IVA")).not.toBeInTheDocument();
+    expect(screen.queryByText("Venta · sin IVA")).not.toBeInTheDocument();
+    expect(screen.queryByText("Finalizados con retraso")).not.toBeInTheDocument();
+    expect(screen.queryByText("de 6 finalizados")).not.toBeInTheDocument();
   });
 
-  it("says which VAT the money is in, and that the cost leaves chapter 20 out", () => {
+  it("shows a global value below zero when the cost passes the budget", () => {
+    renderScreen({
+      control: { ...control, cost: { ...control.cost, supplierInvoicedCents: 70_000_000 }, globalValue: { cents: -7_852_000, bp: -1_263 } },
+    });
+    const figures = within(screen.getByRole("region", { name: "Cifras de la obra" }));
+    expect(figures.getByText("Valor global · sin IVA").parentElement).toHaveTextContent("−78.520,00 € · −12,63 %");
+  });
+
+  it("keeps the table's footnote on cost and chapter 20", () => {
     renderScreen();
-    const kpis = within(screen.getByRole("region", { name: "Indicadores" }));
-    expect(kpis.getByText("Coste · sin IVA")).toBeInTheDocument();
-    expect(kpis.getByText("Venta · sin IVA")).toBeInTheDocument();
-    // The budget's cost total counts chapter 20; the obra's doesn't: the reserve reconciles them.
-    expect(kpis.getByText("Sin el cap. 20 (imprevistos, 24.759,00 €): queda como reserva.")).toBeInTheDocument();
     expect(screen.getByText(/^Importes en euros, a coste y sin IVA\. Imprevistos \(cap\. 20, .+ €\) quedan como reserva, fuera del total\./)).toBeInTheDocument();
-  });
-
-  describe("the schedule, with an approved plan", () => {
-    const live = (chapters: ControlChapter[], forecast: PlanningCheck) =>
-      renderScreen({
-        control: {
-          ...control,
-          chapters,
-          sources: { planning: "live", purchasing: "live" },
-          schedule: scheduleStatus({ chapters, planning: "live", forecast, today: control.today }),
-        },
-      });
-    const schedule = () => within(screen.getByRole("region", { name: "Indicadores" }));
-    const withinContract = { endDate: "2027-03-01", contractEnd: "2027-03-31", delayDays: -30 };
-    const onPlan = [controlChapter({ overdueDays: null, plannedEnd: "2026-10-30" })];
-    // Chapter 17 spans the works: planned from the start, never recorded as started.
-    const notStarted = controlChapter({
-      code: "17",
-      name: "Control de calidad",
-      state: "pending",
-      plannedStart: "2026-02-10",
-      plannedEnd: "2027-03-01",
-      actualStart: null,
-      overdueDays: null,
-    });
-
-    it("is on time only when nothing contradicts it", () => {
-      live(onPlan, withinContract);
-      expect(schedule().getByText("En plazo")).toBeInTheDocument();
-      expect(schedule().getByText("ningún capítulo va tarde")).toBeInTheDocument();
-      expect(schedule().getByText("Fin previsto 1 mar 2027, dentro del contrato (31 mar 2027).")).toBeInTheDocument();
-    });
-
-    it("is late when a chapter's planned start has passed, even with nothing in progress late", () => {
-      live([...onPlan, notStarted], withinContract);
-      expect(schedule().queryByText("En plazo")).not.toBeInTheDocument();
-      expect(schedule().getByText("+249 d")).toBeInTheDocument();
-      expect(schedule().getByText("inicio previsto superado")).toBeInTheDocument();
-      expect(
-        schedule().getByText("1 capítulo sin empezar ha pasado su inicio previsto: 17 Control de calidad, inicio previsto 10 feb 2026."),
-      ).toBeInTheDocument();
-    });
-
-    it("leads with a forecast past the contract, with no money put on the delay", () => {
-      live([...onPlan, notStarted], { endDate: "2027-07-10", contractEnd: "2027-03-31", delayDays: 101 });
-      expect(schedule().getByText("+101 d")).toBeInTheDocument();
-      expect(schedule().getByText("sobre el contrato")).toBeInTheDocument();
-      expect(schedule().getByText("Fin previsto 10 jul 2027: 101 días después del contrato (31 mar 2027).")).toBeInTheDocument();
-      expect(schedule().queryByText(/penaliz/i)).not.toBeInTheDocument();
-      expect(schedule().getByText(/^1 capítulo sin empezar ha pasado su inicio previsto/)).toBeInTheDocument();
-    });
   });
 
   it("warns about late deliveries without changing anything", () => {

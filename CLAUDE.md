@@ -390,8 +390,8 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
 - Whether an obra is on time has **one definition**: `scheduleStatus` in `packages/core/src/schedule-status.ts` (pure,
   in `@repo/core/contract`): with the approved baseline, `late` when a pending chapter is past its planned start, a chapter in progress past
   its planned end, or the forecast ends after the contract date, else `on_time`; `simulated` without a baseline (never
-  on time or late); `no_dates`. Resumen, Planificación (`ScheduleStatusView`) and the project list all read it; never
-  compute it apart
+  on time or late); `no_dates`. Planificación (`ScheduleStatusView`), the project list and `GET …/obra/control`'s
+  `schedule` all read it; never compute it apart
 - Finishing the last chapter of a hito creates one `obra_invoice_requests` row for Administration (unique per hito:
   never a second one, whatever is corrected); hito states pending → reached → requested → invoiced → collected follow
   the Pagos tab's invoice and payment. `Hito.invoiceRequestedAt` shows it on Pagos. A finished chapter counts as 100 %
@@ -400,6 +400,10 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
   project without one has them **simulated** in `control-calc.ts` (hitos in turn, each a share of the works' time like
   its share of the price; `"mock"`, shown as "Simulado"). Contracted amounts are real, from Compras (`lineContracts` in
   `purchasing.ts`, below); a late delivery is a warning only. Sales is the hitos' invoices/payments
+- Resumen leads with three figures, all without VAT (`SummaryFigures`): the total budgeted (`sales.contractCents`, the
+  contract price with its margins), the current cost (`cost.supplierInvoicedCents`, the suppliers' invoices so far,
+  summed from the project's orders) and the valor global (`globalValue`, the one less the other, in € and % of the
+  total; computed in `getControl`). Chapters, cost deviation, sales and schedule live on their own tabs
 - Issues and changes log (`obra_issues`, numbered per kind INC-/CAM-, files in `obra_issue_files`, private Blob,
   served as downloads): history only, never changes dates, amounts or invoices. Document warnings come from
   Subcontratas (`listProjectAttention`). Photos have a `taken_on` day. Staff only; viewers read
@@ -624,7 +628,7 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
   `GET /api/v1/projects` (the `budget` field; `schedule`, `progressPct` and `attention` only with `?signals=1`). The
   signals, for every project in a fixed 15 queries sent at once (`loadObraSummaries`: each chapter's line totals summed
   in SQL, no lines; `countProjectsAttention`; never a query per project, never a list of document ids): with a contract, the
-  schedule (`scheduleStatus` as Obra › Resumen, via `projectSchedule`) and the built %; and the reasons: hitos to
+  schedule (`scheduleStatus` as Planificación, via `projectSchedule`) and the built %; and the reasons: hitos to
   invoice (reached/requested), hito payments past due, supplier invoices overdue (with what they owe), purchase
   requests to approve, late material deliveries, CAE document warnings. Rows add the budget pill
   (opens the budget; a failed AI run says so, filed under no budget, not an attention reason), the stage pill

@@ -56,7 +56,7 @@ import { changesOf, parse } from "./inputs/fields";
 import { revisionsOfChanges } from "./budget-approvals";
 import { chapterCorrectionSchema, chapterDateSchema, issueChangesSchema, issueListSchema, newIssueSchema } from "./inputs/construction";
 import { fail, loadObra, requireProject, userName } from "./obra-data";
-import { todayInSpain } from "./obra-calc";
+import { shareBp, todayInSpain } from "./obra-calc";
 import { listPhotos } from "./photos";
 import { obraContract, obraSchedule } from "./planning";
 import { contractingOf, loadProjectOrders } from "./purchasing";
@@ -193,6 +193,8 @@ async function loadControl(ctx: Ctx, projectId: string) {
     contracts: purchases.contracts,
     orders: purchases.orders,
     lateDeliveries: purchases.orders.filter((o) => o.lateDays !== null),
+    // The obra's current cost: what its suppliers have invoiced, base without VAT, credit notes off.
+    supplierInvoicedCents: purchases.orders.reduce((total, o) => total + o.invoicedCents, 0),
     today,
   };
 }
@@ -410,6 +412,7 @@ export async function getControl(ctx: Ctx, projectId: string): Promise<Construct
       budgetedCents: sum(chapters.map((c) => c.costCents)),
       contractedCents,
       contractedCostCents,
+      supplierInvoicedCents: control.supplierInvoicedCents,
       deviationCents: total.deviationCents ?? 0,
       deviationBp: total.deviationBp ?? 0,
       contingencyCents: control.contingencyCents,
@@ -420,6 +423,11 @@ export async function getControl(ctx: Ctx, projectId: string): Promise<Construct
       collectedCents,
       outstandingCents: invoicedCents - collectedCents,
       toInvoiceCents: contractCents - invoicedCents,
+    },
+    // Valor global: the total budgeted less the current cost, and that as a share of the total.
+    globalValue: {
+      cents: contractCents - control.supplierInvoicedCents,
+      bp: shareBp(contractCents - control.supplierInvoicedCents, contractCents),
     },
     milestones,
     documentAlerts,
