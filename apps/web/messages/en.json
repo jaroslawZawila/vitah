@@ -876,7 +876,6 @@
       "startsIn": "{count, plural, =0 {starts today} other {starts in # d}}"
     },
     "scheduleStatus": {
-      "title": "Schedule",
       "headline": {
         "on_time": "On time",
         "simulated": "No plan",
@@ -891,17 +890,7 @@
         "forecast": "past the contract",
         "finish": "planned end passed",
         "start": "planned start passed"
-      },
-      "text": {
-        "simulated": "There is no approved plan, so whether the works are on time can't be said. Approve one in Planning.",
-        "no_dates": "The project has no start and end dates and no approved plan."
-      },
-      "forecastLate": "Forecast end {date}: {count, plural, one {# day} other {# days}} after the contract ({contract}).",
-      "forecastWithin": "Forecast end {date}, within the contract ({contract}).",
-      "forecastNoContract": "Forecast end {date}. The project has no end date: it isn't compared with the contract.",
-      "bySimulated": "By the simulated dates:",
-      "lateToFinish": "{count, plural, one {# chapter in progress is past its planned end} other {# chapters in progress are past their planned end}}: {count, plural, one {} other {the furthest behind, }}{code} {name}, planned end {date}.",
-      "lateToStart": "{count, plural, one {# chapter not started is past its planned start} other {# chapters not started are past their planned start}}: {count, plural, one {} other {the furthest behind, }}{code} {name}, planned start {date}."
+      }
     },
     "gantt": {
       "plan": "Plan {start} to {end}",

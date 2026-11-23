@@ -52,14 +52,6 @@ export const STATUS_TONE: Record<ScheduleStatus["status"], ScheduleTone> = {
   no_dates: "muted",
 };
 
-/** A tone as a text colour. */
-export const TONE_TEXT: Record<ScheduleTone, string> = {
-  good: "text-good",
-  yel: "text-yel",
-  warn: "text-warn",
-  muted: "text-muted-foreground",
-};
-
 /**
  * Whether finishing `code` completes its hito and asks Administration for
  * the invoice: every other chapter of the hito is finished and the hito has

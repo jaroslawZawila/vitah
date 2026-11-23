@@ -43,13 +43,9 @@ describe("PlanningScreen", () => {
     expect(kpis.queryByText(/€/)).not.toBeInTheDocument();
     expect(kpis.getByText("02 → 03 → 04")).toBeInTheDocument();
 
-    // The same status Obra › Resumen states: late, the forecast past the contract first.
-    const schedule = within(screen.getByRole("region", { name: "Plazo" }));
-    expect(schedule.getByText("+6 d")).toBeInTheDocument();
-    expect(schedule.getByText("sobre el contrato")).toBeInTheDocument();
-    expect(schedule.getByText("Fin previsto 17 dic 2026: 6 días después del contrato (11 dic 2026).")).toBeInTheDocument();
-    expect(schedule.queryByText(/€/)).not.toBeInTheDocument();
-    expect(schedule.queryByText("En plazo")).not.toBeInTheDocument();
+    // No "Plazo" card: the forecast and the contract date are in the figures above.
+    expect(screen.queryByRole("region", { name: "Plazo" })).not.toBeInTheDocument();
+    expect(screen.queryByText("sobre el contrato")).not.toBeInTheDocument();
 
     expect(table().getByRole("link", { name: "Revestimientos interiores y falsos techos" })).toHaveAttribute(
       "href",

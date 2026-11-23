@@ -876,7 +876,6 @@
       "startsIn": "{count, plural, =0 {empieza hoy} other {empieza en # d}}"
     },
     "scheduleStatus": {
-      "title": "Plazo",
       "headline": {
         "on_time": "En plazo",
         "simulated": "Sin plan",
@@ -891,17 +890,7 @@
         "forecast": "sobre el contrato",
         "finish": "fin previsto superado",
         "start": "inicio previsto superado"
-      },
-      "text": {
-        "simulated": "No hay plan aprobado, así que no se puede decir si la obra va en plazo. Apruébalo en Planificación.",
-        "no_dates": "El proyecto no tiene fechas de inicio y fin ni un plan aprobado."
-      },
-      "forecastLate": "Fin previsto {date}: {count, plural, one {# día} other {# días}} después del contrato ({contract}).",
-      "forecastWithin": "Fin previsto {date}, dentro del contrato ({contract}).",
-      "forecastNoContract": "Fin previsto {date}. El proyecto no tiene fecha de fin: no se compara con el contrato.",
-      "bySimulated": "Según las fechas simuladas:",
-      "lateToFinish": "{count, plural, one {# capítulo en curso ha pasado su fin previsto} other {# capítulos en curso han pasado su fin previsto}}: {count, plural, one {} other {el que más, }}{code} {name}, fin previsto {date}.",
-      "lateToStart": "{count, plural, one {# capítulo sin empezar ha pasado su inicio previsto} other {# capítulos sin empezar han pasado su inicio previsto}}: {count, plural, one {} other {el que más, }}{code} {name}, inicio previsto {date}."
+      }
     },
     "gantt": {
       "plan": "Plan {start} a {end}",

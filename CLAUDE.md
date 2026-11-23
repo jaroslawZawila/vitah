@@ -390,8 +390,8 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
 - Whether an obra is on time has **one definition**: `scheduleStatus` in `packages/core/src/schedule-status.ts` (pure,
   in `@repo/core/contract`): with the approved baseline, `late` when a pending chapter is past its planned start, a chapter in progress past
   its planned end, or the forecast ends after the contract date, else `on_time`; `simulated` without a baseline (never
-  on time or late); `no_dates`. Planificación (`ScheduleStatusView`), the project list and `GET …/obra/control`'s
-  `schedule` all read it; never compute it apart
+  on time or late); `no_dates`. The project list's schedule pill, Planificación's phone cards (which chapters are
+  late) and the API (`schedule` of `GET …/obra/control` and `…/planning`) all read it; never compute it apart
 - Finishing the last chapter of a hito creates one `obra_invoice_requests` row for Administration (unique per hito:
   never a second one, whatever is corrected); hito states pending → reached → requested → invoiced → collected follow
   the Pagos tab's invoice and payment. `Hito.invoiceRequestedAt` shows it on Pagos. A finished chapter counts as 100 %
@@ -628,7 +628,7 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
   `GET /api/v1/projects` (the `budget` field; `schedule`, `progressPct` and `attention` only with `?signals=1`). The
   signals, for every project in a fixed 15 queries sent at once (`loadObraSummaries`: each chapter's line totals summed
   in SQL, no lines; `countProjectsAttention`; never a query per project, never a list of document ids): with a contract, the
-  schedule (`scheduleStatus` as Planificación, via `projectSchedule`) and the built %; and the reasons: hitos to
+  schedule (`scheduleStatus`, via `projectSchedule`) and the built %; and the reasons: hitos to
   invoice (reached/requested), hito payments past due, supplier invoices overdue (with what they owe), purchase
   requests to approve, late material deliveries, CAE document warnings. Rows add the budget pill
   (opens the budget; a failed AI run says so, filed under no budget, not an attention reason), the stage pill

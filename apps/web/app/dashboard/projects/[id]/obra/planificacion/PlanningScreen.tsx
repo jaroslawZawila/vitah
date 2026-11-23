@@ -26,7 +26,6 @@ import {
   PlanCards,
   PlanKpis,
   PlanLegend,
-  PlanSchedule,
   PlanTable,
   useCalendarText,
 } from "../../components/planning/PlanViews";
@@ -83,7 +82,6 @@ export default function PlanningScreen({
       <>
         <BaselineBanner baseline={baseline} />
         {draft && <DraftNotice draft={draft} href={editHref} canManage={canManage} />}
-        <PlanSchedule schedule={planning.schedule} />
         <PlanKpis baseline={baseline} completionDate={planning.completionDate} />
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap gap-2">

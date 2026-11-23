@@ -13,7 +13,6 @@ import { muted } from "../obra/classes";
 import { daysBetween, useControlFormat } from "../construction/format";
 import { at, bar, MonthAxis, type Timeline } from "../construction/Gantt";
 import { ChapterStatePill } from "../construction/pills";
-import ScheduleStatusView from "../construction/ScheduleStatusView";
 import { stretchedLink, touchLink } from "../../../../components/touch";
 
 // Presentational: Obra › Planificación, the approved baseline: its key
@@ -62,17 +61,6 @@ export function BaselineBanner({ baseline }: { baseline: Baseline }) {
         {baseline.reason && <> · {t("reason", { reason: baseline.reason })}</>}
       </span>
     </div>
-  );
-}
-
-/** On time or late, with the worst fact: the same status as Obra › Resumen's. */
-export function PlanSchedule({ schedule }: { schedule: ScheduleStatus }) {
-  const t = useTranslations("construction.scheduleStatus");
-  return (
-    <section aria-label={t("title")} className={cn(cardVariants(), "gap-1.5")}>
-      <span className="eyebrow">{t("title")}</span>
-      <ScheduleStatusView schedule={schedule} />
-    </section>
   );
 }
 
