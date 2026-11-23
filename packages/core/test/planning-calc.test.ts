@@ -86,30 +86,36 @@ describe("moveChapter", () => {
   const codes = (items: PlanningItemInput[]) => items.map((i) => i.code);
 
   it("moves a chapter one place up or down, whole, and leaves the rest as they were", () => {
-    const down = moveChapter(CHAIN, "01", 1);
+    const down = moveChapter(CHAIN, "01", "02");
     expect(codes(down)).toEqual(["02", "01", "03", "17"]);
     expect(down[1]).toBe(CHAIN[0]);
-    expect(codes(moveChapter(CHAIN, "03", -1))).toEqual(["01", "03", "02", "17"]);
+    expect(codes(moveChapter(CHAIN, "03", "02"))).toEqual(["01", "03", "02", "17"]);
     // The array given is never changed.
     expect(codes(CHAIN)).toEqual(["01", "02", "03", "17"]);
   });
 
-  it("stays put at either end, for a chapter that spans the works and for one it doesn't know", () => {
-    expect(moveChapter(CHAIN, "01", -1)).toBe(CHAIN);
-    expect(moveChapter(CHAIN, "03", 1)).toBe(CHAIN);
-    expect(moveChapter(CHAIN, "17", -1)).toBe(CHAIN);
-    expect(moveChapter(CHAIN, "99", 1)).toBe(CHAIN);
+  it("moves a chapter several places at once, the ones between making room", () => {
+    const five = [item("01", null, 1), item("02", null, 1), item("03", null, 1), item("04", null, 1), item("05", null, 1)];
+    expect(codes(moveChapter(five, "05", "02"))).toEqual(["01", "05", "02", "03", "04"]);
+    expect(codes(moveChapter(five, "01", "04"))).toEqual(["02", "03", "04", "01", "05"]);
   });
 
-  it("passes the chapters that span the works, wherever they sit", () => {
-    const mixed = [item("01", null, 5), spanning("17"), spanning("18"), item("OP1", null, 3)];
-    expect(codes(moveChapter(mixed, "01", 1))).toEqual(["OP1", "17", "18", "01"]);
-    expect(codes(moveChapter(mixed, "OP1", -1))).toEqual(["OP1", "17", "18", "01"]);
+  it("stays put on itself, for a chapter that spans the works and for one it doesn't know", () => {
+    expect(moveChapter(CHAIN, "01", "01")).toBe(CHAIN);
+    expect(moveChapter(CHAIN, "17", "01")).toBe(CHAIN);
+    expect(moveChapter(CHAIN, "01", "17")).toBe(CHAIN);
+    expect(moveChapter(CHAIN, "99", "01")).toBe(CHAIN);
+  });
+
+  it("leaves the chapters that span the works where they sit", () => {
+    const mixed = [item("01", null, 5), spanning("17"), item("02", null, 5), spanning("18"), item("OP1", null, 3)];
+    expect(codes(moveChapter(mixed, "01", "OP1"))).toEqual(["02", "17", "OP1", "18", "01"]);
+    expect(codes(moveChapter(mixed, "OP1", "01"))).toEqual(["OP1", "17", "01", "18", "02"]);
   });
 
   it("changes no date: the order is only how the plan reads", () => {
     const options = { startDate: "2026-06-01", calendar: PLAIN };
-    expect(asObject(schedulePlan(moveChapter(CHAIN, "03", -1), options))).toEqual(asObject(schedulePlan(CHAIN, options)));
+    expect(asObject(schedulePlan(moveChapter(CHAIN, "03", "01"), options))).toEqual(asObject(schedulePlan(CHAIN, options)));
   });
 });
 

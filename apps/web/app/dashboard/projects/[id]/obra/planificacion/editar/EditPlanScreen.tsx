@@ -9,7 +9,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import type { PlanningCalendar, PlanningDraft, PlanningItemInput } from "@repo/core/contract";
-import { criticalPath, moveChapter, planCheck, planEnd, planProblem, schedulePlan, type MoveBy, type Recorded } from "@repo/core/planning-calc";
+import { criticalPath, moveChapter, planCheck, planEnd, planProblem, schedulePlan, type Recorded } from "@repo/core/planning-calc";
 import { Badge } from "@/components/ui/badge";
 import {
   approvePlanningDraftAction,
@@ -81,9 +81,9 @@ export default function EditPlanScreen({
     setRules((all) => all.map((rule) => (rule.code === code ? { ...rule, ...change } : rule)));
   };
   // The order is the list's, saved with the rules: the dates don't follow it.
-  const moveRule = (code: string, by: MoveBy) => {
+  const moveRule = (code: string, toCode: string) => {
     edited();
-    setRules((all) => moveChapter(all, code, by));
+    setRules((all) => moveChapter(all, code, toCode));
   };
 
   return (

@@ -161,26 +161,21 @@ export function templateItems(codes: string[]): PlanningItemInput[] {
   });
 }
 
-/** One place up the plan's order, or one down. */
-export type MoveBy = -1 | 1;
-
 /**
- * `items` with the chapter `code` one place up (`by` -1) or down (1) in the
- * plan's order, past the chapters that span the works (shown apart); the same
- * array when it is already first or last. The order is how the plan reads,
- * never when a chapter happens.
+ * `items` with the chapter `code` moved to where the chapter `toCode` is, the
+ * ones between making room (one place up or down: `toCode` is its neighbour).
+ * The chapters that span the works (shown apart) stay where they are; the same
+ * array when either is one of them or unknown, or both are the same. The order
+ * is how the plan reads, never when a chapter happens.
  */
-export function moveChapter<T extends { code: string; spansWorks: boolean }>(items: T[], code: string, by: MoveBy): T[] {
-  const from = items.findIndex((item) => item.code === code);
-  let to = from + by;
-  while (items[to]?.spansWorks) to += by;
-  const moved = items[from];
-  const other = items[to];
-  if (!moved || !other || moved.spansWorks) return items;
-  const next = [...items];
-  next[from] = other;
-  next[to] = moved;
-  return next;
+export function moveChapter<T extends { code: string; spansWorks: boolean }>(items: T[], code: string, toCode: string): T[] {
+  const working = items.filter((item) => !item.spansWorks);
+  const from = working.findIndex((item) => item.code === code);
+  const to = working.findIndex((item) => item.code === toCode);
+  if (from < 0 || to < 0 || from === to) return items;
+  working.splice(to, 0, ...working.splice(from, 1));
+  let next = 0;
+  return items.map((item) => (item.spansWorks ? item : working[next++]!));
 }
 
 // ─── Scheduling ──────────────────────────────────────────────────────────────

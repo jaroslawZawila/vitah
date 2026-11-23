@@ -516,8 +516,9 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
   `superseded`). Each contract chapter (20 aside) is a `planning_items` row: it starts the working day after the chapter
   it waits for ends (`after_code` + `lag_days`, negative to overlap), else on `fixed_start` or the works' start, and lasts
   `duration_days` working days; 17–19 span the works (`spans_works`). The dates are stored, so a baseline never moves.
-  The chapters' order (`position`) is staff's, set with the editor's arrows (`moveChapter` in `planning-calc.ts`) and saved
-  as sent: it is only how the plan reads, never when a chapter happens, and a draft copied from a baseline keeps it
+  The chapters' order (`position`) is staff's, set with the editor's arrows or by dragging a row's handle (`@dnd-kit`,
+  table layout only; `moveChapter` in `planning-calc.ts`) and saved as sent: it is only how the plan reads, never when
+  a chapter happens, and a draft copied from a baseline keeps it
 - Working days: weekends, national holidays (Good Friday too), the region's (`as cb cl ga md`, plus Holy Thursday),
   and the optional August (4 weeks from its first Monday) and Christmas (24/12–6/1) closures, chosen per version
 - What Avance records wins: a finished chapter keeps its real dates, a started one its real start; nothing still to

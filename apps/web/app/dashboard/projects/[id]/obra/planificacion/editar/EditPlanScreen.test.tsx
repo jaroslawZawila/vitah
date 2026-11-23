@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
+import type { DndContextProps, DragEndEvent, DragOverEvent } from "@dnd-kit/core";
 import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -15,6 +16,17 @@ vi.mock("../../../../../../actions/planning", () => ({
   updatePlanningDraftAction: vi.fn(),
 }));
 const actions = await import("../../../../../../actions/planning");
+// jsdom lays nothing out, so a drag can't be acted: the real context runs, and
+// the test drops a chapter through what the table gave it.
+const dnd: { props?: DndContextProps } = {};
+vi.mock("@dnd-kit/core", async (original) => {
+  const real = await original<typeof import("@dnd-kit/core")>();
+  const DndContext = (props: DndContextProps) => {
+    dnd.props = props;
+    return <real.DndContext {...props} />;
+  };
+  return { ...real, DndContext };
+});
 
 function renderScreen(props: Partial<Parameters<typeof EditPlanScreen>[0]> = {}) {
   return render(
@@ -34,6 +46,8 @@ beforeEach(() => {
 afterEach(() => vi.restoreAllMocks());
 
 const row = (name: RegExp) => within(screen.getByRole("row", { name }));
+/** The chapters that don't span the works, in the list's order. */
+const order = () => screen.getAllByRole("row").flatMap((r) => within(r).queryAllByRole("cell")[0]?.textContent?.match(/^\d\d$/) ?? []);
 const PLAN = "/dashboard/projects/p-1/obra/planificacion";
 
 describe("EditPlanScreen", () => {
@@ -128,8 +142,6 @@ describe("EditPlanScreen", () => {
 
   it("moves a chapter up and down the list, whole, and saves the new order", async () => {
     renderScreen();
-    // The chapters that don't span the works, in the list's order.
-    const order = () => screen.getAllByRole("row").flatMap((r) => within(r).queryAllByRole("cell")[0]?.textContent?.match(/^\d\d$/) ?? []);
     const arrow = (name: string) => screen.getByRole("button", { name });
     expect(order()).toEqual(["01", "02", "03", "04"]);
     // The ends of the list go no further; 17 spans the works and has no arrows.
@@ -155,6 +167,37 @@ describe("EditPlanScreen", () => {
     const sent = vi.mocked(actions.updatePlanningDraftAction).mock.calls[0]![1] as { items: { code: string; after: string | null }[] };
     expect(sent.items.map((i) => i.code)).toEqual(["04", "01", "02", "03", "17"]);
     expect(sent.items[0]).toMatchObject({ code: "04", after: "03" });
+  });
+
+  it("drags a chapter any number of places by its handle, telling a screen reader where it is", async () => {
+    renderScreen();
+    const drop = (active: string, over: string | null) =>
+      act(() => dnd.props!.onDragEnd!({ active: { id: active }, over: over && { id: over } } as DragEndEvent));
+    // A handle per chapter, beside its arrows; a table row only (a phone's cards move by their arrows).
+    const handle = screen.getByRole("button", { name: "Arrastrar el capítulo 04 para moverlo" });
+    expect(handle).toHaveAttribute("aria-roledescription", "ordenable");
+    expect(handle).toHaveClass("max-md:hidden", "touch-none");
+    expect(handle.closest("td")).toBe(row(/Pinturas/).getAllByRole("cell")[1]);
+    expect(screen.queryByRole("button", { name: "Arrastrar el capítulo 17 para moverlo" })).not.toBeInTheDocument();
+
+    // Dropped on the first chapter: it takes its place, the ones between move down.
+    drop("04", "01");
+    expect(order()).toEqual(["04", "01", "02", "03"]);
+    expect(row(/Pinturas/).getByLabelText("Cuándo empieza el capítulo 04")).toHaveValue("03");
+    // Dropped on itself or outside the list: nothing moves.
+    drop("04", "04");
+    drop("04", null);
+    expect(order()).toEqual(["04", "01", "02", "03"]);
+
+    const { announcements, screenReaderInstructions } = dnd.props!.accessibility!;
+    expect(screenReaderInstructions!.draggable).toMatch(/^Pulsa Espacio para coger el capítulo/);
+    const event = { active: { id: "04" }, over: { id: "02" } } as DragOverEvent;
+    expect(announcements!.onDragOver(event)).toBe("Capítulo 04 en el puesto 3 de 4.");
+    expect(announcements!.onDragEnd({ ...event, over: null })).toBe("Movimiento cancelado: el capítulo 04 vuelve a su puesto.");
+
+    await userEvent.click(screen.getByRole("button", { name: "Guardar borrador" }));
+    const sent = vi.mocked(actions.updatePlanningDraftAction).mock.calls[0]![1] as { items: { code: string }[] };
+    expect(sent.items.map((i) => i.code)).toEqual(["04", "01", "02", "03", "17"]);
   });
 
   it("refuses chapters that wait for each other", async () => {
@@ -217,7 +260,7 @@ describe("EditPlanScreen", () => {
     renderScreen({ canManage: false });
     expect(screen.queryByRole("button", { name: "Aprobar como línea base v3" })).not.toBeInTheDocument();
     expect(row(/Pinturas/).getByLabelText("Días laborables del capítulo 04")).toBeDisabled();
-    expect(screen.queryByRole("button", { name: /^(Subir|Bajar) el capítulo/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^(Subir|Bajar|Arrastrar) el capítulo/ })).not.toBeInTheDocument();
     expect(screen.getByLabelText("Festivos autonómicos")).toBeDisabled();
   });
 

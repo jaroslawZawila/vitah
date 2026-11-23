@@ -1,10 +1,23 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import { ArrowDown, ArrowUp } from "lucide-react";
+import { createContext, use, useEffect, useRef } from "react";
+import {
+  closestCenter,
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type Announcements,
+  type UniqueIdentifier,
+} from "@dnd-kit/core";
+import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
+import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { ArrowDown, ArrowUp, GripVertical } from "lucide-react";
 import { useTranslations } from "next-intl";
 import type { PlanningCalendar, PlanningCheck, PlanningItemInput, PlanningRow } from "@repo/core/contract";
-import { orderByDate, type Dates, type MoveBy } from "@repo/core/planning-calc";
+import { orderByDate, type Dates } from "@repo/core/planning-calc";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cardVariants } from "@/components/ui/card";
@@ -22,8 +35,9 @@ import CalendarFields from "./CalendarFields";
 // chapter waits for, its lag and working days) with the dates they give, and
 // the panels beside it: the end against the contract, the calendar, and
 // approving. The container recomputes the dates as staff type. A chapter moves
-// up and down the list by its arrows: the order is how the plan reads, the
-// dates still come from the rules.
+// up and down the list by its arrows (one place) or dragged by its handle (any
+// number, from 768px, with the mouse, a finger or the keyboard): the order is
+// how the plan reads, the dates still come from the rules.
 
 /** How a chapter's start is set, as the "starts after" select shows it. */
 const FROM_START = "";
@@ -34,6 +48,14 @@ const MOVES = [
   { by: -1, Icon: ArrowUp, label: "moveUp" },
   { by: 1, Icon: ArrowDown, label: "moveDown" },
 ] as const;
+type MoveBy = (typeof MOVES)[number]["by"];
+
+/** A drag starts once the pointer has moved a little (a click on the handle starts none). */
+const POINTER = { activationConstraint: { distance: 4 } };
+/** Or with Space on the handle, then the arrow keys and Space again. */
+const KEYBOARD = { coordinateGetter: sortableKeyboardCoordinates };
+/** A row moves up and down only. */
+const VERTICAL = [restrictToVerticalAxis];
 
 export type RuleChange = Partial<Pick<PlanningItemInput, "after" | "lagDays" | "durationDays" | "fixedStart" | "leadDays">>;
 
@@ -49,6 +71,63 @@ const phone = {
   chapter: "max-md:min-w-0 max-md:p-0",
   field: "max-md:col-span-2 max-md:flex max-md:flex-wrap max-md:items-center max-md:justify-between max-md:gap-x-3 max-md:gap-y-1.5 max-md:p-0",
 };
+
+type RowProps = {
+  code: string;
+  /** What a screen reader calls the handle, after its name. */
+  roleDescription: string;
+  children: React.ReactNode;
+};
+
+/** A chapter's row for those who only look: nothing drags it. */
+function StaticRow({ children }: RowProps) {
+  return <TableRow className={phone.row}>{children}</TableRow>;
+}
+
+/** What a row gives its handle: the element it is dragged by, and what makes it one. */
+type RowDrag = Pick<ReturnType<typeof useSortable>, "attributes" | "listeners" | "setActivatorNodeRef">;
+const RowDragContext = createContext<RowDrag | null>(null);
+
+/**
+ * A chapter's row, which its handle (`RowHandle`, anywhere inside) drags up
+ * and down the list: the rows between make room as it passes.
+ */
+function SortableRow({ code, roleDescription, children }: RowProps) {
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
+    id: code,
+    attributes: { roleDescription },
+  });
+  return (
+    <TableRow
+      ref={setNodeRef}
+      // Computed as it is dragged: how far it has moved.
+      style={{ transform: CSS.Translate.toString(transform), transition }}
+      className={cn(phone.row, isDragging && "relative z-10 bg-card shadow-card hover:bg-card")}
+    >
+      <RowDragContext value={{ attributes, listeners, setActivatorNodeRef }}>{children}</RowDragContext>
+    </TableRow>
+  );
+}
+
+/** The handle its row is dragged by. A table row only: a phone's cards move by their arrows. */
+function RowHandle({ label }: { label: string }) {
+  const drag = use(RowDragContext);
+  if (!drag) return null;
+  return (
+    <Button
+      ref={drag.setActivatorNodeRef}
+      type="button"
+      variant="ghost"
+      size="icon-sm"
+      className="cursor-grab touch-none active:cursor-grabbing max-md:hidden"
+      aria-label={label}
+      {...drag.attributes}
+      {...drag.listeners}
+    >
+      <GripVertical aria-hidden />
+    </Button>
+  );
+}
 
 /** A field's heading, shown beside it on a phone (the input has its own label). */
 function PhoneLabel({ children }: { children: React.ReactNode }) {
@@ -82,7 +161,8 @@ export function DraftTable({
   startDate: string;
   readOnly: boolean;
   onChange: (code: string, change: RuleChange) => void;
-  onMove: (code: string, by: MoveBy) => void;
+  /** Puts the chapter `code` where the chapter `toCode` is. */
+  onMove: (code: string, toCode: string) => void;
 }) {
   const t = useTranslations("planning.edit");
   const f = useControlFormat();
@@ -104,12 +184,28 @@ export function DraftTable({
     );
     (last.by === -1 ? arrows[0] : arrows.at(-1))?.focus();
   }, [rules]);
-  const move = (code: string, by: MoveBy) => {
-    moved.current = { code, by };
-    onMove(code, by);
+  const step = (index: number, by: MoveBy) => {
+    const [rule, other] = [working[index], working[index + by]];
+    if (!rule || !other) return;
+    moved.current = { code: rule.code, by };
+    onMove(rule.code, other.code);
   };
 
-  return (
+  const sensors = useSensors(useSensor(PointerSensor, POINTER), useSensor(KeyboardSensor, KEYBOARD));
+  const order = working.map((rule) => rule.code);
+  // What a screen reader hears while a chapter is dragged: the chapter, and the place it is over.
+  const said = (key: "dragStart" | "dragOver" | "dragEnd", code: UniqueIdentifier, at: UniqueIdentifier) =>
+    t(key, { code: String(code), position: order.indexOf(String(at)) + 1, total: order.length });
+  const cancelled = (code: UniqueIdentifier) => t("dragCancel", { code: String(code) });
+  const announcements: Announcements = {
+    onDragStart: ({ active }) => said("dragStart", active.id, active.id),
+    onDragOver: ({ active, over }) => (over ? said("dragOver", active.id, over.id) : undefined),
+    onDragEnd: ({ active, over }) => (over ? said("dragEnd", active.id, over.id) : cancelled(active.id)),
+    onDragCancel: ({ active }) => cancelled(active.id),
+  };
+  const Row = readOnly ? StaticRow : SortableRow;
+
+  const table = (
     <section ref={section} className={cn(cardVariants({ size: "flush" }), "min-w-0 py-1.5")} aria-label={t("tableLabel")}>
       <Table className={cn("md:min-w-[860px]", phone.table)}>
         <TableHeader className="max-md:hidden">
@@ -134,9 +230,9 @@ export function DraftTable({
             const delta = d && was ? daysBetween(was, d.end) : null;
             const from = rule.after ?? (rule.fixedStart ? FIXED : FROM_START);
             return (
-              <TableRow key={rule.code} className={phone.row}>
+              <Row key={rule.code} code={rule.code} roleDescription={t("dragRole")}>
                 <TableCell className={cn("num pl-[18px] font-semibold md:font-normal", phone.code)}>{rule.code}</TableCell>
-                <TableCell className={cn("whitespace-normal", readOnly ? "min-w-[190px]" : "min-w-[280px]", phone.chapter)}>
+                <TableCell className={cn("whitespace-normal", readOnly ? "min-w-[190px]" : "min-w-[310px]", phone.chapter)}>
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <div className="font-semibold">{row?.name ?? rule.code}</div>
@@ -151,6 +247,7 @@ export function DraftTable({
                     </div>
                     {!readOnly && (
                       <div className="flex gap-0.5">
+                        <RowHandle label={t("dragHandle", { code: rule.code })} />
                         {MOVES.map(({ by, Icon, label }) => (
                           <Button
                             key={by}
@@ -160,7 +257,7 @@ export function DraftTable({
                             data-move={rule.code}
                             aria-label={t(label, { code: rule.code })}
                             disabled={working[index + by] === undefined}
-                            onClick={() => move(rule.code, by)}
+                            onClick={() => step(index, by)}
                           >
                             <Icon aria-hidden />
                           </Button>
@@ -265,7 +362,7 @@ export function DraftTable({
                     {was === undefined ? t("new") : delta === null ? "—" : delta === 0 ? t("same") : f.signedDays(delta)}
                   </TableCell>
                 )}
-              </TableRow>
+              </Row>
             );
           })}
           {spanning.length > 0 && (
@@ -281,6 +378,25 @@ export function DraftTable({
         </TableBody>
       </Table>
     </section>
+  );
+
+  // Nothing to drag for those who only look.
+  if (readOnly) return table;
+  return (
+    <DndContext
+      id="plan-chapters"
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      modifiers={VERTICAL}
+      // The page scrolls with the drag; the table's own sideways scroll stays put.
+      autoScroll={{ threshold: { x: 0, y: 0.2 } }}
+      accessibility={{ announcements, screenReaderInstructions: { draggable: t("dragInstructions") } }}
+      onDragEnd={({ active, over }) => over && active.id !== over.id && onMove(String(active.id), String(over.id))}
+    >
+      <SortableContext items={order} strategy={verticalListSortingStrategy}>
+        {table}
+      </SortableContext>
+    </DndContext>
   );
 }
 
