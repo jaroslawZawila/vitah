@@ -125,6 +125,34 @@ describe("a first plan", () => {
     });
   });
 
+  it("keeps the order of another project's baseline, with the chapters it lacks after them", async () => {
+    const { ctx, project, tenant } = await setup();
+    await svc.createPlanningDraft(ctx, project.id, PLAIN);
+    const first = await svc.getPlanningDraft(ctx, project.id);
+    await svc.approvePlanningDraft(ctx, project.id, { items: [...first.rows].reverse() });
+
+    // Its contract has no 03 (dropped) and a 05 the source never planned.
+    const other = await createTestProject(tenant.id, { startDate: new Date("2026-06-01T00:00:00Z") });
+    const { revisionId } = await framerDraft(ctx, other.id, ["01", "02", "05", "17"]);
+    await budgetService.acceptRevision(ctx, other.id, revisionId, {}, { unissued: true });
+    await svc.createPlanningDraft(ctx, other.id, { ...PLAIN, from: "project", projectId: project.id });
+    // 05 after the chapter before it in the contract; 17 spans the works and goes last.
+    expect((await svc.getPlanningDraft(ctx, other.id)).rows.map((r) => r.code)).toEqual(["02", "05", "01", "17"]);
+  });
+
+  it("keeps the contract's order when the plan copied was never reordered", async () => {
+    const { ctx, project, tenant } = await setup();
+    await svc.createPlanningDraft(ctx, project.id, PLAIN);
+    await svc.approvePlanningDraft(ctx, project.id, {});
+
+    // Its contract has chapters the source never planned.
+    const other = await createTestProject(tenant.id, { startDate: new Date("2026-06-01T00:00:00Z") });
+    const { revisionId } = await framerDraft(ctx, other.id, ["01", "02", "03", "04", "05", "17"]);
+    await budgetService.acceptRevision(ctx, other.id, revisionId, {}, { unissued: true });
+    await svc.createPlanningDraft(ctx, other.id, { ...PLAIN, from: "project", projectId: project.id });
+    expect((await svc.getPlanningDraft(ctx, other.id)).rows.map((r) => r.code)).toEqual(["01", "02", "03", "04", "05", "17"]);
+  });
+
   it("leaves another project's fixed days behind when copying its plan", async () => {
     const { ctx, project, tenant } = await setup();
     await svc.createPlanningDraft(ctx, project.id, PLAIN);
@@ -214,6 +242,36 @@ describe("changing the plan", () => {
       ["02", "2026-07-17"],
       ["03", "2026-08-26"],
     ]);
+  });
+
+  it("keeps the order staff give the chapters, through approval and into the next draft, moving no date", async () => {
+    const { ctx, project } = await approved();
+    await svc.createPlanningDraft(ctx, project.id, { from: "baseline" });
+    const draft = await svc.getPlanningDraft(ctx, project.id);
+    const codes = (rows: { code: string }[]) => rows.map((r) => r.code);
+
+    // 03 first: saved as sent, each chapter whole, with the dates its rules give.
+    const [first, second, third] = draft.rows;
+    await svc.updatePlanningDraft(ctx, project.id, { items: [third, first, second] });
+    const saved = await svc.getPlanningDraft(ctx, project.id);
+    expect(saved.rows.map((r) => [r.code, r.after])).toEqual([["03", "02"], ["01", null], ["02", "01"]]);
+    expect(datesOf(saved.rows)).toEqual(datesOf(draft.rows));
+
+    vi.mocked(notifyProjectClient).mockClear();
+    await svc.approvePlanningDraft(ctx, project.id, { reason: "Orden de lectura" });
+    // Only the order changed: the handover didn't move, so the client hears nothing.
+    expect(notifyProjectClient).not.toHaveBeenCalled();
+    const { baseline } = await svc.getPlanning(ctx, project.id);
+    expect(codes(baseline!.rows)).toEqual(["03", "01", "02"]);
+    const { versions } = await svc.getPlanningVersions(ctx, project.id);
+    expect(versions.map((v) => codes(v.rows))).toEqual([
+      ["03", "01", "02"],
+      ["01", "02", "03"],
+    ]);
+
+    // The next change starts from the order approved, not the contract's.
+    await svc.createPlanningDraft(ctx, project.id, { from: "baseline" });
+    expect(codes((await svc.getPlanningDraft(ctx, project.id)).rows)).toEqual(["03", "01", "02"]);
   });
 
   it("forecasts from what Avance records, leaving the baseline as approved", async () => {

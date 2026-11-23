@@ -9,7 +9,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import type { PlanningCalendar, PlanningDraft, PlanningItemInput } from "@repo/core/contract";
-import { criticalPath, planCheck, planEnd, planProblem, schedulePlan, type Recorded } from "@repo/core/planning-calc";
+import { criticalPath, moveChapter, planCheck, planEnd, planProblem, schedulePlan, type MoveBy, type Recorded } from "@repo/core/planning-calc";
 import { Badge } from "@/components/ui/badge";
 import {
   approvePlanningDraftAction,
@@ -80,6 +80,11 @@ export default function EditPlanScreen({
     edited();
     setRules((all) => all.map((rule) => (rule.code === code ? { ...rule, ...change } : rule)));
   };
+  // The order is the list's, saved with the rules: the dates don't follow it.
+  const moveRule = (code: string, by: MoveBy) => {
+    edited();
+    setRules((all) => moveChapter(all, code, by));
+  };
 
   return (
     <div className="flex flex-col gap-[18px]">
@@ -104,6 +109,7 @@ export default function EditPlanScreen({
             startDate={startDate}
             readOnly={!canManage}
             onChange={changeRule}
+            onMove={moveRule}
           />
         </div>
         <aside className="flex min-w-0 flex-[1_1_300px] flex-col gap-3.5">

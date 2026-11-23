@@ -369,18 +369,28 @@ function calendarFrom(sent: Partial<PlanningCalendar>, fallback?: PlanningCalend
 }
 
 /**
- * Keeps `rules` for the contract's chapters, in the contract's order: a
- * chapter they lack gets the standard rule; one the contract dropped goes, and
- * so does a dependency on it.
+ * Keeps `rules` for the contract's chapters, in the order staff gave them. A
+ * chapter they lack gets the standard rule, placed after the chapter before it
+ * in the contract (one that spans the works, at the end): a plan never
+ * reordered stays in the contract's order. A chapter the contract dropped
+ * goes, and so does a dependency on it.
  */
 function fitToContract(rules: PlanningItemInput[], codes: string[]): PlanningItemInput[] {
   const present = new Set(codes);
-  const known = new Map(rules.map((r) => [r.code, r]));
-  const template = new Map(templateItems(codes).map((r) => [r.code, r]));
-  return codes.map((code) => {
-    const rule = known.get(code) ?? template.get(code)!;
-    return rule.after && !present.has(rule.after) ? { ...rule, after: null, lagDays: 0 } : rule;
+  const known = new Set(rules.map((r) => r.code));
+  const fitted = rules.filter((r) => present.has(r.code));
+  const template = templateItems(codes);
+  template.forEach((rule, index) => {
+    if (known.has(rule.code)) return;
+    let at = fitted.length;
+    if (!rule.spansWorks) {
+      let before = index - 1;
+      while (template[before]?.spansWorks) before--;
+      at = before < 0 ? 0 : fitted.findIndex((r) => r.code === template[before]!.code) + 1;
+    }
+    fitted.splice(at, 0, rule);
   });
+  return fitted.map((rule) => (rule.after && !present.has(rule.after) ? { ...rule, after: null, lagDays: 0 } : rule));
 }
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -501,8 +511,8 @@ function ruleOf(item: unknown, current: PlanningItemInput): PlanningItemInput {
 
 /**
  * The open draft with what staff sent applied: its rules (`items`, every
- * chapter of it, in its order), start and calendar, each kept as stored when
- * not sent.
+ * chapter of it; the order sent becomes the plan's order), start and
+ * calendar, each kept as stored when not sent.
  */
 async function editedDraft(ctx: Ctx, projectId: string, input: unknown) {
   const [loaded, { draft, approved }] = await Promise.all([

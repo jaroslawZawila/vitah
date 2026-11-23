@@ -52,6 +52,12 @@ describe("/api/v1/projects/:id/planning", () => {
     const edited = await (await getDraft(apiRequest(token), at)).json();
     expect(edited.rows.find((r: { code: string }) => r.code === "16").durationDays).toBe(20);
 
+    // The order sent is the plan's order from then on.
+    const reordered = [...items].reverse();
+    expect((await update(apiRequest(token, json({ items: reordered }, "PUT")), at)).status).toBe(204);
+    const moved = await (await getDraft(apiRequest(token), at)).json();
+    expect(moved.rows.map((r: { code: string }) => r.code)).toEqual(reordered.map((i: { code: string }) => i.code));
+
     expect((await approve(apiRequest(token, json({})), at)).status).toBe(204);
     const planning = await (await GET(apiRequest(token), at)).json();
     expect(planning.baseline).toMatchObject({ number: 1, status: "approved" });

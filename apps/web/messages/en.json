@@ -1496,9 +1496,11 @@
     "edit": {
       "eyebrow": "{ref} · Planning",
       "title": "Edit the plan",
-      "description": "Change what each chapter waits for and how many working days it takes: the dates update as you type. Nothing changes in Progress or Purchasing until you approve it.",
+      "description": "Change what each chapter waits for and how many working days it takes: the dates update as you type. Nothing changes in Progress or Purchasing until you approve it. The arrows change the order of the list, not the dates.",
       "badge": "Draft v{number} · not approved",
       "tableLabel": "Draft chapters",
+      "moveUp": "Move chapter {code} up",
+      "moveDown": "Move chapter {code} down",
       "code": "Ch.",
       "chapter": "Chapter",
       "after": "Starts",

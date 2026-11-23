@@ -161,6 +161,28 @@ export function templateItems(codes: string[]): PlanningItemInput[] {
   });
 }
 
+/** One place up the plan's order, or one down. */
+export type MoveBy = -1 | 1;
+
+/**
+ * `items` with the chapter `code` one place up (`by` -1) or down (1) in the
+ * plan's order, past the chapters that span the works (shown apart); the same
+ * array when it is already first or last. The order is how the plan reads,
+ * never when a chapter happens.
+ */
+export function moveChapter<T extends { code: string; spansWorks: boolean }>(items: T[], code: string, by: MoveBy): T[] {
+  const from = items.findIndex((item) => item.code === code);
+  let to = from + by;
+  while (items[to]?.spansWorks) to += by;
+  const moved = items[from];
+  const other = items[to];
+  if (!moved || !other || moved.spansWorks) return items;
+  const next = [...items];
+  next[from] = other;
+  next[to] = moved;
+  return next;
+}
+
 // ─── Scheduling ──────────────────────────────────────────────────────────────
 
 export const MAX_DURATION_DAYS = 600;

@@ -4,6 +4,7 @@ import {
   criticalPath,
   easterSunday,
   holidaysOf,
+  moveChapter,
   orderByDate,
   planCheck,
   planEnd,
@@ -78,6 +79,37 @@ describe("templateItems", () => {
     // Without 01, cimentación starts with the works.
     expect(templateItems(["02"])[0]).toMatchObject({ code: "02", after: null, lagDays: 0 });
     expect(planProblem(templateItems(["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19"]))).toBeNull();
+  });
+});
+
+describe("moveChapter", () => {
+  const codes = (items: PlanningItemInput[]) => items.map((i) => i.code);
+
+  it("moves a chapter one place up or down, whole, and leaves the rest as they were", () => {
+    const down = moveChapter(CHAIN, "01", 1);
+    expect(codes(down)).toEqual(["02", "01", "03", "17"]);
+    expect(down[1]).toBe(CHAIN[0]);
+    expect(codes(moveChapter(CHAIN, "03", -1))).toEqual(["01", "03", "02", "17"]);
+    // The array given is never changed.
+    expect(codes(CHAIN)).toEqual(["01", "02", "03", "17"]);
+  });
+
+  it("stays put at either end, for a chapter that spans the works and for one it doesn't know", () => {
+    expect(moveChapter(CHAIN, "01", -1)).toBe(CHAIN);
+    expect(moveChapter(CHAIN, "03", 1)).toBe(CHAIN);
+    expect(moveChapter(CHAIN, "17", -1)).toBe(CHAIN);
+    expect(moveChapter(CHAIN, "99", 1)).toBe(CHAIN);
+  });
+
+  it("passes the chapters that span the works, wherever they sit", () => {
+    const mixed = [item("01", null, 5), spanning("17"), spanning("18"), item("OP1", null, 3)];
+    expect(codes(moveChapter(mixed, "01", 1))).toEqual(["OP1", "17", "18", "01"]);
+    expect(codes(moveChapter(mixed, "OP1", -1))).toEqual(["OP1", "17", "18", "01"]);
+  });
+
+  it("changes no date: the order is only how the plan reads", () => {
+    const options = { startDate: "2026-06-01", calendar: PLAIN };
+    expect(asObject(schedulePlan(moveChapter(CHAIN, "03", -1), options))).toEqual(asObject(schedulePlan(CHAIN, options)));
   });
 });
 

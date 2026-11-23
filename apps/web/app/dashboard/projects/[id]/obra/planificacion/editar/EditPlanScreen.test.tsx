@@ -126,6 +126,37 @@ describe("EditPlanScreen", () => {
     expect(row(/Actuaciones previas/).getByLabelText("Días de antelación del pedido del capítulo 01")).toBeDisabled();
   });
 
+  it("moves a chapter up and down the list, whole, and saves the new order", async () => {
+    renderScreen();
+    // The chapters that don't span the works, in the list's order.
+    const order = () => screen.getAllByRole("row").flatMap((r) => within(r).queryAllByRole("cell")[0]?.textContent?.match(/^\d\d$/) ?? []);
+    const arrow = (name: string) => screen.getByRole("button", { name });
+    expect(order()).toEqual(["01", "02", "03", "04"]);
+    // The ends of the list go no further; 17 spans the works and has no arrows.
+    expect(arrow("Subir el capítulo 01")).toBeDisabled();
+    expect(arrow("Bajar el capítulo 04")).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Subir el capítulo 17" })).not.toBeInTheDocument();
+    // The arrows sit beside the chapter's name: at the card's top right on a phone.
+    expect(arrow("Subir el capítulo 04").closest("td")).toBe(row(/Pinturas/).getAllByRole("cell")[1]);
+
+    await userEvent.click(arrow("Subir el capítulo 04"));
+    expect(order()).toEqual(["01", "02", "04", "03"]);
+    // The arrow keeps the focus, to press it again; the row keeps its rule.
+    expect(arrow("Subir el capítulo 04")).toHaveFocus();
+    expect(row(/Pinturas/).getByLabelText("Cuándo empieza el capítulo 04")).toHaveValue("03");
+
+    await userEvent.click(arrow("Subir el capítulo 04"));
+    await userEvent.click(arrow("Subir el capítulo 04"));
+    // First now: its "up" is disabled, so its pair takes the focus.
+    expect(arrow("Subir el capítulo 04")).toBeDisabled();
+    expect(arrow("Bajar el capítulo 04")).toHaveFocus();
+
+    await userEvent.click(screen.getByRole("button", { name: "Guardar borrador" }));
+    const sent = vi.mocked(actions.updatePlanningDraftAction).mock.calls[0]![1] as { items: { code: string; after: string | null }[] };
+    expect(sent.items.map((i) => i.code)).toEqual(["04", "01", "02", "03", "17"]);
+    expect(sent.items[0]).toMatchObject({ code: "04", after: "03" });
+  });
+
   it("refuses chapters that wait for each other", async () => {
     renderScreen();
     await userEvent.selectOptions(row(/Revestimientos/).getByLabelText("Cuándo empieza el capítulo 03"), "04");
@@ -186,6 +217,7 @@ describe("EditPlanScreen", () => {
     renderScreen({ canManage: false });
     expect(screen.queryByRole("button", { name: "Aprobar como línea base v3" })).not.toBeInTheDocument();
     expect(row(/Pinturas/).getByLabelText("Días laborables del capítulo 04")).toBeDisabled();
+    expect(screen.queryByRole("button", { name: /^(Subir|Bajar) el capítulo/ })).not.toBeInTheDocument();
     expect(screen.getByLabelText("Festivos autonómicos")).toBeDisabled();
   });
 

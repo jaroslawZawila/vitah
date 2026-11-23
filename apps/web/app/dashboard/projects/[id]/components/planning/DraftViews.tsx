@@ -1,8 +1,10 @@
 "use client";
 
+import { useEffect, useRef } from "react";
+import { ArrowDown, ArrowUp } from "lucide-react";
 import { useTranslations } from "next-intl";
 import type { PlanningCalendar, PlanningCheck, PlanningItemInput, PlanningRow } from "@repo/core/contract";
-import { orderByDate, type Dates } from "@repo/core/planning-calc";
+import { orderByDate, type Dates, type MoveBy } from "@repo/core/planning-calc";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cardVariants } from "@/components/ui/card";
@@ -19,11 +21,19 @@ import CalendarFields from "./CalendarFields";
 // Presentational: Obra › Planificación › Editar, a draft's rules (what each
 // chapter waits for, its lag and working days) with the dates they give, and
 // the panels beside it: the end against the contract, the calendar, and
-// approving. The container recomputes the dates as staff type.
+// approving. The container recomputes the dates as staff type. A chapter moves
+// up and down the list by its arrows: the order is how the plan reads, the
+// dates still come from the rules.
 
 /** How a chapter's start is set, as the "starts after" select shows it. */
 const FROM_START = "";
 const FIXED = "fixed";
+
+/** A chapter's two arrows: one place up the list, one down. */
+const MOVES = [
+  { by: -1, Icon: ArrowUp, label: "moveUp" },
+  { by: 1, Icon: ArrowDown, label: "moveDown" },
+] as const;
 
 export type RuleChange = Partial<Pick<PlanningItemInput, "after" | "lagDays" | "durationDays" | "fixedStart" | "leadDays">>;
 
@@ -59,6 +69,7 @@ export function DraftTable({
   startDate,
   readOnly,
   onChange,
+  onMove,
 }: {
   /** Names, hitos and what Avance recorded. */
   rows: PlanningRow[];
@@ -71,6 +82,7 @@ export function DraftTable({
   startDate: string;
   readOnly: boolean;
   onChange: (code: string, change: RuleChange) => void;
+  onMove: (code: string, by: MoveBy) => void;
 }) {
   const t = useTranslations("planning.edit");
   const f = useControlFormat();
@@ -79,8 +91,26 @@ export function DraftTable({
   const spanning = rules.filter((r) => r.spansWorks);
   const end = dates ? [...dates.values()].map((d) => d.end).sort().at(-1) : null;
 
+  // The arrow pressed keeps the focus as its row moves, so it can be pressed
+  // again; at the end of the list, where it is disabled, its pair takes it.
+  const section = useRef<HTMLElement>(null);
+  const moved = useRef<{ code: string; by: MoveBy } | null>(null);
+  useEffect(() => {
+    const last = moved.current;
+    if (!last) return;
+    moved.current = null;
+    const arrows = [...(section.current?.querySelectorAll<HTMLButtonElement>("button[data-move]:enabled") ?? [])].filter(
+      (button) => button.dataset.move === last.code,
+    );
+    (last.by === -1 ? arrows[0] : arrows.at(-1))?.focus();
+  }, [rules]);
+  const move = (code: string, by: MoveBy) => {
+    moved.current = { code, by };
+    onMove(code, by);
+  };
+
   return (
-    <section className={cn(cardVariants({ size: "flush" }), "min-w-0 py-1.5")} aria-label={t("tableLabel")}>
+    <section ref={section} className={cn(cardVariants({ size: "flush" }), "min-w-0 py-1.5")} aria-label={t("tableLabel")}>
       <Table className={cn("md:min-w-[860px]", phone.table)}>
         <TableHeader className="max-md:hidden">
           <TableRow>
@@ -95,7 +125,7 @@ export function DraftTable({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {working.map((rule) => {
+          {working.map((rule, index) => {
             const row = rowOf.get(rule.code);
             const finished = row?.state === "finished";
             const started = row?.state === "in_progress";
@@ -106,15 +136,37 @@ export function DraftTable({
             return (
               <TableRow key={rule.code} className={phone.row}>
                 <TableCell className={cn("num pl-[18px] font-semibold md:font-normal", phone.code)}>{rule.code}</TableCell>
-                <TableCell className={cn("min-w-[190px] whitespace-normal", phone.chapter)}>
-                  <div className="font-semibold">{row?.name ?? rule.code}</div>
-                  <div className={cn(muted, "flex flex-wrap items-center gap-1.5")}>
-                    {finished
-                      ? t("finished")
-                      : started && row?.actualStart
-                        ? t("inProgress", { date: f.date(row.actualStart) })
-                        : row?.hitoCode}
-                    {critical.has(rule.code) && <Badge variant="warn">{t("critical")}</Badge>}
+                <TableCell className={cn("whitespace-normal", readOnly ? "min-w-[190px]" : "min-w-[280px]", phone.chapter)}>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="font-semibold">{row?.name ?? rule.code}</div>
+                      <div className={cn(muted, "flex flex-wrap items-center gap-1.5")}>
+                        {finished
+                          ? t("finished")
+                          : started && row?.actualStart
+                            ? t("inProgress", { date: f.date(row.actualStart) })
+                            : row?.hitoCode}
+                        {critical.has(rule.code) && <Badge variant="warn">{t("critical")}</Badge>}
+                      </div>
+                    </div>
+                    {!readOnly && (
+                      <div className="flex gap-0.5">
+                        {MOVES.map(({ by, Icon, label }) => (
+                          <Button
+                            key={by}
+                            type="button"
+                            variant="ghost"
+                            size="icon-sm"
+                            data-move={rule.code}
+                            aria-label={t(label, { code: rule.code })}
+                            disabled={working[index + by] === undefined}
+                            onClick={() => move(rule.code, by)}
+                          >
+                            <Icon aria-hidden />
+                          </Button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </TableCell>
                 <TableCell className={phone.field}>
