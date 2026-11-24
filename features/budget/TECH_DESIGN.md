@@ -461,7 +461,7 @@ Both matter more to staff than VAT, so they lead the summary tab.
 
 - `budget_revisions.overhead_bp` / `profit_bp`, both bp of the price. A new revision starts at 16 % + 9 %
   (`DEFAULT_MARGINS`; 16 % + 6 % until 2026-11-24, 13 % + 6 % until 2026-11-04, when the drafts still at 13 % moved too:
-  `packages/db/sql/2026-11-budget-overhead-16.sql`), a copy keeps its source's, and existing rows got 0 (their unit prices already included both;
+  `packages/db/sql/2026-11-24-0600-budget-overhead-16.sql`), a copy keeps its source's, and existing rows got 0 (their unit prices already included both;
   `packages/db/sql/2026-10-budget-margins.sql`). PATCH takes `overheadPct` / `profitPct` on drafts (each 0–50, together
   under 100: `invalid_input`; `budget_revisions_margins_check` in the database).
 - The FRAMER 2026 price base is now at cost: the prototype's prices ÷ 1.19 (kept as the costs when the formula

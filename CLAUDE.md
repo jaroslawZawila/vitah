@@ -230,7 +230,7 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
   (`lib/use-project.tsx`) shows one home everywhere; the client's choice is kept on the phone (`vitah_project`, forgotten on sign-out; a tapped
   push shows its home without changing it), each home's documents offline in their own folder. With one home the app looks as it always did. Pushes name the home (ref in the
   title) when there are several and carry `projectId`. Design `doc/mobile-app-design/A-*Viviendas*.dc.html`. Prod SQL:
-  `packages/db/sql/2026-11-client-several-projects.sql` (drops `projects_client_user_unique`)
+  `packages/db/sql/2026-11-24-0601-client-several-projects.sql` (drops `projects_client_user_unique`)
 - Admin-only server actions guarded by `requireAdmin()` check
 - Passwords: one policy for everyone (`MIN_PASSWORD_LENGTH` 10 + an uppercase letter + a digit, `isStrongPassword` in
   `@repo/core/contract`); existing shorter ones still sign in. Staff change their own in the rail's settings
@@ -362,7 +362,7 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
   chapter started on Avance, 7 every contract chapter finished, 8 H9 paid. Each of those writes calls `raiseStage`
   after it (a new one that adds evidence must too); it marks `obra` when it moves. Staff can still set it by hand,
   up or down; the next event brings a lowered one back up. `getObra`'s `stageEvidence` dates each, shown under the
-  stepper. Prod SQL (catch-up, after deploying): `packages/db/sql/2026-11-obra-stage-auto.sql`
+  stepper. Prod SQL (catch-up, after deploying): `packages/db/sql/2026-11-24-0602-obra-stage-auto.sql`
 - Budget (`packages/core/src/budget.ts`): revisions → chapters → lines (partidas), money in cents, quantities in
   thousandths. Staff then record each line's executed %; a change is a new revision (copied, compared with the
   previous). Only the accepted revision drives prices and progress. The budget itself is under "Budget" below

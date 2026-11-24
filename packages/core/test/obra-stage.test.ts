@@ -200,8 +200,8 @@ describe("raise-only", () => {
   });
 });
 
-describe("the prod SQL (2026-11-obra-stage-auto.sql)", () => {
-  const migration = readFileSync(new URL("../../db/sql/2026-11-obra-stage-auto.sql", import.meta.url), "utf8");
+describe("the prod SQL (2026-11-24-0602-obra-stage-auto.sql)", () => {
+  const migration = readFileSync(new URL("../../db/sql/2026-11-24-0602-obra-stage-auto.sql", import.meta.url), "utf8");
   const setStage = (projectId: string, stage: number) =>
     db.update(projects).set({ obraStage: stage }).where(eq(projects.id, projectId));
 
