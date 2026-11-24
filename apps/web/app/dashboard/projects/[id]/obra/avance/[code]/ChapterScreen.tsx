@@ -1,6 +1,6 @@
 "use client";
 
-// Container for a chapter's page under Obra › Avance: the only part of it
+// Container for a chapter's page under Obra › Planificación: the only part of it
 // that knows about server actions (with ChapterProgress, IssueEditor and
 // UploadPhotos). The views in ../../../components/construction take props only.
 
@@ -60,7 +60,7 @@ export default function ChapterScreen({
 
   return (
     <div className="flex flex-col gap-[18px]">
-      <BackLink href={obraHref(projectId, "progress")} />
+      <BackLink href={obraHref(projectId, "planning")} />
 
       <header className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4">
         <div className="min-w-0">
@@ -180,7 +180,7 @@ export default function ChapterScreen({
             control={control}
             request={progress}
             onClose={() => setProgress(null)}
-            avanceHref={obraHref(projectId, "progress")}
+            backHref={obraHref(projectId, "planning")}
           />
           <Modal
             open={issue !== null}

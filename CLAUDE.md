@@ -360,7 +360,7 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
   and `doc/platform-design/P-*`
 - The stage moves **up on its own**, never down (`obra-stage.ts` › `raiseStage`, rule `stageEvidence` in `obra-calc.ts`):
   2 a budget input registered, 3 a budget revision (by hand or the AI), 4 a revision accepted, 5 H0 paid, 6 a contract
-  chapter started on Avance, 7 every contract chapter finished, 8 H9 paid. Each of those writes calls `raiseStage`
+  chapter started (on Planificación), 7 every contract chapter finished, 8 H9 paid. Each of those writes calls `raiseStage`
   after it (a new one that adds evidence must too); it marks `obra` when it moves. Staff can still set it by hand,
   up or down; the next event brings a lowered one back up. `getObra`'s `stageEvidence` dates each, shown under the
   stepper. Prod SQL (catch-up, after deploying): `packages/db/sql/2026-11-24-0602-obra-stage-auto.sql`
@@ -391,8 +391,8 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
 - Whether an obra is on time has **one definition**: `scheduleStatus` in `packages/core/src/schedule-status.ts` (pure,
   in `@repo/core/contract`): with the approved baseline, `late` when a pending chapter is past its planned start, a chapter in progress past
   its planned end, or the forecast ends after the contract date, else `on_time`; `simulated` without a baseline (never
-  on time or late); `no_dates`. The project list's schedule pill, Planificación's phone cards (which chapters are
-  late) and the API (`schedule` of `GET …/obra/control` and `…/planning`) all read it; never compute it apart
+  on time or late); `no_dates`. The project list's schedule pill, Planificación's late pills (its parts `lateToStartDays` /
+  `lateToFinishDays`) and the API (`schedule` of `GET …/obra/control` and `…/planning`) all read it; never compute it apart
 - Finishing the last chapter of a hito creates one `obra_invoice_requests` row for Administration (unique per hito:
   never a second one, whatever is corrected); hito states pending → reached → requested → invoiced → collected follow
   the Pagos tab's invoice and payment. `Hito.invoiceRequestedAt` shows it on Pagos. A finished chapter counts as 100 %
@@ -410,7 +410,8 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
 - Issues and changes log (`obra_issues`, numbered per kind INC-/CAM-, files in `obra_issue_files`, private Blob,
   served as downloads): history only, never changes dates, amounts or invoices. Document warnings come from
   Subcontratas (`listProjectAttention`). Photos have a `taken_on` day. Staff only; viewers read
-- Portal: `dashboard/projects/[id]/obra/` (Resumen) + `planificacion` (Planning, below), `avance`, `avance/[code]`, `costes`, `hitos`, `incidencias`,
+- Portal: `dashboard/projects/[id]/obra/` (Resumen) + `planificacion` (Planning, below: where each chapter's start and finish is
+  recorded; the old Avance tab `avance` redirects there), a chapter's page `avance/[code]`, `costes`, `hitos`, `incidencias`,
   `fotos` (the old project Fotos tab redirects there); views in `components/construction/`. API: `/api/v1/projects/:id/obra/`
   `control`, `header`, `costs`, `review`, `chapters/:code/{control,start,finish}` (`PATCH …/control` corrects), `issues`,
   `issues/:issueId`, `issues/:issueId/files[/:fileId]`. Prod SQL: `packages/db/sql/2026-10-construction-control.sql`
@@ -528,7 +529,7 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
   a chapter happens, and a draft copied from a baseline keeps it
 - Working days: weekends, national holidays (Good Friday too), the region's (`as cb cl ga md`, plus Holy Thursday),
   and the optional August (4 weeks from its first Monday) and Christmas (24/12–6/1) closures, chosen per version
-- What Avance records wins: a finished chapter keeps its real dates, a started one its real start; nothing still to
+- What is recorded on a chapter (its real start and finish, on Planificación) wins: a finished chapter keeps its real dates, a started one its real start; nothing still to
   happen is placed before today. The baseline view adds that forecast and the critical path; both, and the draft, are
   checked against `projects.completion_date` in days (`planCheck`)
 - Each chapter also has a lead time (`lead_days`, calendar days): its orders must go out by planned start − lead
@@ -537,8 +538,15 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
   (`templateLeadDays`) apply to the simulated dates. Prod SQL: `packages/db/sql/2026-10-planning-lead-times.sql`
 - A first plan comes from the standard steel-frame template (`PLAN_TEMPLATE`) or another project's baseline; a change
   copies the baseline into a draft and needs a reason to approve. Approving recomputes the dates as of that day
-- Portal: Obra tab Planificación (`dashboard/projects/[id]/obra/planificacion/`: the baseline or the generate form,
-  `editar` the draft, `versiones` the history); views in `components/planning/`. API: `/api/v1/projects/:id/planning`
+- Portal: Obra tab Planificación (`dashboard/projects/[id]/obra/planificacion/`, `PlanningScreen`), which took in the
+  old Avance tab (`obra/avance` redirects there, query kept; a chapter's page stays at `obra/avance/[code]`): above,
+  the baseline, its figures and an open draft, or the way to a first plan (the generate form, unfolded on demand);
+  then every contract chapter in one list in the plan's order (the budget's without one) in Avance's look: a table
+  with a mini Gantt from xl, cards below `md` (`components/construction/ProgressViews` + `Gantt`), each with its plan,
+  real dates and the start / finish / correct actions (viewers read), and with a baseline also its forecast,
+  progress %, what it waits for, working days and the critical path ("Solo ruta crítica", "Comparar con la línea
+  base"). Without a baseline the chapters go on simulated dates. The page loads the control and the plan side by
+  side; `editar` the draft, `versiones` the history; views in `components/planning/`. API: `/api/v1/projects/:id/planning`
   (GET), `…/planning/versions` (GET), `…/planning/draft` (GET, POST create, PUT save, DELETE discard) and
   `…/planning/draft/approve` (POST). `pnpm db:seed` approves VTH-26-001's first plan (`seed/planning.ts`). Prod SQL:
   `packages/db/sql/2026-10-planning.sql`

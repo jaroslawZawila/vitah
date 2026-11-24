@@ -29,7 +29,7 @@ export async function getPlanningVersions(projectId: string) {
 }
 
 // ─── Writes ──────────────────────────────────────────────────────────────────
-// Each refreshes every tab of the project: Avance, Compras and the Obra
+// Each refreshes every tab of the project: Planificación, Compras and the Obra
 // summary read the approved plan.
 
 /** Opens a draft: a first plan (`from: "template" | "project"`) or a copy of the baseline. */

@@ -16,7 +16,9 @@ import ProjectDocumentsPage from "./projects/[id]/documents/page";
 import ProjectPage from "./projects/[id]/page";
 import ObraChapterPage from "./projects/[id]/obra/avance/[code]/page";
 import ObraPage from "./projects/[id]/obra/page";
+import ObraProgressPage from "./projects/[id]/obra/avance/page";
 import EditPlanPage from "./projects/[id]/obra/planificacion/editar/page";
+import ObraPlanningPage from "./projects/[id]/obra/planificacion/page";
 import ProjectHitoPage from "./projects/[id]/payments/[hitoId]/page";
 import ProjectPaymentsPage from "./projects/[id]/payments/page";
 import NewProjectPage from "./projects/new/page";
@@ -58,6 +60,7 @@ describe("a record that isn't there", () => {
     await expect(ProjectPage(params({ id: project.id }))).rejects.toEqual(NOT_FOUND);
     await expect(ProjectDocumentsPage(params({ id: project.id }))).rejects.toEqual(NOT_FOUND);
     await expect(ObraPage(params({ id: project.id }))).rejects.toEqual(NOT_FOUND);
+    await expect(ObraPlanningPage(params({ id: project.id }))).rejects.toEqual(NOT_FOUND);
     await expect(ProjectPage(params({ id: "no-such-project" }))).rejects.toEqual(NOT_FOUND);
     await expect(ProjectPaymentsPage(params({ id: project.id }))).rejects.toEqual(NOT_FOUND);
     await expect(ProjectHitoPage(params({ id: project.id, hitoId: "any" }))).rejects.toEqual(NOT_FOUND);
@@ -193,6 +196,7 @@ describe("no session", () => {
     signInAs(null);
 
     await expect(ObraPage(params({ id: project.id }))).rejects.toEqual(TO_LOGIN);
+    await expect(ObraPlanningPage(params({ id: project.id }))).rejects.toEqual(TO_LOGIN);
     await expect(ProjectPage(params({ id: project.id }))).rejects.toEqual(TO_LOGIN);
     await expect(ProjectDocumentsPage(params({ id: project.id }))).rejects.toEqual(TO_LOGIN);
     await expect(ProjectsPage()).rejects.toEqual(TO_LOGIN);
@@ -222,5 +226,17 @@ describe("a redirect that is part of a flow", () => {
     await expect(CompanyPurchasesPage(search({ estado: "open", page: "4" }))).rejects.toEqual(redirectTo("/dashboard/compras?estado=open"));
     await expect(InvoicesPage(search({ q: "msn", page: "2" }))).rejects.toEqual(redirectTo("/dashboard/compras/facturas?q=msn"));
     await expect(PaymentsPage(search({ page: "3" }))).rejects.toEqual(redirectTo("/dashboard/compras/pagos"));
+  });
+});
+
+describe("an old address", () => {
+  it("goes on to where its page is now: Obra › Avance to Planificación, with its query", async () => {
+    const id = "p-1";
+    const page = (query: Record<string, string | string[]>) => ({ params: Promise.resolve({ id }), searchParams: Promise.resolve(query) });
+
+    await expect(ObraProgressPage(page({}))).rejects.toEqual(redirectTo(`/dashboard/projects/${id}/obra/planificacion`));
+    await expect(ObraProgressPage(page({ estado: "pending", tag: ["a", "b"] }))).rejects.toEqual(
+      redirectTo(`/dashboard/projects/${id}/obra/planificacion?estado=pending&tag=a&tag=b`),
+    );
   });
 });

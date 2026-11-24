@@ -96,7 +96,7 @@ export default function SummaryTable({
             {t("planDates")} <Source name={ts("planning")} mock={sources.planning === "mock"} />
           </SourceLabel>
           <SourceLabel>
-            {t("actualDates")} <Source name={ts("progress")} />
+            {t("actualDates")} <Source name={ts("planning")} />
           </SourceLabel>
           <SourceLabel>
             {t("contractedFrom")} <Source name={ts("purchasing")} />

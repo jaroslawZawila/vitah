@@ -23,7 +23,7 @@ import { cardTop, footnote, kv, moreLink } from "./classes";
 import { deviationTone, useControlFormat } from "./format";
 import { MilestoneStatePill, Source, SourceLabel } from "./pills";
 
-// Presentational: the cards of a chapter's page under Avance.
+// Presentational: the cards of a chapter's page (under Planificación).
 
 /** Plan against actual: start, end and duration, with "Corregir" for editors once started. */
 export function DatesCard({

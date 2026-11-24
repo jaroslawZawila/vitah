@@ -113,7 +113,7 @@ export default function SummaryScreen({
             chapters={shown}
             control={control}
             chapterHref={(code) => chapterHref(projectId, code)}
-            progressHref={obraHref(projectId, "progress")}
+            progressHref={obraHref(projectId, "planning")}
           />
 
           <div className={cn("grid grid-cols-[repeat(auto-fit,minmax(min(300px,100%),1fr))] gap-3.5", phoneLater)}>

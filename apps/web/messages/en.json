@@ -613,7 +613,7 @@
         "3": "first budget draft",
         "4": "revision accepted",
         "5": "H0 paid",
-        "6": "first chapter started in Progress",
+        "6": "first chapter started in Planning",
         "7": "every chapter finished",
         "8": "H9 paid"
       }
@@ -815,7 +815,6 @@
       "label": "Construction sections",
       "summary": "Summary",
       "planning": "Planning",
-      "progress": "Progress",
       "costs": "Costs",
       "milestones": "Milestones",
       "issues": "Issues",
@@ -862,7 +861,6 @@
       "mockHint": "Simulated data: the project has no approved plan in Planning yet.",
       "planning": "Planning",
       "purchasing": "Purchasing",
-      "progress": "Progress",
       "budget": "Budget",
       "sales": "Sales",
       "live": "Live",
@@ -899,10 +897,14 @@
       "plan": "Plan {start} to {end}",
       "actual": "actual {start} to {end}",
       "actualSince": "actual since {start}",
+      "forecast": "forecast {start} to {end}",
       "noDates": "No dates",
       "legendPlan": "Plan",
+      "legendBaseline": "Baseline",
       "legendActual": "Actual",
       "legendInProgress": "In progress",
+      "legendForecast": "Forecast",
+      "legendCritical": "Critical path",
       "legendToday": "Today {date}"
     },
     "filters": {
@@ -1002,11 +1004,10 @@
       "nothingRecorded": "nothing recorded"
     },
     "progress": {
-      "title": "Progress",
-      "description": "Record when each chapter really starts and finishes. That is the only thing that changes its state.",
       "recordIssue": "Log an issue",
       "uploadPhoto": "Upload photo",
       "noChapters": "The contract has no chapters yet.",
+      "noMatch": "No chapter matches the filters.",
       "tableLabel": "Chapters and dates",
       "code": "Ch.",
       "chapter": "Chapter",
@@ -1014,6 +1015,7 @@
       "plan": "Plan",
       "actual": "Actual",
       "actions": "Actions",
+      "built": "{pct} built",
       "openIssues": "{count, plural, one {# issue} other {# issues}}",
       "startsOn": "starts on {date} as planned",
       "durationVsPlan": "{actual} d · plan {planned} d",
@@ -1089,7 +1091,7 @@
       "planning": "Planning",
       "planningGets": "updates its forecast with the actual end",
       "close": "Close",
-      "backToProgress": "Back to Progress",
+      "backToPlanning": "Back to Planning",
       "clear": "Clear",
       "clearLabel": "Clear {field}",
       "clearHint": "Clearing the end reopens the chapter; clearing the start too makes it pending.",
@@ -1351,7 +1353,7 @@
   },
   "planning": {
     "title": "Planning",
-    "description": "When each chapter of the contract starts and ends. The approved baseline is what Progress, Purchasing and the works summary measure against.",
+    "description": "When each chapter of the contract starts and ends: the approved plan, what really happens and where the works are heading. Record each chapter's actual start and finish here: it is the only thing that changes its state.",
     "versionsLink": "Versions",
     "editPlan": "Edit plan",
     "continueDraft": "Continue draft v{number}",
@@ -1359,7 +1361,7 @@
     "approvedBy": "Approved on {date} by {name}",
     "approvedOn": "Approved on {date}",
     "reason": "reason: “{reason}”",
-    "footnote": "Actual dates come from Progress: when a chapter finishes late, the ones waiting for it move in the forecast, never in the baseline. Days = working days ({calendar}).",
+    "footnote": "Actual dates are the ones recorded here: when a chapter finishes late, the ones waiting for it move in the forecast, never in the baseline. Days = working days ({calendar}).",
     "margin": "{count, plural, =0 {Right on time} one {# day to spare} other {# days to spare}}",
     "orderBy": "order by {date}",
     "rule": {
@@ -1404,31 +1406,14 @@
       "late": "{count, plural, one {# day} other {# days}} past the contract"
     },
     "table": {
-      "label": "Plan by chapter",
-      "code": "Ch.",
-      "chapter": "Chapter",
-      "dates": "Forecast",
-      "days": "Days",
+      "forecast": "Forecast",
       "compare": "Compare with baseline",
       "onlyCritical": "Critical path only",
       "critical": "Critical",
       "late": "{days} vs. baseline",
-      "barLabel": "Forecast {forecast}; baseline {baseline}",
-      "planned": "Baseline",
-      "actual": "Actual",
-      "actualSince": "since {date} · {pct} %",
       "duration": "Duration",
       "workingDays": "{count, plural, one {# working day} other {# working days}}",
-      "waitsFor": "Starts",
-      "order": "Order by"
-    },
-    "legend": {
-      "finished": "Finished",
-      "inProgress": "In progress (done so far)",
-      "pending": "Pending",
-      "critical": "Critical path",
-      "baseline": "Baseline",
-      "today": "Today · {date}"
+      "waitsFor": "Starts"
     },
     "draftNotice": {
       "badge": "Draft v{number}",
@@ -1438,9 +1423,10 @@
     },
     "generate": {
       "empty": "This project has no plan yet.",
-      "emptyHint": "Generate a draft with {count, plural, one {the chapter} other {the # chapters}} of the accepted budget, adjust it and approve it. Meanwhile, Progress and Purchasing show simulated dates.",
+      "emptyHint": "Generate a draft with {count, plural, one {the chapter} other {the # chapters}} of the accepted budget, adjust it and approve it. Meanwhile, the chapters below and Purchasing use simulated dates.",
       "noBudget": "Planning the works needs an accepted budget.",
       "viewerHint": "An admin or manager can generate the plan.",
+      "open": "Generate the plan",
       "title": "Generate a draft",
       "start": "Start of works (acta de inicio)",
       "from": "Durations",
@@ -1482,7 +1468,7 @@
       "days": "Days",
       "dates": "Start – end",
       "vs": "Vs. v{number}",
-      "finished": "Finished · actual dates from Progress",
+      "finished": "Finished · actual dates as recorded",
       "inProgress": "In progress since {date}",
       "critical": "Critical",
       "afterLabel": "When chapter {code} starts",
@@ -1518,7 +1504,7 @@
         "saved": "Draft saved.",
         "submit": "Approve as baseline v{number}",
         "save": "Save draft",
-        "who": "Once approved, Progress, Purchasing and the works summary use this version; the previous one stays in Versions.",
+        "who": "Once approved, Planning, Purchasing and the works summary use this version; the previous one stays in Versions.",
         "discard": "Discard draft",
         "discardDialog": {
           "title": "Discard draft v{number}?",

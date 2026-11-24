@@ -43,7 +43,7 @@ describe("ChapterScreen", () => {
     expect(screen.getByRole("heading", { level: 1, name: "Envolvente térmica Thermochip" })).toBeInTheDocument();
     expect(screen.getByText("Capítulo 06 · Hito H4")).toBeInTheDocument();
     expect(screen.getByText("Fin previsto superado · +8 d")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "← Volver" })).toHaveAttribute("href", "/dashboard/projects/p-1/obra/avance");
+    expect(screen.getByRole("link", { name: "← Volver" })).toHaveAttribute("href", "/dashboard/projects/p-1/obra/planificacion");
 
     const dates = within(screen.getByRole("region", { name: "Fechas" }));
     expect(dates.getByText("14 sept 2026")).toBeInTheDocument();
@@ -115,7 +115,7 @@ describe("ChapterScreen", () => {
     expect(screen.queryByRole("button", { name: "Guardar avance" })).not.toBeInTheDocument();
   });
 
-  it("finishes the chapter from its page, then offers to go back to Avance", async () => {
+  it("finishes the chapter from its page, then offers to go back to Planificación", async () => {
     renderScreen();
 
     await userEvent.click(screen.getByRole("button", { name: "Finalizar capítulo" }));
@@ -123,7 +123,7 @@ describe("ChapterScreen", () => {
     await userEvent.click(dialog.getByRole("button", { name: "Finalizar y pedir factura" }));
 
     expect(actions.finishChapterAction).toHaveBeenCalledWith("p-1", "06", "2026-10-17");
-    expect(await screen.findByRole("link", { name: "Volver a Avance" })).toHaveAttribute("href", "/dashboard/projects/p-1/obra/avance");
+    expect(await screen.findByRole("link", { name: "Volver a Planificación" })).toHaveAttribute("href", "/dashboard/projects/p-1/obra/planificacion");
   });
 
   it("corrects the start date", async () => {

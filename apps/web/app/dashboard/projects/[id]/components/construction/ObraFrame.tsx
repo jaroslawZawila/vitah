@@ -10,13 +10,12 @@ import { useActiveInView } from "../../../../components/useActiveInView";
 import { Dot } from "./pills";
 
 /** The Obra tab's pages, in the order of its sub-navigation. */
-export const OBRA_TABS = ["summary", "planning", "progress", "costs", "milestones", "issues", "photos"] as const;
+export const OBRA_TABS = ["summary", "planning", "costs", "milestones", "issues", "photos"] as const;
 export type ObraTab = (typeof OBRA_TABS)[number];
 
 const TAB_PATH: Record<ObraTab, string> = {
   summary: "",
   planning: "/planificacion",
-  progress: "/avance",
   costs: "/costes",
   milestones: "/hitos",
   issues: "/incidencias",
@@ -26,9 +25,9 @@ const TAB_PATH: Record<ObraTab, string> = {
 export const obraHref = (projectId: string, tab: ObraTab = "summary") =>
   `/dashboard/projects/${projectId}/obra${TAB_PATH[tab]}`;
 
-/** A chapter's page under Avance (codes are free text, so encoded). */
+/** A chapter's page, under Planificación (at its old Avance address; codes are free text, so encoded). */
 export const chapterHref = (projectId: string, code: string) =>
-  `${obraHref(projectId, "progress")}/${encodeURIComponent(code)}`;
+  `${obraHref(projectId)}/avance/${encodeURIComponent(code)}`;
 
 /** What every Obra page's header needs. */
 export type ObraHeader = { ref: string; stage: ObraStage; openIssues: number };
@@ -69,7 +68,7 @@ export function StageEyebrow({ label, stage }: { label: string; stage?: ObraStag
 /**
  * Presentational: an Obra page's header (ref and stage, title, what the page
  * is for, and its sources or actions on the right) above the sub-navigation
- * Resumen · Planificación · Avance · Costes · Hitos · Incidencias · Fotos.
+ * Resumen · Planificación · Costes · Hitos · Incidencias · Fotos.
  * On a phone the sub-navigation comes straight after the title and the aside
  * after it, as the page's first content (the header box gives way:
  * `max-sm:contents`, and the title and tabs go first: `max-sm:-order-1`).

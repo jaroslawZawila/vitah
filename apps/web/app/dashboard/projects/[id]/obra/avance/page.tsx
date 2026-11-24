@@ -1,9 +1,20 @@
-import { headerOf, loadControl } from "../load";
-import AvanceScreen from "./AvanceScreen";
+import { redirect } from "next/navigation";
+import type { SearchParams } from "../../../../../../lib/list-query";
+import { planningHref } from "../../components/planning/links";
 
-/** Obra › Avance: each chapter's actual start and finish against its plan. */
-export default async function ObraProgressPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
-  const { control, canManage } = await loadControl(id);
-  return <AvanceScreen projectId={id} header={headerOf(control)} control={control} canManage={canManage} />;
+/** The old Obra › Avance: merged into Planificación, where its chapters and their start and finish now are. */
+export default async function ObraProgressPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<SearchParams>;
+}) {
+  const [{ id }, query] = await Promise.all([params, searchParams]);
+  const search = new URLSearchParams();
+  for (const [name, value] of Object.entries(query)) {
+    for (const one of Array.isArray(value) ? value : value === undefined ? [] : [value]) search.append(name, one);
+  }
+  const text = search.toString();
+  redirect(text ? `${planningHref(id)}?${text}` : planningHref(id));
 }

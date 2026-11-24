@@ -14,7 +14,7 @@ import { mutate, read, type ObraState } from "./run";
 
 // ─── Reads ───────────────────────────────────────────────────────────────────
 
-/** Resumen and Avance: the chapters' progress and the project's figures. */
+/** Resumen and Planificación: the chapters' progress and the project's figures. */
 export async function getConstructionControl(projectId: string) {
   const result = await read((ctx) => svc.getControl(ctx, projectId));
   return result && { control: result.data, canManage: result.canManage };

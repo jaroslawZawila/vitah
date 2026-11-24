@@ -33,7 +33,6 @@ describe("ObraFrame", () => {
     expect(tabs.getAllByRole("link").map((link) => link.getAttribute("href"))).toEqual([
       "/dashboard/projects/p-1/obra",
       "/dashboard/projects/p-1/obra/planificacion",
-      "/dashboard/projects/p-1/obra/avance",
       "/dashboard/projects/p-1/obra/costes",
       "/dashboard/projects/p-1/obra/hitos",
       "/dashboard/projects/p-1/obra/incidencias",

@@ -1,7 +1,7 @@
 "use client";
 
 // Container for Obra › Fotos: the only part of it that knows about server
-// actions. `UploadPhotos` is also used in a dialog by Avance and by a
+// actions. `UploadPhotos` is also used in a dialog by Planificación and by a
 // chapter's page. The views in ../../components/construction take props only.
 
 import { useState, useTransition } from "react";

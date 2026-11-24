@@ -1,7 +1,7 @@
 "use client";
 
 // Container for Obra › Incidencias: the only part of it that knows about
-// server actions. `IssueEditor` is also used in a dialog by Avance and by a
+// server actions. `IssueEditor` is also used in a dialog by Planificación and by a
 // chapter's page. The views in ../../components/construction take props only.
 
 import { useRef, useState, useTransition } from "react";

@@ -33,7 +33,7 @@ describe("ProjectStages", () => {
     renderStages();
     expect(
       screen.getByText(
-        "Desde el 6 jul 2026: primer capítulo iniciado en Avance · Pasa sola a Recepción y entrega con: todos los capítulos terminados",
+        "Desde el 6 jul 2026: primer capítulo iniciado en Planificación · Pasa sola a Recepción y entrega con: todos los capítulos terminados",
       ),
     ).toBeInTheDocument();
   });

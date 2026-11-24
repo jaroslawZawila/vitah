@@ -613,7 +613,7 @@
         "3": "primer borrador del presupuesto",
         "4": "revisión aceptada",
         "5": "H0 pagado",
-        "6": "primer capítulo iniciado en Avance",
+        "6": "primer capítulo iniciado en Planificación",
         "7": "todos los capítulos terminados",
         "8": "H9 pagado"
       }
@@ -815,7 +815,6 @@
       "label": "Secciones de obra",
       "summary": "Resumen",
       "planning": "Planificación",
-      "progress": "Avance",
       "costs": "Costes",
       "milestones": "Hitos",
       "issues": "Incidencias",
@@ -862,7 +861,6 @@
       "mockHint": "Dato simulado: la obra todavía no tiene un plan aprobado en Planificación.",
       "planning": "Planificación",
       "purchasing": "Compras",
-      "progress": "Avance",
       "budget": "Presupuesto",
       "sales": "Ventas",
       "live": "Real",
@@ -899,10 +897,14 @@
       "plan": "Plan {start} a {end}",
       "actual": "real {start} a {end}",
       "actualSince": "real desde {start}",
+      "forecast": "previsto {start} a {end}",
       "noDates": "Sin fechas",
       "legendPlan": "Plan",
+      "legendBaseline": "Línea base",
       "legendActual": "Real",
       "legendInProgress": "En curso",
+      "legendForecast": "Previsto",
+      "legendCritical": "Ruta crítica",
       "legendToday": "Hoy {date}"
     },
     "filters": {
@@ -1002,11 +1004,10 @@
       "nothingRecorded": "sin nada registrado"
     },
     "progress": {
-      "title": "Avance",
-      "description": "Registra cuándo empieza y termina de verdad cada capítulo. Es lo único que cambia su estado.",
       "recordIssue": "Registrar incidencia",
       "uploadPhoto": "Subir foto",
       "noChapters": "El contrato todavía no tiene capítulos.",
+      "noMatch": "Ningún capítulo coincide con los filtros.",
       "tableLabel": "Capítulos y fechas",
       "code": "Cap.",
       "chapter": "Capítulo",
@@ -1014,6 +1015,7 @@
       "plan": "Plan",
       "actual": "Real",
       "actions": "Acciones",
+      "built": "{pct} ejecutado",
       "openIssues": "{count, plural, one {# incidencia} other {# incidencias}}",
       "startsOn": "empieza el {date} según plan",
       "durationVsPlan": "{actual} d · plan {planned} d",
@@ -1089,7 +1091,7 @@
       "planning": "Planificación",
       "planningGets": "recalcula la previsión con el fin real",
       "close": "Cerrar",
-      "backToProgress": "Volver a Avance",
+      "backToPlanning": "Volver a Planificación",
       "clear": "Vaciar",
       "clearLabel": "Vaciar {field}",
       "clearHint": "Vaciar el fin reabre el capítulo; vaciar también el inicio lo deja pendiente.",
@@ -1351,7 +1353,7 @@
   },
   "planning": {
     "title": "Planificación",
-    "description": "Cuándo empieza y termina cada capítulo del contrato. La línea base aprobada es la referencia de Avance, Compras y el resumen de la obra.",
+    "description": "Cuándo empieza y termina cada capítulo del contrato: el plan aprobado, lo que de verdad pasa y hacia dónde va la obra. Registra aquí el inicio y el fin reales de cada capítulo: es lo único que cambia su estado.",
     "versionsLink": "Versiones",
     "editPlan": "Editar plan",
     "continueDraft": "Seguir con el borrador v{number}",
@@ -1359,7 +1361,7 @@
     "approvedBy": "Aprobada el {date} por {name}",
     "approvedOn": "Aprobada el {date}",
     "reason": "motivo: «{reason}»",
-    "footnote": "Las fechas reales vienen de Avance: cuando un capítulo termina tarde, los que dependen de él se mueven en la previsión, nunca en la línea base. Días = días laborables ({calendar}).",
+    "footnote": "Las fechas reales son las que se registran aquí: cuando un capítulo termina tarde, los que dependen de él se mueven en la previsión, nunca en la línea base. Días = días laborables ({calendar}).",
     "margin": "{count, plural, =0 {Justo en plazo} one {# día de margen} other {# días de margen}}",
     "orderBy": "pedir antes del {date}",
     "rule": {
@@ -1404,31 +1406,14 @@
       "late": "{count, plural, one {# día} other {# días}} sobre el contrato"
     },
     "table": {
-      "label": "Plan por capítulo",
-      "code": "Cap.",
-      "chapter": "Capítulo",
-      "dates": "Previsto",
-      "days": "Días",
+      "forecast": "Previsto",
       "compare": "Comparar con la línea base",
       "onlyCritical": "Solo ruta crítica",
       "critical": "Crítica",
       "late": "{days} vs. línea base",
-      "barLabel": "Previsto {forecast}; línea base {baseline}",
-      "planned": "Línea base",
-      "actual": "Real",
-      "actualSince": "desde el {date} · {pct} %",
       "duration": "Duración",
       "workingDays": "{count, plural, one {# día laborable} other {# días laborables}}",
-      "waitsFor": "Empieza",
-      "order": "Pedir antes del"
-    },
-    "legend": {
-      "finished": "Terminado",
-      "inProgress": "En curso (avance)",
-      "pending": "Pendiente",
-      "critical": "Ruta crítica",
-      "baseline": "Línea base",
-      "today": "Hoy · {date}"
+      "waitsFor": "Empieza"
     },
     "draftNotice": {
       "badge": "Borrador v{number}",
@@ -1438,9 +1423,10 @@
     },
     "generate": {
       "empty": "Esta obra aún no tiene plan.",
-      "emptyHint": "Genera un borrador con {count, plural, one {el capítulo} other {los # capítulos}} del presupuesto aceptado, ajústalo y apruébalo. Mientras tanto, Avance y Compras muestran fechas simuladas.",
+      "emptyHint": "Genera un borrador con {count, plural, one {el capítulo} other {los # capítulos}} del presupuesto aceptado, ajústalo y apruébalo. Mientras tanto, los capítulos de abajo y Compras usan fechas simuladas.",
       "noBudget": "Para planificar la obra hace falta un presupuesto aceptado.",
       "viewerHint": "Un administrador o gestor puede generar el plan.",
+      "open": "Generar el plan",
       "title": "Generar borrador",
       "start": "Inicio de obra (acta de inicio)",
       "from": "Duraciones",
@@ -1482,7 +1468,7 @@
       "days": "Días",
       "dates": "Inicio – fin",
       "vs": "Vs. v{number}",
-      "finished": "Terminado · fechas reales de Avance",
+      "finished": "Terminado · fechas reales registradas",
       "inProgress": "En curso desde el {date}",
       "critical": "Crítica",
       "afterLabel": "Cuándo empieza el capítulo {code}",
@@ -1518,7 +1504,7 @@
         "saved": "Borrador guardado.",
         "submit": "Aprobar como línea base v{number}",
         "save": "Guardar borrador",
-        "who": "Al aprobar, Avance, Compras y el resumen de la obra pasan a esta versión; la anterior queda en Versiones.",
+        "who": "Al aprobar, Planificación, Compras y el resumen de la obra pasan a esta versión; la anterior queda en Versiones.",
         "discard": "Descartar borrador",
         "discardDialog": {
           "title": "¿Descartar el borrador v{number}?",

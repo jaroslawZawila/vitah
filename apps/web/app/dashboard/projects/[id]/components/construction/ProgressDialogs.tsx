@@ -262,15 +262,15 @@ export function FinishedNotice({
   planningMock,
   date,
   context,
-  avanceHref,
+  backHref,
   onClose,
 }: {
   chapter: ControlChapter;
   planningMock: boolean;
   date: string;
   context: FinishContext;
-  /** Set on pages other than Avance, to go back to it. */
-  avanceHref?: string;
+  /** Set on a chapter's page, to go back to Planificación. */
+  backHref?: string;
   onClose: () => void;
 }) {
   const t = useTranslations("construction.dialogs");
@@ -305,12 +305,12 @@ export function FinishedNotice({
         </Row>
       </div>
       <FormActions>
-        <Button type="button" variant={avanceHref ? "outline" : "default"} onClick={onClose}>
+        <Button type="button" variant={backHref ? "outline" : "default"} onClick={onClose}>
           {t("close")}
         </Button>
-        {avanceHref && (
-          <Link href={avanceHref} className={buttonVariants()}>
-            {t("backToProgress")}
+        {backHref && (
+          <Link href={backHref} className={buttonVariants()}>
+            {t("backToPlanning")}
           </Link>
         )}
       </FormActions>

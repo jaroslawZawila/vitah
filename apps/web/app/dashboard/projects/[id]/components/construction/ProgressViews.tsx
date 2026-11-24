@@ -3,23 +3,27 @@
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { Camera, MessageSquareWarning } from "lucide-react";
-import type { ControlChapter } from "@repo/core/contract";
+import type { ControlChapter, PlanningRow } from "@repo/core/contract";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cardVariants } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { DateRange } from "../../../../components/DateRange";
-import { chapterLink } from "./classes";
 import { stretchedLink } from "../../../../components/touch";
+import { slipDays, useRuleText } from "../planning/PlanViews";
+import { chapterLink } from "./classes";
 import { daysBetween, useControlFormat } from "./format";
 import { GanttBar, MonthAxis, type Timeline } from "./Gantt";
 import { ChapterStatePill, SCHEDULE_TONE } from "./pills";
 import { scheduleOf } from "./schedule";
 import { DateSpan, dateSpan } from "./SummaryTable";
 
-// Presentational: Obra › Avance, the chapters with their plan against what
-// happened: a table with a mini Gantt from 768px, cards on phones.
+// Presentational: Obra › Planificación's chapters, their plan against what
+// happened: a table with a mini Gantt from 768px, cards on phones. With an
+// approved plan each chapter also has its row of it (`plans`): where it is
+// heading, what it waits for, its working days, how much is built and whether
+// it is on the critical path.
 
 /** What staff can do on a chapter; each is omitted for viewers. */
 export type ProgressActions = {
@@ -30,12 +34,68 @@ export type ProgressActions = {
   onPhoto: (code: string) => void;
 };
 
-/** What to note under a chapter's name: how it stands against its plan, its open issues, its duration. */
-function ChapterNotes({ chapter, today }: { chapter: ControlChapter; today: string }) {
+/** The approved plan's rows by chapter code; none without a baseline (the dates are then simulated). */
+export type ChapterPlans = ReadonlyMap<string, PlanningRow>;
+
+type ListProps = {
+  chapters: ControlChapter[];
+  timeline: Timeline | null;
+  today: string;
+  chapterHref: (code: string) => string;
+  actions?: ProgressActions;
+  plans?: ChapterPlans;
+  /** "Comparar con la línea base": the plan's outlined bars. */
+  showPlan: boolean;
+};
+
+/**
+ * What a chapter's row of the plan adds to it: the row, how much is built
+ * while it is under way, and the forecast's dates when they have left the
+ * plan's (a finished chapter's real dates say it already).
+ */
+function usePlanOf(plans: ChapterPlans | undefined) {
+  const f = useControlFormat();
+  return (chapter: ControlChapter) => {
+    const plan = plans?.get(chapter.code);
+    const moved =
+      plan && chapter.state !== "finished" && (plan.forecastStart !== plan.plannedStart || plan.forecastEnd !== plan.plannedEnd);
+    return {
+      plan,
+      built: plan && chapter.state === "in_progress" ? f.share(plan.progressPct * 100) : null,
+      forecast: plan && moved ? { dates: dateSpan(f, plan.forecastStart, plan.forecastEnd)!, late: slipDays(plan) > 0 } : null,
+    };
+  };
+}
+
+/** "Tras 02 · H8": what a chapter waits for in the plan, and its hito. */
+function useWaitsFor() {
+  const ruleText = useRuleText();
+  return (plan: PlanningRow) => [ruleText(plan), plan.hitoCode].filter(Boolean).join(" · ");
+}
+
+/**
+ * What to note under a chapter's name: how it stands against its plan, the
+ * critical path and the forecast's slip, its open issues; and, in the table,
+ * what it waits for and its working days (the phone's card lists those).
+ */
+function ChapterNotes({
+  chapter,
+  plan,
+  today,
+  withPlanText = false,
+}: {
+  chapter: ControlChapter;
+  plan?: PlanningRow;
+  today: string;
+  withPlanText?: boolean;
+}) {
   const t = useTranslations("construction.progress");
   const ts = useTranslations("construction.schedule");
+  const tp = useTranslations("planning.table");
+  const waitsFor = useWaitsFor();
   const f = useControlFormat();
   const schedule = scheduleOf(chapter, today);
+  const slip = plan ? slipDays(plan) : 0;
   const pills: React.ReactNode[] = [];
 
   if (chapter.state === "in_progress" && schedule && schedule.key !== "onTime") {
@@ -52,6 +112,20 @@ function ChapterNotes({ chapter, today }: { chapter: ControlChapter; today: stri
       </Badge>,
     );
   }
+  if (plan?.critical) {
+    pills.push(
+      <Badge key="critical" variant="warn">
+        {tp("critical")}
+      </Badge>,
+    );
+  }
+  if (slip > 0) {
+    pills.push(
+      <Badge key="slip" variant="yel">
+        {tp("late", { days: f.signedDays(slip) })}
+      </Badge>,
+    );
+  }
   if (chapter.openIssues > 0) {
     pills.push(
       <Badge key="issues" variant="warn">
@@ -60,6 +134,11 @@ function ChapterNotes({ chapter, today }: { chapter: ControlChapter; today: stri
     );
   }
 
+  const notes: string[] = [];
+  if (withPlanText && plan) {
+    notes.push(waitsFor(plan));
+    if (!plan.spansWorks) notes.push(tp("workingDays", { count: plan.durationDays }));
+  }
   let note: string | null = null;
   if (chapter.state === "pending" && chapter.plannedStart && chapter.plannedStart >= today) {
     note = t("startsOn", { date: f.date(chapter.plannedStart) });
@@ -71,11 +150,17 @@ function ChapterNotes({ chapter, today }: { chapter: ControlChapter; today: stri
         : t("duration", { days: chapter.actualDays });
   }
 
-  if (pills.length === 0 && !note) return null;
+  if (pills.length === 0 && notes.length === 0 && !note) return null;
   return (
     <div className="mt-1 flex flex-wrap items-center gap-1.5">
       {pills}
-      {note && <span className={cn("text-meta text-muted-foreground", chapter.state === "finished" && "num")}>{note}</span>}
+      {(notes.length > 0 || note) && (
+        <span className="text-meta text-muted-foreground">
+          {notes.join(" · ")}
+          {notes.length > 0 && note && " · "}
+          {note && (chapter.state === "finished" ? <span className="num">{note}</span> : note)}
+        </span>
+      )}
     </div>
   );
 }
@@ -123,22 +208,12 @@ function RowActions({
   );
 }
 
-/** From 768px: the chapters in one list, with plan and actual dates and a mini Gantt. */
-export function ProgressTable({
-  chapters,
-  timeline,
-  today,
-  chapterHref,
-  actions,
-}: {
-  chapters: ControlChapter[];
-  timeline: Timeline | null;
-  today: string;
-  chapterHref: (code: string) => string;
-  actions?: ProgressActions;
-}) {
+/** From 768px: the chapters in one list, with plan and actual dates and a mini Gantt (from xl). */
+export function ProgressTable({ chapters, timeline, today, chapterHref, actions, plans, showPlan }: ListProps) {
   const t = useTranslations("construction.progress");
+  const tp = useTranslations("planning.table");
   const f = useControlFormat();
+  const planOf = usePlanOf(plans);
 
   return (
     <section className={cn(cardVariants({ size: "flush" }), "hidden py-1.5 md:flex")} aria-label={t("tableLabel")}>
@@ -163,33 +238,46 @@ export function ProgressTable({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {chapters.map((chapter) => (
-            <TableRow key={chapter.code}>
-              {/* The code beside the name, not a column of its own: the table fits the card. */}
-              <TableCell className="min-w-[200px] pl-[18px] whitespace-normal">
-                <span className="num mr-2 text-muted-foreground">{chapter.code}</span>
-                <Link href={chapterHref(chapter.code)} className={chapterLink}>
-                  {chapter.name}
-                </Link>
-                <ChapterNotes chapter={chapter} today={today} />
-              </TableCell>
-              <TableCell>
-                <ChapterStatePill state={chapter.state} />
-              </TableCell>
-              <TableCell><DateSpan f={f} start={chapter.plannedStart} end={chapter.plannedEnd} /></TableCell>
-              <TableCell><DateSpan f={f} start={chapter.actualStart} end={chapter.actualEnd} /></TableCell>
-              {timeline && (
-                <TableCell className="hidden xl:table-cell">
-                  <GanttBar chapter={chapter} timeline={timeline} today={today} className="min-w-[240px]" />
+          {chapters.map((chapter) => {
+            const { plan, built, forecast } = planOf(chapter);
+            return (
+              <TableRow key={chapter.code}>
+                {/* The code beside the name, not a column of its own: the table fits the card. */}
+                <TableCell className="min-w-[200px] pl-[18px] whitespace-normal">
+                  <span className="num mr-2 text-muted-foreground">{chapter.code}</span>
+                  <Link href={chapterHref(chapter.code)} className={chapterLink}>
+                    {chapter.name}
+                  </Link>
+                  <ChapterNotes chapter={chapter} plan={plan} today={today} withPlanText />
                 </TableCell>
-              )}
-              {actions && (
-                <TableCell className="pr-[18px] text-right">
-                  <RowActions chapter={chapter} actions={actions} />
+                <TableCell>
+                  <ChapterStatePill state={chapter.state} />
+                  {built !== null && <div className="num mt-1 text-meta text-muted-foreground">{t("built", { pct: built })}</div>}
                 </TableCell>
-              )}
-            </TableRow>
-          ))}
+                <TableCell>
+                  <DateSpan f={f} start={chapter.plannedStart} end={chapter.plannedEnd} />
+                  {forecast && (
+                    <div className={cn("mt-1 text-meta", forecast.late ? "text-warn" : "text-muted-foreground")}>
+                      {tp("forecast")} <DateRange text={forecast.dates} />
+                    </div>
+                  )}
+                </TableCell>
+                <TableCell>
+                  <DateSpan f={f} start={chapter.actualStart} end={chapter.actualEnd} />
+                </TableCell>
+                {timeline && (
+                  <TableCell className="hidden xl:table-cell">
+                    <GanttBar chapter={chapter} timeline={timeline} today={today} forecast={plan} showPlan={showPlan} className="min-w-[240px]" />
+                  </TableCell>
+                )}
+                {actions && (
+                  <TableCell className="pr-[18px] text-right">
+                    <RowActions chapter={chapter} actions={actions} />
+                  </TableCell>
+                )}
+              </TableRow>
+            );
+          })}
         </TableBody>
       </Table>
     </section>
@@ -197,26 +285,19 @@ export function ProgressTable({
 }
 
 /** On phones: a card per chapter, all of them in one list in their order. */
-export function ProgressCards({
-  chapters,
-  timeline,
-  today,
-  chapterHref,
-  actions,
-}: {
-  chapters: ControlChapter[];
-  timeline: Timeline | null;
-  today: string;
-  chapterHref: (code: string) => string;
-  actions?: ProgressActions;
-}) {
+export function ProgressCards({ chapters, timeline, today, chapterHref, actions, plans, showPlan }: ListProps) {
   const t = useTranslations("construction.progress");
+  const tp = useTranslations("planning.table");
+  const waitsFor = useWaitsFor();
   const f = useControlFormat();
+  const planOf = usePlanOf(plans);
+  const term = "text-muted-foreground";
 
   return (
     <div className="flex flex-col gap-2.5 md:hidden">
       {chapters.map((chapter) => {
-        const plan = dateSpan(f, chapter.plannedStart, chapter.plannedEnd);
+        const { plan, built, forecast } = planOf(chapter);
+        const planned = dateSpan(f, chapter.plannedStart, chapter.plannedEnd);
         const actual = dateSpan(f, chapter.actualStart, chapter.actualEnd);
         const soon = chapter.state === "pending" && chapter.plannedStart ? daysBetween(today, chapter.plannedStart) : null;
         return (
@@ -229,12 +310,12 @@ export function ProgressCards({
               </Link>
               <ChapterStatePill state={chapter.state} />
             </div>
-            <ChapterNotes chapter={chapter} today={today} />
+            <ChapterNotes chapter={chapter} plan={plan} today={today} />
             {/* A date span, or the "· in 1 d" after it, goes on to the next line rather than past the card. */}
             <dl className="m-0 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-0.5 text-sm">
-              <dt className="text-muted-foreground">{t("plan")}</dt>
+              <dt className={term}>{t("plan")}</dt>
               <dd className="m-0">
-                {plan ? <DateRange text={plan} /> : "—"}
+                {planned ? <DateRange text={planned} /> : "—"}
                 {soon !== null && soon >= 0 && soon <= 14 && (
                   <>
                     {" "}
@@ -242,16 +323,40 @@ export function ProgressCards({
                   </>
                 )}
               </dd>
-              {actual && (
+              {forecast && (
                 <>
-                  <dt className="text-muted-foreground">{t("actual")}</dt>
-                  <dd className="m-0">
-                    <DateRange text={actual} />
+                  <dt className={term}>{tp("forecast")}</dt>
+                  <dd className={cn("m-0", forecast.late && "text-warn")}>
+                    <DateRange text={forecast.dates} />
                   </dd>
                 </>
               )}
+              {actual && (
+                <>
+                  <dt className={term}>{t("actual")}</dt>
+                  <dd className="m-0">
+                    <DateRange text={actual} />
+                    {built !== null && <span className="whitespace-nowrap text-muted-foreground"> · {t("built", { pct: built })}</span>}
+                  </dd>
+                </>
+              )}
+              {plan && !plan.spansWorks && (
+                <>
+                  <dt className={term}>{tp("duration")}</dt>
+                  <dd className="m-0">{tp("workingDays", { count: plan.durationDays })}</dd>
+                </>
+              )}
+              {plan && (
+                <>
+                  <dt className={term}>{tp("waitsFor")}</dt>
+                  <dd className="m-0">{waitsFor(plan)}</dd>
+                </>
+              )}
             </dl>
-            {timeline && chapter.state !== "pending" && <GanttBar chapter={chapter} timeline={timeline} today={today} className="min-w-0" />}
+            {/* A pending chapter's bar only with a plan: its forecast, maybe on the critical path. */}
+            {timeline && (chapter.state !== "pending" || plan) && (
+              <GanttBar chapter={chapter} timeline={timeline} today={today} forecast={plan} showPlan={showPlan} className="min-w-0" />
+            )}
             {actions && (
               <div className="relative flex justify-end">
                 <RowActions chapter={chapter} actions={actions} phone />

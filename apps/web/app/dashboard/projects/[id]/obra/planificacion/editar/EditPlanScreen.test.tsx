@@ -58,8 +58,8 @@ describe("EditPlanScreen", () => {
     expect(screen.getByRole("link", { name: "← Volver" })).toHaveAttribute("href", PLAN);
     expect(screen.getByRole("columnheader", { name: "Vs. v2" })).toBeInTheDocument();
 
-    // Finished and started chapters keep what Avance recorded.
-    expect(row(/Actuaciones previas/).getByText("Terminado · fechas reales de Avance")).toBeInTheDocument();
+    // Finished and started chapters keep what was recorded.
+    expect(row(/Actuaciones previas/).getByText("Terminado · fechas reales registradas")).toBeInTheDocument();
     expect(row(/Actuaciones previas/).getByLabelText("Días laborables del capítulo 01")).toBeDisabled();
     expect(row(/Cimentación/).getByLabelText("Cuándo empieza el capítulo 02")).toBeDisabled();
     expect(row(/Cimentación/).getByLabelText("Días laborables del capítulo 02")).toBeEnabled();

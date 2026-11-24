@@ -1,7 +1,7 @@
 "use client";
 
 // Container for the dialogs that start, finish and correct a chapter: the
-// only part of them that knows about server actions. Used by Avance and by a
+// only part of them that knows about server actions. Used by Planificación and by a
 // chapter's page; the views are in ../components/construction.
 
 import { useState } from "react";
@@ -29,14 +29,14 @@ export default function ChapterProgress({
   control,
   request,
   onClose,
-  avanceHref,
+  backHref,
 }: {
   projectId: string;
   control: ProgressControl;
   request: ProgressRequest;
   onClose: () => void;
-  /** Offered after finishing, on pages other than Avance. */
-  avanceHref?: string;
+  /** Offered after finishing on a chapter's page: back to Planificación. */
+  backHref?: string;
 }) {
   const t = useTranslations("construction.dialogs");
   const chapter = request && control.chapters.find((c) => c.code === request.code);
@@ -57,7 +57,7 @@ export default function ChapterProgress({
       className={request.kind === "finish" ? "sm:max-w-[760px]" : undefined}
     >
       {/* Keyed so each opening starts afresh. */}
-      <Dialog key={`${request.kind}-${request.code}`} projectId={projectId} control={control} request={request} onClose={onClose} avanceHref={avanceHref} />
+      <Dialog key={`${request.kind}-${request.code}`} projectId={projectId} control={control} request={request} onClose={onClose} backHref={backHref} />
     </Modal>
   );
 }
@@ -67,13 +67,13 @@ function Dialog({
   control,
   request,
   onClose,
-  avanceHref,
+  backHref,
 }: {
   projectId: string;
   control: ProgressControl;
   request: NonNullable<ProgressRequest>;
   onClose: () => void;
-  avanceHref?: string;
+  backHref?: string;
 }) {
   const { state, pending, run } = useObraAction();
   // What finishing did, kept as it was when confirmed (the refreshed control has moved on).
@@ -124,7 +124,7 @@ function Dialog({
         planningMock={control.sources.planning === "mock"}
         date={finished.date}
         context={finished.context}
-        avanceHref={avanceHref}
+        backHref={backHref}
         onClose={onClose}
       />
     );

@@ -23,7 +23,7 @@ describe("Topbar", () => {
     ["/dashboard/projects", "Proyectos — Pipeline Completo"],
     ["/dashboard/projects/new", "Nuevo proyecto"],
     ["/dashboard/projects/p-1", "Proyecto — General"],
-    ["/dashboard/projects/p-1/obra/avance", "Proyecto — Obra"],
+    ["/dashboard/projects/p-1/obra/planificacion", "Proyecto — Obra"],
     ["/dashboard/projects/p-1/budget/lines", "Proyecto — Presupuesto"],
     ["/dashboard/projects/p-1/compras/o-1", "Proyecto — Compras"],
     ["/dashboard/projects/p-1/payments/h-1", "Proyecto — Pagos"],
