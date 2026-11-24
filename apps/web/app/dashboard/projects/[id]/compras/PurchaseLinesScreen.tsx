@@ -20,7 +20,7 @@ import { StageEyebrow, type ObraHeader } from "../components/construction/ObraFr
 import Segmented from "../components/construction/Segmented";
 import { DueBanner, LineKpis, ViewSwitch } from "../components/purchasing/LineViews";
 import { LineTable } from "../components/purchasing/LineTable";
-import { orderSoon, rollUpLines } from "../components/purchasing/line-rollup";
+import { rollUpLines } from "../components/purchasing/line-rollup";
 import { newOrderHref } from "../components/purchasing/links";
 
 type ProgressFilter = "all" | PurchaseProgress;
@@ -80,10 +80,10 @@ export default function PurchaseLinesScreen({
               (progress === "all" || l.progress === progress) &&
               (!needle || l.code.toLowerCase().includes(needle) || l.description.toLowerCase().includes(needle)),
           );
-          return { ...c, lines: kept, rollup: rollUpLines(kept), soon: orderSoon({ state: c.state, orderBy: c.orderBy, lines: kept }, lines.today) };
+          return { ...c, lines: kept, rollup: rollUpLines(kept) };
         })
         .filter((c) => c.lines.length > 0),
-    [lines.chapters, lines.today, chapter, progress, needle],
+    [lines.chapters, chapter, progress, needle],
   );
   const all = useMemo(() => rollUpLines(lines.chapters.flatMap((c) => c.lines)), [lines.chapters]);
 

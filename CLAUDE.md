@@ -521,23 +521,32 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
   `term`; else the project's dates, `clientDates` in `planning-calc.ts`) and each phase's `plannedEnd`. Approving marks `obra` + `project`, and pushes "Nueva fecha de entrega"
   (progress toggle, opens Obra) when the handover moves. Drafts never reach the app
 - A project's schedule by version (`planning_versions`: one `draft` and one `approved` at most, the older ones
-  `superseded`). Each contract chapter (20 aside) is a `planning_items` row: it starts the working day after the chapter
-  it waits for ends (`after_code` + `lag_days`, negative to overlap), else on `fixed_start` or the works' start, and lasts
-  `duration_days` working days; 17–19 span the works (`spans_works`). The dates are stored, so a baseline never moves.
-  The chapters' order (`position`) is staff's, set with the editor's arrows or by dragging a row's handle (`@dnd-kit`,
-  table layout only; `moveChapter` in `planning-calc.ts`) and saved as sent: it is only how the plan reads, never when
-  a chapter happens, and a draft copied from a baseline keeps it
+  `superseded`). Each contract chapter (20 aside) is a `planning_items` row, and **the order is the sequence**
+  (`position`, staff's, set with the editor's arrows or by dragging a row's handle: `@dnd-kit`, table layout only;
+  `moveChapter`): the first chapter starts with the works, every other on the first working day from the day after the
+  one above it ends plus its `lag_days` (**calendar days**, negative to overlap, ±250, never before the works' start),
+  and lasts `duration_days` **working** days; 17–19 span the works (`spans_works`) and stay out of the chain. A draft's
+  rules are always that chain (`chainRules` in `planning-calc.ts`, applied by core on every write and by the editor as
+  it recomputes): `after_code` is derived (the row above), `fixed_start` null. Moving a chapter moves the dates. The
+  dates are stored, so a baseline never moves. Every stored version is read as a chain (`chainOf`, in `planning.ts`'
+  `chainedRules`): a plan stored before the order drove the dates (each chapter said what it waited for, maybe a fixed
+  start) is read in the order its chapters start, lags taken from its stored dates, so it gives the same dates (its
+  baseline forecast too); it is written as a chain the next time it is saved. A draft copied from a baseline or another
+  project keeps its order, so its sequence. The limits are `MAX_PLAN_DURATION_DAYS` / `MAX_PLAN_LAG_DAYS`. The editor
+  (`planificacion/editar`) has no start rule, fixed date, lead time or "Vs." column: the calendar is one row above the
+  table, the check and approval cards below it
 - Working days: weekends, national holidays (Good Friday too), the region's (`as cb cl ga md`, plus Holy Thursday),
   and the optional August (4 weeks from its first Monday) and Christmas (24/12–6/1) closures, chosen per version
 - What is recorded on a chapter (its real start and finish, on Planificación) wins: a finished chapter keeps its real dates, a started one its real start; nothing still to
   happen is placed before today. The baseline view adds that forecast and the critical path; both, and the draft, are
   checked against `projects.completion_date` in days (`planCheck`)
-- Each chapter also has a lead time (`lead_days`, calendar days): its orders must go out by planned start − lead
-  time. Compras' "Por contratar pronto" lists the chapters with lines not ordered whose order-by date falls within
-  `UPCOMING_DAYS` (30) or has passed (`orderLateDays`), soonest first; without a baseline the template's lead times
-  (`templateLeadDays`) apply to the simulated dates. Prod SQL: `packages/db/sql/2026-10-planning-lead-times.sql`
-- A first plan comes from the standard steel-frame template (`PLAN_TEMPLATE`) or another project's baseline; a change
-  copies the baseline into a draft and needs a reason to approve. Approving recomputes the dates as of that day
+- No lead times (dropped 2026-11-24): no order-by dates anywhere, and Compras has no "Por contratar pronto".
+  `planning_items.lead_days` stays in the database, unread and unwritten (default 0); `/api/v1` drops a `leadDays`
+  sent, as it drops an older editor's `after` and `fixedStart`
+- A first plan comes from the standard steel-frame template (`PLAN_TEMPLATE`: the chapters in the order they start,
+  each with its lag and working days, about 180 in all; chapters it doesn't know, such as chosen options, go after
+  them) or another project's baseline; a change copies the baseline into a draft and needs a reason to approve.
+  Approving recomputes the dates as of that day
 - Portal: Obra tab Planificación (`dashboard/projects/[id]/obra/planificacion/`, `PlanningScreen`), which took in the
   old Avance tab (`obra/avance` redirects there, query kept; a chapter's page stays at `obra/avance/[code]`): above,
   the baseline, its figures and an open draft, or the way to a first plan (the generate form, unfolded on demand);

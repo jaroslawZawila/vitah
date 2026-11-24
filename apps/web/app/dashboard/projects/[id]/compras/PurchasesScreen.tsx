@@ -20,11 +20,10 @@ import { newOrderHref, orderHref } from "../components/purchasing/links";
 import OrderList from "../components/purchasing/OrderList";
 import { NO_ORDER_FILTER, filterOrders, groupCounts, suppliersOf, type OrderFilter } from "../components/purchasing/orders";
 import ProjectKpis from "../components/purchasing/ProjectKpis";
-import UpcomingCard from "../components/purchasing/UpcomingCard";
 
 const GROUPS = ["all", "open", "pending", "done"] as const;
 
-/** The obra's orders of material and subcontracts, what they contract and what to order next. */
+/** The obra's orders of material and subcontracts, and what they contract. */
 export default function PurchasesScreen({
   projectId,
   header,
@@ -106,13 +105,6 @@ export default function PurchasesScreen({
           empty={orders.length === 0 ? t("none") : tl("noMatch")}
         />
       </section>
-
-      <UpcomingCard
-        upcoming={purchases.upcoming}
-        planningMock={purchases.sources.planning === "mock"}
-        orderHref={(orderId) => orderHref(projectId, orderId)}
-        newOrderHref={canManage ? (code) => newOrderHref(projectId, code) : undefined}
-      />
 
       <p className="max-w-[860px] text-meta leading-normal text-muted-foreground">
         {t.rich("footnote", { b: (chunks) => <b className="text-foreground">{chunks}</b> })}

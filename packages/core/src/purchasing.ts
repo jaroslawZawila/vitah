@@ -30,7 +30,6 @@ import {
   CONTINGENCY_CHAPTER,
   PURCHASE_FLOWS,
   PURCHASE_PROGRESS,
-  UPCOMING_DAYS,
   canCancel,
   canTakeOrder,
   countsAsContracted,
@@ -52,10 +51,9 @@ import {
   type PurchaseOrderGroup,
   type PurchaseProgress,
   type PurchaseStatus,
-  type PurchaseUpcoming,
   type TenantPurchases,
 } from "./contract";
-import { contractSchedule, contractTotals, daysPast, deviation, lateDays, type LineContract } from "./control-calc";
+import { contractSchedule, contractTotals, deviation, lateDays, type LineContract } from "./control-calc";
 import { idempotent, type Once } from "./idempotency";
 import { changesOf, parse } from "./inputs/fields";
 import {
@@ -69,7 +67,6 @@ import {
 import { MAX_AMOUNT_CENTS } from "./money";
 import { allPages, filterText, pageWindow, pagingOf, searchPattern } from "./paging";
 import { orderLabelSql } from "./sql-labels";
-import { orderByDate, templateLeadDays } from "./planning-calc";
 import { loadDocuments, ordersWithDocuments } from "./purchase-document-data";
 import { loadAmendments } from "./purchase-amendment-data";
 import { loadChecks } from "./purchase-check-data";
@@ -86,7 +83,7 @@ import {
   orderInvoicing,
   orderMilestones,
 } from "./purchase-invoice-data";
-import { addDays, todayInSpain } from "./obra-calc";
+import { todayInSpain } from "./obra-calc";
 import { fail, groupBy, loadBudget, loadObra, requireProject, userName } from "./obra-data";
 import { projectInTenant, projectNotDeleted, projectsInTenant, type Tx } from "./project-client";
 import { loadCompanyStatuses, requireCompany, type Network } from "./subcontractor-network";
@@ -233,9 +230,8 @@ export const contractingOf = (contract: LineContract | undefined): LineContracti
   !contract ? "none" : contract.closed ? "closed" : "open";
 
 /**
- * The project's contract at cost, chapter 20 aside, with each chapter's state,
- * planned dates (the Planning baseline, else simulated) and the day its orders
- * must go out by.
+ * The project's contract at cost, chapter 20 aside, with each chapter's state
+ * and planned dates (the Planning baseline, else simulated).
  */
 async function contractPlan(tenantId: string, projectId: string) {
   const [project, obra] = await Promise.all([
@@ -248,19 +244,12 @@ async function contractPlan(tenantId: string, projectId: string) {
   if (!project) fail("project_not_found");
   const works = { startDate: toCalendarDate(project.startDate), completionDate: toCalendarDate(project.completionDate) };
   const { items, states, plan, planSource } = contractSchedule(obra.costChapters, obra.hitos, obra.progressRows, works, obra.planDates);
-  const chapters = items.map((item) => {
-    const plannedStart = plan.get(item.code)?.start ?? null;
-    // A chapter the baseline lacks has no dates: the standard lead time stands in.
-    const leadDays = plan.get(item.code)?.leadDays ?? templateLeadDays(item.code);
-    return {
-      ...item,
-      state: states.get(item.code)!,
-      plannedStart,
-      plannedEnd: plan.get(item.code)?.end ?? null,
-      leadDays,
-      orderBy: plannedStart ? orderByDate(plannedStart, leadDays) : null,
-    };
-  });
+  const chapters = items.map((item) => ({
+    ...item,
+    state: states.get(item.code)!,
+    plannedStart: plan.get(item.code)?.start ?? null,
+    plannedEnd: plan.get(item.code)?.end ?? null,
+  }));
   return { ref: project.ref, budgetNumber: obra.revision?.number ?? null, chapters, planSource };
 }
 
@@ -470,7 +459,7 @@ export async function listSupplierOrders(ctx: Ctx, subcontractorId: string): Pro
   return loaded.map((o) => toListItem(o, null, today));
 }
 
-/** The project's Compras tab: its orders, what is contracted against the budget, and what to order soon. */
+/** The project's Compras tab: its orders and what is contracted against the budget. */
 export async function getProjectPurchases(ctx: Ctx, projectId: string): Promise<ProjectPurchases> {
   const [plan, loaded] = await Promise.all([
     contractPlan(ctx.tenantId, projectId),
@@ -480,38 +469,10 @@ export async function getProjectPurchases(ctx: Ctx, projectId: string): Promise<
   const today = todayInSpain();
   const orders = loaded.map((o) => toListItem(o, net, today));
   const contracts = contractsOf(loaded, today);
-  const pendingOrders = orders.filter((o) => o.status === "pending");
-  const horizon = addDays(today, UPCOMING_DAYS);
-
-  const upcoming: PurchaseUpcoming[] = [];
-  for (const chapter of plan.chapters) {
-    const { uncontractedLines, uncontractedCostCents } = contractTotals(chapter.lines, contracts);
-    const { orderBy } = chapter;
-    const soon = chapter.state === "in_progress" || (orderBy !== null && orderBy <= horizon);
-    if (uncontractedLines === 0 || chapter.state === "finished" || !soon) continue;
-    upcoming.push({
-      code: chapter.code,
-      name: chapter.name,
-      state: chapter.state,
-      plannedStart: chapter.plannedStart,
-      leadDays: chapter.leadDays,
-      orderBy,
-      orderLateDays: daysPast(orderBy, today),
-      uncontractedLines,
-      uncontractedCostCents,
-      pendingOrders: pendingOrders
-        .filter((o) => o.chapterCodes.includes(chapter.code))
-        .map((o) => ({ id: o.id, number: o.number })),
-    });
-  }
-  // What must go out first, first.
-  upcoming.sort((a, b) => (a.orderBy ?? "").localeCompare(b.orderBy ?? "") || a.code.localeCompare(b.code));
-
   return {
     ref: plan.ref,
     orders,
     summary: contractSummary(plan, orders, contracts),
-    upcoming,
     today,
     sources: { planning: plan.planSource },
   };
@@ -624,7 +585,6 @@ export async function getProjectPurchaseLines(ctx: Ctx, projectId: string): Prom
       code: chapter.code,
       name: chapter.name,
       state: chapter.state,
-      orderBy: chapter.orderBy,
       costCents: lines.reduce((sum, l) => sum + l.costCents, 0),
       contractedCents: lines.reduce((sum, l) => sum + l.contractedCents, 0),
       deviationCents: contractTotals(chapter.lines, contracts).deviationCents,
@@ -712,7 +672,6 @@ export async function getPurchaseForm(ctx: Ctx, projectId: string, orderId?: str
       state: chapter.state,
       plannedStart: chapter.plannedStart,
       plannedEnd: chapter.plannedEnd,
-      orderBy: chapter.orderBy,
       lines: chapter.lines.map((line) => {
         const contract = contracts.get(line.lineageId);
         return {

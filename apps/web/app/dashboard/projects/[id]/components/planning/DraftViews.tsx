@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, use, useEffect, useRef } from "react";
+import { createContext, use, useEffect, useRef, useState } from "react";
 import {
   closestCenter,
   DndContext,
@@ -17,31 +17,27 @@ import { CSS } from "@dnd-kit/utilities";
 import { ArrowDown, ArrowUp, GripVertical } from "lucide-react";
 import { useTranslations } from "next-intl";
 import type { PlanningCalendar, PlanningCheck, PlanningItemInput, PlanningRow } from "@repo/core/contract";
-import { orderByDate, type Dates } from "@repo/core/planning-calc";
+import type { Dates } from "@repo/core/planning-calc";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cardVariants } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { muted } from "../obra/classes";
-import { daysBetween, useControlFormat } from "../construction/format";
+import { useControlFormat } from "../construction/format";
 import CalendarFields from "./CalendarFields";
 
-// Presentational: Obra › Planificación › Editar, a draft's rules (what each
-// chapter waits for, its lag and working days) with the dates they give, and
-// the panels beside it: the end against the contract, the calendar, and
-// approving. The container recomputes the dates as staff type. A chapter moves
-// up and down the list by its arrows (one place) or dragged by its handle (any
+// Presentational: Obra › Planificación › Editar, a draft's chapters in the
+// order the works run them (each after the one above, plus its lag in
+// calendar days, for its working days) with the dates that gives; the
+// calendar above them, and the end against the contract and approving below.
+// The container recomputes the dates as staff type. A chapter moves up and
+// down the list by its arrows (one place) or dragged by its handle (any
 // number, from 768px, with the mouse, a finger or the keyboard): the order is
-// how the plan reads, the dates still come from the rules.
-
-/** How a chapter's start is set, as the "starts after" select shows it. */
-const FROM_START = "";
-const FIXED = "fixed";
+// the sequence, so moving one moves the dates.
 
 /** A chapter's two arrows: one place up the list, one down. */
 const MOVES = [
@@ -57,7 +53,7 @@ const KEYBOARD = { coordinateGetter: sortableKeyboardCoordinates };
 /** A row moves up and down only. */
 const VERTICAL = [restrictToVerticalAxis];
 
-export type RuleChange = Partial<Pick<PlanningItemInput, "after" | "lagDays" | "durationDays" | "fixedStart" | "leadDays">>;
+export type RuleChange = Partial<Pick<PlanningItemInput, "lagDays" | "durationDays">>;
 
 /**
  * Below 768px the table's rows become cards: the chapter on top, then each
@@ -129,6 +125,35 @@ function RowHandle({ label }: { label: string }) {
   );
 }
 
+/**
+ * A whole number of days, passed on as each one is typed (the dates follow
+ * live). What isn't one yet (empty, a lone minus sign on the way to a negative
+ * lag) stays as typed, and the field shows the value again on leaving it.
+ */
+function DaysInput({
+  value,
+  onValue,
+  ...props
+}: Omit<React.ComponentProps<typeof Input>, "type" | "value" | "onChange"> & { value: number; onValue: (days: number) => void }) {
+  // What is typed while the field is being edited; otherwise the value.
+  const [text, setText] = useState<string | null>(null);
+  return (
+    <Input
+      {...props}
+      type="number"
+      className={cn("w-[76px] font-mono", props.className)}
+      value={text ?? String(value)}
+      onChange={(e) => {
+        const typed = e.target.value;
+        setText(typed);
+        const days = Number(typed);
+        if (typed.trim() !== "" && Number.isInteger(days)) onValue(days);
+      }}
+      onBlur={() => setText(null)}
+    />
+  );
+}
+
 /** A field's heading, shown beside it on a phone (the input has its own label). */
 function PhoneLabel({ children }: { children: React.ReactNode }) {
   return (
@@ -138,14 +163,12 @@ function PhoneLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** The draft's chapters: their rules (editable), and the dates and change against the baseline those give. */
+/** The draft's chapters in order: their lags and working days (editable), and the dates those give. */
 export function DraftTable({
   rows,
   rules,
   dates,
   critical,
-  baseline,
-  startDate,
   readOnly,
   onChange,
   onMove,
@@ -153,12 +176,9 @@ export function DraftTable({
   /** Names, hitos and what Avance recorded. */
   rows: PlanningRow[];
   rules: PlanningItemInput[];
-  /** Null while the rules can't be scheduled (a cycle, a bad number). */
+  /** Null while the rules can't be scheduled (a bad number). */
   dates: ReadonlyMap<string, Dates> | null;
   critical: ReadonlySet<string>;
-  baseline: { number: number; ends: Record<string, string> } | null;
-  /** The works' start: a fixed day's default while the rules can't be scheduled. */
-  startDate: string;
   readOnly: boolean;
   onChange: (code: string, change: RuleChange) => void;
   /** Puts the chapter `code` where the chapter `toCode` is. */
@@ -207,17 +227,14 @@ export function DraftTable({
 
   const table = (
     <section ref={section} className={cn(cardVariants({ size: "flush" }), "min-w-0 py-1.5")} aria-label={t("tableLabel")}>
-      <Table className={cn("md:min-w-[860px]", phone.table)}>
+      <Table className={cn("md:min-w-[680px]", phone.table)}>
         <TableHeader className="max-md:hidden">
           <TableRow>
             <TableHead className="pl-[18px]">{t("code")}</TableHead>
             <TableHead>{t("chapter")}</TableHead>
-            <TableHead>{t("after")}</TableHead>
-            <TableHead>{t("lagOrDate")}</TableHead>
+            <TableHead>{t("lag")}</TableHead>
             <TableHead>{t("days")}</TableHead>
-            <TableHead>{t("dates")}</TableHead>
-            <TableHead>{t("lead")}</TableHead>
-            {baseline && <TableHead className="pr-[18px] text-right">{t("vs", { number: baseline.number })}</TableHead>}
+            <TableHead className="pr-[18px]">{t("dates")}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -226,13 +243,11 @@ export function DraftTable({
             const finished = row?.state === "finished";
             const started = row?.state === "in_progress";
             const d = dates?.get(rule.code);
-            const was = baseline?.ends[rule.code];
-            const delta = d && was ? daysBetween(was, d.end) : null;
-            const from = rule.after ?? (rule.fixedStart ? FIXED : FROM_START);
+            const above = working[index - 1];
             return (
               <Row key={rule.code} code={rule.code} roleDescription={t("dragRole")}>
                 <TableCell className={cn("num pl-[18px] font-semibold md:font-normal", phone.code)}>{rule.code}</TableCell>
-                <TableCell className={cn("whitespace-normal", readOnly ? "min-w-[190px]" : "min-w-[310px]", phone.chapter)}>
+                <TableCell className={cn("w-full whitespace-normal", readOnly ? "min-w-[190px]" : "min-w-[300px]", phone.chapter)}>
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <div className="font-semibold">{row?.name ?? rule.code}</div>
@@ -267,107 +282,38 @@ export function DraftTable({
                   </div>
                 </TableCell>
                 <TableCell className={phone.field}>
-                  <PhoneLabel>{t("after")}</PhoneLabel>
-                  <NativeSelect
-                    aria-label={t("afterLabel", { code: rule.code })}
-                    className="w-[132px] max-md:w-44"
-                    value={from}
-                    disabled={readOnly || finished || started}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      if (value === FROM_START) onChange(rule.code, { after: null, fixedStart: null, lagDays: 0 });
-                      else if (value === FIXED) onChange(rule.code, { after: null, lagDays: 0, fixedStart: d?.start ?? startDate });
-                      else onChange(rule.code, { after: value, fixedStart: null });
-                    }}
-                  >
-                    <NativeSelectOption value={FROM_START}>{t("fromStart")}</NativeSelectOption>
-                    <NativeSelectOption value={FIXED}>{t("fixed")}</NativeSelectOption>
-                    {working
-                      .filter((other) => other.code !== rule.code)
-                      .map((other) => (
-                        <NativeSelectOption key={other.code} value={other.code}>
-                          {t("afterCode", { code: other.code })}
-                        </NativeSelectOption>
-                      ))}
-                  </NativeSelect>
-                </TableCell>
-                <TableCell className={phone.field}>
-                  <PhoneLabel>{t("lagOrDate")}</PhoneLabel>
-                  {rule.after ? (
-                    <Input
-                      type="number"
-                      aria-label={t("lagLabel", { code: rule.code })}
-                      className="w-[76px] font-mono"
+                  <PhoneLabel>{t("lag")}</PhoneLabel>
+                  {above ? (
+                    <DaysInput
+                      aria-label={t("lagLabel", { code: rule.code, above: above.code })}
                       value={rule.lagDays}
                       disabled={readOnly || finished || started}
-                      onChange={(e) => onChange(rule.code, { lagDays: Math.trunc(Number(e.target.value)) })}
-                    />
-                  ) : from === FIXED ? (
-                    <Input
-                      type="date"
-                      aria-label={t("fixedLabel", { code: rule.code })}
-                      className="w-[150px]"
-                      value={rule.fixedStart ?? ""}
-                      disabled={readOnly || finished || started}
-                      onChange={(e) => e.target.value && onChange(rule.code, { fixedStart: e.target.value })}
+                      onValue={(lagDays) => onChange(rule.code, { lagDays })}
                     />
                   ) : (
-                    <span className={muted}>—</span>
+                    <span className={cn(muted, "whitespace-nowrap")}>{t("withWorks")}</span>
                   )}
                 </TableCell>
                 <TableCell className={phone.field}>
                   <PhoneLabel>{t("days")}</PhoneLabel>
-                  <Input
-                    type="number"
+                  <DaysInput
                     min={1}
                     aria-label={t("daysLabel", { code: rule.code })}
-                    className="w-[76px] font-mono"
                     value={rule.durationDays}
                     disabled={readOnly || finished}
-                    onChange={(e) => onChange(rule.code, { durationDays: Math.trunc(Number(e.target.value)) })}
+                    onValue={(durationDays) => onChange(rule.code, { durationDays })}
                   />
                 </TableCell>
-                <TableCell className={cn("num whitespace-nowrap", phone.field)}>
+                <TableCell className={cn("num pr-[18px] whitespace-nowrap", phone.field)}>
                   <PhoneLabel>{t("dates")}</PhoneLabel>
                   {d ? `${f.date(d.start)} – ${f.date(d.end)}` : "—"}
                 </TableCell>
-                <TableCell className={phone.field}>
-                  <PhoneLabel>{t("lead")}</PhoneLabel>
-                  <div className="flex items-center gap-2">
-                    <Input
-                      type="number"
-                      min={0}
-                      aria-label={t("leadLabel", { code: rule.code })}
-                      className="w-[68px] font-mono"
-                      value={rule.leadDays}
-                      disabled={readOnly || finished}
-                      onChange={(e) => onChange(rule.code, { leadDays: Math.trunc(Number(e.target.value)) })}
-                    />
-                    {d && !finished && !started && (
-                      <span className="num text-meta whitespace-nowrap text-muted-foreground">
-                        {t("orderBy", { date: f.date(orderByDate(d.start, rule.leadDays)) })}
-                      </span>
-                    )}
-                  </div>
-                </TableCell>
-                {baseline && (
-                  <TableCell
-                    className={cn(
-                      "num pr-[18px] text-right font-semibold",
-                      phone.field,
-                      delta === null ? "text-muted-foreground" : delta > 0 ? "text-warn" : delta < 0 ? "text-good" : "text-muted-foreground",
-                    )}
-                  >
-                    <PhoneLabel>{t("vs", { number: baseline.number })}</PhoneLabel>
-                    {was === undefined ? t("new") : delta === null ? "—" : delta === 0 ? t("same") : f.signedDays(delta)}
-                  </TableCell>
-                )}
               </Row>
             );
           })}
           {spanning.length > 0 && (
             <TableRow className="hover:bg-transparent max-md:block">
-              <TableCell colSpan={baseline ? 8 : 7} className={cn(muted, "pl-[18px] whitespace-normal max-md:block max-md:px-[18px] max-md:py-3")}>
+              <TableCell colSpan={5} className={cn(muted, "pl-[18px] whitespace-normal max-md:block max-md:px-[18px] max-md:py-3")}>
                 {t("spans", {
                   codes: spanning.map((r) => `${r.code} ${rowOf.get(r.code)?.name ?? ""}`.trim()).join(" · "),
                   date: f.date(end),
@@ -436,8 +382,8 @@ export function DraftCheck({ check, problem }: { check: PlanningCheck | null; pr
   );
 }
 
-/** When the works start and which days are worked. */
-export function CalendarCard({
+/** When the works start and which days are worked: one row of settings above the chapters. */
+export function CalendarBar({
   startDate,
   calendar,
   readOnly,
@@ -450,13 +396,16 @@ export function CalendarCard({
 }) {
   const t = useTranslations("planning.edit.calendar");
   return (
-    <section className={cn(cardVariants(), "gap-3")} aria-labelledby="calendar-title">
-      <h2 id="calendar-title">{t("title")}</h2>
+    <section
+      className={cn(cardVariants(), "flex-row flex-wrap items-end gap-x-6 gap-y-3 py-3.5 [&>div]:w-full sm:[&>div]:w-auto")}
+      aria-label={t("title")}
+    >
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="draft-start">{t("start")}</Label>
         <Input
           id="draft-start"
           type="date"
+          className="sm:w-[168px]"
           value={startDate}
           disabled={readOnly}
           onChange={(e) => e.target.value && onChange({ startDate: e.target.value })}

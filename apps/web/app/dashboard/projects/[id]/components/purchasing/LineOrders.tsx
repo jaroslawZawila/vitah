@@ -235,20 +235,17 @@ function LineOrderCard({
 export function LineDetail({
   projectId,
   line,
-  orderBy,
   newOrderHref,
 }: {
   projectId: string;
   line: PurchaseLineItem;
-  orderBy: string | null;
   newOrderHref?: string;
 }) {
   const t = useTranslations("purchasing.lines");
-  const f = usePurchaseFormat();
   if (line.orders.length === 0) {
     return (
       <p className="m-0 text-sm text-muted-foreground">
-        {t("noOrders")} {orderBy && t("orderBy", { date: f.date(orderBy) })}{" "}
+        {t("noOrders")}{" "}
         {newOrderHref && (
           <Link
             href={newOrderHref}

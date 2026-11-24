@@ -5,10 +5,10 @@ import type { ChapterState, PlanningSource } from "./construction";
 import type { ObraStage } from "./obra";
 
 // ─── Planning (the works schedule) ───────────────────────────────────────────
-// Each contract chapter's planned dates (packages/core/src/planning.ts): it
-// starts after another chapter ends (plus a lag, negative to overlap), at a
-// fixed day or with the works, and lasts a number of working days of the
-// project's calendar. A draft is edited freely; approving it makes it the
+// Each contract chapter's planned dates (packages/core/src/planning.ts): the
+// first in the list starts with the works, every other after the one above it
+// ends (plus a lag in calendar days, negative to overlap), and lasts a number
+// of working days of the project's calendar. A draft is edited freely; approving it makes it the
 // baseline Avance, Compras and the Obra tab measure against. A change is a new
 // version with its reason; the old ones are kept. Staff only, portal only.
 
@@ -26,17 +26,26 @@ export type PlanningCalendar = {
 
 export type PlanningStatus = "draft" | "approved" | "superseded";
 
+/** A chapter lasts 1 to this many working days. */
+export const MAX_PLAN_DURATION_DAYS = 600;
+/** A lag after the chapter above goes from minus to plus this many calendar days. */
+export const MAX_PLAN_LAG_DAYS = 250;
+
 /** How a chapter's start is set. */
 export type PlanningRule = {
-  /** Starts the working day after this chapter ends, plus `lagDays`; null = at `fixedStart`, else with the works. */
+  /**
+   * Starts on the first working day from the day after this chapter ends plus
+   * `lagDays` (calendar days); null = with the works. In a draft, the chapter
+   * above it in the list (`chainRules`).
+   */
   after: string | null;
   lagDays: number;
+  /** Working days. */
   durationDays: number;
+  /** Always null in what core answers: a fixed start was dropped with the start rules (kept for older clients). */
   fixedStart: string | null;
   /** Runs from the works' start to the last chapter's end (17, 18, 19). */
   spansWorks: boolean;
-  /** Calendar days before its start its orders must be placed (the suppliers' lead time). */
-  leadDays: number;
 };
 
 export type PlanningItemInput = PlanningRule & { code: string };
@@ -139,8 +148,8 @@ export type PlanningDraft = {
   version: PlanningVersionSummary;
   calendar: PlanningCalendar;
   rows: PlanningRow[];
-  /** The baseline's ends by chapter, to show what the draft moves; null for a first plan. */
-  baseline: { number: number; ends: Record<string, string> } | null;
+  /** The baseline it would replace; null for a first plan. */
+  baseline: { number: number } | null;
   completionDate: string | null;
   today: string;
 };

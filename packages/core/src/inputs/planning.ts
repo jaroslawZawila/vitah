@@ -1,16 +1,12 @@
 import { z } from "zod";
-import { PLANNING_REGIONS } from "../contract";
-import { calendarDate, id, integer, oneOf, optionalText, orNull } from "./fields";
+import { MAX_PLAN_DURATION_DAYS, MAX_PLAN_LAG_DAYS, PLANNING_REGIONS } from "../contract";
+import { calendarDate, id, integer, oneOf, optionalText } from "./fields";
 
 // The bodies of ../planning's writes: opening a draft, saving it, approving
 // it. Fields are in the order the service checked them before; what needs the
-// draft (which chapters, how each starts) or the plan as a whole (its
-// dependencies) is checked there, after parse.
+// draft (which chapters, which span the works) is checked there, after parse.
 
 const MAX_REASON = 500;
-const MAX_LAG_DAYS = 250;
-const MAX_DURATION_DAYS = 600;
-const MAX_LEAD_DAYS = 365;
 
 /** Any object: a body that isn't one is `invalid_input` (its fields are read once the draft is known). */
 export const planningBodySchema = z.object({});
@@ -36,9 +32,9 @@ export const newPlanningSchemas = {
 };
 
 /**
- * The draft's rules (every chapter of it, each by its code: the service
- * matches them with the draft's, then reads each by `planningRuleSchemas`),
- * its start and its calendar; what is not sent stays.
+ * The draft's rules (every chapter of it, in the plan's order, each by its
+ * code: the service matches them with the draft's, then reads each by
+ * `planningRuleSchema`), its start and its calendar; what is not sent stays.
  */
 export const planningEditSchema = z.object({
   items: z.array(z.looseObject({ code: z.string({ error: "invalid_input" }) }, { error: "invalid_input" }), { error: "invalid_input" }).optional(),
@@ -49,30 +45,19 @@ export const planningEditSchema = z.object({
 /** Saving the draft takes its rules. */
 export const planningSaveSchema = z.object({ items: z.array(z.unknown(), { error: "invalid_input" }) });
 
-/** What every rule says: the chapter, what it waits for (none: null or ""), its fixed start (none: null or ""). */
-const ruleHead = { code: z.string({ error: "invalid_input" }), after: orNull(id), fixedStart: orNull(calendarDate) };
-/** Its working days and its lead time (the draft's when missing). */
-const ruleLength = {
-  durationDays: integer(1, MAX_DURATION_DAYS),
-  leadDays: integer(0, MAX_LEAD_DAYS).optional(),
-};
-
 /**
- * A chapter's rule, read by what the draft says of it and what it waits for:
- * 17–19 span the works (nothing else is read); one that waits for another has
- * its lag (0 when missing or null) and length; one that doesn't, its length.
+ * A chapter's rule (17–19, which span the works, read nothing more): its lag
+ * after the chapter above it in the list (calendar days; 0 when missing or
+ * null) and its working days. What an older editor also sent (what it waited
+ * for, a fixed start, a lead time) is dropped: the list's order is the sequence.
  */
-export const planningRuleSchemas = {
-  head: z.object(ruleHead),
-  after: z.object({
-    ...ruleHead,
-    lagDays: integer(-MAX_LAG_DAYS, MAX_LAG_DAYS)
-      .nullish()
-      .transform((days) => days ?? 0),
-    ...ruleLength,
-  }),
-  own: z.object({ ...ruleHead, ...ruleLength }),
-};
+export const planningRuleSchema = z.object({
+  code: z.string({ error: "invalid_input" }),
+  lagDays: integer(-MAX_PLAN_LAG_DAYS, MAX_PLAN_LAG_DAYS)
+    .nullish()
+    .transform((days) => days ?? 0),
+  durationDays: integer(1, MAX_PLAN_DURATION_DAYS),
+});
 
 /** Approving: why (a change to an approved plan needs it), read once the draft is known. */
 export const planningReasonSchemas = {
@@ -89,7 +74,7 @@ export const planningReasonSchemas = {
 // ─── What callers send (re-exported by ../contract, types only) ──────────────
 
 /** One chapter's rule as the editor sends it (`spansWorks` is the draft's, never changed). */
-export type PlanningRuleInput = z.input<typeof planningRuleSchemas.after> & { spansWorks?: boolean };
+export type PlanningRuleInput = z.input<typeof planningRuleSchema> & { spansWorks?: boolean };
 /** POST /api/v1/projects/:id/planning/draft, createPlanningDraftAction. */
 export type PlanningDraftNewInput = z.input<typeof planningSourceSchema> & Partial<z.input<typeof newPlanningSchemas.project>>;
 /** PUT /api/v1/projects/:id/planning/draft, updatePlanningDraftAction (`items` required there). */

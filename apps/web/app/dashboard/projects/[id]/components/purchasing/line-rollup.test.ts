@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { lines } from "../../../../../../test/invoice-fixture";
-import { orderSoon, rollUpLines } from "./line-rollup";
+import { rollUpLines } from "./line-rollup";
 
 const all = lines.chapters.flatMap((c) => c.lines);
 const sum = (key: "costCents" | "contractedCents" | "invoicedCents" | "paidCents") =>
@@ -55,26 +55,5 @@ describe("rollUpLines", () => {
     expect(rollup.lateOrders).toBe(1);
     expect(rollup.counts).toEqual({ to_contract: 2, contracted: 0, invoiced: 0, paid: 0 });
     expect(rollUpLines([])).toMatchObject({ lines: 0, costCents: 0, deviationCents: null });
-  });
-});
-
-describe("orderSoon", () => {
-  const toContract = [{ progress: "to_contract" as const }];
-
-  it("flags a chapter with lines to contract whose order-by day is within 30 days, or past", () => {
-    expect(orderSoon({ state: "pending", orderBy: "2026-11-03", lines: toContract }, "2026-10-19")).toEqual({ orderBy: "2026-11-03", lateDays: 0 });
-    expect(orderSoon({ state: "pending", orderBy: "2026-11-18", lines: toContract }, "2026-10-19")).toEqual({ orderBy: "2026-11-18", lateDays: 0 });
-    expect(orderSoon({ state: "pending", orderBy: "2026-10-09", lines: toContract }, "2026-10-19")).toEqual({ orderBy: "2026-10-09", lateDays: 10 });
-  });
-
-  it("says nothing further off, without a date, or with nothing left to contract", () => {
-    expect(orderSoon({ state: "pending", orderBy: "2026-11-19", lines: toContract }, "2026-10-19")).toBeNull();
-    expect(orderSoon({ state: "pending", orderBy: null, lines: toContract }, "2026-10-19")).toBeNull();
-    expect(orderSoon({ state: "pending", orderBy: "2026-10-09", lines: [{ progress: "contracted" }] }, "2026-10-19")).toBeNull();
-  });
-
-  it("says nothing of a finished chapter, as core's upcoming list", () => {
-    expect(orderSoon({ state: "finished", orderBy: "2026-10-09", lines: toContract }, "2026-10-19")).toBeNull();
-    expect(orderSoon({ state: "in_progress", orderBy: "2026-10-09", lines: toContract }, "2026-10-19")).toEqual({ orderBy: "2026-10-09", lateDays: 10 });
   });
 });

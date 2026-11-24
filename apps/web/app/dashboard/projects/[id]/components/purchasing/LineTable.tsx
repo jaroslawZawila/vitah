@@ -54,8 +54,6 @@ function FigureCell({ label, className, children }: { label: string; className?:
 
 export type LineChapter = ProjectPurchaseLines["chapters"][number] & {
   rollup: LineRollup;
-  /** Its lines to contract must be ordered soon (or are late). */
-  soon: { orderBy: string; lateDays: number } | null;
 };
 
 /** A chapter's money folded (or the obra's): cost, contracted, deviation, invoiced and paid. */
@@ -103,8 +101,7 @@ function ChapterRow({
   onToggle: () => void;
 }) {
   const t = useTranslations("purchasing.lines");
-  const f = usePurchaseFormat();
-  const { rollup, soon } = chapter;
+  const { rollup } = chapter;
   return (
     <FoldRow
       code={chapter.code}
@@ -127,14 +124,6 @@ function ChapterRow({
             <Badge variant="warn" className="px-2 py-px">
               <Dot />
               {t("lateOrders", { count: rollup.lateOrders })}
-            </Badge>
-          )}
-          {soon && (
-            <Badge variant="warn" className="px-2 py-px">
-              <Dot />
-              {soon.lateDays > 0
-                ? t("orderLate", { days: soon.lateDays })
-                : t("orderSoon", { date: f.date(soon.orderBy) })}
             </Badge>
           )}
         </>
@@ -312,7 +301,6 @@ export function LineTable({
                             <LineDetail
                               projectId={projectId}
                               line={line}
-                              orderBy={chapter.orderBy}
                               newOrderHref={newOrderHref?.(chapter.code)}
                             />
                           </TableCell>

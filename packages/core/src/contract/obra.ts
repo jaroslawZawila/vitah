@@ -214,7 +214,6 @@ export type ObraError =
   | "invalid_file_type"
   | "file_too_large"
   | "project_not_found"
-  | "dependency_cycle"
   | "idempotency_key_reused"
   | "exclusion_exists"
   | "exclusion_library_full"

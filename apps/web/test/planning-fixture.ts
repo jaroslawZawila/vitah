@@ -14,7 +14,6 @@ const row = (r: Partial<PlanningRow> & Pick<PlanningRow, "code" | "name">): Plan
   durationDays: 10,
   fixedStart: null,
   spansWorks: false,
-  leadDays: 14,
   plannedStart: "2026-03-02",
   plannedEnd: "2026-03-13",
   forecastStart: "2026-03-02",
@@ -142,7 +141,7 @@ export const planningDraft: PlanningDraft = {
   },
   calendar,
   rows: planningRows,
-  baseline: { number: 2, ends: { "01": "2026-03-13", "02": "2026-10-23", "03": "2026-11-20", "04": "2026-12-10", "17": "2026-12-10" } },
+  baseline: { number: 2 },
   completionDate: "2026-12-11",
   today: TODAY,
 };

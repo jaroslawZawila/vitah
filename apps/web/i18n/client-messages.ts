@@ -46,7 +46,6 @@ export const CLIENT_MESSAGES = {
     "construction.filters",
     "construction.sources",
     "obraPicker",
-    "planning",
     "purchasing",
     "subcontractors.errors",
     "subcontractors.fields.types",

@@ -68,14 +68,17 @@ export const planningItems = pgTable(
     versionId: text("version_id").notNull(),
     chapterCode: text("chapter_code").notNull(),
     position: integer("position").notNull(),
-    // Starts the working day after this chapter ends (+ lag); null = at `fixed_start` or the works' start.
+    // Starts on the first working day from the day after this chapter ends + lag (calendar days); null = the works'
+    // start. Since 2026-11-24 the row above it (`position`): the order is the sequence (core's `chainRules`).
     afterCode: text("after_code"),
     lagDays: integer("lag_days").default(0).notNull(),
+    // Working days.
     durationDays: integer("duration_days").notNull(),
+    // Only in plans stored before the order drove the dates; null in every one written since.
     fixedStart: date("fixed_start", { mode: "string" }),
     // Runs through the whole works (quality control, health and safety, waste).
     spansWorks: boolean("spans_works").default(false).notNull(),
-    // Calendar days before its start its orders must be placed (suppliers' lead time).
+    // The suppliers' lead time, dropped 2026-11-24: neither read nor written (left at its default) until a contract step.
     leadDays: integer("lead_days").default(0).notNull(),
     plannedStart: date("planned_start", { mode: "string" }).notNull(),
     plannedEnd: date("planned_end", { mode: "string" }).notNull(),

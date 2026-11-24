@@ -97,7 +97,7 @@ describe("PlanningScreen with an approved plan", () => {
     expect(first.parentElement).toHaveTextContent("Desde el inicio de obra · H2 · 10 días laborables · 15 d · plan 12 d");
 
     expect(screen.getByRole("link", { name: "Versiones" })).toHaveAttribute("href", "/dashboard/projects/p-1/obra/planificacion/versiones");
-    expect(screen.getByText(/Días = días laborables \(festivos nacionales y de Asturias/)).toBeInTheDocument();
+    expect(screen.getByText(/Duraciones en días laborables \(festivos nacionales y de Asturias/)).toBeInTheDocument();
     // The bars say what they are: the baseline, what happened, what is still to come, the critical path.
     for (const label of ["Línea base", "Real", "En curso", "Previsto", "Ruta crítica"]) {
       expect(screen.getAllByText(label, { selector: "span" }).length).toBeGreaterThan(0);

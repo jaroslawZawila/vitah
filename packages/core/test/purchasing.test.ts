@@ -12,7 +12,7 @@ import {
   subcontractorsService,
   type Ctx,
 } from "../src";
-import { addDays, todayInSpain } from "../src/obra-calc";
+import { todayInSpain } from "../src/obra-calc";
 import { files } from "../src/testing";
 import { framerDraft } from "./budget-fixture";
 
@@ -651,37 +651,10 @@ describe("listPurchases, a page at a time", () => {
   });
 });
 
-describe("upcoming", () => {
-  it("lists chapters under way or starting soon with lines nobody ordered, and their pending orders", async () => {
+describe("the plan's dates", () => {
+  it("gives each chapter the baseline's dates, and no day to order it by", async () => {
     const s = await setup();
-    await constructionService.startChapter(s.ctx, s.project.id, "02", { date: "2026-10-01" });
-    const { orderId } = await svc.createPurchase(s.ctx, s.project.id, material(s, { lines: [{ lineageId: s.lineage("02"), amountCents: 1_000 }] }));
-
-    const { upcoming } = await svc.getProjectPurchases(s.ctx, s.project.id);
-    expect(upcoming.find((u) => u.code === "02")).toMatchObject({
-      state: "in_progress",
-      uncontractedLines: 1,
-      uncontractedCostCents: 100_000,
-      pendingOrders: [{ id: orderId, number: 1 }],
-    });
-
-    // Fully contracted: no longer upcoming.
-    await svc.setPurchaseStatus(s.ctx, orderId, { status: "ordered" });
-    expect((await svc.getProjectPurchases(s.ctx, s.project.id)).upcoming.some((u) => u.code === "02")).toBe(false);
-  });
-
-  it("orders by the date each chapter's orders must go out: its planned start less the standard lead time", async () => {
-    const s = await setup();
-    const { upcoming } = await svc.getProjectPurchases(s.ctx, s.project.id);
-    for (const chapter of upcoming) {
-      const lead = { "01": 7, "02": 14, "03": 42 }[chapter.code]!;
-      expect(chapter).toMatchObject({ leadDays: lead, orderBy: addDays(chapter.plannedStart!, -lead) });
-    }
-  });
-
-  it("follows the plan's lead times, soonest first, and says how late an order is", async () => {
-    const s = await setup();
-    // 01 starts Monday 19 October, 02 on 2 November, 03 on 7 December; 03 is ordered three months ahead.
+    // 01 starts Monday 19 October, 02 on 2 November, 03 on 7 December.
     await planningService.createPlanningDraft(s.ctx, s.project.id, {
       from: "template",
       startDate: "2026-10-19",
@@ -689,19 +662,19 @@ describe("upcoming", () => {
       augustClosure: false,
       christmasClosure: false,
     });
-    const draft = await planningService.getPlanningDraft(s.ctx, s.project.id);
-    await planningService.approvePlanningDraft(s.ctx, s.project.id, {
-      items: draft.rows.map((r) => (r.code === "03" ? { ...r, leadDays: 90 } : r)),
-    });
+    await planningService.approvePlanningDraft(s.ctx, s.project.id, {});
 
-    const { upcoming, sources } = await svc.getProjectPurchases(s.ctx, s.project.id);
-    expect(sources.planning).toBe("live");
-    expect(upcoming.map((u) => [u.code, u.plannedStart, u.leadDays, u.orderBy, u.orderLateDays])).toEqual([
-      ["03", "2026-12-07", 90, "2026-09-08", 39],
-      ["01", "2026-10-19", 7, "2026-10-12", 5],
-      ["02", "2026-11-02", 14, "2026-10-19", null],
+    const purchases = await svc.getProjectPurchases(s.ctx, s.project.id);
+    expect(purchases.sources.planning).toBe("live");
+    expect(purchases).not.toHaveProperty("upcoming");
+    const form = await svc.getPurchaseForm(s.ctx, s.project.id);
+    expect(form.chapters.map((c) => [c.code, c.plannedStart])).toEqual([
+      ["01", "2026-10-19"],
+      ["02", "2026-11-02"],
+      ["03", "2026-12-07"],
     ]);
-    expect((await svc.getPurchaseForm(s.ctx, s.project.id)).chapters.find((c) => c.code === "02")?.orderBy).toBe("2026-10-19");
+    expect(form.chapters[0]).not.toHaveProperty("orderBy");
+    expect((await svc.getProjectPurchaseLines(s.ctx, s.project.id)).chapters[0]).not.toHaveProperty("orderBy");
   });
 });
 

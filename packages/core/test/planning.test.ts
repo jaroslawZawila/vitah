@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createTestProject, createTestTenant, createTestUser, resetDatabase } from "@repo/db/testing";
-import { db, eq, planningVersions } from "@repo/db";
+import { and, db, eq, planningItems, planningVersions } from "@repo/db";
 import {
   budgetService,
   constructionService,
@@ -150,22 +150,32 @@ describe("a first plan", () => {
     const { revisionId } = await framerDraft(ctx, other.id, ["01", "02", "03", "04", "05", "17"]);
     await budgetService.acceptRevision(ctx, other.id, revisionId, {}, { unissued: true });
     await svc.createPlanningDraft(ctx, other.id, { ...PLAIN, from: "project", projectId: project.id });
-    expect((await svc.getPlanningDraft(ctx, other.id)).rows.map((r) => r.code)).toEqual(["01", "02", "03", "04", "05", "17"]);
+    const rows = (await svc.getPlanningDraft(ctx, other.id)).rows;
+    expect(rows.map((r) => r.code)).toEqual(["01", "02", "03", "04", "05", "17"]);
+    // Each added with its standard length and no lag (the template's 04 overlaps 06, which isn't above it here).
+    expect(rows.map((r) => [r.code, r.after, r.lagDays, r.durationDays]).slice(3, 5)).toEqual([
+      ["04", "03", 0, 30],
+      ["05", "04", 0, 15],
+    ]);
   });
 
-  it("leaves another project's fixed days behind when copying its plan", async () => {
+  it("keeps the sequence of another project's baseline: its order and lags, on this project's start", async () => {
     const { ctx, project, tenant } = await setup();
     await svc.createPlanningDraft(ctx, project.id, PLAIN);
     const first = await svc.getPlanningDraft(ctx, project.id);
-    await svc.approvePlanningDraft(ctx, project.id, {
-      items: first.rows.map((r) => (r.code === "01" ? { ...r, fixedStart: "2026-06-08" } : r)),
-    });
+    // 02 overlaps the last week of 01.
+    await svc.approvePlanningDraft(ctx, project.id, { items: first.rows.map((r) => (r.code === "02" ? { ...r, lagDays: -7 } : r)) });
 
     const other = await createTestProject(tenant.id, { startDate: new Date("2027-02-01T00:00:00Z") });
-    const { revisionId } = await framerDraft(ctx, other.id, ["01"]);
+    const { revisionId } = await framerDraft(ctx, other.id, ["01", "02"]);
     await budgetService.acceptRevision(ctx, other.id, revisionId, {}, { unissued: true });
     await svc.createPlanningDraft(ctx, other.id, { ...PLAIN, from: "project", projectId: project.id });
-    expect((await svc.getPlanningDraft(ctx, other.id)).rows[0]).toMatchObject({ fixedStart: null, plannedStart: "2027-02-01" });
+    const copied = await svc.getPlanningDraft(ctx, other.id);
+    expect(copied.rows.map((r) => [r.code, r.after, r.lagDays, r.fixedStart])).toEqual([
+      ["01", null, 0, null],
+      ["02", "01", -7, null],
+    ]);
+    expect(datesOf(copied.rows)).toEqual({ "01": "2027-02-01…2027-02-12", "02": "2027-02-08…2027-03-12" });
   });
 
   it("tells the second of two editors opening a draft at once that one is open", async () => {
@@ -193,28 +203,37 @@ describe("changing the plan", () => {
     await expect(svc.createPlanningDraft(ctx, project.id, { from: "baseline" })).rejects.toMatchObject({ code: "draft_exists" });
 
     const draft = await svc.getPlanningDraft(ctx, project.id);
-    expect(draft.baseline).toEqual({ number: 1, ends: { "01": "2026-06-12", "02": "2026-07-17", "03": "2026-08-26" } });
-    const items = draft.rows.map(({ code, after, lagDays, durationDays, fixedStart, leadDays }) => ({ code, after, lagDays, durationDays, fixedStart, leadDays }));
+    expect(draft.baseline).toEqual({ number: 1 });
+    const items = draft.rows.map(({ code, lagDays, durationDays }) => ({ code, lagDays, durationDays }));
     await svc.updatePlanningDraft(ctx, project.id, {
       region: "md",
       items: items.map((i) => (i.code === "02" ? { ...i, durationDays: 30 } : i)),
     });
     const changed = await svc.getPlanningDraft(ctx, project.id);
-    expect(changed.rows[1]).toMatchObject({ code: "02", durationDays: 30, plannedEnd: "2026-07-24", leadDays: 14 });
-    await svc.updatePlanningDraft(ctx, project.id, { items: items.map((i) => (i.code === "03" ? { ...i, leadDays: 60 } : i)) });
-    expect((await svc.getPlanningDraft(ctx, project.id)).rows[2]!.leadDays).toBe(60);
-    // A client that doesn't send lead times (an older one) keeps them.
-    await svc.updatePlanningDraft(ctx, project.id, { items: items.map(({ leadDays: _, ...rest }) => rest) });
-    expect((await svc.getPlanningDraft(ctx, project.id)).rows[2]!.leadDays).toBe(60);
-    await expect(
-      svc.updatePlanningDraft(ctx, project.id, { items: items.map((i) => (i.code === "03" ? { ...i, leadDays: 400 } : i)) }),
-    ).rejects.toMatchObject({ code: "invalid_input" });
+    expect(changed.rows[1]).toMatchObject({ code: "02", durationDays: 30, plannedEnd: "2026-07-24" });
     expect(changed.calendar.region).toBe("md");
 
-    await expect(
-      svc.updatePlanningDraft(ctx, project.id, { items: items.map((i) => (i.code === "01" ? { ...i, after: "03" } : i)) }),
-    ).rejects.toMatchObject({ code: "dependency_cycle" });
+    // The lag is in calendar days: 01 ends on Friday 12, so 2 days still start 02 on Monday 15, 3 on Tuesday 16.
+    const lag = async (days: number) => {
+      await svc.updatePlanningDraft(ctx, project.id, { items: items.map((i) => (i.code === "02" ? { ...i, lagDays: days } : i)) });
+      return (await svc.getPlanningDraft(ctx, project.id)).rows[1]!.plannedStart;
+    };
+    expect([await lag(2), await lag(3), await lag(-4)]).toEqual(["2026-06-15", "2026-06-16", "2026-06-09"]);
+
+    // An older editor's body: what each chapter waited for, a fixed start and a lead time are dropped, not refused.
+    await svc.updatePlanningDraft(ctx, project.id, {
+      items: items.map((i) => (i.code === "03" ? { ...i, after: "01", fixedStart: "2026-07-01", leadDays: 60 } : i)),
+    });
+    expect((await svc.getPlanningDraft(ctx, project.id)).rows.map((r) => [r.code, r.after, r.fixedStart, r.plannedStart])).toEqual([
+      ["01", null, null, "2026-06-01"],
+      ["02", "01", null, "2026-06-15"],
+      ["03", "02", null, "2026-07-20"],
+    ]);
+
     await expect(svc.updatePlanningDraft(ctx, project.id, { items: items.slice(1) })).rejects.toMatchObject({ code: "invalid_input" });
+    await expect(
+      svc.updatePlanningDraft(ctx, project.id, { items: [items[0], items[0], items[2]] }),
+    ).rejects.toMatchObject({ code: "invalid_input" });
     await expect(
       svc.updatePlanningDraft(ctx, project.id, { items: items.map((i) => (i.code === "02" ? { ...i, durationDays: 0 } : i)) }),
     ).rejects.toMatchObject({ code: "invalid_input" });
@@ -244,22 +263,26 @@ describe("changing the plan", () => {
     ]);
   });
 
-  it("keeps the order staff give the chapters, through approval and into the next draft, moving no date", async () => {
+  it("runs the chapters in the order staff give them, through approval and into the next draft", async () => {
     const { ctx, project } = await approved();
     await svc.createPlanningDraft(ctx, project.id, { from: "baseline" });
     const draft = await svc.getPlanningDraft(ctx, project.id);
     const codes = (rows: { code: string }[]) => rows.map((r) => r.code);
 
-    // 03 first: saved as sent, each chapter whole, with the dates its rules give.
+    // 03 first, with the works; then 01 after it, and 02 after 01.
     const [first, second, third] = draft.rows;
     await svc.updatePlanningDraft(ctx, project.id, { items: [third, first, second] });
     const saved = await svc.getPlanningDraft(ctx, project.id);
-    expect(saved.rows.map((r) => [r.code, r.after])).toEqual([["03", "02"], ["01", null], ["02", "01"]]);
-    expect(datesOf(saved.rows)).toEqual(datesOf(draft.rows));
+    expect(saved.rows.map((r) => [r.code, r.after])).toEqual([["03", null], ["01", "03"], ["02", "01"]]);
+    expect(datesOf(saved.rows)).toEqual({
+      "03": "2026-06-01…2026-07-08",
+      "01": "2026-07-09…2026-07-22",
+      "02": "2026-07-23…2026-08-26",
+    });
 
     vi.mocked(notifyProjectClient).mockClear();
-    await svc.approvePlanningDraft(ctx, project.id, { reason: "Orden de lectura" });
-    // Only the order changed: the handover didn't move, so the client hears nothing.
+    await svc.approvePlanningDraft(ctx, project.id, { reason: "Estructura primero" });
+    // The same working days in another order: the handover didn't move, so the client hears nothing.
     expect(notifyProjectClient).not.toHaveBeenCalled();
     const { baseline } = await svc.getPlanning(ctx, project.id);
     expect(codes(baseline!.rows)).toEqual(["03", "01", "02"]);
@@ -272,6 +295,37 @@ describe("changing the plan", () => {
     // The next change starts from the order approved, not the contract's.
     await svc.createPlanningDraft(ctx, project.id, { from: "baseline" });
     expect(codes((await svc.getPlanningDraft(ctx, project.id)).rows)).toEqual(["03", "01", "02"]);
+  });
+
+  it("reads a plan from before the order set the dates as the chain giving its stored dates, baseline and draft alike", async () => {
+    const { ctx, project } = await approved();
+    // As an older version stored it: 02 and 03 both waited for 01, 03 starting first, 02 a week later.
+    const [baseline] = await db.select({ id: planningVersions.id }).from(planningVersions).where(eq(planningVersions.projectId, project.id));
+    const legacy = { "02": ["01", 5, "2026-06-22", "2026-07-24"], "03": ["01", 0, "2026-06-15", "2026-07-22"] } as const;
+    for (const [code, [after, lagDays, plannedStart, plannedEnd]] of Object.entries(legacy)) {
+      await db
+        .update(planningItems)
+        .set({ afterCode: after, lagDays, plannedStart, plannedEnd })
+        .where(and(eq(planningItems.versionId, baseline!.id), eq(planningItems.chapterCode, code)));
+    }
+    const stored = { "01": "2026-06-01…2026-06-12", "02": "2026-06-22…2026-07-24", "03": "2026-06-15…2026-07-22" };
+
+    await svc.createPlanningDraft(ctx, project.id, { from: "baseline" });
+    const draft = await svc.getPlanningDraft(ctx, project.id);
+    expect(draft.rows.map((r) => [r.code, r.after, r.lagDays])).toEqual([
+      ["01", null, 0],
+      ["03", "01", 2],
+      ["02", "03", -31],
+    ]);
+    expect(datesOf(draft.rows)).toEqual(stored);
+    // The baseline keeps its stored dates, read as the same chain: nothing moves its forecast but Avance.
+    const { baseline: kept } = await svc.getPlanning(ctx, project.id);
+    expect(kept!.rows.map((r) => [r.code, r.after, r.forecastStart, r.forecastEnd])).toEqual([
+      ["01", null, "2026-06-01", "2026-06-12"],
+      ["03", "01", "2026-06-15", "2026-07-22"],
+      ["02", "03", "2026-06-22", "2026-07-24"],
+    ]);
+    expect(kept!.forecast.endDate).toBe(kept!.planned.endDate);
   });
 
   it("forecasts from what Avance records, leaving the baseline as approved", async () => {
@@ -459,14 +513,7 @@ describe("input boundaries (schemas in src/inputs/planning.ts)", () => {
   /** The code a write is refused with, or "ok". */
   const outcome = (write: Promise<unknown>) => write.then(() => "ok", (error: { code?: string }) => error.code ?? String(error));
   const rulesOf = async (ctx: Ctx, projectId: string) =>
-    (await svc.getPlanningDraft(ctx, projectId)).rows.map(({ code, after, lagDays, durationDays, fixedStart, leadDays }) => ({
-      code,
-      after,
-      lagDays,
-      durationDays,
-      fixedStart,
-      leadDays,
-    }));
+    (await svc.getPlanningDraft(ctx, projectId)).rows.map(({ code, after, lagDays, durationDays }) => ({ code, after, lagDays, durationDays }));
 
   it("answers wrong types with each field's code, as before, writing nothing", async () => {
     const { ctx, project } = await setup();
@@ -512,9 +559,7 @@ describe("input boundaries (schemas in src/inputs/planning.ts)", () => {
       [{ items: change("02", { lagDays: "1" }) }, "invalid_input"],
       [{ items: change("02", { durationDays: 601 }) }, "invalid_input"],
       [{ items: change("02", { durationDays: undefined }) }, "invalid_input"],
-      [{ items: change("02", { leadDays: null }) }, "invalid_input"],
-      [{ items: change("02", { after: 1 }) }, "invalid_input"],
-      [{ items: change("01", { fixedStart: "next week" }) }, "invalid_date"],
+      [{ items: change("01", { lagDays: "n/a" }) }, "invalid_input"],
       [{ items: rules, region: "xx" }, "invalid_input"],
       [{ items: rules, startDate: null }, "invalid_date"],
     ];
@@ -523,9 +568,14 @@ describe("input boundaries (schemas in src/inputs/planning.ts)", () => {
     }
     expect(await rulesOf(ctx, project.id)).toEqual(rules);
 
-    // What a rule doesn't use isn't read: a chapter that starts on its own has no lag; a missing or null lag is 0.
-    await svc.updatePlanningDraft(ctx, project.id, { items: change("01", { lagDays: "n/a" }).map((r) => (r.code === "02" ? { ...r, lagDays: null } : r)) });
-    expect((await rulesOf(ctx, project.id)).map((r) => [r.code, r.lagDays])).toEqual([["01", 0], ["02", 0], ["03", rules[2]!.lagDays]]);
+    // The first chapter starts with the works, whatever lag it is sent with; a missing or null lag is 0.
+    // What an older editor sent besides is dropped, whatever it holds.
+    await svc.updatePlanningDraft(ctx, project.id, {
+      items: change("01", { lagDays: 9, after: 1, fixedStart: "next week", leadDays: null }).map((r) =>
+        r.code === "02" ? { ...r, lagDays: null } : r.code === "03" ? { ...r, lagDays: 4 } : r,
+      ),
+    });
+    expect((await rulesOf(ctx, project.id)).map((r) => [r.code, r.lagDays])).toEqual([["01", 0], ["02", 0], ["03", 4]]);
 
     expect(await outcome(svc.approvePlanningDraft(ctx, project.id, { reason: 5 }))).toBe("invalid_input");
     expect(await outcome(svc.approvePlanningDraft(ctx, project.id, { reason: "x".repeat(501) }))).toBe("invalid_input");
@@ -538,7 +588,7 @@ describe("input boundaries (schemas in src/inputs/planning.ts)", () => {
     expect((await svc.getPlanningVersions(ctx, project.id)).versions.map((v) => v.status)).toEqual(["draft", "approved"]);
   });
 
-  it("reads nothing of a chapter that spans the works but what it is and what it waits for", async () => {
+  it("reads nothing of a chapter that spans the works but what it is", async () => {
     const { tenant, ctx, admin } = await setup();
     const project = await createTestProject(tenant.id, { startDate: new Date("2026-06-01T00:00:00Z") });
     const { revisionId } = await framerDraft(admin, project.id, ["01", "17"]);
@@ -547,9 +597,11 @@ describe("input boundaries (schemas in src/inputs/planning.ts)", () => {
     const rules = await rulesOf(ctx, project.id);
     const spanning = (changes: Record<string, unknown>) => ({ items: rules.map((r) => (r.code === "17" ? { ...r, ...changes } : r)) });
 
-    await svc.updatePlanningDraft(ctx, project.id, spanning({ durationDays: "junk", lagDays: -1000, leadDays: null }));
-    expect((await rulesOf(ctx, project.id))[1]).toMatchObject({ code: "17", durationDays: 1, lagDays: 0, leadDays: 0 });
-    expect(await outcome(svc.updatePlanningDraft(ctx, project.id, spanning({ after: 1 })))).toBe("invalid_input");
-    expect(await outcome(svc.updatePlanningDraft(ctx, project.id, spanning({ fixedStart: "soon" })))).toBe("invalid_date");
+    await svc.updatePlanningDraft(ctx, project.id, spanning({ durationDays: "junk", lagDays: -1000, after: 1, fixedStart: "soon" }));
+    expect((await rulesOf(ctx, project.id))[1]).toMatchObject({ code: "17", after: null, durationDays: 1, lagDays: 0 });
+    // Wherever it is sent in the list, it stays apart and the chain runs without it.
+    const [first, last] = rules;
+    await svc.updatePlanningDraft(ctx, project.id, { items: [last, first] });
+    expect((await rulesOf(ctx, project.id)).map((r) => [r.code, r.after])).toEqual([["17", null], ["01", null]]);
   });
 });

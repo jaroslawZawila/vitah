@@ -5,8 +5,10 @@ import { readJson, withContext } from "../../../../../../../lib/api";
 // GET → PlanningDraft (the open draft, recomputed as of today)
 // POST { from: "template" | "project" | "baseline", startDate?, region?,
 //   augustClosure?, christmasClosure?, projectId? } → { versionId, number }
-// PUT { items: [{ code, after, lagDays, durationDays, fixedStart }],
-//   startDate?, region?, augustClosure?, christmasClosure? } → 204
+// PUT { items: [{ code, lagDays, durationDays }] (in the plan's order: each
+//   chapter starts after the one above it, plus its lag in calendar days; an
+//   older client's after, fixedStart and leadDays are dropped), startDate?,
+//   region?, augustClosure?, christmasClosure? } → 204
 // DELETE → 204: throws the draft away
 // ─────────────────────────────────────────────────────────────────────────────
 

@@ -70,7 +70,7 @@ describe("PurchaseLinesScreen", () => {
     }
     // What needs a look, while folded.
     expect(within(chapter("02")).getByText("1 con factura vencida")).toBeInTheDocument();
-    expect(within(chapter("10")).getByText("Pedir antes del 3 nov 2026")).toBeInTheDocument();
+    expect(within(chapter("10")).queryByText(/Pedir antes del/)).not.toBeInTheDocument();
     expect(within(chapter("10").closest("tr")!).getByText("1 por contratar")).toBeInTheDocument();
 
     const total = table().getByText("Total · 3 partidas").closest("tr")!;
@@ -123,7 +123,7 @@ describe("PurchaseLinesScreen", () => {
     // The obra's totals don't add up the rows shown: hidden while filtered.
     expect(table().queryByText(/^Total ·/)).not.toBeInTheDocument();
     await userEvent.click(within(row("10.01")).getByRole("button", { expanded: false }));
-    expect(table().getByText(/debe pedirse antes del 3 nov 2026/)).toBeInTheDocument();
+    expect(table().getByText(/^Sin pedidos\./)).not.toHaveTextContent(/pedirse/);
     expect(table().getByRole("link", { name: "Crear pedido" })).toHaveAttribute("href", "/dashboard/projects/p-1/compras/nuevo?capitulo=10");
 
     await userEvent.click(screen.getByRole("button", { name: /^Todas/ }));

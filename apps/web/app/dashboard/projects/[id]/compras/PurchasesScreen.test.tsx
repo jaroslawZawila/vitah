@@ -93,24 +93,15 @@ describe("PurchasesScreen", () => {
     expect(screen.getAllByText("Ningún pedido con estos filtros.").length).toBeGreaterThan(0);
   });
 
-  it("shows the chapters to contract soon by their order-by dates, with simulated dates", () => {
+  it("lists no chapters to contract soon: lead times and order-by dates are gone", () => {
     renderScreen();
-
-    const soon = within(screen.getByRole("region", { name: "Por contratar pronto" }));
-    expect(soon.getByText("Simulado")).toBeInTheDocument();
-    expect(soon.getByRole("link", { name: "Climatización" })).toHaveAttribute("href", "/dashboard/projects/p-1/compras/nuevo?capitulo=12");
-    expect(soon.getByRole("link", { name: "PED-055" })).toHaveAttribute("href", "/dashboard/projects/p-1/compras/order-55");
-    expect(soon.getByText(/Inicio 2 nov 2026 · pedir antes del 19 oct 2026 · 4 partidas/)).toBeInTheDocument();
-    // Climatización's orders should have gone out on 21 September.
-    expect(soon.getByText("pedir ya: 26 días tarde")).toBeInTheDocument();
-    expect(soon.getByText("23.410,00 €")).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Por contratar pronto" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/pedir antes del/i)).not.toBeInTheDocument();
   });
 
   it("hides every way to order from viewers", () => {
     renderScreen({ canManage: false });
     expect(screen.queryByRole("link", { name: "Nuevo pedido" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Pedir partidas de un capítulo" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Climatización" })).not.toBeInTheDocument();
   });
 
   it("says so when the obra has no orders", () => {

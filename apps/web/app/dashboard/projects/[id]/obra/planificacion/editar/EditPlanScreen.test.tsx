@@ -51,22 +51,44 @@ const order = () => screen.getAllByRole("row").flatMap((r) => within(r).queryAll
 const PLAN = "/dashboard/projects/p-1/obra/planificacion";
 
 describe("EditPlanScreen", () => {
-  it("shows each chapter's rule, the dates it gives and the change against the baseline", () => {
+  it("shows the chapters in order, each one's lag and length and the dates they give", () => {
     renderScreen();
     expect(screen.getByRole("heading", { level: 1, name: "Editar el plan" })).toBeInTheDocument();
     expect(screen.getByText("Borrador v3 · sin aprobar")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "← Volver" })).toHaveAttribute("href", PLAN);
-    expect(screen.getByRole("columnheader", { name: "Vs. v2" })).toBeInTheDocument();
+    // No start rule, order-by date or comparison with the baseline: the order is the sequence.
+    expect(screen.getAllByRole("columnheader").map((h) => h.textContent)).toEqual([
+      "Cap.",
+      "Capítulo",
+      "Desfase (días naturales)",
+      "Duración (días laborables)",
+      "Inicio – fin",
+    ]);
 
     // Finished and started chapters keep what was recorded.
     expect(row(/Actuaciones previas/).getByText("Terminado · fechas reales registradas")).toBeInTheDocument();
     expect(row(/Actuaciones previas/).getByLabelText("Días laborables del capítulo 01")).toBeDisabled();
-    expect(row(/Cimentación/).getByLabelText("Cuándo empieza el capítulo 02")).toBeDisabled();
+    expect(row(/Cimentación/).getByLabelText(/Desfase en días naturales del capítulo 02 tras el 01/)).toBeDisabled();
     expect(row(/Cimentación/).getByLabelText("Días laborables del capítulo 02")).toBeEnabled();
 
-    expect(row(/Pinturas/).getByLabelText("Cuándo empieza el capítulo 04")).toHaveValue("03");
-    expect(row(/Pinturas/).getByLabelText(/Desfase en días laborables del capítulo 04/)).toHaveValue(0);
+    // The first starts with the works; each other after the one above it.
+    expect(row(/Actuaciones previas/).getByText("Con la obra")).toBeInTheDocument();
+    expect(row(/Pinturas/).getByLabelText("Desfase en días naturales del capítulo 04 tras el 03 (negativo para solapar)")).toHaveValue(0);
     expect(screen.getByText(/Durante toda la obra, hasta el .*: 17 Control de calidad/)).toBeInTheDocument();
+  });
+
+  it("puts the calendar in one row above the chapters, and the check and approval below them", () => {
+    renderScreen();
+    const calendar = screen.getByRole("region", { name: "Calendario" });
+    const table = screen.getByRole("region", { name: "Capítulos del borrador" });
+    const check = screen.getByRole("region", { name: "Este borrador" });
+    expect(calendar.compareDocumentPosition(table) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(table.compareDocumentPosition(check) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(within(calendar).getByLabelText("Inicio de obra")).toHaveValue("2026-03-02");
+    expect(within(calendar).getByLabelText("Festivos autonómicos")).toHaveValue("as");
+    expect(within(calendar).getAllByRole("checkbox")).toHaveLength(2);
+    // Nothing beside the table: it takes the page's whole width.
+    expect(table.closest("aside")).toBeNull();
   });
 
   it("compares the draft's end with the contract in days, with no money on a delay", () => {
@@ -89,7 +111,7 @@ describe("EditPlanScreen", () => {
     // A grid card below 768px, a table row from it: the same inputs serve both.
     expect(painting).toHaveClass("max-md:grid");
     const labels = [...painting.querySelectorAll("span.md\\:hidden")].map((span) => span.textContent);
-    expect(labels).toEqual(["Empieza", "Desfase / fecha", "Días", "Inicio – fin", "Pedido", "Vs. v2"]);
+    expect(labels).toEqual(["Desfase (días naturales)", "Duración (días laborables)", "Inicio – fin"]);
     const days = within(painting).getByLabelText("Días laborables del capítulo 04");
     expect(days.closest("td")).toHaveClass("max-md:col-span-2", "max-md:flex");
     expect(screen.getAllByLabelText("Días laborables del capítulo 04")).toHaveLength(1);
@@ -98,10 +120,10 @@ describe("EditPlanScreen", () => {
   it("recomputes the dates as staff type, then approves with the reason", async () => {
     renderScreen();
     const painting = () => row(/Pinturas/);
-    const before = painting().getAllByRole("cell")[5]!.textContent;
+    const before = painting().getAllByRole("cell")[4]!.textContent;
     await userEvent.clear(painting().getByLabelText("Días laborables del capítulo 04"));
     await userEvent.type(painting().getByLabelText("Días laborables del capítulo 04"), "20");
-    expect(painting().getAllByRole("cell")[5]!.textContent).not.toBe(before);
+    expect(painting().getAllByRole("cell")[4]!.textContent).not.toBe(before);
 
     const approve = screen.getByRole("button", { name: "Aprobar como línea base v3" });
     expect(approve).toBeDisabled();
@@ -110,7 +132,7 @@ describe("EditPlanScreen", () => {
     expect(actions.approvePlanningDraftAction).toHaveBeenCalledWith(
       "p-1",
       {
-        items: expect.arrayContaining([expect.objectContaining({ code: "04", after: "03", durationDays: 20 })]),
+        items: expect.arrayContaining([{ code: "04", lagDays: 0, durationDays: 20 }]),
         startDate: "2026-03-02",
         region: "as",
         augustClosure: true,
@@ -122,27 +144,32 @@ describe("EditPlanScreen", () => {
     await waitFor(() => expect(router.push).toHaveBeenCalledWith(PLAN));
   });
 
-  it("sets how far ahead a chapter is ordered, showing the order-by date", async () => {
+  it("moves a chapter's start by its lag in calendar days, overlapping with a negative one", async () => {
     renderScreen();
-    const lead = row(/Pinturas/).getByLabelText("Días de antelación del pedido del capítulo 04");
-    expect(lead).toHaveValue(14);
-    const orderBy = () => row(/Pinturas/).getByText(/^antes del /).textContent;
-    const before = orderBy();
-    await userEvent.clear(lead);
-    await userEvent.type(lead, "42");
-    expect(orderBy()).not.toBe(before);
+    const lag = () => row(/Pinturas/).getByLabelText(/Desfase en días naturales del capítulo 04/);
+    const dates = () => row(/Pinturas/).getAllByRole("cell")[4]!.textContent;
+    const before = dates();
+    // Left empty, the field goes back to the lag it had.
+    await userEvent.clear(lag());
+    await userEvent.tab();
+    expect(lag()).toHaveValue(0);
+    expect(dates()).toBe(before);
+    await userEvent.clear(lag());
+    await userEvent.type(lag(), "-7");
+    expect(dates()).not.toBe(before);
     await userEvent.click(screen.getByRole("button", { name: "Guardar borrador" }));
     expect(actions.updatePlanningDraftAction).toHaveBeenCalledWith(
       "p-1",
-      expect.objectContaining({ items: expect.arrayContaining([expect.objectContaining({ code: "04", leadDays: 42 })]) }),
+      expect.objectContaining({ items: expect.arrayContaining([{ code: "04", lagDays: -7, durationDays: 13 }]) }),
     );
-    // A finished chapter's orders are history.
-    expect(row(/Actuaciones previas/).getByLabelText("Días de antelación del pedido del capítulo 01")).toBeDisabled();
+    expect(await screen.findByText("Borrador guardado.")).toBeInTheDocument();
   });
 
-  it("moves a chapter up and down the list, whole, and saves the new order", async () => {
+  it("moves a chapter up and down the list, its dates with it, and saves the new order", async () => {
     renderScreen();
     const arrow = (name: string) => screen.getByRole("button", { name });
+    const dates = () => row(/Pinturas/).getAllByRole("cell")[4]!.textContent;
+    const last = dates();
     expect(order()).toEqual(["01", "02", "03", "04"]);
     // The ends of the list go no further; 17 spans the works and has no arrows.
     expect(arrow("Subir el capítulo 01")).toBeDisabled();
@@ -153,20 +180,24 @@ describe("EditPlanScreen", () => {
 
     await userEvent.click(arrow("Subir el capítulo 04"));
     expect(order()).toEqual(["01", "02", "04", "03"]);
-    // The arrow keeps the focus, to press it again; the row keeps its rule.
+    // The arrow keeps the focus, to press it again; the chapter now follows 02, and starts earlier.
     expect(arrow("Subir el capítulo 04")).toHaveFocus();
-    expect(row(/Pinturas/).getByLabelText("Cuándo empieza el capítulo 04")).toHaveValue("03");
+    expect(row(/Pinturas/).getByLabelText(/del capítulo 04 tras el 02/)).toHaveValue(0);
+    expect(row(/Revestimientos/).getByLabelText(/del capítulo 03 tras el 04/)).toBeInTheDocument();
+    expect(dates()).not.toBe(last);
 
     await userEvent.click(arrow("Subir el capítulo 04"));
     await userEvent.click(arrow("Subir el capítulo 04"));
-    // First now: its "up" is disabled, so its pair takes the focus.
+    // First now: its "up" is disabled, so its pair takes the focus; it starts with the works.
     expect(arrow("Subir el capítulo 04")).toBeDisabled();
     expect(arrow("Bajar el capítulo 04")).toHaveFocus();
+    expect(row(/Pinturas/).getByText("Con la obra")).toBeInTheDocument();
+    expect(row(/Actuaciones previas/).getByLabelText(/del capítulo 01 tras el 04/)).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: "Guardar borrador" }));
-    const sent = vi.mocked(actions.updatePlanningDraftAction).mock.calls[0]![1] as { items: { code: string; after: string | null }[] };
+    const sent = vi.mocked(actions.updatePlanningDraftAction).mock.calls[0]![1] as { items: { code: string }[] };
     expect(sent.items.map((i) => i.code)).toEqual(["04", "01", "02", "03", "17"]);
-    expect(sent.items[0]).toMatchObject({ code: "04", after: "03" });
+    expect(sent.items[0]).toEqual({ code: "04", lagDays: 0, durationDays: 13 });
   });
 
   it("drags a chapter any number of places by its handle, telling a screen reader where it is", async () => {
@@ -183,7 +214,7 @@ describe("EditPlanScreen", () => {
     // Dropped on the first chapter: it takes its place, the ones between move down.
     drop("04", "01");
     expect(order()).toEqual(["04", "01", "02", "03"]);
-    expect(row(/Pinturas/).getByLabelText("Cuándo empieza el capítulo 04")).toHaveValue("03");
+    expect(row(/Pinturas/).getByText("Con la obra")).toBeInTheDocument();
     // Dropped on itself or outside the list: nothing moves.
     drop("04", "04");
     drop("04", null);
@@ -200,31 +231,34 @@ describe("EditPlanScreen", () => {
     expect(sent.items.map((i) => i.code)).toEqual(["04", "01", "02", "03", "17"]);
   });
 
-  it("refuses chapters that wait for each other", async () => {
+  it("drops the lag of a chapter moved to the top, as core does, so what is checked is what is sent", async () => {
     renderScreen();
-    await userEvent.selectOptions(row(/Revestimientos/).getByLabelText("Cuándo empieza el capítulo 03"), "04");
-    expect(screen.getByRole("alert")).toHaveTextContent("se esperan unos a otros en círculo");
-    expect(screen.getByRole("button", { name: "Guardar borrador" })).toBeDisabled();
-  });
-
-  it("keeps a fixed date chosen while the plan can't be scheduled", async () => {
-    renderScreen();
-    await userEvent.selectOptions(row(/Revestimientos/).getByLabelText("Cuándo empieza el capítulo 03"), "04");
-    await userEvent.selectOptions(row(/Pinturas/).getByLabelText("Cuándo empieza el capítulo 04"), "fixed");
-    expect(row(/Pinturas/).getByLabelText("Fecha de inicio del capítulo 04")).toHaveValue("2026-03-02");
-  });
-
-  it("can start a chapter on a fixed date", async () => {
-    renderScreen();
-    await userEvent.selectOptions(row(/Pinturas/).getByLabelText("Cuándo empieza el capítulo 04"), "fixed");
-    // It starts where the rule had it, now as a fixed day.
-    expect((row(/Pinturas/).getByLabelText("Fecha de inicio del capítulo 04") as HTMLInputElement).value).toMatch(/^2026-1[12]-/);
+    const lag = () => row(/Pinturas/).getByLabelText(/Desfase en días naturales del capítulo 04/);
+    await userEvent.clear(lag());
+    await userEvent.type(lag(), "999");
+    expect(screen.getByRole("alert")).toBeInTheDocument();
+    act(() => dnd.props!.onDragEnd!({ active: { id: "04" }, over: { id: "01" } } as DragEndEvent));
+    expect(row(/Pinturas/).getByText("Con la obra")).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    // Back below 01 it waits for it again, with no lag.
+    act(() => dnd.props!.onDragEnd!({ active: { id: "04" }, over: { id: "01" } } as DragEndEvent));
+    expect(lag()).toHaveValue(0);
     await userEvent.click(screen.getByRole("button", { name: "Guardar borrador" }));
-    expect(actions.updatePlanningDraftAction).toHaveBeenCalledWith(
-      "p-1",
-      expect.objectContaining({ items: expect.arrayContaining([expect.objectContaining({ code: "04", after: null })]) }),
-    );
-    expect(await screen.findByText("Borrador guardado.")).toBeInTheDocument();
+    const sent = vi.mocked(actions.updatePlanningDraftAction).mock.calls[0]![1] as { items: { code: string; lagDays: number }[] };
+    expect(sent.items.find((i) => i.code === "04")).toMatchObject({ lagDays: 0 });
+  });
+
+  it("refuses a lag out of range until it is put right", async () => {
+    renderScreen();
+    const lag = row(/Pinturas/).getByLabelText(/Desfase en días naturales del capítulo 04/);
+    await userEvent.clear(lag);
+    await userEvent.type(lag, "300");
+    expect(screen.getByRole("alert")).toHaveTextContent("el desfase va de −250 a 250 días naturales");
+    expect(screen.getByRole("button", { name: "Guardar borrador" })).toBeDisabled();
+    await userEvent.clear(lag);
+    await userEvent.type(lag, "30");
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Guardar borrador" })).toBeEnabled();
   });
 
   it("changes the calendar and discards the draft once confirmed", async () => {
@@ -268,6 +302,5 @@ describe("EditPlanScreen", () => {
     renderScreen({ draft: { ...planningDraft, baseline: null } });
     expect(screen.getByLabelText("Nota (opcional)")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Aprobar como línea base v3" })).toBeEnabled();
-    expect(screen.queryByRole("columnheader", { name: "Vs. v2" })).not.toBeInTheDocument();
   });
 });

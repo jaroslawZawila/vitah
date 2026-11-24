@@ -1,31 +1,30 @@
 import { describe, expect, it } from "vitest";
 import type { PlanningCalendar, PlanningItemInput } from "../src/contract";
 import {
+  chainOf,
+  chainRules,
   criticalPath,
   easterSunday,
   holidaysOf,
   moveChapter,
-  orderByDate,
   planCheck,
   planEnd,
   planProblem,
   schedulePlan,
   templateItems,
-  templateLeadDays,
   workCalendar,
   type Recorded,
 } from "../src/planning-calc";
 
 const PLAIN: PlanningCalendar = { region: null, augustClosure: false, christmasClosure: false };
 
-const item = (code: string, after: string | null, durationDays: number, lagDays = 0, leadDays = 0): PlanningItemInput => ({
+const item = (code: string, after: string | null, durationDays: number, lagDays = 0): PlanningItemInput => ({
   code,
   after,
   lagDays,
   durationDays,
   fixedStart: null,
   spansWorks: false,
-  leadDays,
 });
 const spanning = (code: string): PlanningItemInput => ({ ...item(code, null, 1), spansWorks: true });
 
@@ -68,17 +67,57 @@ describe("working calendar", () => {
   });
 });
 
+const ALL = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19"];
+
 describe("templateItems", () => {
-  it("gives each contract chapter the standard rule, dropping dependencies on missing chapters", () => {
-    expect(templateItems(["01", "02", "17", "99"])).toEqual([
-      item("01", null, 10, 0, 7),
-      item("02", "01", 25, 0, 14),
-      spanning("17"),
-      item("99", null, 10, 0, 14),
-    ]);
+  it("chains the contract's chapters in the template's order, the unknown ones after, 17–19 apart", () => {
+    expect(templateItems(["01", "17", "02", "99"])).toEqual([item("01", null, 10), item("02", "01", 25), item("99", "02", 10), spanning("17")]);
     // Without 01, cimentación starts with the works.
     expect(templateItems(["02"])[0]).toMatchObject({ code: "02", after: null, lagDays: 0 });
-    expect(planProblem(templateItems(["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19"]))).toBeNull();
+  });
+
+  it("is the realistic standard house: overlapping trades, about 180 working days", () => {
+    const items = templateItems(ALL);
+    expect(planProblem(items)).toBeNull();
+    expect(items.filter((i) => !i.spansWorks).map((i) => i.code)).toEqual(
+      ["01", "02", "03", "05", "06", "04", "10", "11", "13", "14", "12", "07", "09", "08", "15", "16"],
+    );
+    const dates = schedulePlan(items, { startDate: "2027-01-04", calendar: PLAIN });
+    // The envelope overlaps the roof; the finishes run together at the end.
+    expect(dates.get("06")).toEqual({ start: "2027-04-12", end: "2027-05-21" });
+    expect(planEnd(dates)).toBe("2027-09-13");
+    const cal = workCalendar(PLAIN);
+    let days = 0;
+    for (let day = "2027-01-04"; day <= "2027-09-13"; day = cal.addWorkDays(day, 1)) days++;
+    expect(days).toBe(179);
+  });
+});
+
+describe("chainRules", () => {
+  it("starts the first chapter with the works and each other after the one above it, keeping their lags", () => {
+    const loose = [item("03", "01", 2, -1), item("01", "02", 5, 4), spanning("17"), { ...item("02", null, 3, 2), fixedStart: "2026-07-01" }];
+    expect(chainRules(loose)).toEqual([item("03", null, 2, 0), item("01", "03", 5, 4), spanning("17"), item("02", "01", 3, 2)]);
+  });
+});
+
+describe("chainOf", () => {
+  // From before the order set the dates: 02 and 03 both wait for 01, listed in the contract's order.
+  const legacy = [item("01", null, 5), item("02", "01", 3, 5), item("03", "01", 2), spanning("17")];
+  const stored = schedulePlan(legacy, { startDate: "2026-06-01", calendar: PLAIN });
+
+  it("puts an older plan in the order its chapters start, with lags giving the same dates", () => {
+    const chained = chainOf(legacy, stored);
+    expect(chained.map((i) => [i.code, i.after, i.lagDays])).toEqual([
+      ["01", null, 0],
+      ["03", "01", 2], // ends Fri 5, starts Mon 8
+      ["02", "03", 1], // 03 ends Tue 9, 02 starts Thu 11
+      ["17", null, 0],
+    ]);
+    expect(asObject(schedulePlan(chained, { startDate: "2026-06-01", calendar: PLAIN }))).toEqual(asObject(stored));
+  });
+
+  it("keeps a plan that is already a chain as it is, whatever its dates", () => {
+    expect(chainOf(CHAIN, new Map())).toBe(CHAIN);
   });
 });
 
@@ -113,29 +152,26 @@ describe("moveChapter", () => {
     expect(codes(moveChapter(mixed, "OP1", "01"))).toEqual(["OP1", "17", "01", "18", "02"]);
   });
 
-  it("changes no date: the order is only how the plan reads", () => {
+  it("moves the dates: the order is the sequence", () => {
     const options = { startDate: "2026-06-01", calendar: PLAIN };
-    expect(asObject(schedulePlan(moveChapter(CHAIN, "03", "01"), options))).toEqual(asObject(schedulePlan(CHAIN, options)));
-  });
-});
-
-describe("lead times", () => {
-  it("gives each chapter its standard lead time and the day its orders must go out", () => {
-    expect([templateLeadDays("03"), templateLeadDays("10"), templateLeadDays("17"), templateLeadDays("99")]).toEqual([42, 56, 0, 14]);
-    expect(orderByDate("2026-12-07", 42)).toBe("2026-10-26");
-    expect(planProblem([item("01", null, 5, 0, 366)])).toBe("invalid_input");
-    expect(planProblem([item("01", null, 5, 0, -1)])).toBe("invalid_input");
+    // 03 (2 d) first, with the works (its −1 lag dropped), then 01 (5 d), then 02 (3 d).
+    expect(asObject(schedulePlan(chainRules(moveChapter(CHAIN, "03", "01")), options))).toEqual({
+      "03": "2026-06-01…2026-06-02",
+      "01": "2026-06-03…2026-06-09",
+      "02": "2026-06-10…2026-06-12",
+      "17": "2026-06-01…2026-06-12",
+    });
   });
 });
 
 describe("planProblem", () => {
-  it("accepts a chain and refuses cycles, self and missing dependencies, and bad numbers", () => {
+  it("accepts a chain and refuses a chapter twice and lengths or lags out of range", () => {
     expect(planProblem(CHAIN)).toBeNull();
-    expect(planProblem([item("01", "02", 1), item("02", "01", 1)])).toBe("dependency_cycle");
-    expect(planProblem([item("01", "01", 1)])).toBe("invalid_input");
-    expect(planProblem([item("01", "99", 1)])).toBe("invalid_input");
-    expect(planProblem([item("01", "17", 1), spanning("17")])).toBe("invalid_input");
     expect(planProblem([item("01", null, 0)])).toBe("invalid_input");
+    expect(planProblem([item("01", null, 601)])).toBe("invalid_input");
+    expect(planProblem([item("01", null, 1.5)])).toBe("invalid_input");
+    expect(planProblem([item("01", null, 1), item("02", "01", 1, 251)])).toBe("invalid_input");
+    expect(planProblem([item("01", null, 1), item("02", "01", 1, -250)])).toBeNull();
     expect(planProblem([item("01", null, 1), item("01", null, 2)])).toBe("invalid_input");
   });
 });
@@ -152,9 +188,33 @@ describe("schedulePlan", () => {
     expect(planEnd(dates)).toBe("2026-06-11");
   });
 
-  it("starts a chapter on its fixed day, or the next working one", () => {
+  it("counts a lag in calendar days, starting on the next working day when it lands on one off", () => {
+    const options = { startDate: "2026-10-05", calendar: PLAIN };
+    // 01 ends Fri 9 October. A 1-day lag lands on Sunday 11, Monday 12 is a holiday: Tuesday 13.
+    const plan = (lag: number) => schedulePlan([item("01", null, 5), item("02", "01", 1, lag)], options).get("02")!.start;
+    expect(plan(0)).toBe("2026-10-13");
+    expect(plan(1)).toBe("2026-10-13");
+    expect(plan(4)).toBe("2026-10-14");
+    // Negative overlaps: a week back from the day after the end is Saturday 3, so Monday 5, the works' start.
+    expect(plan(-7)).toBe("2026-10-05");
+    expect(plan(-3)).toBe("2026-10-07");
+    // Never before the works start.
+    expect(plan(-30)).toBe("2026-10-05");
+  });
+
+  it("starts a chapter that waits for none with the works, whatever fixed day an older plan gave it", () => {
     const fixed = { ...item("09", null, 2), fixedStart: "2026-06-06" };
     expect(asObject(schedulePlan([fixed], { startDate: "2026-06-01", calendar: PLAIN }))).toEqual({
+      "09": "2026-06-01…2026-06-02",
+    });
+    // Its stored dates keep it there once the plan is read as a chain.
+    const older = [item("01", null, 5), fixed];
+    const stored = new Map([
+      ["01", { start: "2026-06-01", end: "2026-06-05" }],
+      ["09", { start: "2026-06-08", end: "2026-06-09" }],
+    ]);
+    expect(asObject(schedulePlan(chainOf(older, stored), { startDate: "2026-06-01", calendar: PLAIN }))).toEqual({
+      "01": "2026-06-01…2026-06-05",
       "09": "2026-06-08…2026-06-09",
     });
   });

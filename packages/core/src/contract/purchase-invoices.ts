@@ -251,10 +251,8 @@ export type ProjectPurchaseLines = {
   chapters: {
     code: string;
     name: string;
-    /** From Avance's dates: nothing more is ordered "soon" for a finished one. */
+    /** From Avance's dates. */
     state: ChapterState;
-    /** The day its orders must be placed by (planned start − lead time). */
-    orderBy: string | null;
     costCents: number;
     contractedCents: number;
     deviationCents: number | null;

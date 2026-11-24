@@ -9,7 +9,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import type { PlanningCalendar, PlanningDraft, PlanningItemInput } from "@repo/core/contract";
-import { criticalPath, moveChapter, planCheck, planEnd, planProblem, schedulePlan, type Recorded } from "@repo/core/planning-calc";
+import { chainRules, criticalPath, moveChapter, planCheck, planEnd, planProblem, schedulePlan, type Recorded } from "@repo/core/planning-calc";
 import { Badge } from "@/components/ui/badge";
 import {
   approvePlanningDraftAction,
@@ -20,20 +20,19 @@ import BackLink from "../../../../../components/BackLink";
 import FormError from "../../../../../components/FormError";
 import { useConfirm } from "../../../../../components/useConfirm";
 import { useObraAction } from "../../../components/obra/useObraAction";
-import { ApproveCard, CalendarCard, DraftCheck, DraftTable, type RuleChange } from "../../../components/planning/DraftViews";
+import { ApproveCard, CalendarBar, DraftCheck, DraftTable, type RuleChange } from "../../../components/planning/DraftViews";
 import { planningHref } from "../../../components/planning/links";
 
-const toRule = ({ code, after, lagDays, durationDays, fixedStart, spansWorks, leadDays }: PlanningItemInput): PlanningItemInput => ({
+const toRule = ({ code, after, lagDays, durationDays, fixedStart, spansWorks }: PlanningItemInput): PlanningItemInput => ({
   code,
   after,
   lagDays,
   durationDays,
   fixedStart,
   spansWorks,
-  leadDays,
 });
 
-/** Edit the draft's rules and calendar, see the dates they give, then approve it as the baseline. */
+/** Edit the draft's order, lags, lengths and calendar, see the dates they give, then approve it as the baseline. */
 export default function EditPlanScreen({
   projectId,
   draft,
@@ -58,6 +57,7 @@ export default function EditPlanScreen({
     [draft.rows],
   );
   // Only when the plan changes, not on every render (typing a reason, a pending action).
+  // `rules` is always a chain (core's, kept so by `moveRule`), so what is checked is what is sent.
   const { problem, dates, check, critical } = useMemo(() => {
     const problem = planProblem(rules);
     const dates = problem ? null : schedulePlan(rules, { startDate, calendar, recorded, today: draft.today });
@@ -69,7 +69,7 @@ export default function EditPlanScreen({
       critical: dates ? criticalPath(rules, dates, recorded) : new Set<string>(),
     };
   }, [rules, startDate, calendar, recorded, draft.today, draft.completionDate]);
-  const input = { items: rules, startDate, ...calendar };
+  const input = { items: rules.map(({ code, lagDays, durationDays }) => ({ code, lagDays, durationDays })), startDate, ...calendar };
   const back = planningHref(projectId);
 
   const edited = () => {
@@ -80,10 +80,11 @@ export default function EditPlanScreen({
     edited();
     setRules((all) => all.map((rule) => (rule.code === code ? { ...rule, ...change } : rule)));
   };
-  // The order is the list's, saved with the rules: the dates don't follow it.
+  // The order is the sequence, saved with the rules: the dates follow it. A chapter that
+  // comes first starts with the works and loses its lag, as core stores it.
   const moveRule = (code: string, toCode: string) => {
     edited();
-    setRules((all) => moveChapter(all, code, toCode));
+    setRules((all) => chainRules(moveChapter(all, code, toCode)));
   };
 
   return (
@@ -98,59 +99,53 @@ export default function EditPlanScreen({
         <Badge variant="yel">{t("badge", { number: draft.version.number })}</Badge>
       </header>
 
-      <div className="flex flex-wrap items-start gap-[18px]">
-        <div className="min-w-0 flex-[999_1_600px]">
-          <DraftTable
-            rows={draft.rows}
-            rules={rules}
-            dates={dates}
-            critical={critical}
-            baseline={draft.baseline}
-            startDate={startDate}
-            readOnly={!canManage}
-            onChange={changeRule}
-            onMove={moveRule}
+      <CalendarBar
+        startDate={startDate}
+        calendar={calendar}
+        readOnly={!canManage}
+        onChange={({ startDate: start, ...change }) => {
+          edited();
+          if (start) setStartDate(start);
+          setCalendar((current) => ({ ...current, ...change }));
+        }}
+      />
+      <DraftTable
+        rows={draft.rows}
+        rules={rules}
+        dates={dates}
+        critical={critical}
+        readOnly={!canManage}
+        onChange={changeRule}
+        onMove={moveRule}
+      />
+      <div className="grid items-start gap-[18px] md:grid-cols-2">
+        <DraftCheck check={check} problem={problem && <FormError namespace="planning.errors" error={problem} />} />
+        {canManage && (
+          <ApproveCard
+            number={draft.version.number}
+            first={draft.baseline === null}
+            reason={reason}
+            pending={action.pending || confirm.pending}
+            canApprove={problem === null}
+            saved={saved}
+            error={<FormError namespace="planning.errors" error={action.state?.error} />}
+            onReason={setReason}
+            onApprove={() => action.run(() => approvePlanningDraftAction(projectId, input, reason), () => router.push(back))}
+            onSave={() => action.run(() => updatePlanningDraftAction(projectId, input), () => setSaved(true))}
+            onDiscard={() =>
+              confirm.ask({
+                t,
+                key: "approve.discardDialog",
+                values: { number: draft.version.number },
+                destructive: true,
+                action: () => discardPlanningDraftAction(projectId),
+                onDone: () => router.push(back),
+              })
+            }
           />
-        </div>
-        <aside className="flex min-w-0 flex-[1_1_300px] flex-col gap-3.5">
-          <DraftCheck check={check} problem={problem && <FormError namespace="planning.errors" error={problem} />} />
-          {canManage && (
-            <ApproveCard
-              number={draft.version.number}
-              first={draft.baseline === null}
-              reason={reason}
-              pending={action.pending || confirm.pending}
-              canApprove={problem === null}
-              saved={saved}
-              error={<FormError namespace="planning.errors" error={action.state?.error} />}
-              onReason={setReason}
-              onApprove={() => action.run(() => approvePlanningDraftAction(projectId, input, reason), () => router.push(back))}
-              onSave={() => action.run(() => updatePlanningDraftAction(projectId, input), () => setSaved(true))}
-              onDiscard={() =>
-                confirm.ask({
-                  t,
-                  key: "approve.discardDialog",
-                  values: { number: draft.version.number },
-                  destructive: true,
-                  action: () => discardPlanningDraftAction(projectId),
-                  onDone: () => router.push(back),
-                })
-              }
-            />
-          )}
-          {confirm.dialog}
-          <CalendarCard
-            startDate={startDate}
-            calendar={calendar}
-            readOnly={!canManage}
-            onChange={({ startDate: start, ...change }) => {
-              edited();
-              if (start) setStartDate(start);
-              setCalendar((current) => ({ ...current, ...change }));
-            }}
-          />
-        </aside>
+        )}
       </div>
+      {confirm.dialog}
     </div>
   );
 }

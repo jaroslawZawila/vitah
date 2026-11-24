@@ -24,13 +24,15 @@ import {
   planningBodySchema,
   planningEditSchema,
   planningReasonSchemas,
-  planningRuleSchemas,
+  planningRuleSchema,
   planningSaveSchema,
   planningSourceSchema,
 } from "./inputs/planning";
 import { todayInSpain } from "./obra-calc";
 import { fail, loadObra, requireProject, userNamesById } from "./obra-data";
 import {
+  chainOf,
+  chainRules,
   clientDates,
   criticalPath,
   planCheck,
@@ -46,8 +48,9 @@ import { projectInTenant, projectNotDeleted } from "./project-client";
 import { scheduleStatus } from "./schedule-status";
 
 // ─── Planning ────────────────────────────────────────────────────────────────
-// The works schedule (the Obra tab's Planificación): per version, each contract
-// chapter's rule (what it waits for, its lag and working days) and the dates
+// The works schedule (the Obra tab's Planificación): per version, the contract's
+// chapters in order, each starting after the one above it ends (plus its lag)
+// and lasting its working days (./planning-calc's `chainRules`), and the dates
 // that gives on the project's working calendar. A draft is edited freely;
 // approving it makes it the baseline (the previous one superseded), the dates
 // Avance, Compras and the Obra tab measure against (read by ./obra-data's
@@ -73,8 +76,15 @@ const toInput = (row: ItemRow): PlanningItemInput => ({
   durationDays: row.durationDays,
   fixedStart: row.fixedStart,
   spansWorks: row.spansWorks,
-  leadDays: row.leadDays,
 });
+
+/**
+ * A stored version's rules as the plan runs them: in order, each after the one
+ * above (./planning-calc's `chainOf`; a plan from before the order set the
+ * dates becomes the chain giving its stored dates). Every read and copy goes
+ * through it, so drafts, baselines and their forecasts follow one rule.
+ */
+const chainedRules = (items: ItemRow[]) => chainOf(items.map(toInput), storedDates(items));
 
 type Obra = Awaited<ReturnType<typeof loadObra>>;
 type Works = { startDate: string | null; completionDate: string | null };
@@ -156,12 +166,14 @@ const storedDates = (items: ItemRow[]) =>
 const scheduleNow = (measure: Measure, startDate: string, calendar: PlanningCalendar, rules: PlanningItemInput[]) =>
   schedulePlan(rules, { startDate, calendar, recorded: measure.recorded, today: measure.today });
 
-/** The baseline's stored dates, where it is heading as of today, and both against the contract. */
+/** The baseline's rules and stored dates, where it is heading as of today, and both against the contract. */
 function baselineForecast(measure: Measure, approved: VersionRow, rows: ItemRow[]) {
   const planned = storedDates(rows);
-  const forecast = scheduleNow(measure, approved.startDate, calendarOf(approved), rows.map(toInput));
+  const rules = chainedRules(rows);
+  const forecast = scheduleNow(measure, approved.startDate, calendarOf(approved), rules);
   const plannedEnd = planEnd(planned) ?? approved.startDate;
   return {
+    rules,
     planned,
     forecast,
     plannedEnd,
@@ -212,18 +224,18 @@ export function obraSchedule(obra: ScheduleObra, works: Works, today: string, co
   return statusOf(contract, today, forecast);
 }
 
-/** A version's chapters with their planned (`planned`) and forecast dates, in its order. */
-function rowsOf(loaded: Loaded, items: ItemRow[], planned: Map<string, Dates>, forecast: Map<string, Dates>): PlanningRow[] {
-  const critical = criticalPath(items.map(toInput), forecast, loaded.recorded);
+/** A version's chapters (its `rules`) with their planned (`planned`) and forecast dates, in its order. */
+function rowsOf(loaded: Loaded, rules: PlanningItemInput[], planned: Map<string, Dates>, forecast: Map<string, Dates>): PlanningRow[] {
+  const critical = criticalPath(rules, forecast, loaded.recorded);
   const chapterOf = new Map(loaded.chapters.map((c) => [c.code, c]));
-  return items.map((row) => {
-    const chapter = chapterOf.get(row.chapterCode);
-    const recorded = loaded.recorded.get(row.chapterCode);
-    const plan = planned.get(row.chapterCode)!;
-    const now = forecast.get(row.chapterCode) ?? plan;
+  return rules.map((rule) => {
+    const chapter = chapterOf.get(rule.code);
+    const recorded = loaded.recorded.get(rule.code);
+    const plan = planned.get(rule.code)!;
+    const now = forecast.get(rule.code) ?? plan;
     return {
-      ...toInput(row),
-      name: chapter?.name ?? row.chapterCode,
+      ...rule,
+      name: chapter?.name ?? rule.code,
       hitoCode: chapter?.hitoCode ?? null,
       plannedStart: plan.start,
       plannedEnd: plan.end,
@@ -233,7 +245,7 @@ function rowsOf(loaded: Loaded, items: ItemRow[], planned: Map<string, Dates>, f
       actualStart: recorded?.actualStart ?? null,
       actualEnd: recorded?.actualEnd ?? null,
       progressPct: recorded?.actualEnd ? 100 : (chapter?.progressPct ?? 0),
-      critical: critical.has(row.chapterCode),
+      critical: critical.has(rule.code),
     };
   });
 }
@@ -257,11 +269,11 @@ export async function getPlanning(ctx: Ctx, projectId: string): Promise<ProjectP
   let baseline: ProjectPlanning["baseline"] = null;
   if (approved) {
     const rows = loaded.obra.plan!.items;
-    const { planned, forecast, plannedEnd, plannedCheck, forecastCheck } = baselineForecast(loaded, approved, rows);
+    const { rules, planned, forecast, plannedEnd, plannedCheck, forecastCheck } = baselineForecast(loaded, approved, rows);
     baseline = {
       ...summaryOf(approved, plannedEnd, names),
       calendar: calendarOf(approved),
-      rows: rowsOf(loaded, rows, planned, forecast),
+      rows: rowsOf(loaded, rules, planned, forecast),
       planned: plannedCheck,
       forecast: forecastCheck,
     };
@@ -304,17 +316,15 @@ export async function getPlanningDraft(ctx: Ctx, projectId: string): Promise<Pla
     loadVersions(ctx.tenantId, projectId),
   ]);
   if (!draft) fail("not_found");
-  const [items, names] = await Promise.all([loadItems([draft, approved]), namesOf(ctx.tenantId, versions)]);
-  const rows = items.get(draft.id) ?? [];
-  const dates = scheduleNow(loaded, draft.startDate, calendarOf(draft), rows.map(toInput));
+  const [items, names] = await Promise.all([loadItems([draft]), namesOf(ctx.tenantId, versions)]);
+  const rules = chainedRules(items.get(draft.id) ?? []);
+  const dates = scheduleNow(loaded, draft.startDate, calendarOf(draft), rules);
   return {
     ref: loaded.project.ref,
     version: summaryOf(draft, planEnd(dates) ?? draft.startDate, names),
     calendar: calendarOf(draft),
-    rows: rowsOf(loaded, rows, dates, dates),
-    baseline: approved
-      ? { number: approved.number, ends: Object.fromEntries((items.get(approved.id) ?? []).map((r) => [r.chapterCode, r.plannedEnd])) }
-      : null,
+    rows: rowsOf(loaded, rules, dates, dates),
+    baseline: approved ? { number: approved.number } : null,
     completionDate: loaded.completionDate,
     today: loaded.today,
   };
@@ -369,28 +379,27 @@ function calendarFrom(sent: Partial<PlanningCalendar>, fallback?: PlanningCalend
 }
 
 /**
- * Keeps `rules` for the contract's chapters, in the order staff gave them. A
- * chapter they lack gets the standard rule, placed after the chapter before it
- * in the contract (one that spans the works, at the end): a plan never
- * reordered stays in the contract's order. A chapter the contract dropped
- * goes, and so does a dependency on it.
+ * Keeps `rules` for the contract's chapters, in the order staff gave them, as
+ * a chain. A chapter they lack gets the standard length with no lag, placed
+ * after the chapter before it in the contract (first when none is; one that
+ * spans the works, at the end). A chapter the contract dropped goes; the one
+ * below it then follows the one above.
  */
 function fitToContract(rules: PlanningItemInput[], codes: string[]): PlanningItemInput[] {
   const present = new Set(codes);
-  const known = new Set(rules.map((r) => r.code));
   const fitted = rules.filter((r) => present.has(r.code));
-  const template = templateItems(codes);
-  template.forEach((rule, index) => {
-    if (known.has(rule.code)) return;
-    let at = fitted.length;
-    if (!rule.spansWorks) {
-      let before = index - 1;
-      while (template[before]?.spansWorks) before--;
-      at = before < 0 ? 0 : fitted.findIndex((r) => r.code === template[before]!.code) + 1;
-    }
-    fitted.splice(at, 0, rule);
-  });
-  return fitted.map((rule) => (rule.after && !present.has(rule.after) ? { ...rule, after: null, lagDays: 0 } : rule));
+  const planned = new Set(fitted.map((r) => r.code));
+  const standard = new Map(templateItems(codes).map((rule) => [rule.code, rule]));
+  // The last chapter of the contract met so far that doesn't span the works.
+  let before: string | null = null;
+  for (const code of codes) {
+    const rule = standard.get(code)!;
+    // Its standard length, and no lag: the template's is meant for the chapter above it there.
+    const added = { ...rule, lagDays: 0 };
+    if (!planned.has(code)) fitted.splice(rule.spansWorks ? fitted.length : fitted.findIndex((r) => r.code === before) + 1, 0, added);
+    if (!rule.spansWorks) before = code;
+  }
+  return chainRules(fitted);
 }
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -410,7 +419,6 @@ async function writeItems(tx: Tx, tenantId: string, versionId: string, rules: Pl
       durationDays: rule.durationDays,
       fixedStart: rule.fixedStart,
       spansWorks: rule.spansWorks,
-      leadDays: rule.leadDays,
       plannedStart: dates.get(rule.code)!.start,
       plannedEnd: dates.get(rule.code)!.end,
     })),
@@ -443,7 +451,7 @@ export async function createPlanningDraft(
   const { from } = parse(planningSourceSchema, input);
   if (from === "baseline") {
     if (!approved) fail("not_found");
-    rules = fitToContract(((await loadItems([approved])).get(approved.id) ?? []).map(toInput), codes);
+    rules = fitToContract(chainedRules((await loadItems([approved])).get(approved.id) ?? []), codes);
     calendar = calendarOf(approved);
     startDate = approved.startDate;
   } else {
@@ -462,9 +470,8 @@ export async function createPlanningDraft(
         loadVersions(ctx.tenantId, sourceId),
       ]);
       if (!other || !source) fail("not_found");
-      // Its fixed days belong to its own calendar: here those chapters start with the works.
-      const copied = ((await loadItems([source])).get(source.id) ?? []).map((row) => ({ ...toInput(row), fixedStart: null }));
-      rules = fitToContract(copied, codes);
+      // Its order, lags and lengths; the dates come from this project's start and calendar.
+      rules = fitToContract(chainedRules((await loadItems([source])).get(source.id) ?? []), codes);
     }
   }
 
@@ -490,29 +497,19 @@ export async function createPlanningDraft(
 }
 
 /**
- * A rule as staff sent it (`planningRuleSchemas`, by what it is): `spansWorks`
- * stays as the draft has it, and so does a lead time not sent.
+ * A rule as staff sent it (`planningRuleSchema`), `spansWorks` as the draft
+ * has it: a chapter spanning the works reads nothing more. What it waits for
+ * is set by the order (`chainRules`).
  */
-function ruleOf(item: unknown, current: PlanningItemInput): PlanningItemInput {
-  const { spansWorks } = current;
-  const { code, after, fixedStart } = parse(planningRuleSchemas.head, item);
-  if (spansWorks) return { code, after: null, lagDays: 0, durationDays: 1, fixedStart: null, spansWorks, leadDays: 0 };
-  const rule = after === null ? { ...parse(planningRuleSchemas.own, item), lagDays: 0 } : parse(planningRuleSchemas.after, item);
-  return {
-    code,
-    after,
-    lagDays: rule.lagDays,
-    durationDays: rule.durationDays,
-    fixedStart: after === null ? fixedStart : null,
-    spansWorks,
-    leadDays: rule.leadDays ?? current.leadDays,
-  };
+function ruleOf(item: unknown, { code, spansWorks }: PlanningItemInput): PlanningItemInput {
+  const rule = spansWorks ? { lagDays: 0, durationDays: 1 } : parse(planningRuleSchema, item);
+  return { code, after: null, lagDays: rule.lagDays, durationDays: rule.durationDays, fixedStart: null, spansWorks };
 }
 
 /**
  * The open draft with what staff sent applied: its rules (`items`, every
- * chapter of it; the order sent becomes the plan's order), start and
- * calendar, each kept as stored when not sent.
+ * chapter of it; the order sent is the plan's sequence), start and calendar,
+ * each kept as stored when not sent.
  */
 async function editedDraft(ctx: Ctx, projectId: string, input: unknown) {
   const [loaded, { draft, approved }] = await Promise.all([
@@ -521,12 +518,12 @@ async function editedDraft(ctx: Ctx, projectId: string, input: unknown) {
   ]);
   if (!draft) fail("not_found");
   const { items, startDate: start, ...sent } = parse(planningEditSchema, input);
-  const current = ((await loadItems([draft])).get(draft.id) ?? []).map(toInput);
+  const current = chainedRules((await loadItems([draft])).get(draft.id) ?? []);
   let rules = current;
   if (items) {
     if (items.length !== current.length) fail("invalid_input");
     const byCode = new Map(current.map((rule) => [rule.code, rule]));
-    rules = items.map((item) => ruleOf(item, byCode.get(item.code) ?? fail("invalid_input")));
+    rules = chainRules(items.map((item) => ruleOf(item, byCode.get(item.code) ?? fail("invalid_input"))));
     const problem = planProblem(rules);
     if (problem) fail(problem);
   }

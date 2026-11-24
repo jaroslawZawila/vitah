@@ -10,17 +10,17 @@ export type PlanItemRow = typeof planningItems.$inferSelect;
 /** An approved baseline: its version (start day, calendar) and its items in order (rules and stored dates). */
 export type ApprovedPlan = { version: PlanVersionRow; items: PlanItemRow[] };
 
-export type PlanDates = Map<string, { start: string; end: string; leadDays: number }>;
+export type PlanDates = Map<string, { start: string; end: string }>;
 
-/** The approved Planning baseline's dates and lead times by chapter code (./planning); null without one. */
+/** The approved Planning baseline's dates by chapter code (./planning); null without one. */
 export async function approvedPlanDates(tenantId: string, projectId: string): Promise<PlanDates | null> {
   return planDatesOf((await approvedPlansOf(tenantId, [projectId])).get(projectId) ?? null);
 }
 
-/** A baseline's dates and lead times by chapter code; null without one, or with no items. */
+/** A baseline's dates by chapter code; null without one, or with no items. */
 export function planDatesOf(plan: ApprovedPlan | null): PlanDates | null {
   if (!plan || plan.items.length === 0) return null;
-  return new Map(plan.items.map((i) => [i.chapterCode, { start: i.plannedStart, end: i.plannedEnd, leadDays: i.leadDays }]));
+  return new Map(plan.items.map((i) => [i.chapterCode, { start: i.plannedStart, end: i.plannedEnd }]));
 }
 
 /**

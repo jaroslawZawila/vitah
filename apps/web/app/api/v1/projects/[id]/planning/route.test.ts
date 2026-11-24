@@ -40,23 +40,31 @@ describe("/api/v1/projects/:id/planning", () => {
     expect(draft.version).toMatchObject({ number: 1, status: "draft", startDate: "2026-03-02" });
     expect(draft.rows[0]).toMatchObject({ code: "01", plannedStart: "2026-10-19" });
 
-    const items = draft.rows.map((r: { code: string; after: string | null; lagDays: number; durationDays: number; fixedStart: string | null }) => ({
+    // As an older build sends it: what each waits for, a fixed start and a lead time are dropped, not refused.
+    type Row = { code: string; after: string | null; lagDays: number; durationDays: number; fixedStart: string | null; spansWorks: boolean };
+    const items = draft.rows.map((r: Row) => ({
       code: r.code,
       after: r.after,
       lagDays: r.lagDays,
       durationDays: r.code === "16" ? 20 : r.durationDays,
-      fixedStart: r.fixedStart,
+      fixedStart: r.code === "01" ? "2026-11-02" : r.fixedStart,
+      leadDays: 30,
     }));
     const saved = await update(apiRequest(token, json({ items }, "PUT")), at);
     expect(saved.status).toBe(204);
     const edited = await (await getDraft(apiRequest(token), at)).json();
     expect(edited.rows.find((r: { code: string }) => r.code === "16").durationDays).toBe(20);
+    expect(edited.rows[0]).toMatchObject({ code: "01", fixedStart: null, plannedStart: "2026-10-19" });
+    expect(edited.rows[0]).not.toHaveProperty("leadDays");
 
-    // The order sent is the plan's order from then on.
+    // The order sent is the plan's sequence from then on: each chapter after the one above it.
     const reordered = [...items].reverse();
     expect((await update(apiRequest(token, json({ items: reordered }, "PUT")), at)).status).toBe(204);
     const moved = await (await getDraft(apiRequest(token), at)).json();
     expect(moved.rows.map((r: { code: string }) => r.code)).toEqual(reordered.map((i: { code: string }) => i.code));
+    const chain = moved.rows.filter((r: Row) => !r.spansWorks);
+    expect(chain[0].after).toBeNull();
+    expect(chain.slice(1).map((r: Row) => r.after)).toEqual(chain.slice(0, -1).map((r: Row) => r.code));
 
     expect((await approve(apiRequest(token, json({})), at)).status).toBe(204);
     const planning = await (await GET(apiRequest(token), at)).json();

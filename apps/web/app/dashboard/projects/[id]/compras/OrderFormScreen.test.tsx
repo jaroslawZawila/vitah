@@ -59,7 +59,7 @@ describe("OrderFormScreen", () => {
     expect(screen.getByText("VTH-26-001 · se numerará PED-057")).toBeInTheDocument();
     expect(screen.getByRole("combobox", { name: "Capítulo" })).toHaveValue("07");
     expect(screen.getByText(/Capítulo 07 previsto/)).toBeInTheDocument();
-    expect(screen.getByText(/pedir antes del 19 oct 2026/)).toBeInTheDocument();
+    expect(screen.queryByText(/pedir antes del/)).not.toBeInTheDocument();
     expect(screen.getByText("Simulado")).toBeInTheDocument();
     expect(screen.getByLabelText("Entrega prevista")).toBeInTheDocument();
   });

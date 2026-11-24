@@ -8,7 +8,6 @@ import {
   type PurchaseStatus,
 } from "./contract";
 import { addDays } from "./obra-calc";
-import { templateLeadDays } from "./planning-calc";
 import { lateToFinishDays } from "./schedule-status";
 import { daysBetween } from "./subcontractor-rules";
 
@@ -131,7 +130,7 @@ export function plannedDates(
 
 /**
  * The contract's chapters to build (chapter 20, the contingency reserve,
- * aside), each one's state from its recorded dates, and the planned dates and lead time:
+ * aside), each one's state from its recorded dates, and the planned dates:
  * the approved Planning baseline's (`approved`), else simulated. A chapter the
  * baseline lacks (added to the contract since) has no planned dates.
  */
@@ -140,22 +139,17 @@ export function contractSchedule<C extends { code: string }>(
   hitos: { pctBp: number; chapters: { code: string }[] }[],
   progress: (Dates & { chapterCode: string })[],
   works: { startDate: string | null; completionDate: string | null },
-  approved: ReadonlyMap<string, { start: string; end: string; leadDays: number }> | null = null,
+  approved: ReadonlyMap<string, { start: string; end: string }> | null = null,
 ) {
   const items = chapters.filter((c) => c.code !== CONTINGENCY_CHAPTER);
   const dates = new Map(progress.map((row) => [row.chapterCode, row]));
   const states = new Map(items.map((c) => [c.code, chapterState(dates.get(c.code))]));
-  // With each chapter's lead time: the baseline's, or the standard one with the simulated dates.
   const plan = approved
     ? new Map(items.flatMap((c) => (approved.has(c.code) ? [[c.code, approved.get(c.code)!] as const] : [])))
-    : new Map(
-        [
-          ...plannedDates(
-            works,
-            hitos.map((h) => ({ pctBp: h.pctBp, chapterCodes: h.chapters.map((c) => c.code) })),
-            items.map((c) => c.code),
-          ),
-        ].map(([code, dates]) => [code, { ...dates, leadDays: templateLeadDays(code) }] as const),
+    : plannedDates(
+        works,
+        hitos.map((h) => ({ pctBp: h.pctBp, chapterCodes: h.chapters.map((c) => c.code) })),
+        items.map((c) => c.code),
       );
   const planSource: PlanningSource = approved ? "live" : "mock";
   return { items, dates, states, plan, planSource };
