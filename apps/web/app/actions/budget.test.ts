@@ -79,9 +79,10 @@ describe("budget actions", () => {
     expect(draft.chapters.map((c) => c.code)).toHaveLength(20);
 
     expect(await updateRevisionAction(project.id, draft.id, { contingencyPct: 4, builtAreaM2: 200 })).toEqual({ success: true });
-    // The margins, in % of the cost (a new budget starts at 16 % + 6 %).
+    // The margins, each in % of the price (a new budget starts at 16 % + 9 %), together under 100 %.
     expect(await updateRevisionAction(project.id, draft.id, { overheadPct: 12, profitPct: 6 })).toEqual({ success: true });
     expect(await updateRevisionAction(project.id, draft.id, { profitPct: 101 })).toEqual({ error: "invalid_input" });
+    expect(await updateRevisionAction(project.id, draft.id, { overheadPct: 50, profitPct: 50 })).toEqual({ error: "invalid_input" });
     expect(await updateRevisionAction(project.id, draft.id, { reviewed: { key: "annex:i1", done: true } })).toEqual({ success: true });
     // A wrong type, as a caller past the types could send it.
     expect(await updateRevisionAction(project.id, draft.id, { reviewed: { key: "annex:i1", done: "yes" } } as never)).toEqual({ error: "invalid_input" });
@@ -96,13 +97,20 @@ describe("budget actions", () => {
 
     let current = await revision(project.id);
     // At cost, 01: 661,76 € + 400 × 3,22 € = 1.949,76 €; 20 = 4 % of that (77,99 €).
-    // Each unit price × 1,12 ÷ 0,94: 788,48 € + 400 × 3,84 € + 92,92 € = 2.417,40 €, 389,65 € over
-    // the cost: 145,04 € of beneficio industrial (6 % of the price) and the rest gastos asociados.
-    expect(current).toMatchObject({ contingencyBp: 400, costCents: 194_976 + 7_799, overheadCents: 24_461, profitCents: 14_504, totalCents: 241_740 });
+    // Each unit price ÷ 0,82: 807,02 € + 400 × 3,93 € + 95,11 € = 2.474,13 €: 296,90 € of gastos asociados
+    // (12 % of the price), 148,45 € of beneficio industrial (6 %) and 1,03 € of the unit prices' rounding.
+    expect(current).toMatchObject({
+      contingencyBp: 400,
+      costCents: 194_976 + 7_799,
+      overheadCents: 29_690,
+      profitCents: 14_845,
+      roundingCents: 103,
+      totalCents: 247_413,
+    });
     expect(current.chapters[0]).toMatchObject({ pdfNote: "Sobre parcela llana." });
     const [deduction, garage] = current.options;
     expect(deduction).toMatchObject({ optionKind: "deduction", totalCents: -66_176 });
-    expect(garage).toMatchObject({ name: "Puerta de garaje seccional motorizada", totalCents: 269_118, priceCents: 320_651 });
+    expect(garage).toMatchObject({ name: "Puerta de garaje seccional motorizada", totalCents: 269_118, priceCents: 328_193 });
     expect(await updateOptionAction(project.id, garage!.id, { name: "Puerta de garaje" })).toEqual({ success: true });
     expect(revalidatePath).toHaveBeenCalledWith(`/dashboard/projects/${project.id}`, "layout");
 
@@ -133,7 +141,7 @@ describe("budget actions", () => {
     form.set("acceptedOn", "2026-10-05");
     expect(await acceptRevisionAction(project.id, draft.id, form)).toEqual({ success: true });
     current = await revision(project.id);
-    expect(current).toMatchObject({ status: "accepted", acceptedOn: "2026-10-05", acceptedBy: "Ana", contractTotalCents: current.totalCents + 320_651 });
+    expect(current).toMatchObject({ status: "accepted", acceptedOn: "2026-10-05", acceptedBy: "Ana", contractTotalCents: current.totalCents + 328_193 });
     // Registered by the signed-in user, with the signed copy filed with the contracts.
     expect(current.acceptedByUser).toMatchObject({ id: ctx.userId });
     const contract = (await getProjectDocuments(project.id)).documents.find((d) => d.category === "contract")!;

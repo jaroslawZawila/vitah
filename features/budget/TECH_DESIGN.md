@@ -459,23 +459,30 @@ Draft edits, options, texts and generations → none: the app only sees accepted
 Budgets are built from **costs**, then a % of **gastos asociados** and of **beneficio industrial** goes on top.
 Both matter more to staff than VAT, so they lead the summary tab.
 
-- `budget_revisions.overhead_bp` (bp of the cost) / `profit_bp` (bp of the price). A new revision starts at 16 % + 6 %
-  (`DEFAULT_MARGINS`; 13 % + 6 % until 2026-11-04, when the drafts still at 13 % moved too:
+- `budget_revisions.overhead_bp` / `profit_bp`, both bp of the price. A new revision starts at 16 % + 9 %
+  (`DEFAULT_MARGINS`; 16 % + 6 % until 2026-11-24, 13 % + 6 % until 2026-11-04, when the drafts still at 13 % moved too:
   `packages/db/sql/2026-11-budget-overhead-16.sql`), a copy keeps its source's, and existing rows got 0 (their unit prices already included both;
-  `packages/db/sql/2026-10-budget-margins.sql`). PATCH takes `overheadPct` / `profitPct` on drafts.
+  `packages/db/sql/2026-10-budget-margins.sql`). PATCH takes `overheadPct` / `profitPct` on drafts (each 0–50, together
+  under 100: `invalid_input`; `budget_revisions_margins_check` in the database).
 - The FRAMER 2026 price base is now at cost: the prototype's prices ÷ 1.19 (kept as the costs when the formula
   below came in, so its lines now sell about 1 % above the prototype). The AI prompt says the P.U. are costs.
-  The Caviedes seed takes, for each line, the cost whose price comes back to the document's unit price; its PEC
-  lands within a few euros of the document.
+  The Caviedes seed takes, for each line, the cost whose price comes back to the document's unit price; at ÷ 0,75 a
+  cent of cost moves the price 1,33 cents, so some unit prices land a cent off and its PEC, 519.995,29 €, is 46,65 €
+  over the document's 519.948,64 €.
 - Lines stay at cost. Prices are per line: the unit price with both margins in, to the cent (`unitPrice` /
   `priceLines` in `obra-calc.ts`; `linesPriceSql` in SQL), amount = quantity × unit price. A chapter's or option's
   `priceCents` and the PEC are plain sums, so every printed row multiplies out. The portal shows what the margins
-  came to (PEC − cost): beneficio is its % of the PEC, gastos the rest (`marginsOn`), and the gross margin on sales.
-- **The formula (2026-11-01, client document "Fórmulas margen obra"):** gastos asociados are a markup on the cost,
-  beneficio industrial a margin on the selling price, kept apart: unit price = unit cost × (1 + gastos) ÷
-  (1 − beneficio), rounded half away from zero. At 16 % + 6 %, 100.000 € of cost sells at 123.404,26 €: 16.000 € of
-  gastos and 6 % of the price as beneficio (it was cost × 1,19 before, beneficio 5 % of the price). Beneficio is at
-  most 50 %. Not live yet, so every budget moved to it; the Caviedes seed still comes back to the document's prices.
+  came to: gastos and beneficio each exactly its % of the PEC, and the unit prices' rounding to the cent (PEC − cost
+  − both, a few euros either way) on a line of its own (`marginsOn` › `roundingCents`), so neither margin carries
+  it; and the gross margin on sales.
+- **The formula (2026-11-24, client document "FRAMER · Cálculo de gastos operativos y beneficio industrial"):** the
+  selling price without VAT splits into cost, gastos asociados and beneficio industrial, both margins a share of
+  that price (75 % + 16 % + 9 %): unit price = unit cost ÷ (1 − gastos − beneficio), rounded half away from zero.
+  100.000 € of cost sells at 133.333,33 €: 21.333,33 € of gastos and 12.000 € of beneficio. The document's own
+  example: 236.084,76 € of cost → 314.779,68 €, 50.364,75 € of gastos, 28.330,17 € of beneficio. It replaced the
+  formula of 2026-11-01 ("Fórmulas margen obra": gastos a markup on the cost, price = cost × (1 + gastos) ÷
+  (1 − beneficio)), whose different bases the client called the error. No budget had reached a client, so every
+  budget moved to it; the Caviedes seed still comes back to the document's prices.
 - **The client never sees the margins apart.** Both PDFs (the detailed one carries the contract) print the priced
   lines (`forClient`), and the obra, hitos and the app read the contract the same way (`loadBudget`). Only the
   portal's summary shows cost, gastos and beneficio. A draft at 0 % shows a warning: its lines are at cost (budgets

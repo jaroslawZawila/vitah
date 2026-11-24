@@ -96,6 +96,8 @@ export default function ChapterSummary({
             [t("costTotal"), revision.costCents, contingency && t("costTotalNote", { amount: f.money(contingency.totalCents) })],
             [t("overhead", { pct: f.share(revision.overheadBp) }), revision.overheadCents, null],
             [t("profit", { pct: f.share(revision.profitBp) }), revision.profitCents, null],
+            // Each unit price is rounded to the cent: what that adds up to stays apart, so both margins are their exact %.
+            ...(revision.roundingCents !== 0 ? ([[t("rounding"), revision.roundingCents, null]] as const) : []),
           ] as const
         ).map(([label, cents, note]) => (
           <div key={label} className="flex flex-wrap justify-between gap-2">

@@ -545,11 +545,14 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
 ### Budget (Presupuesto)
 
 - Spec: `features/budget/TECH_DESIGN.md` (decisions in §17); PDF template and AI prompts in the same folder
-- Lines are priced at **cost**; gastos asociados (`overhead_bp`, a markup on the cost) and beneficio industrial
-  (`profit_bp`, a margin on the selling price), default 16 % + 6 % (§18; prod SQL for the drafts at 13 %: `packages/db/sql/2026-11-budget-overhead-16.sql`), go into each unit price: price = cost ×
-  (1 + gastos) ÷ (1 − beneficio), as in the client's document "Fórmulas margen obra". The PEC is the sum of the
-  priced lines (`priceLines` in `obra-calc.ts`, `linesPriceSql` in SQL). Only the portal's summary shows the margins apart; the PDFs (`forClient`), obra, hitos and
-  app see the priced lines
+- Lines are priced at **cost**; gastos asociados (`overhead_bp`) and beneficio industrial (`profit_bp`), **both a
+  share of the selling price without VAT**, default 16 % + 9 % (cost 75 %), go into each unit price: price = cost ÷
+  (1 − gastos − beneficio), as in the client's document "FRAMER · Cálculo de gastos operativos y beneficio
+  industrial" (2026-11-24; it replaced "Fórmulas margen obra"; §18). Together under 100 % (`budget_revisions_margins_check`,
+  prod SQL `packages/db/sql/2026-11-24-1200-budget-margins-on-price.sql`). The PEC is the sum of the
+  priced lines (`priceLines` in `obra-calc.ts`, `linesPriceSql` in SQL). The portal's summary shows gastos and
+  beneficio as their exact % of the PEC and the unit prices' rounding to the cent on a line of its own
+  (`marginsOn` › `roundingCents`); the PDFs (`forClient`), obra, hitos and app see the priced lines
 - Model `framer20`: always the 20 fixed chapters 01–20 (`budget-template.ts`); chapter 20 is one computed line,
   `contingency_bp` × chapters 01–19, kept in sync by `syncDraft` (`budget-draft.ts`) inside every draft write.
   Options live below as `budget_chapters` with `kind = 'option'` (codes OP1, OP2…, lines numbered OP.01… across

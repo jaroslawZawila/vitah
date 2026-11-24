@@ -43,8 +43,9 @@ export const budgetRevisions = pgTable(
     // Chapter 20 (Imprevistos) as a share of chapters 01–19: 5 % = 500.
     contingencyBp: integer("contingency_bp").default(500).notNull(),
     // The margins on top of the cost (chapters 01–20): gastos asociados and
-    // beneficio industrial, 13 % = 1300. 0 for budgets priced before them, whose
-    // unit prices already included both; new revisions get core's defaults.
+    // beneficio industrial, each a share of the selling price, 16 % = 1600. 0 for
+    // budgets priced before them, whose unit prices already included both; new
+    // revisions get core's defaults.
     overheadBp: integer("overhead_bp").default(0).notNull(),
     profitBp: integer("profit_bp").default(0).notNull(),
     // The AI's quality reference: framer | project.
@@ -100,8 +101,8 @@ export const budgetRevisions = pgTable(
     vatRateCheck: basisPoints("budget_revisions_vat_rate_bp_check", table.vatRateBp),
     contingencyCheck: basisPoints("budget_revisions_contingency_bp_check", table.contingencyBp),
     overheadCheck: basisPoints("budget_revisions_overhead_bp_check", table.overheadBp),
-    // A margin on the price: at 100 % there would be no price.
-    profitCheck: check("budget_revisions_profit_bp_check", sql`${table.profitBp} >= 0 and ${table.profitBp} < 10000`),
+    // Both margins are shares of the price: together at 100 % there would be no price.
+    marginsCheck: check("budget_revisions_margins_check", sql`${table.profitBp} >= 0 and ${table.overheadBp} + ${table.profitBp} < 10000`),
     areasCheck: check(
       "budget_revisions_areas_check",
       sql`${table.builtAreaCm2} >= 0 and ${table.usefulAreaCm2} >= 0`,

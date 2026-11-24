@@ -40,6 +40,7 @@ import { computeChecks, reviewedKeys, tenantRatios } from "./budget-review";
 import { markChanged } from "./changes";
 import { raiseStage } from "./obra-stage";
 import { requireEditor, type Ctx } from "./context";
+import { CoreError } from "./errors";
 import {
   BUDGET_MODEL,
   CONTINGENCY_CHAPTER,
@@ -588,6 +589,10 @@ export async function updateRevision(
   if (contingencyPct !== undefined) changes.contingencyBp = contingencyPct;
   if (overheadPct !== undefined) changes.overheadBp = overheadPct;
   if (profitPct !== undefined) changes.profitBp = profitPct;
+  // Gastos and beneficio are shares of the price: the cost needs some of it left.
+  if ((changes.overheadBp ?? revision.overheadBp) + (changes.profitBp ?? revision.profitBp) >= 10_000) {
+    throw new CoreError("invalid_input", 400);
+  }
   if (texts) changes.texts = mergeTexts(texts, readTexts(revision.texts));
   if (exclusions !== undefined) {
     // /api/v1's one-per-line string: a FRAMER revision keeps them in its texts.

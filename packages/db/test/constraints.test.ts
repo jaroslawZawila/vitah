@@ -151,6 +151,7 @@ describe("amounts, shares and counts in range", () => {
   it.each([
     ["projects", "obra_stage = 9", "project_a"],
     ["budget_revisions", "profit_bp = 10000", "revision_a"],
+    ["budget_revisions", "overhead_bp = 5000, profit_bp = 5000", "revision_a"],
     ["budget_revisions", "vat_rate_bp = -1", "revision_a"],
     ["budget_lines", "executed_pct = 101", "line_a"],
     ["budget_lines", "quantity_milli = -1", "line_a"],

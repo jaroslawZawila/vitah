@@ -136,23 +136,25 @@ describe("BudgetScreen", () => {
 
     const work = screen.getByText("Importe de la obra · sin IVA").parentElement!;
     expect(work).toHaveTextContent(/38\.554,78/);
-    expect(work).toHaveTextContent(/Coste 32\.398,97/);
-    expect(work).toHaveTextContent(/Margen bruto 15,97\s%\ssobre la venta/);
-    expect(screen.getByText("Beneficio industrial").parentElement).toHaveTextContent(/1\.943,94/);
-    expect(screen.getByText("Gastos asociados").parentElement).toHaveTextContent(/4\.211,87/);
+    expect(work).toHaveTextContent(/Coste 28\.916,08/);
+    expect(work).toHaveTextContent(/Margen bruto 25\s%\ssobre la venta/);
+    expect(screen.getByText("Beneficio industrial").parentElement).toHaveTextContent(/3\.469,93/);
+    expect(screen.getByText("Gastos asociados").parentElement).toHaveTextContent(/6\.168,76/);
     expect(screen.getByText("€/m² construido · sin IVA").parentElement).toHaveTextContent("184,91 m² construidos");
     // Under the chapters: the cost, then each margin in % and €.
     expect(screen.getByText(/Coste de ejecución/)).toBeInTheDocument();
     // It counts chapter 20; the Obra tab's cost doesn't, so the reserve reconciles the two.
     expect(screen.getByText(/^La Obra mide el coste sin el cap\. 20 \(1\.836,19\s€\): es la reserva de imprevistos\.$/)).toBeInTheDocument();
-    expect(screen.getByText(/Gastos asociados · 13\s%\sdel coste/)).toBeInTheDocument();
-    expect(screen.getByText(/Beneficio industrial · 6\s%\sde la venta/)).toBeInTheDocument();
+    // Both margins are a share of the price; the unit prices' rounding stays on a line of its own.
+    expect(screen.getByText(/Gastos asociados · 16\s%\sde la venta/)).toBeInTheDocument();
+    expect(screen.getByText(/Beneficio industrial · 9\s%\sde la venta/)).toBeInTheDocument();
+    expect(screen.getByText("Redondeo de los precios unitarios al céntimo").parentElement).toHaveTextContent(/0,01/);
     const chapters = screen.getByRole("table", { name: "Resumen por capítulos" });
     expect(chapters.compareDocumentPosition(screen.getByText("1 de 2 revisados")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 
     // Typed in % on the draft.
     const profit = screen.getByLabelText("Porcentaje de beneficio industrial");
-    expect(profit).toHaveValue("6");
+    expect(profit).toHaveValue("9");
     await userEvent.clear(profit);
     await userEvent.type(profit, "7{Enter}");
     expect(actions.updateRevisionAction).toHaveBeenCalledWith("p-1", "rev-1", { profitPct: 7 });
@@ -173,8 +175,14 @@ describe("BudgetScreen", () => {
     renderScreen({ budget: issued });
 
     expect(screen.queryByLabelText("Porcentaje de beneficio industrial")).not.toBeInTheDocument();
-    expect(screen.getByText("Beneficio industrial").parentElement).toHaveTextContent(/6\s%\ssobre la venta/);
-    expect(screen.getByText("Gastos asociados").parentElement).toHaveTextContent(/13\s%\ssobre el coste/);
+    expect(screen.getByText("Beneficio industrial").parentElement).toHaveTextContent(/9\s%\ssobre la venta/);
+    expect(screen.getByText("Gastos asociados").parentElement).toHaveTextContent(/16\s%\ssobre la venta/);
+  });
+
+  it("leaves out the rounding line when the unit prices' rounding comes to nothing", () => {
+    renderScreen({ budget: { ...draft, revision: { ...draft.revision, roundingCents: 0 } } });
+
+    expect(screen.queryByText("Redondeo de los precios unitarios al céntimo")).not.toBeInTheDocument();
   });
 
   it("folds the AI checks into one row once all are reviewed, and opens them again", async () => {

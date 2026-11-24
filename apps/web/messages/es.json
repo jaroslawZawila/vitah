@@ -1689,8 +1689,8 @@
       "overhead": "Gastos asociados",
       "profitLabel": "Porcentaje de beneficio industrial",
       "overheadLabel": "Porcentaje de gastos asociados",
-      "overheadOn": "{pct} sobre el coste",
-      "overheadOnInput": "sobre el coste",
+      "overheadOn": "{pct} sobre la venta",
+      "overheadOnInput": "sobre la venta",
       "profitOn": "{pct} sobre la venta",
       "profitOnInput": "sobre la venta",
       "grossMargin": "Margen bruto {pct} sobre la venta",
@@ -1721,8 +1721,9 @@
       "vatNote": "El importe de cada capítulo incluye su parte de los gastos asociados y del beneficio industrial, como en el PDF. IVA {rate}: {vat} · Total con IVA: {total}.",
       "costTotal": "Coste de ejecución (capítulos 01–20)",
       "costTotalNote": "La Obra mide el coste sin el cap. 20 ({amount}): es la reserva de imprevistos.",
-      "overhead": "Gastos asociados · {pct} del coste",
-      "profit": "Beneficio industrial · {pct} de la venta"
+      "overhead": "Gastos asociados · {pct} de la venta",
+      "profit": "Beneficio industrial · {pct} de la venta",
+      "rounding": "Redondeo de los precios unitarios al céntimo"
     },
     "options": {
       "summaryTitle": "Partidas opcionales",

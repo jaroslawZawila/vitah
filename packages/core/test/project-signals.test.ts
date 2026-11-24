@@ -272,8 +272,8 @@ describe("project signals", () => {
       return optionId;
     };
     const pool = await option("Piscina", 1.25, 4321);
-    // A deduction priced to a negative half cent: -1,235 × 0.5 = -617.5, which `amountCents` rounds to -617.
-    const deduction = await option("Sin solado", 0.5, -1001);
+    // A deduction priced to a negative half cent: -9,63 ÷ 0,78 = -12,35 and -1,235 × 0.5 = -617.5, which `amountCents` rounds to -617.
+    const deduction = await option("Sin solado", 0.5, -963);
     await option("Pérgola", 1, 99_999);
     await budgetService.acceptRevision(admin, project.id, revisionId, { chosenOptionIds: [pool, deduction] }, { unissued: true });
 

@@ -9,9 +9,9 @@ import InlinePct from "./InlinePct";
 
 /**
  * Presentational: the works' price (the PEC) and its gross margin on it, its two
- * margins (beneficio industrial, % of the price, and gastos asociados, % of the
- * cost, with their €; the % editable on a draft via `onMargins`, e.g.
- * `{ profitPct: 6 }`) and €/m² built against the tenant's average.
+ * margins (beneficio industrial and gastos asociados, each a % of the price, with
+ * their €; the % editable on a draft via `onMargins`, e.g. `{ profitPct: 9 }`)
+ * and €/m² built against the tenant's average.
  */
 export default function SummaryKpis({
   revision,

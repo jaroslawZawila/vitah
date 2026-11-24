@@ -146,7 +146,7 @@ export const linesTotalSql = () =>
  * option's deduction). Lines joined to their revision.
  */
 export const linePriceSql = () =>
-  sql<string>`floor(${budgetLines.quantityMilli}::numeric * round(${budgetLines.unitPriceCents}::numeric * (10000 + ${budgetRevisions.overheadBp}) / (10000 - ${budgetRevisions.profitBp})) / 1000 + 0.5)`;
+  sql<string>`floor(${budgetLines.quantityMilli}::numeric * round(${budgetLines.unitPriceCents}::numeric * 10000 / (10000 - ${budgetRevisions.overheadBp} - ${budgetRevisions.profitBp})) / 1000 + 0.5)`;
 
 /** The sum of the selected lines' `linePriceSql`. */
 export const linesPriceSql = () => sql<number>`coalesce(sum(${linePriceSql()}), 0)`.mapWith(Number);

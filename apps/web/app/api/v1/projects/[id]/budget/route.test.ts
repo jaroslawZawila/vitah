@@ -61,10 +61,15 @@ describe("/api/v1/projects/:id/budget", () => {
     expect(created.status).toBe(201);
     const { revisionId } = await created.json();
     expect((await patchRevision(patch({ vatRateBp: 1000 }), routeParams({ id, revisionId }))).status).toBe(200);
-    // Priced at cost, with gastos asociados and beneficio industrial on top (in %).
-    expect((await read()).revision).toMatchObject({ overheadBp: 1600, profitBp: 600 });
+    // Priced at cost, with gastos asociados and beneficio industrial on top (each in % of the price).
+    expect((await read()).revision).toMatchObject({ overheadBp: 1600, profitBp: 900 });
     expect((await patchRevision(patch({ overheadPct: 10, profitPct: 5 }), routeParams({ id, revisionId }))).status).toBe(200);
     expect((await patchRevision(patch({ profitPct: -1 }), routeParams({ id, revisionId }))).status).toBe(400);
+    // Together they must leave something of the price for the cost.
+    const whole = await patchRevision(patch({ overheadPct: 50, profitPct: 50 }), routeParams({ id, revisionId }));
+    expect(whole.status).toBe(400);
+    expect(await whole.json()).toEqual({ error: "invalid_input" });
+    expect((await read()).revision).toMatchObject({ overheadBp: 1000, profitBp: 500 });
     // One review check at a time.
     expect((await patchRevision(patch({ reviewed: { key: "annex:i1", done: true } }), routeParams({ id, revisionId }))).status).toBe(200);
     expect((await patchRevision(patch({ reviewed: { key: "annex:i1" } }), routeParams({ id, revisionId }))).status).toBe(400);
@@ -81,10 +86,11 @@ describe("/api/v1/projects/:id/budget", () => {
     expect(line.status).toBe(201);
     const { lineId } = await line.json();
     expect((await patchLine(patch({ quantity: 100 }), routeParams({ id, lineId }))).status).toBe(200);
-    // 350,00 € plus chapter 20's 5 %, then each unit price × 1,10 ÷ 0,95: 100 × 4,05 € + 20,26 €.
+    // 350,00 € plus chapter 20's 5 %, then each unit price ÷ 0,85: 100 × 4,12 € + 20,59 € = 432,59 €: 10 % and 5 %
+    // of it as the margins and 0,20 € of the unit prices' rounding.
     const edited = (await read()).revision;
-    expect(edited).toMatchObject({ costCents: 35_000 + 1_750, overheadCents: 3_650, profitCents: 2_126, totalCents: 42_526 });
-    expect(edited.chapters[0]).toMatchObject({ name: "Actuaciones previas", totalCents: 35_000, priceCents: 40_500 });
+    expect(edited).toMatchObject({ costCents: 35_000 + 1_750, overheadCents: 4_326, profitCents: 2_163, roundingCents: 20, totalCents: 43_259 });
+    expect(edited.chapters[0]).toMatchObject({ name: "Actuaciones previas", totalCents: 35_000, priceCents: 41_200 });
 
     // A draft was never sent to the client: it can't become the contract, whatever the body says.
     for (const body of [undefined, { unissued: true }]) {
@@ -163,7 +169,7 @@ describe("/api/v1/projects/:id/budget", () => {
 
     expect((await accept(post({ acceptedBy: "Ana", chosenOptionIds: [optionId] }), routeParams({ id, revisionId }))).status).toBe(200);
     const accepted = (await read()).revision;
-    expect(accepted).toMatchObject({ status: "accepted", acceptedBy: "Ana", contractTotalCents: accepted.totalCents + 3_085_106 }); // the pool × 1,16 ÷ 0,94
+    expect(accepted).toMatchObject({ status: "accepted", acceptedBy: "Ana", contractTotalCents: accepted.totalCents + 3_333_333 }); // the pool ÷ 0,75
   }, 60_000);
 
   it("records that the client rejected an issued revision", async () => {

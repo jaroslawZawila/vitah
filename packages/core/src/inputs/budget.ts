@@ -117,8 +117,8 @@ export const revisionChangesSchema = z.object({
   builtAreaM2: area.optional(),
   usefulAreaM2: area.optional(),
   contingencyPct: scaled(50, 100).optional(),
-  overheadPct: scaled(100, 100).optional(),
-  // A margin on the price: at 100 % there would be no price.
+  // Both margins are shares of the price, together below 100 % (checked in `updateRevision`).
+  overheadPct: scaled(50, 100).optional(),
   profitPct: scaled(50, 100).optional(),
   texts: textsSchema.optional(),
   exclusions: optionalText(MAX_TEXT).optional(),

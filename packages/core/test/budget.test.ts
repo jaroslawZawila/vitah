@@ -80,7 +80,7 @@ describe("createBudget", () => {
     const revision = budget.revision!;
     expect(revision).toMatchObject({ reference: "036/2026", vatRateBp: 1000, model: "framer20", contingencyBp: 500, options: [] });
     // Priced at cost: gastos asociados and beneficio industrial go on top.
-    expect(revision).toMatchObject({ overheadBp: 1600, profitBp: 600, costCents: 0, overheadCents: 0, profitCents: 0 });
+    expect(revision).toMatchObject({ overheadBp: 1600, profitBp: 900, costCents: 0, overheadCents: 0, profitCents: 0, roundingCents: 0 });
     expect(revision.chapters.map((c) => [c.code, c.name])).toEqual(BUDGET_CHAPTER_CODES.map((code) => [code, CHAPTER_NAMES[code]]));
     // Chapter 20 is one computed line, at 0 while 01–19 are empty.
     expect(revision.chapters[19]!.lines).toMatchObject([{ code: "20.01", source: "computed", amountCents: 0 }]);
@@ -328,33 +328,34 @@ describe("margins", () => {
     return draft;
   }
 
-  it("puts gastos asociados on the cost and beneficio industrial on the price: the PEC, its chapters and VAT", async () => {
+  it("takes gastos asociados and beneficio industrial each as a share of the price: the PEC, its chapters and VAT", async () => {
     const { project, ctx } = await setup();
     const { revisionId } = await withMargins(ctx, project.id);
     await svc.updateRevision(ctx, project.id, revisionId, { builtAreaM2: 100 });
 
     const revision = await revisionOf(ctx, project.id);
-    // Each unit price is cost × 1,13 ÷ 0,94, to the cent: 3,50 → 4,21 €, 72,50 → 87,15 €,
-    // 1.000 → 1.202,13 € and chapter 20 132,63 → 159,44 €. The PEC, 3.348,72 €, is 563,59 €
-    // over the cost: 200,92 € of beneficio industrial (6 % of the PEC) and 362,67 € of gastos
-    // asociados (13 % of the cost, 362,07 €, and each line's rounding).
+    // Each unit price is cost ÷ (1 − 0,13 − 0,06) = cost ÷ 0,81, to the cent: 3,50 → 4,32 €,
+    // 72,50 → 89,51 €, 1.000 → 1.234,57 € and chapter 20 132,63 → 163,74 €. Of the PEC, 3.438,21 €:
+    // 446,97 € of gastos asociados (13 %), 206,29 € of beneficio industrial (6 %), the cost and
+    // −0,18 € of the unit prices' rounding.
     expect(revision).toMatchObject({
       costCents: 278_513,
       overheadBp: 1300,
-      overheadCents: 36_267,
+      overheadCents: 44_697,
       profitBp: 600,
-      profitCents: 20_092,
-      totalCents: 334_872,
-      contractTotalCents: 334_872,
-      vatCents: 33_487,
-      perM2Cents: 3_349,
+      profitCents: 20_629,
+      roundingCents: -18,
+      totalCents: 343_821,
+      contractTotalCents: 343_821,
+      vatCents: 34_382,
+      perM2Cents: 3_438,
     });
-    expect((await svc.getBudget(ctx, project.id)).revisions[0]!.totalCents).toBe(334_872);
+    expect((await svc.getBudget(ctx, project.id)).revisions[0]!.totalCents).toBe(343_821);
     // Each chapter keeps its cost; its price is the sum of its priced lines.
     const [c1, c2] = revision.chapters;
-    expect(c1).toMatchObject({ totalCents: 165_250, priceCents: 111_565 + 87_150, perM2Cents: 1_987 });
-    expect(c2).toMatchObject({ totalCents: 100_000, priceCents: 120_213 });
-    expect(revision.chapters.reduce((sum, c) => sum + c.priceCents, 0)).toBe(334_872);
+    expect(c1).toMatchObject({ totalCents: 165_250, priceCents: 114_480 + 89_510, perM2Cents: 2_040 });
+    expect(c2).toMatchObject({ totalCents: 100_000, priceCents: 123_457 });
+    expect(revision.chapters.reduce((sum, c) => sum + c.priceCents, 0)).toBe(343_821);
     // Lines stay at cost.
     expect(c1!.lines.map((l) => l.amountCents)).toEqual([92_750, 72_500]);
   });
@@ -369,26 +370,26 @@ describe("margins", () => {
 
     let revision = await revisionOf(ctx, project.id);
     expect(revision.options.map((o) => [o.totalCents, o.priceCents])).toEqual([
-      [1_000_000, 1_202_128],
-      [-100_000, -120_213],
+      [1_000_000, 1_234_568],
+      [-100_000, -123_457],
     ]);
-    expect(revision.optionTotals).toEqual({ adding: { count: 1, cents: 1_202_128 }, subtracting: { count: 1, cents: -120_213 } });
+    expect(revision.optionTotals).toEqual({ adding: { count: 1, cents: 1_234_568 }, subtracting: { count: 1, cents: -123_457 } });
 
     await issue.issueRevision(ctx, project.id, revisionId, { issuedOn: "2026-10-14", shareWithClient: false });
     await svc.acceptRevision(ctx, project.id, revisionId, { acceptedOn: "2026-10-21", chosenOptionIds: [pool] });
 
     revision = await revisionOf(ctx, project.id);
-    expect(revision.contractTotalCents).toBe(334_872 + 1_202_128);
+    expect(revision.contractTotalCents).toBe(343_821 + 1_234_568);
     // The obra and the hitos follow the price: every line priced, quantity × unit price.
     const obra = await obraService.getObra(ctx, project.id);
-    expect(obra.budget!.totalCents).toBe(1_537_000);
-    expect(obra.chapters.find((c) => c.code === "01")!.totalCents).toBe(198_715);
-    expect(obra.chapters.reduce((sum, c) => sum + c.totalCents, 0)).toBe(1_537_000);
-    expect((await hitosService.listHitos(ctx, project.id))[0]).toMatchObject({ amountCents: 76_850 });
+    expect(obra.budget!.totalCents).toBe(1_578_389);
+    expect(obra.chapters.find((c) => c.code === "01")!.totalCents).toBe(203_990);
+    expect(obra.chapters.reduce((sum, c) => sum + c.totalCents, 0)).toBe(1_578_389);
+    expect((await hitosService.listHitos(ctx, project.id))[0]).toMatchObject({ amountCents: 78_919 });
     const chapter = await obraService.getChapter(ctx, project.id, "01");
     expect(chapter.chapter.lines.map((l) => [l.amountCents, l.unitPriceCents])).toEqual([
-      [265 * 421, 421],
-      [10 * 8_715, 8_715],
+      [265 * 432, 432],
+      [10 * 8_951, 8_951],
     ]);
   });
 
@@ -870,11 +871,11 @@ describe("the v1 exclusions field", () => {
 describe("checks before issuing", () => {
   it("lists the AI's inconsistencies and assumptions, estimated lines and chapters off the tenant's ratios", async () => {
     const { tenant, project, ctx } = await setup();
-    // Another project's issued budget: 01 at 100 €/m² built, at price (80 € of
-    // cost × 1,15 ÷ 0,92; budgets compare at what the client pays).
+    // Another project's issued budget: 01 at 100 €/m² built, at price (77 € of
+    // cost ÷ (1 − 0,15 − 0,08); budgets compare at what the client pays).
     const reference = await createTestProject(tenant.id);
     const { revisionId: refRev, chapterId: refChapter } = await framerDraft(ctx, reference.id, [], 0, { overheadPct: 15, profitPct: 8 });
-    await svc.addLine(ctx, reference.id, refChapter("01"), line("01.01", 100, 8_000));
+    await svc.addLine(ctx, reference.id, refChapter("01"), line("01.01", 100, 7_700));
     await svc.updateRevision(ctx, reference.id, refRev, { builtAreaM2: 100 });
     await issue.issueRevision(ctx, reference.id, refRev, { shareWithClient: false });
 

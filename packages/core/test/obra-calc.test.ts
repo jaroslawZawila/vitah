@@ -27,41 +27,47 @@ describe("lineAmountCents", () => {
 });
 
 describe("margins", () => {
-  const margins = { overheadBp: 1300, profitBp: 600 };
+  const margins = { overheadBp: 1600, profitBp: 900 };
   const line = (quantity: number, unitPriceCents: number) => ({ quantity, unitPriceCents, amountCents: lineAmountCents(quantity, unitPriceCents) });
 
-  it("puts both margins in a unit price, to the cent: gastos on the cost, beneficio on the price", () => {
-    expect(unitPrice(1_000, margins)).toBe(1_202); // 1.000 × 1,13 ÷ 0,94 = 1.202,13
-    expect(unitPrice(322, margins)).toBe(387); // 387,09
-    expect(unitPrice(-1_000, margins)).toBe(-1_202);
+  it("puts both margins in a unit price, to the cent, each a share of the price: cost ÷ (1 − gastos − beneficio)", () => {
+    expect(unitPrice(1_000, margins)).toBe(1_333); // 1.000 ÷ 0,75 = 1.333,33
+    expect(unitPrice(322, margins)).toBe(429); // 429,33
+    expect(unitPrice(-1_000, margins)).toBe(-1_333);
     expect(unitPrice(500, { overheadBp: 0, profitBp: 0 })).toBe(500);
     expect(unitPrice(0, margins)).toBe(0);
-    expect(unitPrice(1_000, { overheadBp: 1300 } as typeof margins)).toBeNaN(); // a missing margin shows, never 0 €
+    expect(unitPrice(1_000, { overheadBp: 1600 } as typeof margins)).toBeNaN(); // a missing margin shows, never 0 €
   });
 
-  it("follows Formulas_margen_obra: 15 % recargo on 100.000 € is 115.000 €, a 15 % margen 117.647,06 €", () => {
-    expect(unitPrice(10_000_000, { overheadBp: 1500, profitBp: 0 })).toBe(11_500_000);
+  it("follows FRAMER's Cálculo de gastos operativos y beneficio industrial: 75 % cost, 16 % gastos, 9 % beneficio", () => {
+    // § 3: 236.084,76 € of cost sells at 314.779,68 €: 50.364,75 € of gastos, 28.330,17 € of beneficio.
+    expect(unitPrice(23_608_476, margins)).toBe(31_477_968);
+    expect(marginsOn(23_608_476, 31_477_968, margins)).toEqual({ overheadCents: 5_036_475, profitCents: 2_833_017, roundingCents: 0 });
+    // § 5: keeping the original quote, 313.134,25 €, the cost is 234.850,69 €.
+    expect(unitCost(31_313_425, margins)).toBe(23_485_069);
+    // The same share of the price whichever margin it is.
+    expect(unitPrice(10_000_000, { overheadBp: 1500, profitBp: 0 })).toBe(11_764_706);
     expect(unitPrice(10_000_000, { overheadBp: 0, profitBp: 1500 })).toBe(11_764_706);
   });
 
   it("finds the unit cost that comes back to a price", () => {
-    expect(unitCost(1_202, margins)).toBe(1_000);
-    expect(unitCost(-1_202, margins)).toBe(-1_000);
-    // 3,84 € can't be reached exactly (3,19 → 3,83 €, 3,20 → 3,85 €): a tie keeps the first guess.
-    expect(unitPrice(unitCost(384, margins), margins)).toBe(383);
+    expect(unitCost(1_333, margins)).toBe(1_000);
+    expect(unitCost(-1_333, margins)).toBe(-1_000);
+    // 13,34 € can't be reached exactly (10,00 → 13,33 €, 10,01 → 13,35 €): a tie keeps the first guess.
+    expect(unitPrice(unitCost(1_334, margins), margins)).toBe(1_335);
   });
 
   it("rounds halves away from zero, as linesPriceSql does", () => {
-    const half = { overheadBp: 5000, profitBp: 0 }; // × 1,5: 1 → 1,5 and −1 → −1,5
-    expect(unitPrice(1, half)).toBe(2);
-    expect(unitPrice(-1, half)).toBe(-2);
+    const quarter = { overheadBp: 2000, profitBp: 0 }; // ÷ 0,8: 2 → 2,5 and −2 → −2,5
+    expect(unitPrice(2, quarter)).toBe(3);
+    expect(unitPrice(-2, quarter)).toBe(-3);
   });
 
   it("prices lines so each is its quantity × its unit price", () => {
     const priced = priceLines([line(400, 322), line(1, 66_176)], margins);
     expect(priced.map((l) => [l.unitPriceCents, l.amountCents])).toEqual([
-      [387, 154_800],
-      [79_552, 79_552],
+      [429, 171_600],
+      [88_235, 88_235],
     ]);
     expect(priceLines([], margins)).toEqual([]);
   });
@@ -71,26 +77,27 @@ describe("margins", () => {
       [{ lines: [line(400, 322), line(1, 66_176)] as BudgetLine[] }, { lines: [line(1, -100_000)] as BudgetLine[] }],
       margins,
     );
-    expect(chapter!.priceCents).toBe(154_800 + 79_552);
-    expect(option!.priceCents).toBe(-120_213);
+    expect(chapter!.priceCents).toBe(171_600 + 88_235);
+    expect(option!.priceCents).toBe(-133_333);
   });
 
-  it("splits what the margins came to: beneficio is its % of the price, gastos the rest", () => {
-    expect(marginsOn(1_000_000, 1_202_131, margins)).toEqual({ overheadCents: 130_003, profitCents: 72_128 });
-    expect(marginsOn(1_000_000, 1_064_000, { overheadBp: 0, profitBp: 600 })).toEqual({ overheadCents: 0, profitCents: 64_000 });
-    expect(marginsOn(1_000_000, 1_130_000, { overheadBp: 1300, profitBp: 0 })).toEqual({ overheadCents: 130_000, profitCents: 0 });
-    expect(marginsOn(1_000, 1_000, { overheadBp: 0, profitBp: 0 })).toEqual({ overheadCents: 0, profitCents: 0 });
+  it("gives each margin its exact % of the price and the unit prices' rounding apart", () => {
+    // 400 × 3,22 € of cost sells at 400 × 4,29 € (4,2933… rounded): 1,00 € short of cost ÷ 0,75 once both margins are taken.
+    expect(marginsOn(128_800, 171_600, margins)).toEqual({ overheadCents: 27_456, profitCents: 15_444, roundingCents: -100 });
+    expect(marginsOn(1_000_000, 1_333_333, margins)).toEqual({ overheadCents: 213_333, profitCents: 120_000, roundingCents: 0 });
+    expect(marginsOn(1_000_000, 1_098_901, { overheadBp: 0, profitBp: 900 })).toEqual({ overheadCents: 0, profitCents: 98_901, roundingCents: 0 });
+    expect(marginsOn(1_000, 1_000, { overheadBp: 0, profitBp: 0 })).toEqual({ overheadCents: 0, profitCents: 0, roundingCents: 0 });
   });
 
   it("gives the client's view of a revision: chapters and options at their price, lines priced", () => {
     const revision = {
       ...margins,
-      chapters: [{ totalCents: 1_000, priceCents: 1_202, lines: [line(1, 1_000)] }],
-      options: [{ totalCents: -1_000, priceCents: -1_202, lines: [line(2, -500)] }],
+      chapters: [{ totalCents: 1_000, priceCents: 1_333, lines: [line(1, 1_000)] }],
+      options: [{ totalCents: -1_000, priceCents: -1_334, lines: [line(2, -500)] }],
     } as unknown as BudgetRevision;
     const client = forClient(revision);
-    expect(client.chapters[0]).toMatchObject({ totalCents: 1_202, lines: [{ amountCents: 1_202, unitPriceCents: 1_202 }] });
-    expect(client.options[0]).toMatchObject({ totalCents: -1_202, lines: [{ amountCents: -1_202, unitPriceCents: -601 }] });
+    expect(client.chapters[0]).toMatchObject({ totalCents: 1_333, lines: [{ amountCents: 1_333, unitPriceCents: 1_333 }] });
+    expect(client.options[0]).toMatchObject({ totalCents: -1_334, lines: [{ amountCents: -1_334, unitPriceCents: -667 }] });
   });
 });
 
