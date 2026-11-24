@@ -120,6 +120,8 @@ export function tenantTree(t: string, { fixtureOnly = false } = {}): string {
       values (${id("claim_photo")}, ${T}, ${id("claim")}, 'warranty/${t}/1.jpg', 'image/jpeg', 2048, 512, ${id("client")});
     insert into warranty_claim_events (id, tenant_id, claim_id, user_id, action)
       values (${id("claim_event")}, ${T}, ${id("claim")}, ${id("client")}, 'created');
+    insert into budget_exclusion_presets (id, tenant_id, label, position, created_by_id)
+      values (${id("exclusion")}, ${T}, 'Licencia de obras', 0, ${id("admin")});
 
     insert into budget_revisions (id, tenant_id, project_id, number, status, model, change_reason)
       values (${id("revision1")}, ${T}, ${id("project")}, 1, 'issued', 'framer20', 'Cambio');
@@ -184,4 +186,5 @@ export const TENANT_TABLES = [
   "warranty_claims",
   "warranty_claim_photos",
   "warranty_claim_events",
+  "budget_exclusion_presets",
 ];

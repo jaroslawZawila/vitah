@@ -26,6 +26,7 @@ export {
   budgetLines,
   budgetApprovals,
   budgetRevisionChanges,
+  budgetExclusionPresets,
   obraHitos,
   obraHitoChapters,
   obraHitoChecks,

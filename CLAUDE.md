@@ -253,8 +253,8 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
 ### Database
 
 - **Driver:** `postgres` (postgres.js) — works with any PostgreSQL (local Docker, Vercel Postgres, AWS RDS, etc.)
-- Schema in `packages/db/src/schema/` by module (`tenants`, `users`, `projects`, `project-files`, `budget`, `budget-approvals`, `hitos`, `construction`, `ai`, `subcontractors`, `purchasing`, `purchase-requests`, `purchase-invoices`, `purchase-checks`, `planning`, `idempotency`, `warranty`, `relations`; `checks.ts` holds `COLUMN_VALUES`, `COLUMN_RANGES` and the CHECK helpers), re-exported by `packages/db/src/schema.ts`, the entry that drizzle-kit, the client, the test databases and `db:drift` read: a new module must be re-exported there — tables: `tenants`, `users`, `client_profiles`, `client_settings`, `push_tokens`, `accounts`, `sessions`, `verification_tokens`, `projects`, `project_documents`, `project_photos`, the construction control's `obra_chapter_progress`, `obra_progress_events`,
-  `obra_invoice_requests`, `obra_issues`, `obra_issue_files`, and the obra's `budget_revisions`, `budget_chapters`, `budget_lines`, `obra_hitos`, `obra_hito_chapters`, `obra_hito_checks`, `obra_hito_photos`, `obra_hito_events`, `budget_revision_changes`, `budget_approvals`, plus `budget_generations` (AI runs) and `ai_usage` (one row per Claude call, with its cost), and the
+- Schema in `packages/db/src/schema/` by module (`tenants`, `users`, `projects`, `project-files`, `budget`, `budget-approvals`, `budget-exclusions`, `hitos`, `construction`, `ai`, `subcontractors`, `purchasing`, `purchase-requests`, `purchase-invoices`, `purchase-checks`, `planning`, `idempotency`, `warranty`, `relations`; `checks.ts` holds `COLUMN_VALUES`, `COLUMN_RANGES` and the CHECK helpers), re-exported by `packages/db/src/schema.ts`, the entry that drizzle-kit, the client, the test databases and `db:drift` read: a new module must be re-exported there — tables: `tenants`, `users`, `client_profiles`, `client_settings`, `push_tokens`, `accounts`, `sessions`, `verification_tokens`, `projects`, `project_documents`, `project_photos`, the construction control's `obra_chapter_progress`, `obra_progress_events`,
+  `obra_invoice_requests`, `obra_issues`, `obra_issue_files`, and the obra's `budget_revisions`, `budget_chapters`, `budget_lines`, `obra_hitos`, `obra_hito_chapters`, `obra_hito_checks`, `obra_hito_photos`, `obra_hito_events`, `budget_revision_changes`, `budget_approvals`, the tenant's `budget_exclusion_presets` (its library of "Gastos no incluidos"), plus `budget_generations` (AI runs) and `ai_usage` (one row per Claude call, with its cost), and the
   Subcontratas tables `subcontractors`, `subcontractor_workers`, `subcontractor_documents`, `subcontractor_document_versions`,
   `subcontractor_assignments`, `subcontractor_audit`, Compras' `purchase_orders`, `purchase_order_lines`,
   `purchase_order_events`, `purchase_order_documents`, `purchase_order_document_versions`, `purchase_order_milestones`, `purchase_invoices`, `purchase_invoice_lines`, `purchase_invoice_files`,
@@ -262,9 +262,10 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
 - **Deletes are soft.** What a user deletes is never erased: a project (admins; it leaves the portal and the client's
   app, whatever it holds), a project document or photo, an incident's file, a subcontractor's assignment to an obra
   (assigning again takes the same row back, and an obra's CAE document counts only while the company is assigned to
-  it), an order's document, a supplier's invoice or payment. Each keeps its row
+  it), an order's document, a supplier's invoice or payment, a line of the budget's library of "Gastos no incluidos"
+  (not listed on Elementos eliminados: under no project; adding its text again makes a new line). Each keeps its row
   and its files in the Blob store, with `deleted_at` and `deleted_by_id` (when and who), and **every read leaves it
-  out**, as if it were gone: lists, by-id lookups, joins, sums and counters. A new read of one of these 8 tables must
+  out**, as if it were gone: lists, by-id lookups, joins, sums and counters. A new read of one of these 9 tables must
   filter `deleted_at is null`, and a tenant-wide query must also leave out the rows of a deleted project
   (`projectInTenant`, `projectsInTenant`, `projectIdsInTenant`, `projectNotDeleted` and, in raw SQL, `inLiveProject` /
   `inLiveOrder` in `project-client.ts`; a child row read by its own id checks its project too, e.g. `requireOrder`,
@@ -583,6 +584,22 @@ In the portal, use the theme tokens (below), not these raw colours: verde oliva 
   only where the project has none. `revision.identity` shows a draft's differences (notice on Texts, one line on the
   summary; `takeProjectData`, `POST …/revisions/:revisionId/project-data`); issued revisions only get a note. Never
   writes to the project
+- Gastos no incluidos (Condiciones): a revision's own lines, `texts.exclusions` (text copies: the PDFs print them, an
+  issued revision keeps them, a copied one takes them along). On a draft they are a checklist against the tenant's
+  library (`budget-exclusions.ts`, `budgetExclusionsService`, table `budget_exclusion_presets`, up to
+  `MAX_EXCLUSION_PRESETS` lines, unique text among those not deleted): every library line with a tick box, then the
+  budget's own lines; a line is the library's when its text is the same (`exclusionChecklist` in `@repo/core/contract`).
+  A tenant starts from `DEFAULT_EXCLUSIONS`, written the first time its library is read (never again, even once every
+  line is deleted). Ticking is `updateRevision`'s `exclusion: { text, included, save?, replaces? }`: one line, merged
+  under the draft's row lock, FRAMER drafts only (`withExclusion`: a library line goes after the last ticked one before
+  it in the library, any other last; `replaces`, an edited line in the place of the old one); `save` ("Guardar para
+  otros proyectos") also adds it to the library in the same transaction (`exclusion_library_full`; a budget over 50
+  lines is `too_many_exclusions`). Editing or deleting (soft) a library
+  line never changes a budget; on the draft being edited a renamed ticked line follows. Admins/managers write, any
+  staff reads; viewers and issued revisions see just the lines that apply. API `GET`/`POST /api/v1/budgets/exclusions`,
+  `PATCH`/`DELETE …/:presetId`. Prod SQL (before the code): `packages/db/sql/2026-11-24-1200-budget-exclusion-presets.sql`
+- Opcionales: each option folds to its header (code, kind, name, price), "Desplegar todo" / "Plegar todo" from two
+  options on; the ones open are kept in the URL (`?abierto=OP1,OP3`, all by default; `useUrlState` in `BudgetScreen`)
 - Portal: Budget tab pages under `dashboard/projects/[id]/budget/` (summary, lines, options, texts, conditions,
   pdf; `?revision=` shows an older one, picked from the menu on the revision pill); `BudgetScreen` / `BudgetStartScreen` are the containers, views in
   `components/budget/`. Web-only: the app only sees the general PDF (Documentos), the contract via the obra and a

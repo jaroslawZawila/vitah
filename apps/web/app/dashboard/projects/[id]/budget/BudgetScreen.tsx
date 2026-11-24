@@ -6,6 +6,7 @@
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useOptimistic, useState } from "react";
+import { withExclusion } from "@repo/core/contract";
 import type {
   BudgetChapter,
   BudgetCheck,
@@ -14,6 +15,7 @@ import type {
   BudgetRevision,
   BudgetRevisionChangesInput,
   BudgetTexts,
+  ExclusionPreset,
   Hito,
   ProjectBudget,
   ProjectDocument,
@@ -27,6 +29,7 @@ import {
   addOptionAction,
   askApprovalAction,
   createRevisionAction,
+  deleteExclusionPresetAction,
   deleteLineAction,
   deleteOptionAction,
   deleteRevisionAction,
@@ -38,6 +41,7 @@ import {
   takeProjectDataAction,
   unlinkChangeAction,
   updateChapterAction,
+  updateExclusionPresetAction,
   updateLineAction,
   updateOptionAction,
   updateRevisionAction,
@@ -46,6 +50,7 @@ import {
 import { savePlanAction } from "../../../../actions/obra";
 import FormError from "../../../components/FormError";
 import { useConfirm, type ConfirmRequest } from "../../../components/useConfirm";
+import { openGroups, openParam, parseOpen, useUrlState } from "../../../components/useUrlState";
 import AcceptDialog, { type AcceptInput } from "../components/budget/AcceptDialog";
 import AcceptedBanner from "../components/budget/AcceptedBanner";
 import AskApprovalDialog from "../components/budget/AskApprovalDialog";
@@ -54,6 +59,7 @@ import { budgetHref, type BudgetTab } from "../components/budget/links";
 import ChangeApprovalCard, { type ChangeOption } from "../components/budget/ChangeApprovalCard";
 import ChapterSummary from "../components/budget/ChapterSummary";
 import ConditionsView from "../components/budget/ConditionsView";
+import type { ExclusionHandlers } from "../components/budget/ExclusionChecklist";
 import IdentityNotice from "../components/budget/IdentityNotice";
 import IssueDialog, { type IssueInput } from "../components/budget/IssueDialog";
 import type { LineOps, LineParent } from "../components/budget/LineTable";
@@ -93,9 +99,24 @@ type Props = {
   hitos: Hito[];
   /** The project's changes (CAM-), to link to a revision from Rev.1 on (the Summary tab). */
   changes?: ChangeOption[];
+  /** The company's library of "Gastos no incluidos" (the Conditions tab). */
+  exclusionLibrary?: ExclusionPreset[];
 };
 
-export default function BudgetScreen({ projectId, projectRef, site, clientName, budget, canManage, tab, chapterCode, inputs, hitos, changes = [] }: Props) {
+export default function BudgetScreen({
+  projectId,
+  projectRef,
+  site,
+  clientName,
+  budget,
+  canManage,
+  tab,
+  chapterCode,
+  inputs,
+  hitos,
+  changes = [],
+  exclusionLibrary = [],
+}: Props) {
   const t = useTranslations("budget");
   const f = useObraFormat();
   const router = useRouter();
@@ -104,7 +125,11 @@ export default function BudgetScreen({ projectId, projectRef, site, clientName, 
   const [checks, showTick] = useOptimistic(budget.revision.checks, (current, tick: { key: string; done: boolean }) =>
     current.map((c) => (c.key === tick.key ? { ...c, done: tick.done } : c)),
   );
-  const revision = { ...budget.revision, checks };
+  // And so do the "Gastos no incluidos" ticked, placed as the server places them.
+  const [exclusions, showExclusion] = useOptimistic(budget.revision.texts.exclusions, (current, tick: { text: string; included: boolean }) =>
+    withExclusion(current, tick.text, tick.included, exclusionLibrary.map((preset) => preset.label)),
+  );
+  const revision = { ...budget.revision, checks, texts: { ...budget.revision.texts, exclusions } };
   const { state, pending, run, reset } = useObraAction();
   const confirm = useConfirm("obra.errors");
   /** Asks first; the dialog runs `action` and shows its error. */
@@ -118,6 +143,10 @@ export default function BudgetScreen({ projectId, projectRef, site, clientName, 
       action,
     });
   };
+  // The options unfolded, in the URL (`?abierto=OP1,OP3`; all of them by default).
+  const [unfolded, setUnfolded] = useUrlState((params) => parseOpen(params.get("abierto")), (open) => ({ abierto: openParam(open) }));
+  const optionCodes = budget.revision.options.map((option) => option.code);
+  const optionFolds = openGroups(unfolded, optionCodes, optionCodes, setUnfolded);
   const [dialog, setDialog] = useState<Dialog | null>(null);
   const editable = canManage && revision.status === "draft";
   const isNewest = revisions[0]?.id === revision.id;
@@ -249,6 +278,23 @@ export default function BudgetScreen({ projectId, projectRef, site, clientName, 
     onDeleteOption: (option) => ask("options.deleteDialog", { name: option.name }, () => deleteOptionAction(projectId, option.id)),
   };
   const saveTexts = (texts: Partial<BudgetTexts>) => saveRevision({ texts });
+  const exclusionHandlers: ExclusionHandlers = {
+    // One line per save, merged on the server: quick ticks don't undo each other.
+    onTick: (text, included, save, onDone) =>
+      run(async () => {
+        showExclusion({ text, included });
+        return updateRevision({ exclusion: { text, included, ...(save ? { save } : {}) } });
+      }, onDone),
+    onEdit: (line, text) => saveRevision({ exclusion: { text, included: true, replaces: line } }),
+    onRenamePreset: (preset, label) =>
+      run(async () => {
+        const renamed = await updateExclusionPresetAction(projectId, preset.id, { label });
+        if (!renamed?.success || !revision.texts.exclusions.includes(preset.label)) return renamed;
+        // This budget had the line: it follows the new text, in its place (other budgets keep theirs).
+        return updateRevision({ exclusion: { text: label, included: true, replaces: preset.label } });
+      }),
+    onDeletePreset: (preset) => ask("conditions.deletePresetDialog", { label: preset.label }, () => deleteExclusionPresetAction(projectId, preset.id)),
+  };
   const saveConditions = (conditions: Partial<BudgetConditions>) => saveRevision({ conditions });
 
   function issue(input: IssueInput) {
@@ -299,7 +345,7 @@ export default function BudgetScreen({ projectId, projectRef, site, clientName, 
       body = <LinesView revision={revision} code={chapterCode ?? "01"} hrefOf={chapterHref} optionsHref={href("/options")} handlers={editable ? lineHandlers : undefined} />;
       break;
     case "options":
-      body = <OptionsView revision={revision} handlers={editable && revision.model ? optionHandlers : undefined} />;
+      body = <OptionsView revision={revision} folds={optionFolds} handlers={editable && revision.model ? optionHandlers : undefined} />;
       break;
     case "texts":
       body = (
@@ -320,6 +366,8 @@ export default function BudgetScreen({ projectId, projectRef, site, clientName, 
         <ConditionsView
           revision={revision}
           hitos={hitos}
+          exclusionLibrary={exclusionLibrary}
+          exclusionHandlers={editable ? exclusionHandlers : undefined}
           onTexts={editable ? saveTexts : undefined}
           onConditions={editable ? saveConditions : undefined}
           onEditPlan={canManage ? () => open({ kind: "plan" }) : undefined}

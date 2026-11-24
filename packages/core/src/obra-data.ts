@@ -90,6 +90,9 @@ const STATUS: Record<ObraError, number> = {
   project_not_found: 404,
   dependency_cycle: 400,
   idempotency_key_reused: 409,
+  exclusion_exists: 409,
+  exclusion_library_full: 409,
+  too_many_exclusions: 409,
   not_found: 404,
   forbidden: 403,
 };

@@ -30,7 +30,7 @@ export const CLIENT_MESSAGES = {
   // The project list (its budget and stage pills) and a new project; every project's tabs below.
   "dashboard/projects": ["budget.revisionPill", "budgetsOverview.pill", "construction.scheduleStatus", "newProjectPage", "obra", "projectsPage"],
   "dashboard/projects/[id]": ["construction.photos", "projectDetailPage"],
-  "dashboard/projects/[id]/budget": ["budget"],
+  "dashboard/projects/[id]/budget": ["budget", "construction.filters"],
   "dashboard/projects/[id]/obra": [
     "construction",
     "subcontractors.companies.attention",

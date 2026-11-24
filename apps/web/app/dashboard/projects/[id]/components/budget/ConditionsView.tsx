@@ -1,8 +1,7 @@
 "use client";
 
-import { Trash2 } from "lucide-react";
 import { useTranslations } from "next-intl";
-import type { BudgetConditions, BudgetRevision, BudgetTexts, Hito } from "@repo/core/contract";
+import type { BudgetConditions, BudgetRevision, BudgetTexts, ExclusionPreset, Hito } from "@repo/core/contract";
 import { ofBp } from "@repo/core/obra-calc";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,7 +9,7 @@ import { cardVariants } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { cardHead, codeChip, columns, muted, table } from "../obra/classes";
 import { useObraFormat } from "../obra/format";
-import { removeAt, replaceAt } from "./lists";
+import ExclusionChecklist, { type ExclusionHandlers } from "./ExclusionChecklist";
 import SaveOnBlur from "./SaveOnBlur";
 
 const COLUMNS = "48px minmax(180px, 1fr) 70px 120px minmax(160px, 1.2fr)";
@@ -23,12 +22,17 @@ const COLUMNS = "48px minmax(180px, 1fr) 70px 120px minmax(160px, 1.2fr)";
 export default function ConditionsView({
   revision,
   hitos,
+  exclusionLibrary,
+  exclusionHandlers,
   onTexts,
   onConditions,
   onEditPlan,
 }: {
   revision: BudgetRevision;
   hitos: Hito[];
+  /** The company's library of "Gastos no incluidos" (a draft's checklist). */
+  exclusionLibrary: ExclusionPreset[];
+  exclusionHandlers?: ExclusionHandlers;
   onTexts?: (texts: Partial<BudgetTexts>) => void;
   onConditions?: (conditions: Partial<BudgetConditions>) => void;
   onEditPlan?: () => void;
@@ -38,7 +42,6 @@ export default function ConditionsView({
   const pctTotal = hitos.reduce((sum, h) => sum + h.pctBp, 0);
   const base = revision.contractTotalCents;
   const { texts, conditions } = revision;
-  const saveExclusions = (exclusions: string[]) => onTexts?.({ exclusions });
 
   return (
     <div className="flex flex-col gap-4.5">
@@ -87,24 +90,7 @@ export default function ConditionsView({
             <p className="eyebrow">{t("bothPdfs")}</p>
             <h2 id="exclusions-title">{t("exclusions")}</h2>
           </div>
-          <ol className="flex flex-col">
-            {texts.exclusions.map((item, i) => (
-              <li key={`${i}-${item}`} className="flex items-start gap-2.5 border-t py-2">
-                <span className="num pt-2 text-muted-foreground">{i + 1}</span>
-                <SaveOnBlur label={t("exclusion", { n: i + 1 })} value={item} multiline rows={2} className="flex-1" onSave={onTexts ? (value) => saveExclusions(replaceAt(texts.exclusions, i, value)) : undefined} />
-                {onTexts && (
-                  <Button type="button" variant="ghost" size="icon-sm" className="hover:text-bad" aria-label={t("removeExclusion", { n: i + 1 })} onClick={() => saveExclusions(removeAt(texts.exclusions, i))}>
-                    <Trash2 aria-hidden />
-                  </Button>
-                )}
-              </li>
-            ))}
-          </ol>
-          {onTexts && (
-            <Button type="button" variant="ghost" size="sm" className="w-fit" onClick={() => saveExclusions([...texts.exclusions, t("newExclusion")])}>
-              + {t("addExclusion")}
-            </Button>
-          )}
+          <ExclusionChecklist exclusions={texts.exclusions} library={exclusionLibrary} handlers={exclusionHandlers} />
           <label className="flex flex-col gap-1.5 text-meta font-semibold text-muted-foreground">
             {t("includes")}
             <SaveOnBlur key={texts.includes} label={t("includes")} multiline rows={3} value={texts.includes} onSave={onTexts ? (includes) => onTexts({ includes }) : undefined} />

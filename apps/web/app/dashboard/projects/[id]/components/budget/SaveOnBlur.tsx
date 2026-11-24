@@ -18,6 +18,7 @@ export default function SaveOnBlur({
   placeholder,
   className,
   invalid,
+  autoFocus,
 }: {
   value: string;
   onSave?: (value: string) => void;
@@ -28,12 +29,15 @@ export default function SaveOnBlur({
   className?: string;
   /** Marks a field the AI couldn't fill (shown amber). */
   invalid?: boolean;
+  /** Takes the focus when it appears (a field opened for editing). */
+  autoFocus?: boolean;
 }) {
   const [text, setText] = useState(value);
   const common = {
     "aria-label": label,
     value: text,
     placeholder,
+    autoFocus,
     readOnly: !onSave,
     onChange: (event: React.ChangeEvent<HTMLInputElement & HTMLTextAreaElement>) => setText(event.target.value),
     onBlur: () => {

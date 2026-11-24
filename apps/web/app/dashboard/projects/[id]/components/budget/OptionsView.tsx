@@ -1,12 +1,16 @@
 "use client";
 
+import { ChevronRight } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { codeRange, OPTION_KINDS, type BudgetOption, type BudgetRevision, type OptionKind, type PriceBaseItem } from "@repo/core/contract";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cardVariants } from "@/components/ui/card";
 import { NativeSelect } from "@/components/ui/native-select";
-import { muted } from "../obra/classes";
+import { cn } from "@/lib/utils";
+import type { openGroups } from "../../../../components/useUrlState";
+import { FoldAllButtons } from "../construction/Filters";
+import { codeChip, muted } from "../obra/classes";
 import { useObraFormat } from "../obra/format";
 import Kpi from "../obra/Kpi";
 import LineTable, { type LineOps } from "./LineTable";
@@ -22,12 +26,16 @@ export type OptionHandlers = LineOps & {
   onDeleteOption: (option: BudgetOption) => void;
 };
 
+/** Which options are unfolded, and how to change it (the container keeps it in the URL: `openGroups`). */
+type OptionFolds = ReturnType<typeof openGroups>;
+
 /**
  * Presentational: the options below the twenty chapters, each a "Partida
  * opcional" with its OP lines. Adding (extras) or subtracting (alternatives,
- * deductions); the client chooses on acceptance.
+ * deductions); the client chooses on acceptance. Each folds to its header
+ * (code, name, price), and all of them at once.
  */
-export default function OptionsView({ revision, handlers }: { revision: BudgetRevision; handlers?: OptionHandlers }) {
+export default function OptionsView({ revision, folds, handlers }: { revision: BudgetRevision; folds: OptionFolds; handlers?: OptionHandlers }) {
   const t = useTranslations("budget.options");
   const f = useObraFormat();
   const { adding, subtracting } = revision.optionTotals;
@@ -58,29 +66,72 @@ export default function OptionsView({ revision, handlers }: { revision: BudgetRe
         )}
       </div>
 
+      {revision.options.length > 1 && (
+        <FoldAllButtons allOpen={folds.allOpen} noneOpen={folds.noneOpen} onExpand={folds.expandAll} onCollapse={folds.collapseAll} className="self-end" />
+      )}
       {revision.options.length === 0 && <p className={`${cardVariants()} ${muted}`}>{t("none")}</p>}
       {revision.options.map((option) => (
-        <section key={option.id} className={cardVariants()} aria-label={option.name}>
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="flex min-w-0 flex-col gap-1.5">
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge variant={OPTION_VARIANT[option.optionKind]}>{t(`kinds.${option.optionKind}`)}</Badge>
-                <span className="eyebrow">{t("range", { range: codeRange(option.lines) })}</span>
-                {option.chosen === true && <Badge variant="good">{t("chosen")}</Badge>}
-                {option.chosen === false && <Badge variant="outline">{t("declined")}</Badge>}
-              </div>
-              {handlers ? (
-                <SaveOnBlur key={option.id + option.name} label={t("name")} value={option.name} onSave={(name) => handlers.onUpdateOption(option, { name })} className="h-9 min-w-[280px] font-heading text-xl font-bold" />
-              ) : (
-                <h2>{option.name}</h2>
-              )}
-              {option.replacesLine && <p className={muted}>{t("replaces", { code: option.replacesLine })}</p>}
+        <OptionCard key={option.id} option={option} open={folds.isOpen(option.code)} onToggle={() => folds.toggle(option.code)} handlers={handlers} />
+      ))}
+
+      <section className="grid gap-3.5 md:grid-cols-3">
+        <Kpi label={t("pec")} value={f.money(revision.totalCents)} hints={[t("pecHint")]} />
+        <Kpi label={t("withAdding")} value={f.money(revision.totalCents + adding.cents)} hints={[f.signedMoney(adding.cents)]} />
+        <Kpi label={t("withSubtracting")} value={f.money(revision.totalCents + subtracting.cents)} hints={[f.money(subtracting.cents)]} />
+      </section>
+    </div>
+  );
+}
+
+/** One "Partida opcional": folded, its header only (code, kind, name, price); open, its lines and fields too. */
+function OptionCard({ option, open, onToggle, handlers }: { option: BudgetOption; open: boolean; onToggle: () => void; handlers?: OptionHandlers }) {
+  const t = useTranslations("budget.options");
+  const f = useObraFormat();
+  const bodyId = `option-${option.code}-body`;
+
+  return (
+    <section className={cardVariants()} aria-label={option.name}>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex min-w-0 flex-1 items-start gap-1.5">
+          <button
+            type="button"
+            aria-expanded={open}
+            aria-controls={bodyId}
+            aria-label={t(open ? "fold" : "unfold", { code: option.code })}
+            onClick={onToggle}
+            className="-ml-1.5 grid size-8 flex-none cursor-pointer place-items-center rounded-md text-muted-foreground hover:bg-raise hover:text-foreground pointer-coarse:size-11"
+          >
+            <ChevronRight aria-hidden className={cn("size-4 transition-transform", open && "rotate-90")} />
+          </button>
+          <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className={codeChip}>{option.code}</span>
+              <Badge variant={OPTION_VARIANT[option.optionKind]}>{t(`kinds.${option.optionKind}`)}</Badge>
+              {open && <span className="eyebrow">{t("range", { range: codeRange(option.lines) })}</span>}
+              {option.chosen === true && <Badge variant="good">{t("chosen")}</Badge>}
+              {option.chosen === false && <Badge variant="outline">{t("declined")}</Badge>}
             </div>
-            <span className="flex flex-col items-end">
-              <span className="num text-xl font-semibold">{f.signedMoney(option.priceCents)}</span>
-              <span className={muted}>{t("price")}</span>
-            </span>
+            {handlers && open ? (
+              <SaveOnBlur
+                key={option.id + option.name}
+                label={t("name")}
+                value={option.name}
+                onSave={(name) => handlers.onUpdateOption(option, { name })}
+                className="h-9 font-heading text-xl font-bold sm:min-w-[280px]"
+              />
+            ) : (
+              <h2 className="min-w-0 break-words">{option.name}</h2>
+            )}
+            {open && option.replacesLine && <p className={muted}>{t("replaces", { code: option.replacesLine })}</p>}
           </div>
+        </div>
+        <span className="flex flex-col items-end max-sm:w-full max-sm:flex-row max-sm:items-baseline max-sm:justify-between">
+          <span className={cn(muted, "sm:order-last")}>{t("price")}</span>
+          <span className="num text-xl font-semibold">{f.signedMoney(option.priceCents)}</span>
+        </span>
+      </div>
+      {open && (
+        <div id={bodyId} className="flex flex-col gap-3.5">
           {handlers && (
             <div className="flex flex-wrap items-end gap-3">
               <label className="flex flex-col gap-1 text-meta font-semibold text-muted-foreground">
@@ -131,14 +182,8 @@ export default function OptionsView({ revision, handlers }: { revision: BudgetRe
             )}
             <strong className="text-sm">{t("total", { name: option.name, amount: f.money(option.totalCents) })}</strong>
           </div>
-        </section>
-      ))}
-
-      <section className="grid gap-3.5 md:grid-cols-3">
-        <Kpi label={t("pec")} value={f.money(revision.totalCents)} hints={[t("pecHint")]} />
-        <Kpi label={t("withAdding")} value={f.money(revision.totalCents + adding.cents)} hints={[f.signedMoney(adding.cents)]} />
-        <Kpi label={t("withSubtracting")} value={f.money(revision.totalCents + subtracting.cents)} hints={[f.money(subtracting.cents)]} />
-      </section>
-    </div>
+        </div>
+      )}
+    </section>
   );
 }

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -18,6 +18,7 @@ vi.mock("../../../../actions/budget", () => ({
   unlinkChangeAction: vi.fn(),
   withdrawApprovalAction: vi.fn(),
   createRevisionAction: vi.fn(),
+  deleteExclusionPresetAction: vi.fn(),
   deleteLineAction: vi.fn(),
   deleteOptionAction: vi.fn(),
   deleteRevisionAction: vi.fn(),
@@ -27,13 +28,18 @@ vi.mock("../../../../actions/budget", () => ({
   searchPriceBaseAction: vi.fn(),
   takeProjectDataAction: vi.fn(),
   updateChapterAction: vi.fn(),
+  updateExclusionPresetAction: vi.fn(),
   updateLineAction: vi.fn(),
   updateOptionAction: vi.fn(),
   updateRevisionAction: vi.fn(),
 }));
 vi.mock("../../../../actions/obra", () => ({ savePlanAction: vi.fn() }));
 const push = vi.fn();
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push, refresh: vi.fn() }) }));
+// The app router's search params follow history.replaceState; jsdom's location stands in for them.
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push, refresh: vi.fn() }),
+  useSearchParams: () => new URLSearchParams(window.location.search),
+}));
 const actions = await import("../../../../actions/budget");
 
 type Budget = ProjectBudget & { revision: BudgetRevision };
@@ -686,5 +692,171 @@ describe("BudgetScreen: a change to the contract and the client's approval in th
 
     expect(card().getByText(/El proyecto no tiene cliente de la app/)).toBeInTheDocument();
     expect(card().queryByRole("button", { name: "Pedir aprobación en la app" })).not.toBeInTheDocument();
+  });
+});
+
+describe("BudgetScreen: Gastos no incluidos as a checklist", () => {
+  // The draft excludes "Estudio geotécnico" (in the library) and "Mobiliario" (its own).
+  const library = [
+    { id: "preset-1", label: "Estudio geotécnico" },
+    { id: "preset-2", label: "Licencia de obras" },
+  ];
+  const conditions = (props: Partial<Parameters<typeof BudgetScreen>[0]> = {}) => {
+    renderScreen({ tab: "conditions", exclusionLibrary: library, ...props });
+    return within(screen.getByRole("region", { name: "Gastos no incluidos en el presupuesto" }));
+  };
+
+  it("ticks the library's lines the budget has, and lists its own below", () => {
+    const section = conditions();
+
+    expect(section.getByRole("checkbox", { name: "Estudio geotécnico" })).toBeChecked();
+    expect(section.getByRole("checkbox", { name: "Licencia de obras" })).not.toBeChecked();
+    expect(section.getByText("Solo en este presupuesto")).toBeInTheDocument();
+    expect(section.getByLabelText("Exclusión 1 de este presupuesto")).toHaveValue("Mobiliario");
+  });
+
+  it("saves each tick as one line, showing it at once", async () => {
+    const release = holdSaves();
+    const section = conditions();
+
+    await userEvent.click(section.getByRole("checkbox", { name: "Licencia de obras" }));
+    await userEvent.click(section.getByRole("checkbox", { name: "Estudio geotécnico" }));
+
+    expect(section.getByRole("checkbox", { name: "Licencia de obras" })).toBeChecked();
+    expect(section.getByRole("checkbox", { name: "Estudio geotécnico" })).not.toBeChecked();
+    expect(actions.updateRevisionAction).toHaveBeenCalledWith("p-1", "rev-1", { exclusion: { text: "Licencia de obras", included: true } });
+    expect(actions.updateRevisionAction).toHaveBeenCalledWith("p-1", "rev-1", { exclusion: { text: "Estudio geotécnico", included: false } });
+    await release();
+  });
+
+  it("adds a line to this budget, or to the library too", async () => {
+    const section = conditions();
+    const field = section.getByLabelText("Nueva línea de gastos no incluidos");
+
+    expect(section.getByRole("button", { name: "+ Añadir línea" })).toBeDisabled();
+    await userEvent.type(field, "Piscina ");
+    await userEvent.click(section.getByRole("button", { name: "+ Añadir línea" }));
+    await waitFor(() => expect(actions.updateRevisionAction).toHaveBeenCalledWith("p-1", "rev-1", { exclusion: { text: "Piscina", included: true } }));
+    await waitFor(() => expect(field).toHaveValue(""));
+
+    await userEvent.type(field, "Acometidas");
+    await userEvent.click(section.getByRole("checkbox", { name: "Guardar para otros proyectos" }));
+    await userEvent.click(section.getByRole("button", { name: "+ Añadir línea" }));
+    await waitFor(() =>
+      expect(actions.updateRevisionAction).toHaveBeenCalledWith("p-1", "rev-1", { exclusion: { text: "Acometidas", included: true, save: true } }),
+    );
+    // One of its own lines, kept for other projects or taken off.
+    await userEvent.click(section.getByRole("button", { name: "Guardar la exclusión 1 para otros proyectos" }));
+    expect(actions.updateRevisionAction).toHaveBeenCalledWith("p-1", "rev-1", { exclusion: { text: "Mobiliario", included: true, save: true } });
+  });
+
+  it("keeps what was typed when the line is refused", async () => {
+    vi.mocked(actions.updateRevisionAction).mockResolvedValue({ error: "exclusion_library_full" });
+    const section = conditions();
+    const field = section.getByLabelText("Nueva línea de gastos no incluidos");
+
+    await userEvent.type(field, "Acometidas");
+    await userEvent.click(section.getByRole("checkbox", { name: "Guardar para otros proyectos" }));
+    await userEvent.click(section.getByRole("button", { name: "+ Añadir línea" }));
+
+    expect(await screen.findByText(/La lista de la empresa está llena/)).toBeInTheDocument();
+    expect(field).toHaveValue("Acometidas");
+    expect(section.getByRole("checkbox", { name: "Guardar para otros proyectos" })).toBeChecked();
+  });
+
+  it("edits a library line, which this budget's tick follows, and removes one once confirmed", async () => {
+    const section = conditions();
+
+    await userEvent.click(section.getByRole("button", { name: "Editar la línea 1 de la lista" }));
+    const field = section.getByLabelText("Línea 1 de la lista");
+    expect(field).toHaveFocus();
+    await userEvent.clear(field);
+    await userEvent.type(field, "Estudio geotécnico definitivo");
+    await userEvent.tab();
+    await waitFor(() => expect(actions.updateExclusionPresetAction).toHaveBeenCalledWith("p-1", "preset-1", { label: "Estudio geotécnico definitivo" }));
+    await waitFor(() =>
+      expect(actions.updateRevisionAction).toHaveBeenCalledWith("p-1", "rev-1", {
+        exclusion: { text: "Estudio geotécnico definitivo", included: true, replaces: "Estudio geotécnico" },
+      }),
+    );
+
+    // One of the budget's own lines, edited in its place.
+    const own = section.getByLabelText("Exclusión 1 de este presupuesto");
+    await userEvent.clear(own);
+    await userEvent.type(own, "Mobiliario y cocina");
+    await userEvent.tab();
+    await waitFor(() =>
+      expect(actions.updateRevisionAction).toHaveBeenCalledWith("p-1", "rev-1", { exclusion: { text: "Mobiliario y cocina", included: true, replaces: "Mobiliario" } }),
+    );
+
+    await userEvent.click(section.getByRole("button", { name: "Quitar la línea 2 de la lista" }));
+    const dialog = await confirmation("¿Quitar la línea de la lista?");
+    expect(dialog.getByText(/«Licencia de obras» deja de ofrecerse/)).toBeInTheDocument();
+    await userEvent.click(dialog.getByRole("button", { name: "Quitar de la lista" }));
+    expect(actions.deleteExclusionPresetAction).toHaveBeenCalledWith("p-1", "preset-2");
+  });
+
+  it("shows viewers and an issued revision just the lines that apply", () => {
+    for (const props of [{ canManage: false }, { budget: issued }]) {
+      const section = conditions(props);
+      expect(section.queryByRole("checkbox")).not.toBeInTheDocument();
+      expect(section.getByText("Estudio geotécnico")).toBeInTheDocument();
+      expect(section.getByText("Mobiliario")).toBeInTheDocument();
+      expect(section.queryByText("Licencia de obras")).not.toBeInTheDocument();
+      cleanup();
+    }
+  });
+});
+
+describe("BudgetScreen: folding the options", () => {
+  const twoOptions: Budget = {
+    ...draft,
+    revision: {
+      ...draft.revision,
+      options: [draft.revision.options[0]!, { ...draft.revision.options[0]!, id: "option-2", code: "OP2", name: "Pérgola bioclimática" }],
+    },
+  };
+  const goTo = (url: string) => window.history.replaceState(null, "", url);
+  beforeEach(() => goTo("/"));
+
+  it("folds an option to its header and back, keeping it in the URL", async () => {
+    renderScreen({ tab: "options", budget: twoOptions });
+    const option = within(screen.getByRole("region", { name: "Piscina desbordante" }));
+
+    expect(option.getByLabelText("Nombre de la partida opcional")).toBeInTheDocument();
+    await userEvent.click(option.getByRole("button", { name: "Plegar OP1" }));
+
+    expect(option.queryByLabelText("Nombre de la partida opcional")).not.toBeInTheDocument();
+    expect(option.queryByText("Vaso de hormigón armado")).not.toBeInTheDocument();
+    expect(option.getByRole("heading", { name: "Piscina desbordante" })).toBeInTheDocument();
+    expect(option.getByText("OP1")).toBeInTheDocument();
+    expect(option.getByRole("button", { name: "Desplegar OP1" })).toHaveAttribute("aria-expanded", "false");
+    expect(window.location.search).toBe("?abierto=OP2");
+
+    await userEvent.click(option.getByRole("button", { name: "Desplegar OP1" }));
+    expect(option.getByText("Vaso de hormigón armado")).toBeInTheDocument();
+    expect(window.location.search).toBe("");
+  });
+
+  it("folds and unfolds them all, and opens as the URL says", async () => {
+    goTo("/?abierto=OP2");
+    renderScreen({ tab: "options", budget: twoOptions });
+
+    expect(screen.getByRole("button", { name: "Desplegar OP1" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Plegar OP2" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Plegar todo" }));
+    expect(screen.queryByLabelText("Nombre de la partida opcional")).not.toBeInTheDocument();
+    expect(window.location.search).toBe("?abierto=");
+    expect(screen.getByRole("button", { name: "Plegar todo" })).toBeDisabled();
+
+    await userEvent.click(screen.getByRole("button", { name: "Desplegar todo" }));
+    expect(screen.getAllByLabelText("Nombre de la partida opcional")).toHaveLength(2);
+    expect(window.location.search).toBe("");
+  });
+
+  it("offers no fold-all for a single option", () => {
+    renderScreen({ tab: "options" });
+    expect(screen.queryByRole("button", { name: "Plegar todo" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Plegar OP1" })).toBeInTheDocument();
   });
 });

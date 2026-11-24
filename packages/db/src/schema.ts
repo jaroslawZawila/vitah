@@ -25,6 +25,7 @@ export * from "./schema/projects";
 export * from "./schema/project-files";
 export * from "./schema/budget";
 export * from "./schema/budget-approvals";
+export * from "./schema/budget-exclusions";
 export * from "./schema/hitos";
 export * from "./schema/construction";
 export * from "./schema/ai";

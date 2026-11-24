@@ -5,6 +5,7 @@
 
 import {
   budgetApprovalsService as approvals,
+  budgetExclusionsService as exclusions,
   budgetGenerationsService as generations,
   budgetIssueService as issue,
   budgetOptionsService as options,
@@ -16,6 +17,7 @@ import {
   type BudgetLineChangesInput,
   type BudgetOptionChangesInput,
   type BudgetRevisionChangesInput,
+  type ExclusionPresetInput,
   type IssueRevisionInput,
   type NewBudgetLineInput,
   type NewBudgetOptionInput,
@@ -65,6 +67,24 @@ export async function createRevisionAction(projectId: string): Promise<ObraState
 
 export async function updateRevisionAction(projectId: string, revisionId: string, input: BudgetRevisionChangesInput): Promise<ObraState> {
   return mutate(projectId, (ctx) => svc.updateRevision(ctx, projectId, revisionId, input));
+}
+
+/** The tenant's library of "Gastos no incluidos", for a draft's checklist (Condiciones). */
+export async function getExclusionPresets() {
+  return (await read((ctx) => exclusions.listExclusionPresets(ctx)))?.data ?? [];
+}
+
+/** A line into the library (the project's pages are refreshed: the checklist shows it). */
+export async function createExclusionPresetAction(projectId: string, input: ExclusionPresetInput): Promise<ObraState> {
+  return mutate(projectId, (ctx) => exclusions.createExclusionPreset(ctx, input));
+}
+
+export async function updateExclusionPresetAction(projectId: string, presetId: string, input: ExclusionPresetInput): Promise<ObraState> {
+  return mutate(projectId, (ctx) => exclusions.updateExclusionPreset(ctx, presetId, input));
+}
+
+export async function deleteExclusionPresetAction(projectId: string, presetId: string): Promise<ObraState> {
+  return mutate(projectId, (ctx) => exclusions.deleteExclusionPreset(ctx, presetId));
 }
 
 /** "Usar los datos del proyecto": the draft's cover takes the project's client and address. */

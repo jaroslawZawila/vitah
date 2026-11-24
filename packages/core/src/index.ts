@@ -20,6 +20,7 @@ export * as budgetService from "./budget";
 export * as budgetOptionsService from "./budget-options";
 export * as budgetIssueService from "./budget-issue";
 export * as budgetApprovalsService from "./budget-approvals";
+export * as budgetExclusionsService from "./budget-exclusions";
 export * as budgetGenerationsService from "./budget-generations";
 export * as budgetOverviewService from "./budget-overview";
 export { searchPriceBase } from "./price-base";

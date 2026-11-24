@@ -1,7 +1,8 @@
 import { budgetService } from "@repo/core";
 import { readJson, withContext } from "../../../../../../../../lib/api";
 
-// PATCH  { reference?, vatRateBp?, builtAreaM2?, usefulAreaM2?, exclusions?, contingencyPct?, overheadPct? (0–50), profitPct? (0–50): both % of the price, together under 100, reviewed?: { key, done } } (drafts)
+// PATCH  { reference?, vatRateBp?, builtAreaM2?, usefulAreaM2?, exclusions?, contingencyPct?, overheadPct? (0–50), profitPct? (0–50): both % of the price, together under 100, reviewed?: { key, done },
+//          exclusion?: { text, included, save? } (one "Gasto no incluido" ticked or not; `save` also adds it to /api/v1/budgets/exclusions) } (drafts)
 // DELETE (drafts)
 
 type Params = { params: Promise<{ id: string; revisionId: string }> };

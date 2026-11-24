@@ -36,6 +36,7 @@ describe("soft deletion in the codebase", () => {
   it("knows the soft-deleted tables, and what lies under a project, from the schema", () => {
     expect([...schema.soft].sort()).toEqual(
       [
+        "budgetExclusionPresets",
         "obraIssueFiles",
         "projectDocuments",
         "projectPhotos",
@@ -106,6 +107,8 @@ describe("soft deletion in the codebase", () => {
     );
     const narrowing = Object.fromEntries(schema.soft.map((t) => [t, [...schema.tables.get(t)!.scoping].sort()]));
     expect(narrowing).toEqual({
+      // A tenant's own, under no project.
+      budgetExclusionPresets: [],
       projects: ["id"],
       projectDocuments: ["budgetRevisionId", "id", "projectId"],
       projectPhotos: ["id", "projectId"],

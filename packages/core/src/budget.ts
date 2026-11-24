@@ -56,7 +56,9 @@ import {
   type BudgetTexts,
   type ChapterChange,
   type ProjectBudget,
+  withExclusion,
 } from "./contract";
+import { addToLibrary, libraryOf } from "./budget-exclusions";
 import { getLatestGeneration } from "./budget-generations";
 import { createDefaultHitos } from "./hitos";
 import {
@@ -64,6 +66,7 @@ import {
   chapterChangesSchema,
   lineBaseSchema,
   lineChangesSchemas,
+  MAX_EXCLUSIONS,
   MAX_REVIEWED,
   newBudgetSchema,
   newChapterSchema,
@@ -570,7 +573,10 @@ function mergeTexts(sent: TextsChanges, current: BudgetTexts): BudgetTexts {
  * Body: any of { reference, vatRateBp, builtAreaM2, usefulAreaM2, exclusions,
  * contingencyPct, overheadPct, profitPct, quality, changeReason, texts (partial), conditions (partial),
  * review: { done: string[] } (the whole list), reviewed: { key, done } (one
- * check, merged with the stored list) } — drafts only.
+ * check, merged with the stored list), exclusion: { text, included, save?, replaces? }
+ * (one "Gasto no incluido" ticked or not, merged with the stored ones in the
+ * library's order: ./budget-exclusions; `save` also adds it to the library;
+ * `replaces`, a line of the budget it takes the place of) } — drafts only.
  */
 export async function updateRevision(
   ctx: Ctx,
@@ -579,7 +585,7 @@ export async function updateRevision(
   input: Record<string, unknown>,
 ) {
   const revision = await revisionInProject(ctx, projectId, revisionId);
-  const { builtAreaM2, usefulAreaM2, contingencyPct, overheadPct, profitPct, texts, exclusions, conditions, review, reviewed, ...columns } =
+  const { builtAreaM2, usefulAreaM2, contingencyPct, overheadPct, profitPct, texts, exclusions, exclusion, conditions, review, reviewed, ...columns } =
     changesOf(parse(revisionChangesSchema, input));
   const framer = revision.model === BUDGET_MODEL;
   const changes: Partial<typeof budgetRevisions.$inferInsert> = columns;
@@ -601,8 +607,23 @@ export async function updateRevision(
   }
   if (conditions) changes.conditions = { ...readConditions(revision.conditions), ...changesOf(conditions) };
   if (review) changes.review = { done: [...new Set(review.done)] };
-  if (Object.keys(changes).length > 0 || reviewed) {
+  // The checklist is a FRAMER budget's: an older one keeps its lines as one text (`exclusions`).
+  if (exclusion && !framer) fail("invalid_state");
+  if (Object.keys(changes).length > 0 || reviewed || exclusion) {
     await inDraft(revisionId, async (tx) => {
+      if (exclusion) {
+        const { text, included, save, replaces } = exclusion;
+        // "Guardar para otros proyectos": the line joins the tenant's library with the draft's write.
+        if (save) await addToLibrary(ctx, text, tx);
+        // Where a ticked line goes: among the library's, in its order.
+        const library = included ? (await libraryOf(ctx.tenantId, tx)).map((preset) => preset.label) : [];
+        // Read under inDraft's row lock, like `reviewed`: lines ticked together all stick.
+        const [row] = await tx.select({ texts: budgetRevisions.texts }).from(budgetRevisions).where(eq(budgetRevisions.id, revisionId));
+        const stored = (changes.texts as BudgetTexts | undefined) ?? readTexts(row?.texts);
+        const next = withExclusion(stored.exclusions, text, included, library, replaces);
+        if (next.length > MAX_EXCLUSIONS) fail("too_many_exclusions");
+        changes.texts = { ...stored, exclusions: next };
+      }
       if (reviewed) {
         // Read under inDraft's row lock, so ticks sent together (two people, quick
         // clicks) all stick, and keys whose check is hidden for now are kept.

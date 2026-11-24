@@ -804,7 +804,10 @@
       "already_approved": "El cliente ya la aprobó: registra la aceptación.",
       "approval_closed": "La petición ya no está abierta.",
       "not_a_change": "Solo se vinculan cambios (CAM-), no incidencias.",
-      "links_frozen": "Los cambios vinculados no se pueden tocar: el cliente ya la tiene para aprobar, o la revisión ya está decidida."
+      "links_frozen": "Los cambios vinculados no se pueden tocar: el cliente ya la tiene para aprobar, o la revisión ya está decidida.",
+      "exclusion_exists": "Ya hay una línea con ese texto en la lista.",
+      "exclusion_library_full": "La lista de la empresa está llena: quita alguna línea de la lista antes de guardar otra.",
+      "too_many_exclusions": "Este presupuesto ya tiene el máximo de gastos no incluidos: quita alguno antes de añadir otro."
     }
   },
   "construction": {
@@ -1763,7 +1766,9 @@
         "description": "Se borra del borrador con todas sus partidas, y no se puede deshacer.",
         "confirm": "Borrar partida opcional"
       },
-      "price": "precio con márgenes"
+      "price": "precio con márgenes",
+      "fold": "Plegar {code}",
+      "unfold": "Desplegar {code}"
     },
     "picker": {
       "title": "Base de precios FRAMER 2026",
@@ -1902,10 +1907,9 @@
       "paymentTerm": "pago a 5 días hábiles desde el acta",
       "bothPdfs": "Los dos PDF",
       "exclusions": "Gastos no incluidos en el presupuesto",
-      "exclusion": "Exclusión {n}",
-      "removeExclusion": "Quitar la exclusión {n}",
-      "newExclusion": "Nueva exclusión.",
-      "addExclusion": "Añadir",
+      "exclusion": "Exclusión {n} de este presupuesto",
+      "removeExclusion": "Quitar la exclusión {n} de este presupuesto",
+      "addExclusion": "Añadir línea",
       "includes": "Este presupuesto sí incluye",
       "fixedEyebrow": "Textos fijos de la empresa",
       "fixed": "Garantías, documentación y contrato",
@@ -1925,6 +1929,22 @@
         "validityDays": "Validez de la oferta (días)",
         "term": "Plazo de ejecución",
         "signingPlace": "Lugar de firma"
+      },
+      "exclusionsHint": "Marca lo que este presupuesto no incluye: sale en los dos PDF. La lista es la de la empresa, común a todos los proyectos; cambiarla no cambia los presupuestos que ya la usan.",
+      "library": "Lista de la empresa",
+      "emptyLibrary": "La lista está vacía. Añade una línea y guárdala para otros proyectos.",
+      "presetLabel": "Línea {n} de la lista",
+      "editPreset": "Editar la línea {n} de la lista",
+      "removePreset": "Quitar la línea {n} de la lista",
+      "own": "Solo en este presupuesto",
+      "saveOwn": "Guardar la exclusión {n} para otros proyectos",
+      "saveForOthers": "Guardar para otros proyectos",
+      "newExclusion": "Nueva línea de gastos no incluidos",
+      "noExclusions": "Este presupuesto no excluye ningún gasto.",
+      "deletePresetDialog": {
+        "title": "¿Quitar la línea de la lista?",
+        "description": "«{label}» deja de ofrecerse en los presupuestos. Los que ya la tienen la conservan.",
+        "confirm": "Quitar de la lista"
       }
     },
     "issue": {

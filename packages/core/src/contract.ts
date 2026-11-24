@@ -9,6 +9,7 @@ export * from "./contract/files";
 export * from "./contract/obra";
 export * from "./contract/budget";
 export * from "./contract/budget-approvals";
+export * from "./contract/budget-exclusions";
 export * from "./contract/budget-overview";
 export * from "./budget-overview-rules";
 export * from "./project-filters";
@@ -41,6 +42,7 @@ export type {
 export { MAX_AMOUNT_CENTS } from "./money";
 export type { AcceptRevisionInput, BudgetChapterChangesInput, BudgetGenerationInput, BudgetLineChangesInput, BudgetOptionChangesInput, BudgetProgressInput, BudgetRevisionChangesInput, IssueRevisionInput, NewBudgetChapterInput, NewBudgetInput, NewBudgetLineInput, NewBudgetOptionInput, OptionFromLineInput, RejectRevisionInput } from "./inputs/budget";
 export type { ApprovalDecisionInput, AskApprovalInput } from "./inputs/budget-approvals";
+export type { ExclusionPresetInput } from "./inputs/budget-exclusions";
 export type { ActaPhotosInput, HitoChangesInput, HitoCheckChangesInput, HitoFileInput, HitoPaymentInput, HitoPlanInput, NewHitoCheckInput } from "./inputs/hitos";
 export type { ObraStageInput } from "./inputs/obra";
 

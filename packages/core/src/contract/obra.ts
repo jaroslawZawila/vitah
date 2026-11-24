@@ -216,5 +216,8 @@ export type ObraError =
   | "project_not_found"
   | "dependency_cycle"
   | "idempotency_key_reused"
+  | "exclusion_exists"
+  | "exclusion_library_full"
+  | "too_many_exclusions"
   | "not_found"
   | "forbidden";

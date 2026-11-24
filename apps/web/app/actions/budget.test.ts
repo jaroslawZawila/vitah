@@ -14,10 +14,13 @@ import {
   addLineAction,
   addOptionAction,
   cancelGenerationAction,
+  createExclusionPresetAction,
   createRevisionAction,
+  deleteExclusionPresetAction,
   deleteLineAction,
   deleteOptionAction,
   deleteRevisionAction,
+  getExclusionPresets,
   getGenerationAction,
   getProjectBudget,
   issueRevisionAction,
@@ -27,6 +30,7 @@ import {
   startGenerationAction,
   takeProjectDataAction,
   updateChapterAction,
+  updateExclusionPresetAction,
   updateLineAction,
   updateOptionAction,
   updateRevisionAction,
@@ -266,5 +270,53 @@ describe("budget actions", () => {
     await expect(getProjectBudget(project.id)).rejects.toEqual(NOT_FOUND);
     // The open page's poll just stops following a run that is gone.
     expect(await getGenerationAction(project.id, "nope")).toBeNull();
+  });
+});
+
+describe("the library of Gastos no incluidos", () => {
+  it("lists the template's lines, adds, edits and removes one, and ticks lines on a draft", async () => {
+    const { project, ctx } = await setup();
+    await budgetService.createBudget(ctx, project.id, {});
+    const draft = await revision(project.id);
+    const presets = await getExclusionPresets();
+    expect(presets.map((p) => p.label)).toEqual(draft.texts.exclusions);
+
+    expect(await createExclusionPresetAction(project.id, { label: "Piscina" })).toEqual({ success: true });
+    const piscina = (await getExclusionPresets()).find((p) => p.label === "Piscina")!;
+    expect(await updateExclusionPresetAction(project.id, piscina.id, { label: presets[0]!.label })).toEqual({ error: "exclusion_exists" });
+    expect(await updateExclusionPresetAction(project.id, piscina.id, { label: "Piscina y depuradora" })).toEqual({ success: true });
+    expect(await deleteExclusionPresetAction(project.id, presets[1]!.id)).toEqual({ success: true });
+    expect((await getExclusionPresets()).map((p) => p.label)).toEqual([
+      presets[0]!.label,
+      ...presets.slice(2).map((p) => p.label),
+      "Piscina y depuradora",
+    ]);
+    expect(revalidatePath).toHaveBeenCalledWith(`/dashboard/projects/${project.id}`, "layout");
+
+    // Ticking on the draft: one line at a time, with "save for other projects".
+    expect(await updateRevisionAction(project.id, draft.id, { exclusion: { text: presets[0]!.label, included: false } })).toEqual({ success: true });
+    expect(await updateRevisionAction(project.id, draft.id, { exclusion: { text: "Acometidas", included: true, save: true } })).toEqual({ success: true });
+    const exclusions = (await revision(project.id)).texts.exclusions;
+    expect(exclusions).not.toContain(presets[0]!.label);
+    expect(exclusions).toContain("Acometidas");
+    expect((await getExclusionPresets()).map((p) => p.label)).toContain("Acometidas");
+  });
+
+  it("is written by admins and managers only, each tenant its own", async () => {
+    const { project } = await setup("viewer");
+    const [preset] = await getExclusionPresets();
+    expect(await createExclusionPresetAction(project.id, { label: "x" })).toEqual({ error: "forbidden" });
+    expect(await updateExclusionPresetAction(project.id, preset!.id, { label: "x" })).toEqual({ error: "forbidden" });
+    expect(await deleteExclusionPresetAction(project.id, preset!.id)).toEqual({ error: "forbidden" });
+
+    await setup();
+    expect(await deleteExclusionPresetAction(project.id, preset!.id)).toEqual({ error: "not_found" });
+    expect(await createExclusionPresetAction(project.id, { label: " " })).toEqual({ error: "missing_fields" });
+  });
+
+  it("sends a signed-out caller to the login page", async () => {
+    signInAs(null);
+    await expect(getExclusionPresets()).rejects.toEqual(TO_LOGIN);
+    await expect(createExclusionPresetAction("p", { label: "x" })).rejects.toEqual(TO_LOGIN);
   });
 });

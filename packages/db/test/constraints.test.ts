@@ -253,6 +253,18 @@ describe("asking for an account to be deleted", () => {
   });
 });
 
+describe("the library of exclusions", () => {
+  const insert = (id: string, tenant: string, label: string) =>
+    `insert into budget_exclusion_presets (id, tenant_id, label, position) values ('${id}', '${tenant}', '${label}', 1)`;
+
+  it("holds one line of each text per tenant among those not deleted, never a blank one", async () => {
+    expect(await attempt(TREE, insert("x", "a", "Licencia de obras"))).toBe("23505");
+    expect(await attempt(TREE, insert("x", "b", "Mobiliario"))).toBeNull();
+    expect(await attempt(TREE + "update budget_exclusion_presets set deleted_at = now() where id = 'exclusion_a';", insert("x", "a", "Licencia de obras"))).toBeNull();
+    expect(await attempt(TREE, insert("x", "a", "  "))).toBe(CHECK);
+  });
+});
+
 describe("soft deletes", () => {
   const softDeleted = [
     ["projects", "project_a"],
@@ -263,6 +275,7 @@ describe("soft deletes", () => {
     ["purchase_order_documents", "order_document_a"],
     ["purchase_invoices", "invoice_a"],
     ["purchase_payments", "payment_a"],
+    ["budget_exclusion_presets", "exclusion_a"],
   ];
 
   it.each(softDeleted)("never says who deleted a row of %s that is not deleted", async (table, id) => {

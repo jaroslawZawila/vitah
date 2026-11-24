@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ANNEX_KINDS, BUDGET_QUALITIES, MAX_CHAPTER_CODE, OPTION_KINDS } from "../contract";
+import { ANNEX_KINDS, BUDGET_QUALITIES, MAX_CHAPTER_CODE, MAX_EXCLUSION_TEXT, OPTION_KINDS } from "../contract";
 import {
   basisPoints,
   calendarDate,
@@ -32,6 +32,8 @@ const MAX_QUANTITY = 1_000_000;
 const MAX_AREA_M2 = 1_000_000;
 const MAX_UNIT_PRICE_CENTS = 100_000_000;
 const MAX_BLOCKS = 50;
+/** A budget's exclusion lines at most (its `texts.exclusions`). */
+export const MAX_EXCLUSIONS = MAX_BLOCKS;
 /** Ticked review checks kept on a revision (keys of checks hidden for now stay too). */
 export const MAX_REVIEWED = 1_000;
 const MAX_REVIEW_KEY = 80;
@@ -54,7 +56,7 @@ const list = <S extends z.ZodType>(item: S) =>
 const section = <S extends z.ZodRawShape>(shape: S) =>
   z.union([z.array(z.unknown()).transform(() => ({}) as Partial<z.output<z.ZodObject<S>>>), entry(shape)]);
 
-/** A cover field or one exclusion. */
+/** A cover field. */
 const MAX_SHORT_TEXT = 2_000;
 /** A FRAMER revision's texts, partial: each section sent replaces (cover: merges into) the stored one. */
 const textsSchema = entry({
@@ -85,7 +87,7 @@ const textsSchema = entry({
       text: prose(),
     }),
   ).optional(),
-  exclusions: list(prose(MAX_SHORT_TEXT).transform((text) => text.trim()))
+  exclusions: list(prose(MAX_EXCLUSION_TEXT).transform((text) => text.trim()))
     .transform((items) => items.filter(Boolean))
     .optional(),
   includes: prose().optional(),
@@ -123,6 +125,14 @@ export const revisionChangesSchema = z.object({
   texts: textsSchema.optional(),
   exclusions: optionalText(MAX_TEXT).optional(),
   conditions: conditionsSchema.optional(),
+  // One "Gasto no incluido" ticked or not, merged with the stored list; `save` also keeps it in the tenant's
+  // library; `replaces`: the budget's line it takes the place of (edited, or its library line renamed).
+  exclusion: entry({
+    text: requiredText(MAX_EXCLUSION_TEXT),
+    included: z.boolean({ error: "invalid_input" }),
+    save: z.boolean({ error: "invalid_input" }).optional(),
+    replaces: z.string({ error: "invalid_input" }).max(MAX_EXCLUSION_TEXT, { error: "invalid_input" }).optional(),
+  }).optional(),
   review: entry({
     done: z
       .array(z.string({ error: "invalid_input" }).max(MAX_REVIEW_KEY, { error: "invalid_input" }), { error: "invalid_input" })

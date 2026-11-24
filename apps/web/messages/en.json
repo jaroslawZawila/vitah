@@ -804,7 +804,10 @@
       "already_approved": "The client already approved it: register the acceptance.",
       "approval_closed": "The request is no longer open.",
       "not_a_change": "Only changes (CAM-) can be linked, not issues.",
-      "links_frozen": "The linked changes can't be touched: the client has it to approve, or the revision is decided."
+      "links_frozen": "The linked changes can't be touched: the client has it to approve, or the revision is decided.",
+      "exclusion_exists": "The list already has a line with that text.",
+      "exclusion_library_full": "The company list is full: remove a line from the list before saving another.",
+      "too_many_exclusions": "This budget already has the most costs not included it can: remove one before adding another."
     }
   },
   "construction": {
@@ -1763,7 +1766,9 @@
         "description": "It is deleted from the draft with all its line items, and this cannot be undone.",
         "confirm": "Delete optional item"
       },
-      "price": "price with margins"
+      "price": "price with margins",
+      "fold": "Fold {code}",
+      "unfold": "Unfold {code}"
     },
     "picker": {
       "title": "FRAMER 2026 price base",
@@ -1902,10 +1907,9 @@
       "paymentTerm": "payment within 5 working days of the certificate",
       "bothPdfs": "Both PDFs",
       "exclusions": "Costs not included in the budget",
-      "exclusion": "Exclusion {n}",
-      "removeExclusion": "Remove exclusion {n}",
-      "newExclusion": "New exclusion.",
-      "addExclusion": "Add",
+      "exclusion": "Exclusion {n} of this budget",
+      "removeExclusion": "Remove exclusion {n} from this budget",
+      "addExclusion": "Add line",
       "includes": "This budget does include",
       "fixedEyebrow": "Standard company texts",
       "fixed": "Guarantees, documentation and contract",
@@ -1925,6 +1929,22 @@
         "validityDays": "Offer validity (days)",
         "term": "Execution period",
         "signingPlace": "Place of signing"
+      },
+      "exclusionsHint": "Tick what this budget doesn't include: it is printed in both PDFs. The list is the company's, shared by every project; changing it doesn't change the budgets that already use it.",
+      "library": "Company list",
+      "emptyLibrary": "The list is empty. Add a line and save it for other projects.",
+      "presetLabel": "Line {n} of the list",
+      "editPreset": "Edit line {n} of the list",
+      "removePreset": "Remove line {n} from the list",
+      "own": "This budget only",
+      "saveOwn": "Save exclusion {n} for other projects",
+      "saveForOthers": "Save for other projects",
+      "newExclusion": "New line of costs not included",
+      "noExclusions": "This budget excludes no costs.",
+      "deletePresetDialog": {
+        "title": "Remove the line from the list?",
+        "description": "“{label}” is no longer offered on budgets. Those that have it keep it.",
+        "confirm": "Remove from the list"
       }
     },
     "issue": {
